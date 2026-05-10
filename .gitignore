@@ -3,3 +3,5 @@ __pycache__/
 *.pyc
 badge/.badge_state/**
 gh_badge
+.venv/
+firmware/*.bin
