@@ -15,6 +15,19 @@ Goal: validate the full feature set (display, touch, buttons, IR TX/RX, corner L
 | 1.1 | [ESP32-S3-DevKitC-1-N16R8 (OceanLabz)](https://www.amazon.in/OceanLabz-ESP32-S3-DevKit-N16R8-MicroPython-Unsoldered/dp/B0F9XB91XG) | 1 | **N16R8 variant only** — 16MB flash + 8MB octal PSRAM, dual USB-C (UART + native OTG), PCB antenna, headers unsoldered. Datasheets: [ESP32-S3 chip](https://www.espressif.com/sites/default/files/documentation/esp32-s3_datasheet_en.pdf) · [WROOM-1 module](https://www.espressif.com/sites/default/files/documentation/esp32-s3-wroom-1_wroom-1u_datasheet_en.pdf) · [DevKitC-1 pinout (RNT)](https://randomnerdtutorials.com/esp32-s3-devkitc-pinout-guide/) |
 | 1.2 | USB-C to USB-A (or USB-C) cable, data-capable | 1 | Some cables are charge-only. Confirm data lines work — needed for flashing + USB-MSC. |
 
+### 1.a Dual USB-C port reference
+
+The DevKitC-1 has **two** USB-C ports — they are not interchangeable:
+
+| Silkscreen | Internal path | Linux device | Use for |
+|---|---|---|---|
+| **UART** | USB → CP2102 bridge → UART0 (GPIO43 TX / GPIO44 RX) | `/dev/ttyUSB0` | Flashing + `Serial.print` during bring-up. Auto-reset is bulletproof. |
+| **USB** | USB → ESP32-S3 native USB-OTG peripheral (GPIO19/20) | `/dev/ttyACM0` | USB-CDC, USB-MSC (mount as drive), USB-HID (keyboard mode), DFU. |
+
+**Default during development:** flash via the **UART** port. Reserve the **USB** port for the badge's user-facing USB features so a firmware crash on the CDC stack doesn't take your debug serial down with it.
+
+**What is UART vs USB?** UART is a 2-wire async serial protocol (TX/RX, agreed baud rate, 3.3V TTL) implemented as a peripheral inside the chip. USB is a complex packet-based bus with enumeration and device classes; the S3 has a native USB peripheral so it can speak it directly. The UART port relies on a CP2102 bridge chip that converts USB↔UART for the PC.
+
 ---
 
 ## 2. Display
