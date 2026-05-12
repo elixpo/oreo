@@ -1,4 +1,4 @@
-"""Auto-generated status icon — bluetooth. Re-run tools/optimize_assets.py."""
+"""Auto-generated bitmap — do not edit. Re-run tools/optimize_assets.py."""
 W = 13
 H = 13
 DATA = (
