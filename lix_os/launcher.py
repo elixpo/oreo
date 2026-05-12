@@ -118,37 +118,24 @@ def show_crash(os_obj, name, err):
         time.sleep_ms(20)
 
 
-# ── app menu (icon grid) ──────────────────────────────────────────────────────
-
-_ICON_PALETTE = [
-    api.rgb(255, 80, 200),
-    api.rgb(0, 200, 255),
-    api.rgb(255, 160, 0),
-    api.rgb(120, 220, 80),
-    api.rgb(200, 80, 255),
-    api.rgb(255, 120, 60),
-    api.rgb(60, 200, 200),
-    api.rgb(220, 220, 60),
-]
-
+# ── app menu (icon grid) — 320×240 landscape ──────────────────────────────────
 
 class _AppMenu:
-    """Scrollable app selector with coloured icon tiles."""
+    """4-column icon grid. Icons only — no tile boxes. Faint border on select.
+    All 4 nav directions wrap around circularly."""
 
-    COLS    = 2
-    TILE_W  = 100
-    TILE_H  = 80
-    GAP     = 8
-    HEADER  = 30
+    COLS    = 4
+    ICON_SZ = 48    # display size for each icon (px)
+    GAP_X   = 20
+    GAP_Y   = 18
+    HEADER  = 28
+    SEL_PAD = 4     # padding around selected icon for the border
 
     def __init__(self, apps):
-        self.apps    = apps
-        self.sel     = 0
-        self._dirty  = True
-        self._os     = None
-        self._scroll = 0   # pixel scroll offset (future: smooth scroll)
-
-    # --- lifecycle -----------------------------------------------------------
+        self.apps   = apps
+        self.sel    = 0
+        self._dirty = True
+        self._os    = None
 
     def on_enter(self, os_obj):
         self._os    = os_obj
@@ -157,18 +144,28 @@ class _AppMenu:
     def on_exit(self):
         pass
 
+    def _move(self, delta_col, delta_row):
+        n    = len(self.apps)
+        if not n: return
+        cols = self.COLS
+        rows = (n + cols - 1) // cols
+        col  = self.sel % cols
+        row  = self.sel // cols
+
+        new_col = (col + delta_col) % cols
+        new_row = (row + delta_row) % rows
+        new_sel = new_row * cols + new_col
+        # if last row is partial, clamp to last item
+        self.sel = min(new_sel, n - 1)
+        self._dirty = True
+
     def on_button_press(self, btn):
         n = len(self.apps)
-        if not n:
-            return
-        if btn == api.BTN_LEFT and self.sel % self.COLS > 0:
-            self.sel -= 1;  self._dirty = True
-        elif btn == api.BTN_RIGHT and self.sel % self.COLS < self.COLS - 1 and self.sel + 1 < n:
-            self.sel += 1;  self._dirty = True
-        elif btn == api.BTN_UP and self.sel >= self.COLS:
-            self.sel -= self.COLS;  self._dirty = True
-        elif btn == api.BTN_DOWN and self.sel + self.COLS < n:
-            self.sel += self.COLS;  self._dirty = True
+        if not n: return
+        if   btn == api.BTN_LEFT:  self._move(-1,  0)
+        elif btn == api.BTN_RIGHT: self._move( 1,  0)
+        elif btn == api.BTN_UP:    self._move( 0, -1)
+        elif btn == api.BTN_DOWN:  self._move( 0,  1)
         elif btn == api.BTN_A:
             self._os.launch(self.apps[self.sel]["dir"])
 
@@ -179,63 +176,72 @@ class _AppMenu:
         pass
 
     def draw(self, d):
+        from lix_os import theme
         if not self._dirty:
             return
 
-        BG  = api.rgb(8, 8, 20)
-        d.clear(BG)
+        SW = api.SCREEN_W
+        SH = api.SCREEN_H
 
-        # header
-        d.rect(0, 0, api.SCREEN_W, self.HEADER, api.rgb(0, 180, 160), fill=True)
-        d.text("APPS", 8, 9, api.BLACK, scale=2)
-        d.text(VERSION, api.SCREEN_W - 44, 11, api.BLACK)
+        d.clear(theme.BG)
+
+        # ── header ────────────────────────────────────────────────────────
+        d.rect(0, 0, SW, self.HEADER, theme.STATUS_BG, fill=True)
+        title = "APPS"
+        tx = (SW - len(title) * 8 * 2) // 2
+        d.text(title, tx, (self.HEADER - 16) // 2, api.WHITE, scale=2)
 
         if not self.apps:
-            d.text("no apps found", 20, 160, api.WHITE, scale=2)
+            d.text("no apps found", 40, SH // 2, theme.MUTED, scale=2)
             self._dirty = False
             return
 
-        # icon grid
-        x0 = (api.SCREEN_W - (self.COLS * self.TILE_W + (self.COLS - 1) * self.GAP)) // 2
+        # ── icon grid (centred) ───────────────────────────────────────────
+        cols    = self.COLS
+        n       = len(self.apps)
+        rows    = (n + cols - 1) // cols
+        cell_w  = self.ICON_SZ + self.GAP_X
+        cell_h  = self.ICON_SZ + self.GAP_Y
+
+        grid_w  = cols * self.ICON_SZ + (cols - 1) * self.GAP_X
+        grid_h  = rows * self.ICON_SZ + (rows - 1) * self.GAP_Y
+        avail_h = SH - self.HEADER
+        x0      = (SW - grid_w) // 2
+        y0      = self.HEADER + (avail_h - grid_h) // 2
 
         for i, app in enumerate(self.apps):
-            col = i % self.COLS
-            row = i // self.COLS
-            tx  = x0 + col * (self.TILE_W + self.GAP)
-            ty  = self.HEADER + self.GAP + row * (self.TILE_H + self.GAP)
-
-            ic  = _ICON_PALETTE[i % len(_ICON_PALETTE)]
+            col = i % cols
+            row = i // cols
+            tx  = x0 + col * cell_w
+            ty  = y0 + row * cell_h
             sel = (i == self.sel)
 
-            tile_bg = api.rgb(25, 25, 45) if not sel else api.rgb(0, 50, 45)
-            d.rect(tx, ty, self.TILE_W, self.TILE_H, tile_bg, fill=True)
-            border_c = ic if sel else api.rgb(40, 40, 70)
-            d.rect(tx, ty, self.TILE_W, self.TILE_H, border_c, fill=False)
+            # No background tile — icon stands alone
+            if sel:
+                d.rect(tx - self.SEL_PAD, ty - self.SEL_PAD,
+                       self.ICON_SZ + self.SEL_PAD * 2,
+                       self.ICON_SZ + self.SEL_PAD * 2,
+                       theme.SEL_BORDER, fill=False)
 
-            # Icon: try PNG, fall back to letter tile
+            # Load icon from asset pipeline
             icon_data = None
             if app.get("icon"):
                 from lix_os import icons as _icons
                 result = _icons.load(app["dir"], app["icon"])
                 if result:
                     icon_data = result
+
             if icon_data:
                 idata, iw, ih = icon_data
-                ix = tx + (self.TILE_W - iw) // 2
-                iy = ty + 8
-                d.blit(idata, ix, iy, iw, ih)
+                bx = tx + (self.ICON_SZ - iw) // 2
+                by = ty + (self.ICON_SZ - ih) // 2
+                d.blit(idata, bx, by, iw, ih)
             else:
-                d.rect(tx + 30, ty + 8, 40, 36, ic, fill=True)
-                d.text(app["name"][0].upper(), tx + 38, ty + 13, api.BLACK, scale=4)
-
-            # Selection glow on bottom border
-            if sel:
-                d.rect(tx + 4, ty + self.TILE_H - 3, self.TILE_W - 8, 3, ic, fill=True)
-
-        # footer hint
-        foot_y = api.SCREEN_H - 18
-        d.rect(0, foot_y, api.SCREEN_W, 18, api.rgb(10, 10, 20), fill=True)
-        d.text("arrows  nav     A  open", 8, foot_y + 4, api.rgb(100, 100, 130))
+                # Letter fallback (only until icon is generated & optimised)
+                letter_c = [theme.PRIMARY, theme.TEAL, theme.GOLD,
+                             theme.ORANGE, theme.PURPLE, theme.GREEN]
+                lc = letter_c[i % len(letter_c)]
+                d.text(app["name"][0].upper(), tx + 8, ty + 8, lc, scale=4)
 
         self._dirty = False
 

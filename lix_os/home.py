@@ -1,169 +1,125 @@
-"""Elixpo OS — home screen.
+"""Elixpo OS — home screen, 320×240 landscape, celebration theme.
 
-Layout (240×320):
-  ┌─ status bar (h=22) ─────────────────────────────────┐
-  │  HH:MM    [wifi] [bt] [bat]                          │
-  ├─────────────────────────────────────────────────────-┤
-  │          mascot (72×72)    vertically centered       │
-  │           HH:MM  scale=3                             │
-  │          Day DD Mon YYYY                             │
-  ├──────────────────────────────────────────────────────┤
-  │               [APPS]  (dock, centered)               │  y=264
-  └──────────────────────────────────────────────────────┘
+Layout:
+  ┌─ status bar h=22 (pink bar) ───────────────────────────────┐
+  │  [wifi] [bt] [bat]                              17:06       │
+  ├────────────────────────────────────────────────────────────┤
+  │  (home_bg asset, warm jungle/celebration bg)               │
+  │                                                            │
+  │          17:06       (scale=4, dark text, centred)         │
+  │       Tue 12 May 2026  (centred)                           │
+  │                                                            │
+  ├────────────────────────────────────────────────────────────┤
+  │            [APPS icon]   (cream dock, centred)             │
+  └────────────────────────────────────────────────────────────┘
 
-Navigation:  LEFT/RIGHT cycle dock (wraps), A to open.
+Nav: LEFT/RIGHT wrap, A to open.
 """
 
 import time
 from lix import api
-from lix_os import timeutil
+from lix_os import theme, timeutil
 import lix
 
-# ── palette ──────────────────────────────────────────────────────────────────
-
-BG       = api.rgb(14, 12, 20)        # warm near-black (panda shadow)
-BG2      = api.rgb(22, 18, 30)        # card background
-PRIMARY  = api.rgb(255, 93, 104)      # panda cheek pink — main accent
-ACCENT   = api.rgb(255, 200, 60)      # warm gold (badge E colour)
-MUTED    = api.rgb(120, 100, 130)     # warm muted purple
-MUTED2   = api.rgb(70, 58, 80)        # dimmer muted
-STATUS   = api.rgb(10, 8, 16)         # status bar dark
-DOCK_BG  = api.rgb(18, 14, 26)        # dock dark
-DOCK_SEL = api.rgb(60, 20, 28)        # dock selection warm dark
-WHITE    = api.WHITE
-CLK_COL  = api.rgb(235, 228, 240)     # soft near-white for clock digits (panda fur)
-
-# ── layout constants ─────────────────────────────────────────────────────────
+SW = api.SCREEN_W   # 320
+SH = api.SCREEN_H   # 240
 
 _STATUS_H = 22
-_DOCK_H   = 56
-_DOCK_Y   = api.SCREEN_H - _DOCK_H        # 264
-_MAIN_TOP = _STATUS_H                      # 22
-_MAIN_H   = _DOCK_Y - _MAIN_TOP           # 242
+_DOCK_H   = 44
+_DOCK_Y   = SH - _DOCK_H        # 196
+_MAIN_TOP = _STATUS_H            # 22
+_MAIN_H   = _DOCK_Y - _MAIN_TOP  # 174
 
-_MASCOT_W = 72
-_MASCOT_H = 72
+# Clock block: 32px (HH:MM scale=4) + 8 gap + 8 (date) = 48px, centred
+_CLOCK_Y = _MAIN_TOP + (_MAIN_H - 48) // 2   # ≈ 85
+_DATE_Y  = _CLOCK_Y + 32 + 8                  # ≈ 125
 
-# Content block: mascot(72) + gap(8) + clock(24) + gap(6) + date(8) = 118px
-# Centre that block in _MAIN_H (242px)
-_BLOCK_H    = _MASCOT_H + 8 + 24 + 6 + 8   # 118
-_BLOCK_TOP  = _MAIN_TOP + (_MAIN_H - _BLOCK_H) // 2   # ≈84
+# ── asset loaders (pipeline only — no procedural fallback drawing) ─────────────
 
-_MASCOT_X = (api.SCREEN_W - _MASCOT_W) // 2   # 84
-_MASCOT_Y = _BLOCK_TOP                          # ≈84
+_bg_cache   = None
+_apps_cache = None
 
-_CLOCK_Y  = _MASCOT_Y + _MASCOT_H + 8          # ≈164
-_DATE_Y   = _CLOCK_Y + 24 + 6                  # ≈194
 
-# ── mascot loader (cached, PIL-friendly) ──────────────────────────────────────
-
-_mascot_cache = None
-
-def _load_mascot():
-    global _mascot_cache
-    if _mascot_cache is not None:
-        return _mascot_cache if _mascot_cache is not False else None
-    # 1. pre-converted module
+def _load_bg():
+    global _bg_cache
+    if _bg_cache is not None:
+        return _bg_cache if _bg_cache is not False else None
     try:
-        import assets.mascot as m
-        _mascot_cache = (m.DATA, m.W, m.H)
-        return _mascot_cache
+        import assets.icons.home_bg as m
+        _bg_cache = (m.DATA, m.W, m.H)
+        return _bg_cache
     except (ImportError, AttributeError):
         pass
-    # 2. PIL runtime load
     try:
         from PIL import Image
         import struct
-        img = Image.open("asset/mascot.png").convert("RGBA").resize(
-            (_MASCOT_W, _MASCOT_H), Image.LANCZOS)
-        bg = Image.new("RGBA", (_MASCOT_W, _MASCOT_H), (8, 8, 20, 255))
+        img = Image.open("asset/icons/home_bg.png").convert("RGBA")
+        img = img.resize((80, 60), Image.LANCZOS)
+        bg  = Image.new("RGBA", (80, 60),
+                        (theme.BG_R, theme.BG_G, theme.BG_B, 255))
         bg.paste(img, mask=img.split()[3])
         rgb = bg.convert("RGB")
-        px = rgb.load()
+        px  = rgb.load()
         words = []
-        for y in range(_MASCOT_H):
-            for x in range(_MASCOT_W):
+        for y in range(60):
+            for x in range(80):
                 r, g, b = px[x, y]
                 words.append(((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3))
         data = struct.pack(">%dH" % len(words), *words)
-        _mascot_cache = (data, _MASCOT_W, _MASCOT_H)
-        return _mascot_cache
+        _bg_cache = (data, 80, 60)
+        return _bg_cache
     except Exception:
-        pass
-    _mascot_cache = False
+        _bg_cache = False
     return None
 
 
-# ── icon loader (for dock) ────────────────────────────────────────────────────
-
-def _load_icon(app_dir, icon_filename=None):
+def _load_apps_icon():
+    global _apps_cache
+    if _apps_cache is not None:
+        return _apps_cache if _apps_cache is not False else None
     from lix_os.icons import load
-    return load(app_dir, icon_filename)
+    result = load("apps", "apps_icon.png")
+    _apps_cache = result if result else False
+    return result
 
 
 # ── status bar icons ──────────────────────────────────────────────────────────
 
 def _icon_wifi(d, x, y):
-    c = PRIMARY
-    d.rect(x + 5, y + 9,  3, 2, c, fill=True)   # dot
-    d.rect(x + 2, y + 6,  9, 2, c, fill=True)   # inner arc
-    d.rect(x,     y + 3, 13, 2, c, fill=True)   # outer arc
+    c = api.WHITE
+    d.rect(x + 5, y + 9,  3, 2, c, fill=True)
+    d.rect(x + 2, y + 6,  9, 2, c, fill=True)
+    d.rect(x,     y + 3, 13, 2, c, fill=True)
 
 
 def _icon_bt(d, x, y):
-    c = api.rgb(80, 140, 255)
-    # Vertical stem
+    c = api.WHITE
     d.rect(x + 2, y,      2, 12, c, fill=True)
-    # Upper B bulge: top bar + right side + middle bar
-    d.rect(x + 4, y,      4,  2, c, fill=True)   # top
-    d.rect(x + 8, y + 2,  2,  2, c, fill=True)   # upper right
-    d.rect(x + 4, y + 5,  4,  2, c, fill=True)   # middle (shorter reach)
-    # Lower B bulge: middle bar + right side + bottom bar
-    d.rect(x + 9, y + 7,  1,  3, c, fill=True)   # lower right (wider curve)
-    d.rect(x + 4, y + 10, 4,  2, c, fill=True)   # bottom
-    # Crossing arms (the diagonal lines of the BT logo)
-    d.rect(x,     y + 1,  2,  2, c, fill=True)   # upper-left arm
-    d.rect(x,     y + 9,  2,  2, c, fill=True)   # lower-left arm
+    d.rect(x + 4, y,      4,  2, c, fill=True)
+    d.rect(x + 8, y + 2,  2,  2, c, fill=True)
+    d.rect(x + 4, y + 5,  4,  2, c, fill=True)
+    d.rect(x + 9, y + 7,  1,  3, c, fill=True)
+    d.rect(x + 4, y + 10, 4,  2, c, fill=True)
+    d.rect(x,     y + 1,  2,  2, c, fill=True)
+    d.rect(x,     y + 9,  2,  2, c, fill=True)
 
 
 def _icon_battery(d, x, y, pct=85):
-    fc = api.rgb(100, 220, 80) if pct > 30 else api.rgb(255, 80, 80)
-    d.rect(x, y, 20, 10, MUTED, fill=False)
-    d.rect(x + 20, y + 3, 2, 4, MUTED, fill=True)
+    fc = api.WHITE
+    d.rect(x, y, 20, 10, api.WHITE, fill=False)
+    d.rect(x + 20, y + 3, 2, 4, api.WHITE, fill=True)
     filled = max(1, int((pct / 100) * 18))
     d.rect(x + 1, y + 1, filled, 8, fc, fill=True)
-
-
-# ── dot grid background ───────────────────────────────────────────────────────
-
-def _draw_grid(d):
-    dot = api.rgb(18, 18, 38)
-    for gy in range(24, _DOCK_Y, 18):
-        for gx in range(6, 240, 18):
-            d.pixel(gx, gy, dot)
-
-
-# ── apps icon (2×2 grid of squares) ──────────────────────────────────────────
-
-def _draw_apps_icon(d, x, y, size=14):
-    cell = (size - 4) // 3   # 3 cells + 2 gaps of 2px each
-    gap  = 2
-    for row in range(3):
-        for col in range(3):
-            rx = x + col * (cell + gap)
-            ry = y + row * (cell + gap)
-            d.rect(rx, ry, cell, cell, PRIMARY, fill=True)
 
 
 # ── dock entry ────────────────────────────────────────────────────────────────
 
 class _DockEntry:
-    __slots__ = ("label", "action", "icon_file", "color")
-    def __init__(self, label, action, icon_file=None, color=None):
+    __slots__ = ("label", "action", "icon_file")
+    def __init__(self, label, action, icon_file=None):
         self.label     = label
         self.action    = action
         self.icon_file = icon_file
-        self.color     = color or PRIMARY
 
 
 # ── Home app ─────────────────────────────────────────────────────────────────
@@ -173,7 +129,7 @@ class Home(lix.App):
 
     def __init__(self, app_list):
         self._apps     = app_list
-        self._dock     = []
+        self._dock     = [_DockEntry("APPS", "__appmenu__", "apps_icon.png")]
         self._dock_sel = 0
         self._dirty    = True
         self._last_sec = -1
@@ -181,13 +137,7 @@ class Home(lix.App):
 
     def on_enter(self, os):
         super().on_enter(os)
-        self._build_dock()
         self._dirty = True
-
-    def _build_dock(self):
-        # Only APPS entry on the home dock — single centred button
-        self._dock = [_DockEntry("APPS", "__appmenu__", color=PRIMARY)]
-        self._dock_sel = 0
 
     def on_button_press(self, btn):
         n = len(self._dock)
@@ -214,83 +164,91 @@ class Home(lix.App):
         h, m, s, wd, day, mon, yr = timeutil.now()
 
         # ── background ────────────────────────────────────────────────────
-        d.clear(BG)
-        _draw_grid(d)
+        d.clear(theme.BG)   # warm ivory fallback
 
-        # Soft card behind main content area
-        d.rect(10, _MAIN_TOP + 2, api.SCREEN_W - 20, _DOCK_Y - _MAIN_TOP - 4,
-               BG2, fill=True)
+        bg = _load_bg()
+        if bg:
+            data, bw, bh = bg
+            # Draw bg scaled 4× to fill main area
+            d.blit_scale(data, 0, _MAIN_TOP, bw, bh, 4)
 
         # ── status bar ────────────────────────────────────────────────────
-        d.rect(0, 0, api.SCREEN_W, _STATUS_H, STATUS, fill=True)
-        d.rect(0, _STATUS_H - 1, api.SCREEN_W, 1, PRIMARY, fill=True)
+        d.rect(0, 0, SW, _STATUS_H, theme.STATUS_BG, fill=True)
+
+        _icon_wifi   (d,  6, 5)
+        _icon_bt     (d, 26, 4)
+        _icon_battery(d, 46, 6, pct=85)
 
         time_str = "%02d:%02d" % (h, m)
-        d.text(time_str, 4, 7, WHITE)
+        tx = SW - len(time_str) * 8 - 6
+        d.text(time_str, tx, 7, api.WHITE)
 
-        _icon_wifi   (d, 181,      5)
-        _icon_bt     (d, 181 + 17, 5)
-        _icon_battery(d, 181 + 33, 6, pct=85)
+        # ── hero clock ────────────────────────────────────────────────────
+        char_w  = 8 * 4                   # 32px per char at scale=4
+        total_w = 5 * char_w              # 160px for "HH:MM"
+        cx      = (SW - total_w) // 2     # 80
 
-        # ── mascot ────────────────────────────────────────────────────────
-        mascot = _load_mascot()
-        if mascot:
-            data, mw, mh = mascot
-            d.blit(data, _MASCOT_X, _MASCOT_Y, mw, mh)
-        else:
-            from lix_os.panda import draw_panda
-            draw_panda(d, _MASCOT_X + 6, _MASCOT_Y + 2, ps=3)
+        colon_c = theme.TEXT_BRIGHT if self._blink else theme.MUTED
 
-        # ── hero clock — "HH:MM" scale=3, 120px wide, centered ────────────
-        clock_str = "%02d:%02d" % (h, m)
-        colon_c   = CLK_COL if self._blink else MUTED2
-        # Draw HH, blink colon, MM separately
-        char_w = 8 * 3   # 24px per char at scale=3
-        total_w = 5 * char_w   # "HH:MM" = 5 chars × 24px = 120px
-        cx = (api.SCREEN_W - total_w) // 2   # 60
+        d.text("%02d" % h, cx,              _CLOCK_Y, theme.TEXT_BRIGHT, scale=4)
+        d.text(":",        cx + 2 * char_w, _CLOCK_Y, colon_c,           scale=4)
+        d.text("%02d" % m, cx + 3 * char_w, _CLOCK_Y, theme.TEXT_BRIGHT, scale=4)
 
-        d.text("%02d" % h, cx,              _CLOCK_Y, CLK_COL, scale=3)
-        d.text(":",        cx + 2 * char_w, _CLOCK_Y, colon_c, scale=3)
-        d.text("%02d" % m, cx + 3 * char_w, _CLOCK_Y, CLK_COL, scale=3)
-
-        # ── date — "Wed 12 May 2026" centered ────────────────────────────
+        # ── date ──────────────────────────────────────────────────────────
         date_str = "%s %d %s %d" % (wd, day, mon, yr)
-        date_px  = len(date_str) * 8
-        date_x   = max(2, (api.SCREEN_W - date_px) // 2)
-        d.text(date_str, date_x, _DATE_Y, MUTED)
+        dx = max(0, (SW - len(date_str) * 8) // 2)
+        d.text(date_str, dx, _DATE_Y, theme.MUTED)
 
         # ── dock ──────────────────────────────────────────────────────────
-        d.rect(0, _DOCK_Y, api.SCREEN_W, _DOCK_H, DOCK_BG, fill=True)
-        d.rect(0, _DOCK_Y, api.SCREEN_W, 1, PRIMARY, fill=True)
+        d.rect(0, _DOCK_Y, SW, _DOCK_H, theme.DOCK_BG, fill=True)
+        d.rect(0, _DOCK_Y, SW, 1, theme.PRIMARY, fill=True)
 
-        TILE_W = 52
-        TILE_H = 42
-        n      = len(self._dock)
-        gap    = 10
-        total  = n * TILE_W + (n - 1) * gap
-        ix     = (api.SCREEN_W - total) // 2
-        iy     = _DOCK_Y + (_DOCK_H - TILE_H) // 2
+        ICON_SZ  = 32
+        TILE_PAD = 4
+        n        = len(self._dock)
+        gap      = 20
+        total    = n * ICON_SZ + (n - 1) * gap
+        ix       = (SW - total) // 2
+        iy       = _DOCK_Y + (_DOCK_H - ICON_SZ) // 2
 
         for i, entry in enumerate(self._dock):
-            sel    = (i == self._dock_sel)
-            tile_c = DOCK_SEL if sel else api.rgb(22, 22, 44)
-            d.rect(ix, iy, TILE_W, TILE_H, tile_c, fill=True)
+            sel = (i == self._dock_sel)
             if sel:
-                d.rect(ix, iy, TILE_W, TILE_H, entry.color, fill=False)
-                d.rect(ix + 3, _DOCK_Y + _DOCK_H - 5, TILE_W - 6, 3,
-                       entry.color, fill=True)
+                d.rect(ix - TILE_PAD, iy - TILE_PAD,
+                       ICON_SZ + TILE_PAD * 2, ICON_SZ + TILE_PAD * 2,
+                       theme.SEL_BORDER, fill=False)
 
             if entry.action == "__appmenu__":
-                _draw_apps_icon(d, ix + (TILE_W - 14) // 2 - 1, iy + (TILE_H - 14) // 2 - 1, size=14)
-            else:
-                icon = _load_icon(entry.action, entry.icon_file)
+                icon = _load_apps_icon()
                 if icon:
                     idata, iw, ih = icon
-                    d.blit(idata, ix + (TILE_W - iw) // 2, iy + 3, iw, ih)
+                    d.blit(idata, ix + (ICON_SZ - iw) // 2,
+                           iy + (ICON_SZ - ih) // 2, iw, ih)
                 else:
-                    d.rect(ix + 14, iy + 4, 24, 20, entry.color, fill=True)
-                    d.text(entry.label[0], ix + 18, iy + 7, api.BLACK, scale=2)
+                    _draw_grid_fallback(d, ix + 2, iy + 2, ICON_SZ - 4)
+            else:
+                from lix_os.icons import load as _load
+                icon = _load(entry.action, entry.icon_file)
+                if icon:
+                    idata, iw, ih = icon
+                    d.blit(idata, ix + (ICON_SZ - iw) // 2,
+                           iy + (ICON_SZ - ih) // 2, iw, ih)
 
-            ix += TILE_W + gap
+            ix += ICON_SZ + gap
 
         self._dirty = False
+
+
+def _draw_grid_fallback(d, x, y, size):
+    """3×3 squares — shown only until apps_icon.png is generated & optimised."""
+    cell = (size - 4) // 3
+    gap  = 2
+    cols = [theme.PRIMARY, theme.TEAL,  theme.GOLD,
+            theme.TEAL,    theme.ORANGE, theme.PRIMARY,
+            theme.GOLD,    theme.PRIMARY, theme.PURPLE]
+    i = 0
+    for row in range(3):
+        for col in range(3):
+            d.rect(x + col * (cell + gap), y + row * (cell + gap),
+                   cell, cell, cols[i % len(cols)], fill=True)
+            i += 1

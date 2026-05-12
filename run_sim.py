@@ -36,43 +36,25 @@ from lix_os.splash   import show_splash
 from lix_os.home     import Home
 from lix_os          import launcher
 
-WINDOW_TITLE = "Elixpo Badge Simulator"
+WINDOW_TITLE = "Elixpo Badge Simulator — 320×240"
 FPS_CAP      = 60
-BADGE_W      = api.SCREEN_W * SCALE
-BADGE_H      = api.SCREEN_H * SCALE
-BORDER       = 20
-LEGEND_H     = 110
-WIN_W        = BADGE_W + BORDER * 2
-WIN_H        = BADGE_H + BORDER * 2 + LEGEND_H
-
-_KEY_LABELS = [
-    ("Esc", "HOME"),
-    ("Arrows", "D-Pad"),
-    ("Z / ↵", "A"),
-    ("X", "B"),
-    ("C", "C"),
-]
+BADGE_W      = api.SCREEN_W * SCALE   # 640
+BADGE_H      = api.SCREEN_H * SCALE   # 480
+BORDER       = 16
+WIN_W        = BADGE_W + BORDER * 2   # 672
+WIN_H        = BADGE_H + BORDER * 2 + 18   # 18px for fps line
 
 
 def _draw_chrome(win, badge_surf, legend_font, fps):
-    win.fill((14, 14, 26))
-    # bezel
-    pygame.draw.rect(win, (40, 40, 60),
-                     (BORDER - 6, BORDER - 6, BADGE_W + 12, BADGE_H + 12),
-                     border_radius=8)
+    win.fill((245, 238, 225))   # warm cream frame matching badge bg
+    # bezel shadow
+    pygame.draw.rect(win, (200, 180, 160),
+                     (BORDER - 4, BORDER - 4, BADGE_W + 8, BADGE_H + 8),
+                     border_radius=6)
     win.blit(badge_surf, (BORDER, BORDER))
-    # FPS counter
-    fps_s = legend_font.render("%.0f fps" % fps, True, (60, 60, 90))
-    win.blit(fps_s, (BORDER, BORDER + BADGE_H + 4))
-    # key legend
-    lx = BORDER
-    ly = BORDER + BADGE_H + 20
-    for key, label in _KEY_LABELS:
-        pygame.draw.rect(win, (30, 30, 50), (lx, ly, 96, 44), border_radius=6)
-        pygame.draw.rect(win, (0, 160, 140), (lx, ly, 96, 44), 1, border_radius=6)
-        win.blit(legend_font.render(key,   True, (220, 220, 220)), (lx + 48 - legend_font.size(key)[0]   // 2, ly + 6))
-        win.blit(legend_font.render(label, True, (100, 100, 140)), (lx + 48 - legend_font.size(label)[0] // 2, ly + 26))
-        lx += 108
+    fps_s = legend_font.render("%.0f fps  |  Arrows=nav  Z/Enter=A  Esc=HOME" % fps,
+                                True, (160, 120, 100))
+    win.blit(fps_s, (BORDER, BORDER + BADGE_H + 3))
 
 
 def _run_app(os_obj, buttons, app, badge_surf, win, clock, legend_font):
