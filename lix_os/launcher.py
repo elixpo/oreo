@@ -14,9 +14,26 @@ from lix_hw.os import OS
 
 
 VERSION       = "v0.1"
-APPS_DIR      = "/apps"
 SPLASH_MS     = 1500
 FRAME_MIN_MS  = 16   # cap frame rate ~60fps even if hardware can do more
+
+# Candidate locations for /apps. When the badge is flashed directly the project
+# lives at root ("/apps"). When developing via `mpremote mount .` the laptop
+# directory is exposed at "/remote", so apps appear at "/remote/apps".
+_APPS_CANDIDATES = ("/apps", "/remote/apps", "apps")
+
+
+def _find_apps_dir():
+    for d in _APPS_CANDIDATES:
+        try:
+            _os.stat(d)
+            return d
+        except OSError:
+            continue
+    return None
+
+
+APPS_DIR = _find_apps_dir() or "/apps"
 
 
 # ----------------------------- splash --------------------------------------
