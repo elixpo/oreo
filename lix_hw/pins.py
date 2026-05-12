@@ -1,0 +1,44 @@
+"""GPIO assignments for the Lix badge breadboard prototype.
+
+Single source of truth. Every hardware module imports from here — never hardcode a
+GPIO number anywhere else. When the PCB swaps pins, this is the only file to edit.
+"""
+
+# ----- Display: SmartElex 2.0" IPS, ST7789P3, 4-wire SPI -----
+# Module silkscreen → our name:  CS=CS, RST=RESET, DC=DC, SDA=MOSI, SCL=SCK, EN=BL
+# Power: VCC → DevKit 5V pin (module has onboard 3V3 LDO). TE pin left disconnected.
+DISPLAY_CS    = 14
+DISPLAY_RESET = 16
+DISPLAY_DC    = 15
+DISPLAY_MOSI  = 11     # display silkscreen: SDA
+DISPLAY_SCK   = 12     # display silkscreen: SCL
+DISPLAY_BL    = 17     # display silkscreen: EN. Active-high, PWM-capable for brightness
+DISPLAY_BAUD  = 40_000_000  # 40MHz SPI — ST7789P3 max is 62.5MHz, 40 is safe on breadboard
+
+# ----- Buttons (active-low, internal pull-up) -----
+BTN_HOME   = 9
+BTN_A      = 10
+BTN_B      = 13
+BTN_C      = 8
+BTN_UP     = 4
+BTN_DOWN   = 5
+BTN_LEFT   = 6
+BTN_RIGHT  = 7
+
+# ----- Corner LEDs (LEDC PWM via 470Ω) -----
+LED_TL = 38   # top-left
+LED_TR = 39   # top-right
+LED_BL = 40   # bottom-left
+LED_BR = 41   # bottom-right
+
+# ----- Status NeoPixel (onboard WS2812) -----
+LED_STATUS = 48
+
+# ----- IR subsystem -----
+# Reassigned from BOM's original GPIO48 because that pin is the onboard NeoPixel.
+# Picked from the unused pool: 2, 18, 21, 42, 47.
+IR_TX = 2     # to 2N2222 base via 4.7kΩ
+IR_RX = 18    # TSOP38238 OUT pin
+
+# ----- Analog inputs -----
+ADC_VBAT = 1  # ADC1_CH0, fed by the 100kΩ/100kΩ divider stub

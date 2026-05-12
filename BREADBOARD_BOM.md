@@ -34,17 +34,17 @@ The DevKitC-1 has **two** USB-C ports — they are not interchangeable:
 
 | # | Part | Qty | Notes |
 |---|---|---:|---|
-| 2.1 | [**SmartElex 2.0" IPS TFT LCD (LHS200KP-IF05)**](https://robu.in/product/smartelex-2-inch-ips-tft-lcd-module) — ST7789P3, 240×320, 4-wire SPI, no touch | 1 | Same controller family as the Tufty. Sharper than 2.4" (denser pixels), slimmer form factor, simpler wiring (no shared touch bus). Backlight: 3× white LEDs onboard, single PWM pin. [Module datasheet (Robu)](https://robu-prod-media.s3.ap-south-1.amazonaws.com/uploads/2026/03/SmartElex-2-inch-IPS-TFT-LCD-module.pdf) |
+| 2.1 | [**SmartElex 2.0" IPS TFT LCD (LHS200KP-IF05)**](https://robu.in/product/smartelex-2-inch-ips-tft-lcd-module) — ST7789P3, 240×320, 4-wire SPI, no touch | 1 | Same controller family as the Tufty. Sharper than 2.4" (denser pixels), slimmer form factor, simpler wiring (no shared touch bus). Backlight: 3× white LEDs onboard, single PWM pin. **Power: VCC to DevKit 5V** (onboard AMS1117 LDO drops to 3.3V for the panel) — see [docs/lcd.md](docs/lcd.md) for the full pin map. [Module datasheet (Robu)](https://robu-prod-media.s3.ap-south-1.amazonaws.com/uploads/2026/03/SmartElex-2-inch-IPS-TFT-LCD-module.pdf) |
 | 2.2 | Female-to-male Dupont jumpers, 20cm | 1 bundle (10pc) | Connecting display module to breadboard. |
 
-**Display pinout reference (typical SmartElex / generic ST7789 4-wire SPI):**
+**Display pinout reference (SmartElex 2.0" ST7789P3 — module silkscreen names):**
 
 ```
-VCC  GND  CS   RESET DC/RS  SDI(MOSI) SCK  LED
-3V3  GND  G14  G16   G15    G11       G12  G17
+VCC  GND  EN   DC   SCL  SDA  CS   RST  TE
+5V   GND  G17  G15  G12  G11  G14  G16  —
 ```
 
-8 wires total. No MISO needed (display is write-only — we never read framebuffer back from the panel).
+7 wires from the display connected, 2 skipped (TE = optional vsync, MISO = panel is write-only). Authoritative reference: [docs/lcd.md](docs/lcd.md).
 
 **GPIO freed by dropping touch:** GPIO18 and GPIO21 are now unassigned — reserved for future expansion or exposed on the dev breakout header for hackability.
 
