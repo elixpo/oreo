@@ -21,16 +21,17 @@ import lix
 
 # ── palette ──────────────────────────────────────────────────────────────────
 
-BG       = api.rgb(8, 8, 20)
-BG2      = api.rgb(12, 12, 28)
-PRIMARY  = api.rgb(0, 220, 200)
-ACCENT   = api.rgb(255, 80, 200)
-MUTED    = api.rgb(90, 90, 120)
-MUTED2   = api.rgb(60, 60, 85)
-STATUS   = api.rgb(10, 10, 24)
-DOCK_BG  = api.rgb(14, 14, 30)
-DOCK_SEL = api.rgb(0, 50, 46)
+BG       = api.rgb(14, 12, 20)        # warm near-black (panda shadow)
+BG2      = api.rgb(22, 18, 30)        # card background
+PRIMARY  = api.rgb(255, 93, 104)      # panda cheek pink — main accent
+ACCENT   = api.rgb(255, 200, 60)      # warm gold (badge E colour)
+MUTED    = api.rgb(120, 100, 130)     # warm muted purple
+MUTED2   = api.rgb(70, 58, 80)        # dimmer muted
+STATUS   = api.rgb(10, 8, 16)         # status bar dark
+DOCK_BG  = api.rgb(18, 14, 26)        # dock dark
+DOCK_SEL = api.rgb(60, 20, 28)        # dock selection warm dark
 WHITE    = api.WHITE
+CLK_COL  = api.rgb(235, 228, 240)     # soft near-white for clock digits (panda fur)
 
 # ── layout constants ─────────────────────────────────────────────────────────
 
@@ -104,25 +105,33 @@ def _load_icon(app_dir, icon_filename=None):
 
 def _icon_wifi(d, x, y):
     c = PRIMARY
-    d.rect(x + 5, y + 8, 3, 3, c, fill=True)
-    d.rect(x + 3, y + 5, 7, 2, c, fill=True)
-    d.rect(x + 1, y + 2, 11, 2, c, fill=True)
+    d.rect(x + 5, y + 9,  3, 2, c, fill=True)   # dot
+    d.rect(x + 2, y + 6,  9, 2, c, fill=True)   # inner arc
+    d.rect(x,     y + 3, 13, 2, c, fill=True)   # outer arc
 
 
 def _icon_bt(d, x, y):
     c = api.rgb(80, 140, 255)
-    d.rect(x + 4, y,      2, 12, c, fill=True)
-    d.rect(x + 4, y,      5,  2, c, fill=True)
-    d.rect(x + 4, y + 5,  5,  2, c, fill=True)
-    d.rect(x + 4, y + 10, 5,  2, c, fill=True)
+    # Vertical stem
+    d.rect(x + 2, y,      2, 12, c, fill=True)
+    # Upper B bulge: top bar + right side + middle bar
+    d.rect(x + 4, y,      4,  2, c, fill=True)   # top
+    d.rect(x + 8, y + 2,  2,  2, c, fill=True)   # upper right
+    d.rect(x + 4, y + 5,  4,  2, c, fill=True)   # middle (shorter reach)
+    # Lower B bulge: middle bar + right side + bottom bar
+    d.rect(x + 9, y + 7,  1,  3, c, fill=True)   # lower right (wider curve)
+    d.rect(x + 4, y + 10, 4,  2, c, fill=True)   # bottom
+    # Crossing arms (the diagonal lines of the BT logo)
+    d.rect(x,     y + 1,  2,  2, c, fill=True)   # upper-left arm
+    d.rect(x,     y + 9,  2,  2, c, fill=True)   # lower-left arm
 
 
 def _icon_battery(d, x, y, pct=85):
-    fc = api.rgb(80, 220, 80) if pct > 30 else api.rgb(255, 80, 80)
-    d.rect(x, y, 18, 8, MUTED, fill=False)
-    d.rect(x + 18, y + 2, 2, 4, MUTED, fill=True)
-    filled = max(1, int((pct / 100) * 16))
-    d.rect(x + 1, y + 1, filled, 6, fc, fill=True)
+    fc = api.rgb(100, 220, 80) if pct > 30 else api.rgb(255, 80, 80)
+    d.rect(x, y, 20, 10, MUTED, fill=False)
+    d.rect(x + 20, y + 3, 2, 4, MUTED, fill=True)
+    filled = max(1, int((pct / 100) * 18))
+    d.rect(x + 1, y + 1, filled, 8, fc, fill=True)
 
 
 # ── dot grid background ───────────────────────────────────────────────────────
@@ -137,11 +146,13 @@ def _draw_grid(d):
 # ── apps icon (2×2 grid of squares) ──────────────────────────────────────────
 
 def _draw_apps_icon(d, x, y, size=14):
-    h = (size - 2) // 2
-    d.rect(x,         y,         h, h, PRIMARY, fill=True)
-    d.rect(x + h + 2, y,         h, h, PRIMARY, fill=True)
-    d.rect(x,         y + h + 2, h, h, PRIMARY, fill=True)
-    d.rect(x + h + 2, y + h + 2, h, h, PRIMARY, fill=True)
+    cell = (size - 4) // 3   # 3 cells + 2 gaps of 2px each
+    gap  = 2
+    for row in range(3):
+        for col in range(3):
+            rx = x + col * (cell + gap)
+            ry = y + row * (cell + gap)
+            d.rect(rx, ry, cell, cell, PRIMARY, fill=True)
 
 
 # ── dock entry ────────────────────────────────────────────────────────────────
@@ -212,14 +223,14 @@ class Home(lix.App):
 
         # ── status bar ────────────────────────────────────────────────────
         d.rect(0, 0, api.SCREEN_W, _STATUS_H, STATUS, fill=True)
-        d.rect(0, _STATUS_H - 1, api.SCREEN_W, 1, api.rgb(0, 80, 72), fill=True)
+        d.rect(0, _STATUS_H - 1, api.SCREEN_W, 1, PRIMARY, fill=True)
 
         time_str = "%02d:%02d" % (h, m)
-        d.text(time_str, 4, 6, WHITE)
+        d.text(time_str, 4, 7, WHITE)
 
-        _icon_wifi   (d, api.SCREEN_W - 92, 5)
-        _icon_bt     (d, api.SCREEN_W - 72, 5)
-        _icon_battery(d, api.SCREEN_W - 52, 7, pct=85)
+        _icon_wifi   (d, 181,      5)
+        _icon_bt     (d, 181 + 17, 5)
+        _icon_battery(d, 181 + 33, 6, pct=85)
 
         # ── mascot ────────────────────────────────────────────────────────
         mascot = _load_mascot()
@@ -232,15 +243,15 @@ class Home(lix.App):
 
         # ── hero clock — "HH:MM" scale=3, 120px wide, centered ────────────
         clock_str = "%02d:%02d" % (h, m)
-        colon_c   = PRIMARY if self._blink else MUTED2
+        colon_c   = CLK_COL if self._blink else MUTED2
         # Draw HH, blink colon, MM separately
         char_w = 8 * 3   # 24px per char at scale=3
         total_w = 5 * char_w   # "HH:MM" = 5 chars × 24px = 120px
         cx = (api.SCREEN_W - total_w) // 2   # 60
 
-        d.text("%02d" % h, cx,              _CLOCK_Y, PRIMARY, scale=3)
+        d.text("%02d" % h, cx,              _CLOCK_Y, CLK_COL, scale=3)
         d.text(":",        cx + 2 * char_w, _CLOCK_Y, colon_c, scale=3)
-        d.text("%02d" % m, cx + 3 * char_w, _CLOCK_Y, PRIMARY, scale=3)
+        d.text("%02d" % m, cx + 3 * char_w, _CLOCK_Y, CLK_COL, scale=3)
 
         # ── date — "Wed 12 May 2026" centered ────────────────────────────
         date_str = "%s %d %s %d" % (wd, day, mon, yr)
@@ -270,7 +281,7 @@ class Home(lix.App):
                        entry.color, fill=True)
 
             if entry.action == "__appmenu__":
-                _draw_apps_icon(d, ix + 19, iy + 8, size=14)
+                _draw_apps_icon(d, ix + (TILE_W - 14) // 2 - 1, iy + (TILE_H - 14) // 2 - 1, size=14)
             else:
                 icon = _load_icon(entry.action, entry.icon_file)
                 if icon:

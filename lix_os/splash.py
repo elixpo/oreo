@@ -11,6 +11,7 @@ Sequence (total ≈ 3 seconds):
 """
 
 import time
+import struct
 from lix import api
 from lix_os.panda import draw_panda, PANDA_W, PANDA_H
 
@@ -40,8 +41,7 @@ def _get_mascot():
             for x in range(72):
                 r, g, b = px[x, y]
                 words.append(((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3))
-        import struct as _s
-        data = _s.pack(">%dH" % len(words), *words)
+        data = struct.pack(">%dH" % len(words), *words)
         _mascot = (data, 72, 72)
     except Exception:
         _mascot = False  # sentinel: skip, use pixel panda
@@ -127,7 +127,10 @@ def show_splash(os_obj):
                 rows_visible = max(1, int(p2 * mh))
                 mx = _PANDA_X - (mw - _PW) // 2   # centre the 72px sprite
                 # blit the sprite; rows below visible count are still BG
-                d.blit(data, mx, _PANDA_Y, mw, min(mh, rows_visible))
+                try:
+                    d.blit(data, mx, _PANDA_Y, mw, min(mh, rows_visible))
+                except Exception:
+                    draw_panda(d, _PANDA_X, _PANDA_Y, ps=_PS, max_rows=max(1, int(p2 * PANDA_H)))
             else:
                 rows = max(1, int(p2 * PANDA_H))
                 draw_panda(d, _PANDA_X, _PANDA_Y, ps=_PS, max_rows=rows)

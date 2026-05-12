@@ -77,7 +77,11 @@ class Display(api.Display):
                     self._fb.fill_rect(x + px * scale, y + py * scale, scale, scale, swapped)
 
     def blit(self, sprite, x, y, w, h):
-        src = framebuf.FrameBuffer(bytearray(sprite), w, h, framebuf.RGB565)
+        import struct
+        n = w * h
+        words = struct.unpack(">%dH" % n, sprite[:n*2])
+        buf = struct.pack("<%dH" % n, *words)
+        src = framebuf.FrameBuffer(buf, w, h, framebuf.RGB565)
         self._fb.blit(src, x, y)
 
     def present(self):
