@@ -39,15 +39,18 @@ APPS_DIR = _find_apps_dir() or "/apps"
 # ----------------------------- splash --------------------------------------
 
 def show_splash(d):
-    d.clear(api.rgb(12, 12, 24))
-    # logo
-    d.text("LIX", 65, 110, api.rgb(255, 200, 0), scale=6)
-    d.text("OS",  95, 175, api.WHITE,            scale=4)
-    # version
-    d.text(VERSION, 100, 235, api.rgb(120, 120, 150), scale=1)
-    # subtle accent
-    d.rect(40,  100, 160, 2, api.rgb(255, 100, 30), fill=True)
-    d.rect(40,  225, 160, 2, api.rgb(255, 100, 30), fill=True)
+    bg      = api.rgb(8, 8, 20)
+    primary = api.rgb(0, 220, 200)     # placeholder neon teal — theming pass swaps this
+    accent  = api.rgb(255, 80, 200)    # placeholder magenta
+    muted   = api.rgb(120, 120, 150)
+    d.clear(bg)
+    # ELIXPO — 6 chars at scale=4 = 192 wide, centered on 240
+    d.text("ELIXPO", 24, 130, primary, scale=4)
+    d.text("BADGE OS", 72, 175, api.WHITE, scale=2)
+    d.text(VERSION, 100, 215, muted)
+    # accent rails
+    d.rect(20, 120, 200, 2, accent, fill=True)
+    d.rect(20, 200, 200, 2, accent, fill=True)
     d.present()
     time.sleep_ms(SPLASH_MS)
 
@@ -182,10 +185,10 @@ class _Menu:
     def draw(self, d):
         if not self._dirty:
             return
-        d.clear(api.rgb(12, 12, 24))
+        d.clear(api.rgb(8, 8, 20))
         # header
-        d.rect(0, 0, api.SCREEN_W, 30, api.rgb(255, 100, 30), fill=True)
-        d.text("LIX OS", 8, 11, api.BLACK, scale=2)
+        d.rect(0, 0, api.SCREEN_W, 30, api.rgb(0, 220, 200), fill=True)
+        d.text("ELIXPO", 8, 11, api.BLACK, scale=2)
         d.text(VERSION, api.SCREEN_W - 50, 11, api.BLACK)
 
         if not self.apps:
