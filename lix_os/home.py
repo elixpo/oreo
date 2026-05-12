@@ -84,8 +84,23 @@ def _load_apps_icon():
 
 
 # ── status bar icons ──────────────────────────────────────────────────────────
+# Procedural fallbacks — replaced automatically when assets/status/<name>.py exists
+
+def _load_status_icon(name):
+    """Try to load a pre-baked 13×13 status icon. Returns (data,w,h) or None."""
+    try:
+        mod = __import__("assets.status.%s" % name,
+                         fromlist=["DATA", "W", "H"])
+        return (mod.DATA, mod.W, mod.H)
+    except ImportError:
+        return None
+
 
 def _icon_wifi(d, x, y):
+    icon = _load_status_icon("wifi")
+    if icon:
+        d.blit(icon[0], x, y, icon[1], icon[2])
+        return
     c = api.WHITE
     d.rect(x + 5, y + 9,  3, 2, c, fill=True)
     d.rect(x + 2, y + 6,  9, 2, c, fill=True)
@@ -93,23 +108,31 @@ def _icon_wifi(d, x, y):
 
 
 def _icon_bt(d, x, y):
+    icon = _load_status_icon("bluetooth")
+    if icon:
+        d.blit(icon[0], x, y, icon[1], icon[2])
+        return
     c = api.WHITE
-    d.rect(x + 2, y,      2, 12, c, fill=True)
-    d.rect(x + 4, y,      4,  2, c, fill=True)
-    d.rect(x + 8, y + 2,  2,  2, c, fill=True)
-    d.rect(x + 4, y + 5,  4,  2, c, fill=True)
-    d.rect(x + 9, y + 7,  1,  3, c, fill=True)
-    d.rect(x + 4, y + 10, 4,  2, c, fill=True)
-    d.rect(x,     y + 1,  2,  2, c, fill=True)
-    d.rect(x,     y + 9,  2,  2, c, fill=True)
+    # spine
+    d.rect(x + 3, y,      2, 13, c, fill=True)
+    # upper-right arm: diagonal out then back
+    d.rect(x + 5, y,      2,  2, c, fill=True)
+    d.rect(x + 7, y + 2,  2,  2, c, fill=True)
+    d.rect(x + 5, y + 4,  2,  2, c, fill=True)
+    # lower-right arm: diagonal out then back
+    d.rect(x + 5, y + 7,  2,  2, c, fill=True)
+    d.rect(x + 7, y + 9,  2,  2, c, fill=True)
+    d.rect(x + 5, y + 11, 2,  2, c, fill=True)
+    # left cross-arms
+    d.rect(x,     y + 3,  3,  2, c, fill=True)
+    d.rect(x,     y + 8,  3,  2, c, fill=True)
 
 
 def _icon_battery(d, x, y, pct=85):
-    fc = api.WHITE
-    d.rect(x, y, 20, 10, api.WHITE, fill=False)
-    d.rect(x + 20, y + 3, 2, 4, api.WHITE, fill=True)
+    d.rect(x,      y,     20, 10, api.WHITE, fill=False)
+    d.rect(x + 20, y + 3,  2,  4, api.WHITE, fill=True)
     filled = max(1, int((pct / 100) * 18))
-    d.rect(x + 1, y + 1, filled, 8, fc, fill=True)
+    d.rect(x + 1,  y + 1, filled, 8, api.WHITE, fill=True)
 
 
 # ── dock entry ────────────────────────────────────────────────────────────────
@@ -169,19 +192,19 @@ class Home(lix.App):
         bg = _load_bg()
         if bg:
             data, bw, bh = bg
-            # Draw bg scaled 4× to fill main area
-            d.blit_scale(data, 0, _MAIN_TOP, bw, bh, 4)
+            d.blit_scale(data, 0, _MAIN_TOP, bw, bh, 4, dim=0.45)
 
         # ── status bar ────────────────────────────────────────────────────
         d.rect(0, 0, SW, _STATUS_H, theme.STATUS_BG, fill=True)
 
-        _icon_wifi   (d,  6, 5)
-        _icon_bt     (d, 26, 4)
-        _icon_battery(d, 46, 6, pct=85)
-
+        # time on the LEFT
         time_str = "%02d:%02d" % (h, m)
-        tx = SW - len(time_str) * 8 - 6
-        d.text(time_str, tx, 7, api.WHITE)
+        d.text(time_str, 6, 7, api.WHITE)
+
+        # icons on the RIGHT: battery | bt | wifi  ←  right edge
+        _icon_battery(d, SW - 28, 6, pct=85)   # 22px wide + 2px nub
+        _icon_bt     (d, SW - 44, 4)            # ~11px wide, 13px tall
+        _icon_wifi   (d, SW - 60, 5)            # 13px wide
 
         # ── hero clock ────────────────────────────────────────────────────
         char_w  = 8 * 4                   # 32px per char at scale=4
@@ -197,7 +220,7 @@ class Home(lix.App):
         # ── date ──────────────────────────────────────────────────────────
         date_str = "%s %d %s %d" % (wd, day, mon, yr)
         dx = max(0, (SW - len(date_str) * 8) // 2)
-        d.text(date_str, dx, _DATE_Y, theme.MUTED)
+        d.text(date_str, dx, _DATE_Y, api.WHITE)
 
         # ── dock ──────────────────────────────────────────────────────────
         d.rect(0, _DOCK_Y, SW, _DOCK_H, theme.DOCK_BG, fill=True)

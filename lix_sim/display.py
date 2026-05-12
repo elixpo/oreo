@@ -101,11 +101,14 @@ class SimDisplay(api.Display):
             surf = pygame.transform.scale(surf, (w * SCALE, h * SCALE))
         self._surf.blit(surf, (x * SCALE, y * SCALE))
 
-    def blit_scale(self, sprite, x, y, w, h, scale):
-        """Blit sprite scaled up by `scale` badge-pixels."""
+    def blit_scale(self, sprite, x, y, w, h, scale, dim=0.0):
+        """Blit sprite scaled up by `scale` badge-pixels. dim 0.0–1.0 blends toward BG."""
         import struct
         n = w * h
         words = struct.unpack_from(">%dH" % n, sprite, 0)
+        if dim > 0:
+            from lix_os import theme as _t
+            br, bg_, bb = _t.BG_R, _t.BG_G, _t.BG_B
         surf = pygame.Surface((w * scale, h * scale))
         pa   = pygame.PixelArray(surf)
         for row in range(h):
@@ -114,6 +117,10 @@ class SimDisplay(api.Display):
                 r = ((word >> 11) & 0x1F) << 3
                 g = ((word >>  5) & 0x3F) << 2
                 b = ( word        & 0x1F) << 3
+                if dim > 0:
+                    r = int(r + (br  - r) * dim)
+                    g = int(g + (bg_ - g) * dim)
+                    b = int(b + (bb  - b) * dim)
                 c = surf.map_rgb(r, g, b)
                 for dy in range(scale):
                     for dx in range(scale):

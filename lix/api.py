@@ -79,17 +79,24 @@ class Display(ABC):
     def blit(self, sprite, x, y, w, h):
         """Copy a w*h RGB565 sprite (bytes-like) to (x,y)."""
 
-    def blit_scale(self, sprite, x, y, w, h, scale):
-        """Draw sprite scaled up by `scale`. Default: per-pixel fallback."""
+    def blit_scale(self, sprite, x, y, w, h, scale, dim=0.0):
+        """Draw sprite scaled up by `scale`. dim 0.0–1.0 blends toward theme BG."""
         import struct
         n = w * h
         words = struct.unpack_from(">%dH" % n, sprite, 0)
+        if dim > 0:
+            from lix_os import theme as _t
+            br, bg_, bb = _t.BG_R, _t.BG_G, _t.BG_B
         for row in range(h):
             for col in range(w):
                 word = words[row * w + col]
                 r = ((word >> 11) & 0x1F) << 3
                 g = ((word >>  5) & 0x3F) << 2
                 b = ( word        & 0x1F) << 3
+                if dim > 0:
+                    r = int(r + (br  - r) * dim)
+                    g = int(g + (bg_ - g) * dim)
+                    b = int(b + (bb  - b) * dim)
                 self.rect(x + col * scale, y + row * scale,
                           scale, scale, rgb(r, g, b), fill=True)
 

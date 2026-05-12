@@ -183,11 +183,13 @@ def main():
 
 def _draw_splash_frame(display, elapsed_ms):
     """Replicate splash.py animation inline for the sim's frame-pumped loop."""
-    from lix_os import panda as _p
-    from lix_os.splash import (BG, PRIMARY, ACCENT, MUTED,
-                                _PANDA_X, _PANDA_Y, _PS,
-                                _TEXT_X, _TEXT_Y, _SUB_Y, _VER_Y,
-                                _BAR_X, _BAR_Y, _BAR_W, TOTAL_MS, _lerp)
+    from lix_os import panda as _p, theme
+    from lix_os.splash import (_MX as _PANDA_X, _MY as _PANDA_Y,
+                                _TX as _TEXT_X, _TY as _TEXT_Y,
+                                _BAR_X, _BAR_Y, _BAR_W, TOTAL_MS,
+                                _get_mascot, _draw_gradient)
+    PRIMARY = theme.PRIMARY
+    MUTED   = theme.MUTED
 
     def phase(e, s, en):
         t = e / TOTAL_MS
@@ -196,58 +198,37 @@ def _draw_splash_frame(display, elapsed_ms):
         return (t - s) / (en - s)
 
     d = display
-    d.clear(BG)
+    _draw_gradient(d)
 
-    p1 = phase(elapsed_ms, 0.0, 0.25)
+    p1 = phase(elapsed_ms, 0.00, 0.08)
     if p1 > 0:
-        sy = int(p1 * api.SCREEN_H)
-        d.rect(0, max(0, sy - 30), api.SCREEN_W, 30, api.rgb(0, 40, 35), fill=True)
-        d.rect(0, max(0, sy - 3),  api.SCREEN_W,  3, PRIMARY, fill=True)
+        lx = int(p1 * api.SCREEN_W)
+        d.rect(0, _BAR_Y - 6, lx, 1, theme.TEAL, fill=True)
 
-    p2 = phase(elapsed_ms, 0.15, 0.72)
-    if p2 > 0:
-        from lix_os.splash import _get_mascot
+    p2 = phase(elapsed_ms, 0.10, 0.12)
+    if p2 >= 1.0:
         mascot = _get_mascot()
         if mascot and mascot is not False:
             mdata, mw, mh = mascot
-            rows_vis = max(1, int(p2 * mh))
-            mx = (api.SCREEN_W - mw) // 2
-            d.blit(mdata, mx, _PANDA_Y, mw, min(mh, rows_vis))
+            d.blit(mdata, _PANDA_X, _PANDA_Y, mw, mh)
         else:
-            rows = max(1, int(p2 * _p.PANDA_H))
-            _p.draw_panda(d, _PANDA_X, _PANDA_Y, ps=_PS, max_rows=rows)
+            _p.draw_panda(d, _PANDA_X, _PANDA_Y, ps=4)
 
-    p3 = phase(elapsed_ms, 0.60, 1.10)
+    p3 = phase(elapsed_ms, 0.18, 0.52)
     if p3 > 0:
-        n = max(1, int(p3 * 6))
-        d.text("ELIXPO"[:n], _TEXT_X, _TEXT_Y, PRIMARY, scale=4)
+        label = "ELIXPO OS"
+        n = max(1, int(p3 * len(label)))
+        d.text(label[:n], _TEXT_X, _TEXT_Y, theme.TEXT_BRIGHT, scale=2)
 
-    p4 = phase(elapsed_ms, 1.00, 1.45)
-    if p4 > 0:
-        n_sub = max(1, int(p4 * 8))
-        d.text("BADGE OS"[:n_sub], 72, _SUB_Y, api.WHITE, scale=2)
-        if p4 > 0.8:
-            d.text("v0.1", 100, _VER_Y, MUTED)
-
-    p5 = phase(elapsed_ms, 1.30, 2.00)
+    p5 = phase(elapsed_ms, 0.58, 0.88)
     if p5 > 0:
-        d.rect(_BAR_X, _BAR_Y, _BAR_W, 5, api.rgb(25, 25, 40), fill=True)
-        filled = int(p5 * _BAR_W)
-        if filled > 0:
-            d.rect(_BAR_X, _BAR_Y, filled, 5, PRIMARY, fill=True)
-        d.text("%d%%" % int(p5 * 100), _BAR_X + _BAR_W + 4, _BAR_Y - 2, MUTED)
+        d.rect(_BAR_X, _BAR_Y, _BAR_W, 5, api.rgb(200, 180, 160), fill=True)
+        filled = max(2, int(p5 * _BAR_W))
+        d.rect(_BAR_X, _BAR_Y, filled, 5, PRIMARY, fill=True)
+        d.text("%d%%" % int(p5 * 100), _BAR_X + _BAR_W + 6, _BAR_Y - 2, MUTED)
 
-    p6 = phase(elapsed_ms, 1.90, 2.60)
-    if p6 > 0:
-        pulse = abs((p6 * 2) % 2 - 1)
-        rail_c = api.rgb(int(_lerp(0, 255, pulse)),
-                         int(_lerp(220, 80, pulse)),
-                         int(_lerp(200, 200, pulse)))
-        d.rect(20, _TEXT_Y - 6, api.SCREEN_W - 40, 2, rail_c, fill=True)
-        d.rect(20, _BAR_Y + 10, api.SCREEN_W - 40, 2, rail_c, fill=True)
-
-    p7 = phase(elapsed_ms, 2.60, 3.00)
-    if p7 > 0 and p7 >= 1.0:
+    p6 = phase(elapsed_ms, 0.92, 1.00)
+    if p6 >= 1.0:
         d.clear(api.BLACK)
 
 

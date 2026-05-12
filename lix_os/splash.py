@@ -13,25 +13,24 @@ import struct
 import time
 from lix import api
 from lix_os import theme
-from lix_os.panda import draw_panda, PANDA_W, PANDA_H
+from lix_os.panda import draw_panda
 
 SW = api.SCREEN_W   # 320
 SH = api.SCREEN_H   # 240
 
 # ── layout ────────────────────────────────────────────────────────────────────
+# Single-line: [MASCOT] ELIXPO OS   (mascot left, text right, vertically centred)
 
 _MW, _MH = 72, 72
-_MX = 30
-_MY = (SH - _MH) // 2        # 84
-_TX = _MX + _MW + 20         # 122
-_TY = _MY + 4
-_SUB_Y = _TY + 40
-_VER_Y = _SUB_Y + 20
+_MX  = 24
+_MY  = (SH - _MH) // 2          # 84
+_TX  = _MX + _MW + 16           # 112 — text starts right of mascot
+_TY  = _MY + (_MH - 16) // 2    # vertically centre 16px text (scale=2→16px tall)
 _BAR_X = 20
 _BAR_Y = SH - 28
 _BAR_W = SW - 40
 
-TOTAL_MS = 3000
+TOTAL_MS = 5000
 
 # ── mascot loader (cached) ────────────────────────────────────────────────────
 
@@ -41,12 +40,7 @@ def _get_mascot():
     global _mascot
     if _mascot is not None:
         return _mascot if _mascot is not False else None
-    try:
-        import assets.mascot as m
-        _mascot = (m.DATA, m.W, m.H)
-        return _mascot
-    except (ImportError, AttributeError):
-        pass
+    # Try PIL first — composites cleanly on cream BG (works on sim; no PIL on hw)
     try:
         from PIL import Image
         img = Image.open("asset/mascot.png").convert("RGBA").resize(
@@ -64,7 +58,15 @@ def _get_mascot():
         _mascot = (data, _MW, _MH)
         return _mascot
     except Exception:
-        _mascot = False
+        pass
+    # Hardware fallback — uses pre-baked assets/mascot.py (cream fill)
+    try:
+        import assets.mascot as m
+        _mascot = (m.DATA, m.W, m.H)
+        return _mascot
+    except (ImportError, AttributeError):
+        pass
+    _mascot = False
     return None
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -82,14 +84,21 @@ def _lerp(a, b, t):
     return int(a + (b - a) * t)
 
 def _draw_gradient(d):
-    """Vertical gradient: dark at edges, warm glow at centre."""
-    mid = SH // 2
-    for y in range(SH):
-        dist = abs(y - mid) / mid
-        t    = 1.0 - dist * dist
-        r = _lerp(theme.BG_R, 0,  t)
-        g = _lerp(theme.BG_G, 70, t)
-        b = _lerp(theme.BG_B, 65, t)
+    """Warm celebration gradient: pink at top → cream in center → gold at bottom."""
+    d.rect(0, 0, SW, SH, api.rgb(theme.BG_R, theme.BG_G, theme.BG_B), fill=True)
+    # pink sweep from top
+    for y in range(60):
+        t = (1.0 - y / 60) ** 2
+        r = _lerp(theme.BG_R, theme.PRIMARY_R, t)
+        g = _lerp(theme.BG_G, theme.PRIMARY_G, t)
+        b = _lerp(theme.BG_B, theme.PRIMARY_B, t)
+        d.rect(0, y, SW, 1, api.rgb(r, g, b), fill=True)
+    # gold sweep from bottom
+    for y in range(SH - 50, SH):
+        t = ((y - (SH - 50)) / 50) ** 2
+        r = _lerp(theme.BG_R, theme.GOLD_R, t)
+        g = _lerp(theme.BG_G, theme.GOLD_G, t)
+        b = _lerp(theme.BG_B, theme.GOLD_B, t)
         d.rect(0, y, SW, 1, api.rgb(r, g, b), fill=True)
 
 # ── show_splash ───────────────────────────────────────────────────────────────
@@ -108,47 +117,40 @@ def show_splash(os_obj):
             _draw_gradient(d)
             drawn_bg = True
 
-        p1 = _phase(elapsed, 0.0, 0.30)
+        # all phase fractions are within 0.0–1.0 of TOTAL_MS=5000
+        p1 = _phase(elapsed, 0.00, 0.08)   # teal sweep:  0–400ms
         if p1 > 0:
             lx = int(p1 * SW)
             d.rect(0, _BAR_Y - 6, lx, 1, theme.TEAL, fill=True)
 
-        p2 = _phase(elapsed, 0.20, 0.80)
-        if p2 > 0:
+        # mascot pops in all at once (no row-reveal)
+        p2 = _phase(elapsed, 0.10, 0.12)   # trigger:     500ms–600ms
+        if p2 >= 1.0:
             mascot = _get_mascot()
             if mascot:
                 data, mw, mh = mascot
-                rows = max(1, int(p2 * mh))
                 try:
-                    d.blit(data, _MX, _MY, mw, min(mh, rows))
+                    d.blit(data, _MX, _MY, mw, mh)
                 except Exception:
-                    draw_panda(d, _MX, _MY, ps=4,
-                               max_rows=max(1, int(p2 * PANDA_H)))
+                    draw_panda(d, _MX, _MY, ps=4)
             else:
-                draw_panda(d, _MX, _MY, ps=4,
-                           max_rows=max(1, int(p2 * PANDA_H)))
+                draw_panda(d, _MX, _MY, ps=4)
 
-        p3 = _phase(elapsed, 0.70, 1.20)
+        p3 = _phase(elapsed, 0.18, 0.52)   # "ELIXPO OS" types in: 900ms–2600ms
         if p3 > 0:
-            n = max(1, int(p3 * 6))
-            d.text("ELIXPO"[:n], _TX, _TY, theme.TEXT_BRIGHT, scale=4)
+            label = "ELIXPO OS"
+            n = max(1, int(p3 * len(label)))
+            d.text(label[:n], _TX, _TY, theme.TEXT_BRIGHT, scale=2)
 
-        p4 = _phase(elapsed, 1.10, 1.50)
-        if p4 > 0:
-            n = max(1, int(p4 * 8))
-            d.text("BADGE OS"[:n], _TX + 4, _SUB_Y, theme.TEAL, scale=2)
-            if p4 > 0.9:
-                d.text("v0.1", _TX + 4, _VER_Y, theme.MUTED)
-
-        p5 = _phase(elapsed, 1.40, 2.10)
+        p5 = _phase(elapsed, 0.58, 0.88)   # loading bar: 2900ms–4400ms
         if p5 > 0:
-            d.rect(_BAR_X, _BAR_Y, _BAR_W, 5, api.rgb(30, 26, 40), fill=True)
+            d.rect(_BAR_X, _BAR_Y, _BAR_W, 5, api.rgb(200, 180, 160), fill=True)
             filled = max(2, int(p5 * _BAR_W))
             d.rect(_BAR_X, _BAR_Y, filled, 5, theme.PRIMARY, fill=True)
             pct = int(p5 * 100)
             d.text("%d%%" % pct, _BAR_X + _BAR_W + 6, _BAR_Y - 2, theme.MUTED)
 
-        p6 = _phase(elapsed, 2.60, 3.00)
+        p6 = _phase(elapsed, 0.92, 1.00)   # fade:        4600ms–5000ms
         if p6 >= 1.0:
             d.clear(api.BLACK)
 
