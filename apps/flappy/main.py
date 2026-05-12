@@ -197,41 +197,35 @@ class Panda:
             self.died_at_ms = time.ticks_ms()
 
     def draw(self, d):
-        sheet = _load("mona_sheet")
-        py = int(self.y)
-        if sheet:
-            # mona_sheet is 7×2 of 24×24. Pick frame by velocity.
-            data, sw, sh = sheet
-            fw, fh = sw // 7, sh // 2
-            if not self.is_dead():
-                # velocity ∈ [-3..3] mapped to frame 0..6
-                v = max(-3.0, min(self.vy / 60.0, 3.0))
-                frame = int(((v + 3) / 6) * 6)
-                row = 0
-            else:
-                t = time.ticks_diff(time.ticks_ms(), self.died_at_ms) / 120
-                frame = min(int(t), 4)
-                row = 1
-            self._blit_frame(d, data, sw, fw, fh, frame, row, PANDA_X, py)
+        py  = int(self.y)
+        key = self._pick_sprite()
+        sprite = _load(key)
+        if sprite:
+            data, sw, sh = sprite
+            d.blit(data, PANDA_X, py, sw, sh)
         else:
-            # fallback to single up/down sprite
-            key = "panda_down" if self.vy > 40 or self.is_dead() else "panda_up"
-            sprite = _load(key)
-            if sprite:
-                data, sw, sh = sprite
-                d.blit(data, PANDA_X, py, sw, sh)
-            else:
-                d.rect(PANDA_X, py, 24, 24, C_TITLE, fill=True)
+            d.rect(PANDA_X, py, 24, 24, C_TITLE, fill=True)
 
-    def _blit_frame(self, d, sheet_data, sheet_w, fw, fh, col, row, x, y):
-        # Extract a single frame from the sheet and blit it.
-        out = bytearray(fw * fh * 2)
-        for fy in range(fh):
-            src_y = row * fh + fy
-            src_x = col * fw
-            src_off = (src_y * sheet_w + src_x) * 2
-            out[fy * fw * 2: (fy + 1) * fw * 2] = sheet_data[src_off: src_off + fw * 2]
-        d.blit(bytes(out), x, y, fw, fh)
+    def _pick_sprite(self):
+        """Choose which sprite key to render this frame.
+
+        Alive:
+          vy > 50  → panda_down (falling)
+          else     → panda_up_a / panda_up_b alternating every ~150ms (engine puff)
+        Dying (≈ 1200ms total):
+          first half  → panda_crash
+          second half → panda_blast
+        """
+        if self.is_dead():
+            elapsed = time.ticks_diff(time.ticks_ms(), self.died_at_ms)
+            return "panda_crash" if elapsed < 500 else "panda_blast"
+
+        if self.vy > 50:
+            return "panda_down"
+
+        # alternate every 150 ms
+        phase = (time.ticks_ms() // 150) & 1
+        return "panda_up_b" if phase else "panda_up_a"
 
 # ── scenery (parallax) ───────────────────────────────────────────────────────
 

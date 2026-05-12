@@ -7,4 +7,4 @@
 
 ## Prompt
 
-pixel art cloud, single fluffy white cumulus cloud with soft pink and gold edge highlights, thick dark outline, retro 8 bit cartoon style, solid bright blue sky behind, simple flat composition, no other details, no text, no watermark, horizontal cloud tile
+simple flat pixel art game asset of a single white cartoon cloud shape, soft rounded silhouette, thick black outline, plain bright blue sky color filling the rest of the frame, retro 8 bit videogame tile, centered composition, no text, no characters

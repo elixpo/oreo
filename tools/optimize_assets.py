@@ -40,13 +40,15 @@ STATUS_BG      = (255, 93, 104)  # pink status bar — composite SVGs onto this
 # Names matching neither this table nor _bg fall back to 32×32.
 PER_APP_SIZES = {
     # flappy game
-    "panda_up":    (24, 24),
-    "panda_down":  (24, 24),
-    "mona_sheet":  (168, 48),   # 7×2 frames of 24×24
-    "obstacle":    (24, 24),
-    "background":  (80, 30),
-    "cloud":       (40, 20),
-    "grass":       (80, 10),
+    "panda_up_a":   (24, 24),   # alive frame 0 — idle engine
+    "panda_up_b":   (24, 24),   # alive frame 1 — exhaust on (alternates with _a)
+    "panda_down":   (24, 24),   # falling
+    "panda_crash":  (24, 24),   # death frame 0 — tumbling
+    "panda_blast":  (24, 24),   # death frame 1 — explosion
+    "obstacle":     (24, 24),
+    "background":   (80, 30),
+    "cloud":        (40, 20),
+    "grass":        (80, 10),
 }
 
 

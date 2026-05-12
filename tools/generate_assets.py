@@ -20,10 +20,10 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv()
-load_dotenv(".env.local")   # also try .env.local
 
-KEY  = os.getenv("POLLINATIONS_KEY")
-BASE = "https://gen.pollinations.ai/image"
+KEY   = os.getenv("POLLINATIONS_KEY")
+BASE  = "https://gen.pollinations.ai/image"
+MODEL = "gptimage"
 
 
 def _read_prompt(path):
@@ -44,20 +44,26 @@ def _read_prompt(path):
     return None
 
 
-def download_to(prompt, out_path, width=200, height=200):
+def download_to(prompt, out_path, width=200, height=200, seed=42):
     """Generic download — saves the generated PNG to out_path."""
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     print("→ %s  (%dx%d)\n  %s..." % (out_path, width, height, prompt[:90]))
 
+    if not KEY:
+        print("  ERROR: POLLINATIONS_KEY not set in .env — cannot authenticate")
+        return False
+
+    # NOTE: User-Agent is REQUIRED — the API returns 403 without it.
     headers = {
-        "Authorization": "Bearer %s" % KEY if KEY else "",
-        "User-Agent":    "ElixpoBadge/1.0",
+        "Authorization": "Bearer %s" % KEY,
+        "User-Agent":    "ElixpoBadge/1.0"
     }
     enc = urllib.parse.quote(prompt)
-    url = "%s/%s?width=%d&height=%d&seed=42&nologo=true&model=gptimage" % (
-        BASE, enc, width, height
+    url = "%s/%s?width=%d&height=%d&seed=%d&nologo=true&model=%s" % (
+        BASE, enc, width, height, seed, MODEL
     )
+
     for attempt in range(4):
         try:
             req  = urllib.request.Request(url, headers=headers)
@@ -68,8 +74,34 @@ def download_to(prompt, out_path, width=200, height=200):
                 time.sleep(15 * (attempt + 1))
                 continue
             out_path.write_bytes(data)
-            print("  saved %d bytes" % len(data))
+            print("  saved %d bytes  [model=%s]" % (len(data), MODEL))
             return True
+        except urllib.error.HTTPError as e:
+            # Read the response body so we can show *why* the server refused.
+            try:
+                body = e.read().decode("utf-8", "replace").strip()
+            except Exception:
+                body = ""
+            short = (body[:600] + "…") if len(body) > 600 else body
+
+            # 401/403/400 won't fix themselves — bail fast with the full message.
+            if e.code in (400, 401, 403, 404, 422):
+                print("  FATAL HTTP %d %s   [model=%s]" % (e.code, e.reason, MODEL))
+                if body:
+                    print("  ── server response ──")
+                    for line in short.splitlines():
+                        print("    " + line)
+                    print("  ──────────────────────")
+                else:
+                    print("  (empty response body)")
+                return False
+
+            wait = 20 * (attempt + 1)
+            print("  attempt %d HTTP %d %s — retry in %ds" %
+                  (attempt + 1, e.code, e.reason, wait))
+            if body:
+                print("    server: " + short.splitlines()[0][:200])
+            time.sleep(wait)
         except Exception as e:
             wait = 20 * (attempt + 1)
             print("  attempt %d error: %s — retry in %ds" % (attempt + 1, e, wait))
@@ -77,7 +109,7 @@ def download_to(prompt, out_path, width=200, height=200):
     return False
 
 
-def generate_app(app_name, only_names=None):
+def generate_app(app_name, only_names=None, seed=42):
     """Generate all assets for one app: prompts/<app>/*.md → apps/<app>/assets/raw/*.png"""
     prompts_dir = Path("prompts") / app_name
     out_dir     = Path("apps") / app_name / "assets" / "raw"
@@ -93,14 +125,15 @@ def generate_app(app_name, only_names=None):
         print("No .md prompt files in %s" % prompts_dir)
         return
 
-    print("Generating %d sprite(s) for app '%s'...\n" % (len(mds), app_name))
+    print("Generating %d sprite(s) for app '%s'  [seed=%d]...\n" %
+          (len(mds), app_name, seed))
     for md in mds:
         prompt = _read_prompt(md)
         if not prompt:
             print("  SKIP %s — no ## Prompt block" % md.name)
             continue
         out = out_dir / ("%s.png" % md.stem)
-        download_to(prompt, out, width=200, height=200)
+        download_to(prompt, out, width=200, height=200, seed=seed)
         time.sleep(8)
     print("\nDone. Run:  python tools/optimize_assets.py --app %s" % app_name)
 
@@ -113,8 +146,8 @@ def generate_app(app_name, only_names=None):
 # Comment out entries you don't want to regenerate.
 
 ACTIVE = {
-    "home_bg":    (200, 200),
-    "apps_icon":  (200, 200),
+    # "home_bg":    (200, 200),
+    # "apps_icon":  (200, 200),
     # "flappy_icon":  None,
     # "snake_icon":   None,
     # "gamepad_icon": None,
@@ -162,20 +195,36 @@ def download(name, width=200, height=200):
     download_to(prompt, "assets/icons/raw/%s.png" % name, width, height)
 
 
+def _pop_seed(args):
+    """Strip a `--seed N` pair from args. Returns (remaining_args, seed_int)."""
+    seed = 42
+    if "--seed" in args:
+        i = args.index("--seed")
+        if i + 1 < len(args):
+            try:
+                seed = int(args[i + 1])
+            except ValueError:
+                print("WARN: --seed expects an integer; using 42")
+            args = args[:i] + args[i + 2:]
+    return args, seed
+
+
 def main():
+    args, seed = _pop_seed(sys.argv[1:])
+
     # ── per-app mode ─────────────────────────────────────────────────────────
-    if "--app" in sys.argv:
-        idx = sys.argv.index("--app")
-        rest = sys.argv[idx + 1:]
+    if "--app" in args:
+        idx  = args.index("--app")
+        rest = args[idx + 1:]
         if not rest:
-            print("Usage: generate_assets.py --app <app> [name ...]")
+            print("Usage: generate_assets.py --app <app> [name ...] [--seed N]")
             return
         app, *only = rest
-        generate_app(app, only_names=only or None)
+        generate_app(app, only_names=only or None, seed=seed)
         return
 
     # ── top-level icons mode ─────────────────────────────────────────────────
-    targets = sys.argv[1:]
+    targets = args
     active  = {k: v for k, v in ACTIVE.items()}
     if targets:
         active = {k: active.get(k, (200, 200)) for k in targets}
@@ -183,10 +232,14 @@ def main():
         print("No active entries. Uncomment entries in ACTIVE dict or pass names as args.")
         return
 
-    print("Generating %d asset(s)...\n" % len(active))
+    print("Generating %d asset(s)  [seed=%d]...\n" % (len(active), seed))
     for name, dims in active.items():
         w, h = dims if dims else (200, 200)
-        download(name, w, h)
+        prompt = _read_prompt("prompts/%s.md" % name) or _FALLBACK_PROMPTS.get(name)
+        if not prompt:
+            print("  SKIP %s — no prompt at prompts/%s.md" % (name, name))
+            continue
+        download_to(prompt, "assets/icons/raw/%s.png" % name, w, h, seed=seed)
         time.sleep(8)
 
     print("\nDone. Run:  python tools/optimize_assets.py")
