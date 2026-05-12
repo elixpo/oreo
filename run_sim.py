@@ -57,7 +57,7 @@ def _draw_chrome(win, badge_surf, legend_font, fps):
     win.blit(fps_s, (BORDER, BORDER + BADGE_H + 3))
 
 
-def _run_app(os_obj, buttons, app, badge_surf, win, clock, legend_font):
+def _run_app(os_obj, buttons, app, badge_surf, win, clock, legend_font):  # noqa: E501
     os_obj._quit_requested = False
     os_obj._launch_request = None
 
