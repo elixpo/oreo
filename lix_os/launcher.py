@@ -10,7 +10,6 @@ import os as _os
 import time
 
 from lix import api
-from lix_hw.os import OS
 
 
 VERSION       = "v0.1"
@@ -216,6 +215,7 @@ class _Menu:
 # ----------------------------- boot ----------------------------------------
 
 def boot():
+    from lix_hw.os import OS
     os_obj = OS()
     show_splash(os_obj.display)
 
