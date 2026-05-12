@@ -35,17 +35,18 @@ datasheet we ordered.
 
 Total: **9 wires from the display**, 7 connected, 2 (TE + the absent MISO) skipped.
 
-## Why VCC is 5V on this module specifically
+## VCC: 5V is the safe default, 3V3 works on this batch
 
-The board has an onboard **AMS1117-3.3** linear regulator that takes 3.3–5V in
-and outputs 3.3V to the ST7789P3. With ~1.1V dropout, feeding 3.3V to VCC
-would leave the panel at ~2.2V — marginal/unreliable. Feed 5V and the panel
-sees a clean 3.3V. Logic pins from the ESP32 stay at 3.3V — within the panel's
-input spec, no level shifting needed.
+The datasheet recommends 5V because some batches ship with an AMS1117 LDO
+whose ~1.1V dropout would leave the panel at ~2.2V if fed 3.3V (marginal).
 
-(The BOM's original "VCC to 3V3 not 5V" line was wrong for this specific
-module and has been corrected. Other ST7789 modules without an onboard LDO
-*are* 3V3-native; always check before applying advice across boards.)
+**Empirically (2026-05-10): our unit runs cleanly on 3V3** — the LDO on this
+batch is a low-dropout part (AP2112 or similar, ~0.4V dropout). Both work.
+Prefer 5V if you have a fresh board you haven't tested; drop to 3V3 only after
+confirming a clean image.
+
+Logic pins from the ESP32 stay at 3.3V regardless of which VCC you pick — no
+level shifting needed in either case.
 
 ## Pre-flight checklist before powering on
 

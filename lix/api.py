@@ -6,7 +6,13 @@ Apps and the Lix OS launcher depend only on this interface — they do not
 know or care which backend is active.
 """
 
-from abc import ABC, abstractmethod
+try:
+    from abc import ABC, abstractmethod
+except ImportError:
+    # MicroPython has no `abc` module — fall back to duck-typed bases.
+    ABC = object
+    def abstractmethod(f):
+        return f
 
 
 # ---------- Display geometry ----------
