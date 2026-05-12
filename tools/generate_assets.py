@@ -1,11 +1,17 @@
-"""Generate badge icons via the Pollinations AI image API.
+"""Generate Elixpo Badge assets via the Pollinations AI image API.
 
 Usage:
-    python tools/gen_icons.py              # all active (uncommented) entries
-    python tools/gen_icons.py home_bg      # single asset by name
+    python tools/generate_assets.py              # all active entries
+    python tools/generate_assets.py home_bg      # single asset by name
 
-Prompts live in prompts/<name>.md — edit there, uncomment here to activate.
-After generating, run: python tools/optimize_assets.py <name>
+Workflow:
+  1. Edit/create  prompts/<name>.md   — prompt text + theme notes
+  2. Uncomment    ACTIVE[<name>]       — in this file
+  3. Run          python tools/generate_assets.py [name]
+  4. Run          python tools/optimize_assets.py [name]
+  5. Asset is ready in assets/icons/<name>.py
+
+Theme reference: prompts/THEME.md
 """
 
 import os
@@ -48,8 +54,8 @@ def _read_prompt(name):
 # Comment out entries you don't want to regenerate.
 
 ACTIVE = {
-    # "home_bg":    (200, 200),
-    # "apps_icon":  (200, 200),
+    "home_bg":    (200, 200),
+    "apps_icon":  (200, 200),
     # "flappy_icon":  None,
     # "snake_icon":   None,
     # "gamepad_icon": None,

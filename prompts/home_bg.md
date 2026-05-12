@@ -1,17 +1,19 @@
 # home_bg — Home screen background
 
 **Asset name:** `home_bg`  
-**Output size:** 200×200 (optimizer will scale to 80×60 for 4× upscale to 320×240)  
-**Used in:** `lix_os/home.py` — faint background behind clock and dock
+**Output size:** 200×200 (optimizer scales to 80×60 for 4× upscale to 320×240)  
+**Used in:** `lix_os/home.py` — background behind clock and dock  
+**Theme reference:** See [THEME.md](THEME.md)
 
 ## Prompt
 
-pixel art 8-bit landscape background: lush dark jungle scene, tall bamboo stalks of varying heights, large tropical palm leaves silhouetted in foreground, glowing pink and teal fireflies scattered throughout, misty night atmosphere with deep teal fog in background, dark emerald green and deep teal palette, warm pink bioluminescent glow accents, layered depth with close leaves dark and background lighter, moody atmospheric night scene, no characters, no text, no watermark, pixel art 8-bit chunky pixels, kawaii cute aesthetic
+pixel art 8-bit landscape background: lush vibrant jungle scene, tall bamboo stalks of varying heights, large tropical palm leaves in warm golden-green tones, glowing pink and teal fireflies scattered throughout, warm misty sunrise atmosphere with soft teal and peach haze in background, bright emerald and lime green foliage palette, warm pink bioluminescent glow accents, layered depth with close leaves warm-toned and background lighter peachy-mist, joyful celebration mood, no characters, no text, no watermark, pixel art 8-bit chunky pixels, kawaii cute aesthetic
 
 ## Theme notes
 
-Colours must harmonise with the panda mascot theme:
-- Background darks: rgb(3, 67, 25) — near-black warm dark
-- Foliage: deep greens and teals
+See [THEME.md](THEME.md) for the full palette.
+
+- Background: warm ivory and peach tones — NOT dark, NOT night scene
+- Foliage: bright greens, warm lime, golden yellows
 - Accent glow: panda pink rgb(255, 93, 104) and teal rgb(0, 180, 165)
-- No white, no bright daylight colours
+- Mood: daytime celebration, warm and festive — like a jungle party backdrop

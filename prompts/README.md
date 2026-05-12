@@ -4,9 +4,9 @@ Each `.md` file in this folder defines one asset for the Elixpo Badge.
 
 ## How to generate an asset
 
-1. Edit the prompt in `prompts/<asset_name>.md`
-2. Uncomment (or add) the matching entry in `tools/gen_icons.py` ICONS dict
-3. Run: `python tools/gen_icons.py`
+1. Edit the prompt in `prompts/<asset_name>.md` (use [THEME.md](THEME.md) for colour reference)
+2. Uncomment (or add) the matching entry in `tools/generate_assets.py` ACTIVE dict
+3. Run: `python tools/generate_assets.py <asset_name>`
 4. Run: `python tools/optimize_assets.py <asset_name>`
 5. The asset is now in `assets/icons/<asset_name>.py` and ready to load
 
