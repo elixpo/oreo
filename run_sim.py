@@ -17,7 +17,14 @@ import time
 import gc
 
 # Make project root importable regardless of cwd
-sys.path.insert(0, os.path.dirname(__file__))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+# MicroPython shims — must be patched before importing any lix_os code
+if not hasattr(time, "ticks_ms"):
+    time.ticks_ms   = lambda: int(time.monotonic() * 1000)
+    time.ticks_diff = lambda a, b: a - b
+if not hasattr(time, "sleep_ms"):
+    time.sleep_ms = lambda ms: time.sleep(ms / 1000.0)
 
 import pygame
 
