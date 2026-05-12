@@ -1,27 +1,34 @@
-"""First app that uses the lix Display API — no raw SPI, no ST7789 details."""
+"""Hello — minimal demo app proving the lix.App lifecycle."""
 
+import lix
 from lix import api
-from lix_hw.display import Display
 
-d = Display()
 
-# background
-d.clear(api.rgb(20, 20, 40))
+class App(lix.App):
+    name = "Hello"
 
-# title bar
-d.rect(0, 0, api.SCREEN_W, 30, api.rgb(255, 100, 30), fill=True)
-d.text("Lix OS", 8, 11, api.BLACK, scale=2)
+    def on_enter(self, os):
+        super().on_enter(os)
+        self.t = 0.0
+        self.last_sec = -1
+        self.dirty = True
 
-# centered card
-d.rect(20, 60, 200, 200, api.WHITE, fill=True)
-d.rect(20, 60, 200, 200, api.rgb(50, 50, 80))
-d.text("hello, world", 36, 130, api.BLACK)
-d.text("badge alive", 50, 160, api.rgb(120, 0, 0))
+    def update(self, dt):
+        self.t += dt
+        sec = int(self.t)
+        if sec != self.last_sec:
+            self.last_sec = sec
+            self.dirty = True
 
-# decoration
-for i in range(0, api.SCREEN_W, 8):
-    d.pixel(i,                     api.SCREEN_H - 1, api.rgb(255, 200, 0))
-    d.pixel(api.SCREEN_W - 1 - i,  api.SCREEN_H - 4, api.rgb(255, 200, 0))
+    def draw(self, d):
+        if not self.dirty:
+            return
+        d.clear(api.rgb(20, 20, 40))
+        d.rect(0, 0, api.SCREEN_W, 30, api.rgb(255, 100, 30), fill=True)
+        d.text("Hello", 8, 11, api.BLACK, scale=2)
 
-d.present()
-print("hello: drawn")
+        d.text("hello, world!", 30, 80, api.WHITE, scale=2)
+        d.text("alive: %ds" % self.last_sec, 30, 130, api.rgb(255, 220, 100), scale=2)
+
+        d.text("press HOME to return", 22, api.SCREEN_H - 40, api.rgb(160, 160, 180))
+        self.dirty = False
