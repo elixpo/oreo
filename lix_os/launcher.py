@@ -1,7 +1,8 @@
-"""Lix OS — boot splash, app menu, generic app loop.
+"""Elixpo OS — app loader, generic run loop, crash screen, boot entry point.
 
-Apps live in /apps/<name>/ with a manifest.json declaring metadata and a
-main.py exposing an `App` class that subclasses `lix.App`.
+Apps live in apps/<name>/ with a manifest.json and a main.py that exposes
+an App class subclassing lix.App.  The OS launcher owns the top-level loop;
+individual screens (splash, home, app-menu) live in separate modules.
 """
 
 import gc
@@ -11,14 +12,9 @@ import time
 
 from lix import api
 
+VERSION      = "v0.1"
+FRAME_MIN_MS = 16        # ≈60 fps cap
 
-VERSION       = "v0.1"
-SPLASH_MS     = 1500
-FRAME_MIN_MS  = 16   # cap frame rate ~60fps even if hardware can do more
-
-# Candidate locations for /apps. When the badge is flashed directly the project
-# lives at root ("/apps"). When developing via `mpremote mount .` the laptop
-# directory is exposed at "/remote", so apps appear at "/remote/apps".
 _APPS_CANDIDATES = ("/apps", "/remote/apps", "apps")
 
 
@@ -35,29 +31,10 @@ def _find_apps_dir():
 APPS_DIR = _find_apps_dir() or "/apps"
 
 
-# ----------------------------- splash --------------------------------------
-
-def show_splash(d):
-    bg      = api.rgb(8, 8, 20)
-    primary = api.rgb(0, 220, 200)     # placeholder neon teal — theming pass swaps this
-    accent  = api.rgb(255, 80, 200)    # placeholder magenta
-    muted   = api.rgb(120, 120, 150)
-    d.clear(bg)
-    # ELIXPO — 6 chars at scale=4 = 192 wide, centered on 240
-    d.text("ELIXPO", 24, 130, primary, scale=4)
-    d.text("BADGE OS", 72, 175, api.WHITE, scale=2)
-    d.text(VERSION, 100, 215, muted)
-    # accent rails
-    d.rect(20, 120, 200, 2, accent, fill=True)
-    d.rect(20, 200, 200, 2, accent, fill=True)
-    d.present()
-    time.sleep_ms(SPLASH_MS)
-
-
-# ----------------------------- app discovery -------------------------------
+# ── app discovery ─────────────────────────────────────────────────────────────
 
 def list_apps():
-    """Return list of dicts: [{'dir': 'hello', 'name': 'Hello', ...}, ...]."""
+    """Return [{'dir':..., 'name':..., 'type':...}, ...]  sorted by dir name."""
     apps = []
     try:
         entries = _os.listdir(APPS_DIR)
@@ -65,12 +42,13 @@ def list_apps():
         return apps
     for entry in sorted(entries):
         try:
-            with open(f"{APPS_DIR}/{entry}/manifest.json") as f:
+            with open("%s/%s/manifest.json" % (APPS_DIR, entry)) as f:
                 manifest = json.loads(f.read())
             apps.append({
-                "dir":  entry,
-                "name": manifest.get("name", entry),
-                "type": manifest.get("type", "app"),
+                "dir":   entry,
+                "name":  manifest.get("name", entry),
+                "type":  manifest.get("type", "app"),
+                "color": manifest.get("color", None),  # optional accent hex
             })
         except (OSError, ValueError):
             continue
@@ -78,12 +56,12 @@ def list_apps():
 
 
 def load_app(app_dir):
-    module_path = f"apps.{app_dir}.main"
+    module_path = "apps.%s.main" % app_dir
     mod = __import__(module_path, None, None, ["App"])
     return mod.App()
 
 
-# ----------------------------- generic app loop ----------------------------
+# ── generic app run loop ──────────────────────────────────────────────────────
 
 def run_app(os_obj, app):
     os_obj._quit_requested = False
@@ -97,23 +75,20 @@ def run_app(os_obj, app):
             dt  = time.ticks_diff(now, last) / 1000.0
             last = now
 
-            # 1. inputs
             os_obj.buttons.update()
             for b in api.BUTTONS:
                 if os_obj.buttons.just_pressed(b):
                     if b == api.BTN_HOME:
-                        os_obj.quit()       # universal: HOME = back to launcher
+                        os_obj.quit()
                     else:
                         app.on_button_press(b)
                 if os_obj.buttons.just_released(b):
                     app.on_button_release(b)
 
-            # 2. tick + render
             app.update(dt)
             app.draw(os_obj.display)
             os_obj.display.present()
 
-            # 3. frame pacing
             elapsed = time.ticks_diff(time.ticks_ms(), now)
             if elapsed < FRAME_MIN_MS:
                 time.sleep_ms(FRAME_MIN_MS - elapsed)
@@ -122,21 +97,19 @@ def run_app(os_obj, app):
         gc.collect()
 
 
-# ----------------------------- crash screen --------------------------------
+# ── crash screen ──────────────────────────────────────────────────────────────
 
 def show_crash(os_obj, name, err):
     d = os_obj.display
     d.clear(api.rgb(60, 0, 0))
     d.rect(0, 0, api.SCREEN_W, 30, api.rgb(180, 30, 30), fill=True)
     d.text("APP CRASHED", 50, 11, api.WHITE, scale=2)
-    d.text(name, 20, 70, api.rgb(255, 220, 100), scale=2)
-    # error message wrapped
+    d.text(name[:14], 20, 50, api.rgb(255, 220, 100), scale=2)
     msg = str(err)
-    for i, line_start in enumerate(range(0, min(len(msg), 120), 30)):
-        d.text(msg[line_start:line_start + 30], 10, 110 + i * 12, api.WHITE)
-    d.text("press any key", 60, api.SCREEN_H - 30, api.rgb(200, 200, 200), scale=2)
+    for i, start in enumerate(range(0, min(len(msg), 150), 28)):
+        d.text(msg[start:start + 28], 8, 90 + i * 14, api.WHITE)
+    d.text("any key to continue", 16, api.SCREEN_H - 22, api.rgb(160, 160, 160))
     d.present()
-    # block until any press
     while True:
         os_obj.buttons.update()
         if any(os_obj.buttons.just_pressed(b) for b in api.BUTTONS):
@@ -144,34 +117,57 @@ def show_crash(os_obj, name, err):
         time.sleep_ms(20)
 
 
-# ----------------------------- menu (internal app) -------------------------
+# ── app menu (icon grid) ──────────────────────────────────────────────────────
 
-class _Menu:
-    """The launcher's app picker. Same lifecycle shape as a regular App so we
-    can drive it through run_app() without special-casing."""
+_ICON_PALETTE = [
+    api.rgb(255, 80, 200),
+    api.rgb(0, 200, 255),
+    api.rgb(255, 160, 0),
+    api.rgb(120, 220, 80),
+    api.rgb(200, 80, 255),
+    api.rgb(255, 120, 60),
+    api.rgb(60, 200, 200),
+    api.rgb(220, 220, 60),
+]
+
+
+class _AppMenu:
+    """Scrollable app selector with coloured icon tiles."""
+
+    COLS    = 2
+    TILE_W  = 100
+    TILE_H  = 80
+    GAP     = 8
+    HEADER  = 30
 
     def __init__(self, apps):
-        self.apps = apps
-        self.sel  = 0
-        self._dirty = True
-        self._os = None
+        self.apps    = apps
+        self.sel     = 0
+        self._dirty  = True
+        self._os     = None
+        self._scroll = 0   # pixel scroll offset (future: smooth scroll)
+
+    # --- lifecycle -----------------------------------------------------------
 
     def on_enter(self, os_obj):
-        self._os = os_obj
+        self._os    = os_obj
         self._dirty = True
 
     def on_exit(self):
         pass
 
     def on_button_press(self, btn):
-        if not self.apps:
+        n = len(self.apps)
+        if not n:
             return
-        if   btn == api.BTN_UP   and self.sel > 0:
-            self.sel -= 1
-            self._dirty = True
-        elif btn == api.BTN_DOWN and self.sel < len(self.apps) - 1:
-            self.sel += 1
-            self._dirty = True
+        if btn == api.BTN_LEFT and self.sel % self.COLS > 0:
+            self.sel -= 1;  self._dirty = True
+        elif btn == api.BTN_RIGHT and self.sel % self.COLS < self.COLS - 1 and self.sel + 1 < n:
+            self.sel += 1;  self._dirty = True
+        elif btn == api.BTN_UP and self.sel >= self.COLS:
+            self.sel -= self.COLS;  self._dirty = True
+        elif btn == api.BTN_DOWN and self.sel + self.COLS < n:
+            self.sel += self.COLS;  self._dirty = True
         elif btn == api.BTN_A:
             self._os.launch(self.apps[self.sel]["dir"])
 
@@ -184,48 +180,81 @@ class _Menu:
     def draw(self, d):
         if not self._dirty:
             return
-        d.clear(api.rgb(8, 8, 20))
+
+        BG  = api.rgb(8, 8, 20)
+        d.clear(BG)
+
         # header
-        d.rect(0, 0, api.SCREEN_W, 30, api.rgb(0, 220, 200), fill=True)
-        d.text("ELIXPO", 8, 11, api.BLACK, scale=2)
-        d.text(VERSION, api.SCREEN_W - 50, 11, api.BLACK)
+        d.rect(0, 0, api.SCREEN_W, self.HEADER, api.rgb(0, 180, 160), fill=True)
+        d.text("APPS", 8, 9, api.BLACK, scale=2)
+        d.text(VERSION, api.SCREEN_W - 44, 11, api.BLACK)
 
         if not self.apps:
-            d.text("no apps in", 60, 140, api.WHITE, scale=2)
-            d.text(APPS_DIR,      80, 170, api.YELLOW, scale=2)
-        else:
-            y0 = 50
-            for i, app in enumerate(self.apps):
-                selected = (i == self.sel)
-                bg = api.rgb(80, 80, 160) if selected else api.rgb(30, 30, 40)
-                tx = api.WHITE            if selected else api.rgb(180, 180, 200)
-                y = y0 + i * 32
-                d.rect(10, y, api.SCREEN_W - 20, 28, bg, fill=True)
-                if selected:
-                    d.text(">", 14, y + 7, api.WHITE, scale=2)
-                d.text(app["name"], 36, y + 7, tx, scale=2)
+            d.text("no apps found", 20, 160, api.WHITE, scale=2)
+            self._dirty = False
+            return
+
+        # icon grid
+        x0 = (api.SCREEN_W - (self.COLS * self.TILE_W + (self.COLS - 1) * self.GAP)) // 2
+
+        for i, app in enumerate(self.apps):
+            col = i % self.COLS
+            row = i // self.COLS
+            tx  = x0 + col * (self.TILE_W + self.GAP)
+            ty  = self.HEADER + self.GAP + row * (self.TILE_H + self.GAP)
+
+            ic  = _ICON_PALETTE[i % len(_ICON_PALETTE)]
+            sel = (i == self.sel)
+
+            tile_bg = api.rgb(25, 25, 45) if not sel else api.rgb(0, 50, 45)
+            d.rect(tx, ty, self.TILE_W, self.TILE_H, tile_bg, fill=True)
+            border_c = ic if sel else api.rgb(40, 40, 70)
+            d.rect(tx, ty, self.TILE_W, self.TILE_H, border_c, fill=False)
+
+            # Large letter icon
+            d.rect(tx + 30, ty + 8, 40, 36, ic, fill=True)
+            d.text(app["name"][0].upper(), tx + 38, ty + 13, api.BLACK, scale=4)
+
+            # App name — up to 8 chars, centered
+            label = app["name"][:9]
+            lx    = tx + (self.TILE_W - len(label) * 8) // 2
+            d.text(label, lx, ty + 56, api.WHITE if sel else api.rgb(160, 160, 190))
+
+            # Selection glow on bottom border
+            if sel:
+                d.rect(tx + 4, ty + self.TILE_H - 3, self.TILE_W - 8, 3, ic, fill=True)
 
         # footer hint
-        d.rect(0, api.SCREEN_H - 20, api.SCREEN_W, 20, api.rgb(10, 10, 20), fill=True)
-        d.text("UP/DN  pick     A  open", 20, api.SCREEN_H - 14, api.rgb(140, 140, 160))
+        foot_y = api.SCREEN_H - 18
+        d.rect(0, foot_y, api.SCREEN_W, 18, api.rgb(10, 10, 20), fill=True)
+        d.text("arrows  nav     A  open", 8, foot_y + 4, api.rgb(100, 100, 130))
 
         self._dirty = False
 
 
-# ----------------------------- boot ----------------------------------------
+# ── boot entry point ─────────────────────────────────────────────────────────
 
 def boot():
     from lix_hw.os import OS
+    from lix_os.splash import show_splash
+    from lix_os.home   import Home
+
     os_obj = OS()
-    show_splash(os_obj.display)
+    show_splash(os_obj)
 
     while True:
         apps = list_apps()
-        menu = _Menu(apps)
-        run_app(os_obj, menu)
+        home = Home(apps)
+        run_app(os_obj, home)
 
         target = os_obj._launch_request
-        if target:
+
+        if target == "__appmenu__":
+            menu = _AppMenu(apps)
+            run_app(os_obj, menu)
+            target = os_obj._launch_request
+
+        if target and target not in (None, "__appmenu__"):
             try:
                 app = load_app(target)
                 run_app(os_obj, app)
