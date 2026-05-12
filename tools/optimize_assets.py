@@ -36,6 +36,12 @@ STATUS_HW_DIR  = Path("assets/status/optimized")
 STATUS_SIZE    = 13
 STATUS_BG      = (255, 93, 104)  # pink status bar — composite SVGs onto this
 
+# Default fill colour for transparent pixels when a per-app override is missing.
+# RGB565 has no alpha, so cleared pixels must be replaced with some colour.
+PER_APP_FILL = {
+    "flappy":   (120, 200, 240),   # bright sky blue (matches Scenery.C_SKY)
+}
+
 # Per-app asset target sizes (W, H) by file stem.
 # Names matching neither this table nor _bg fall back to 32×32.
 PER_APP_SIZES = {
@@ -122,19 +128,23 @@ def optimize(src: Path):
 
 # ── SVG status icon processing ────────────────────────────────────────────────
 
-def optimize_app(app_name):
+def optimize_app(app_name, fill_override=None):
     """Optimize app sprites → optimized/*.py.
 
     Source preference per-file:
       apps/<app>/assets/transparent/<name>.png  (background removed — preferred)
       apps/<app>/assets/raw/<name>.png          (fallback)
+
+    fill_override : (r,g,b) tuple to fill transparent pixels.
+                    Falls back to PER_APP_FILL[app] or BADGE_BG.
     """
     raw_dir  = Path("apps") / app_name / "assets" / "raw"
     tr_dir   = Path("apps") / app_name / "assets" / "transparent"
     out_dir  = Path("apps") / app_name / "assets" / "optimized"
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # Use raw filenames as the manifest; substitute transparent/ when present.
+    fill = fill_override or PER_APP_FILL.get(app_name, BADGE_BG)
+
     raw_pngs = sorted(raw_dir.glob("*.png"))
     sources  = []
     for r in raw_pngs:
@@ -145,22 +155,23 @@ def optimize_app(app_name):
         print("No raw PNGs in", raw_dir)
         return
 
-    print("Optimizing %d asset(s) for app '%s'...\n" % (len(sources), app_name))
+    print("Optimizing %d asset(s) for app '%s'  [fill=rgb%s]...\n"
+          % (len(sources), app_name, fill))
     for src in sources:
         size = PER_APP_SIZES.get(src.stem)
         if size is None:
-            # default 32×32 (or _bg fallback)
             size = (BG_W, BG_H) if src.stem.endswith("_bg") else (ICON_SIZE, ICON_SIZE)
 
         w, h     = size
         img_raw  = Image.open(src)
         hw_img   = img_raw.convert("RGBA").resize((w, h), Image.LANCZOS)
-        hw_rgb   = _fill_transparent(hw_img, BADGE_BG)
+        hw_rgb   = _fill_transparent(hw_img, fill)
         hw_data  = _to_rgb565_bytes(hw_rgb)
         out      = out_dir / ("%s.py" % src.stem)
         _write_py_module(out, hw_data, w, h)
-        print("  %-30s %3dkB raw  →  %dx%d  %dB" % (
-            src.stem, src.stat().st_size // 1024, w, h, out.stat().st_size))
+        flagged  = " (transparent)" if "transparent" in str(src) else ""
+        print("  %-25s  →  %dx%d  %dB%s" %
+              (src.stem, w, h, out.stat().st_size, flagged))
 
 
 def optimize_status_svgs():
@@ -213,9 +224,22 @@ def main():
     if "--app" in sys.argv:
         idx = sys.argv.index("--app")
         if idx + 1 >= len(sys.argv):
-            print("Usage: optimize_assets.py --app <app_name>")
+            print("Usage: optimize_assets.py --app <app_name> [--fill R,G,B]")
             return
-        optimize_app(sys.argv[idx + 1])
+        app = sys.argv[idx + 1]
+        # Optional --fill R,G,B override
+        fill = None
+        if "--fill" in sys.argv:
+            fi = sys.argv.index("--fill")
+            if fi + 1 < len(sys.argv):
+                try:
+                    fill = tuple(int(x) for x in sys.argv[fi + 1].split(","))
+                    if len(fill) != 3:
+                        raise ValueError
+                except ValueError:
+                    print("--fill expects R,G,B (e.g. 120,200,240)")
+                    return
+        optimize_app(app, fill_override=fill)
         return
 
     targets = [a for a in sys.argv[1:] if not a.startswith("--")]
