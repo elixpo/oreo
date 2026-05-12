@@ -68,7 +68,7 @@ def _save_hiscore(v):
 
 # ── asset loaders ────────────────────────────────────────────────────────────
 
-_assets = {}   # name → (data, w, h) or None
+_assets = {}   # name → (bytearray_data, w, h) or None
 
 def _try_import(modname):
     try:
@@ -77,15 +77,49 @@ def _try_import(modname):
         return None
 
 def _load(name):
+    """Return (bytearray, W, H) for a sprite, or None.
+
+    Converts the immutable bytes DATA into a bytearray once and caches it, so
+    the per-frame Display.blit() can wrap it directly without copying.
+    """
     if name in _assets:
         return _assets[name]
     mod = _try_import("apps.flappy.assets.optimized.%s" % name)
     if mod and hasattr(mod, "DATA"):
-        result = (mod.DATA, mod.W, mod.H)
+        ba = bytearray(mod.DATA)            # one-time bytes → bytearray copy
+        result = (ba, mod.W, mod.H)
     else:
         result = None
     _assets[name] = result
     return result
+
+
+def _upscale_to_bytearray(data, w, h, scale_x, scale_y):
+    """Nearest-neighbour upscale `data` (big-endian RGB565 bytes) → bytearray.
+
+    Used once at app init to pre-render the background and grass strip at
+    full screen width. After this, drawing the scenery is a single fast blit.
+    """
+    sw = w * scale_x
+    sh = h * scale_y
+    out  = bytearray(sw * sh * 2)
+    row  = bytearray(sw * 2)
+    for src_row in range(h):
+        # build one horizontal row
+        for col in range(w):
+            base_src = (src_row * w + col) * 2
+            b1 = data[base_src]
+            b0 = data[base_src + 1]
+            base = col * scale_x * 2
+            for dx in range(scale_x):
+                row[base + dx * 2]     = b1
+                row[base + dx * 2 + 1] = b0
+        # stamp the row `scale_y` times via memcpy
+        row_start = src_row * scale_y * sw * 2
+        for dy in range(scale_y):
+            s = row_start + dy * sw * 2
+            out[s: s + sw * 2] = row
+    return out, sw, sh
 
 # ── LCG RNG ──────────────────────────────────────────────────────────────────
 
@@ -97,7 +131,7 @@ def _rand():
 
 def _rand_gap_y(top_margin, bot_margin):
     lo = top_margin
-    hi = SH - GROUND_H - GAP_H - bot_margin
+    hi = PLAY_H - GAP_H - bot_margin
     return lo + _rand() % max(1, hi - lo)
 
 # ── obstacle ─────────────────────────────────────────────────────────────────
@@ -123,25 +157,31 @@ class Obstacle:
         obs = _load("obstacle")
         x = int(self.x)
         if obs:
-            data, ow, oh = obs
-            # Top: stack tiles from y=gap_y-oh upward to y=0
-            y = self.gap_y - oh
-            while y > -oh:
-                d.blit(data, x, max(0, y), ow, oh)
-                # crude clipping when y < 0: just stop drawing past the top
-                if y <= 0:
-                    break
-                y -= oh
-            # Bottom: stack tiles from y=gap_y+GAP_H downward to ground
-            y = self.gap_y + GAP_H
-            while y < SH - GROUND_H:
+            data, ow, oh = obs   # 24 × OBSTACLE_H
+            # Top column: anchor the bottom tile flush with the gap, extend upward.
+            top_h = self.gap_y
+            if top_h > 0:
+                y = self.gap_y - oh                 # bottom of the top column
+                # Anchored tile sits flush at the gap edge.
                 d.blit(data, x, y, ow, oh)
-                y += oh
+                # Extend upward with extra tiles if the column is taller than one tile.
+                y -= oh
+                while y > -oh:
+                    d.blit(data, x, y, ow, oh)
+                    y -= oh
+
+            # Bottom column: anchor top tile flush with the gap edge.
+            bot_y0 = self.gap_y + GAP_H
+            bot_h  = SH - GROUND_H - bot_y0
+            if bot_h > 0:
+                y = bot_y0
+                while y < SH - GROUND_H:
+                    d.blit(data, x, y, ow, oh)
+                    y += oh
         else:
-            # Procedural fallback: solid pipes
             d.rect(x, 0,                  OBSTACLE_W, self.gap_y,       api.GREEN, fill=True)
             d.rect(x, self.gap_y + GAP_H, OBSTACLE_W,
-                   SH - GROUND_H - self.gap_y - GAP_H,                 api.GREEN, fill=True)
+                   SH - GROUND_H - self.gap_y - GAP_H,                  api.GREEN, fill=True)
 
 # ── panda ────────────────────────────────────────────────────────────────────
 
@@ -238,74 +278,65 @@ class Panda:
 # ── scenery (parallax) ───────────────────────────────────────────────────────
 
 class Scenery:
-    """Parallax layers, draw order: background → clouds → (obstacles) → ground.
+    """Pre-rendered scenery — built ONCE in build(), drawn as 2 big blits/frame.
 
-    The background already contains sky + distant hills, so it fills the
-    full play area (above the ground). The flat-sky fill is only used as
-    a fallback when the background asset is missing.
+    The background asset (80×48) is upscaled ×4 in both axes at app init →
+    320×192 bytearray that fills the play area. Likewise grass is upscaled
+    horizontally ×4 → 320×16. After that, the per-frame cost is two
+    chroma-key-free blits + procedural clouds + dynamic obstacles + panda.
     """
     def __init__(self):
-        self.offset = 0.0
+        self.offset    = 0.0
+        self._bg_data  = None   # (bytearray, sw, sh)
+        self._gr_data  = None
+
+    def build(self):
+        """One-time pre-render of background and grass at full screen width."""
+        bg = _load("background")
+        if bg:
+            data, bw, bh = bg
+            sx = max(1, SW     // bw)                       # 320/80 = 4
+            sy = max(1, (PLAY_H + bh - 1) // bh)            # ceil(190/48) = 4
+            self._bg_data = _upscale_to_bytearray(data, bw, bh, sx, sy)
+
+        gr = _load("grass")
+        if gr:
+            data, gw, gh = gr
+            sx = max(1, SW // gw)                           # 320/80 = 4
+            self._gr_data = _upscale_to_bytearray(data, gw, gh, sx, 1)
 
     def update(self, dt):
         self.offset += SCROLL * dt * 0.5
 
     def draw_background(self, d):
-        """Tile the generated background image across the full play area."""
-        bg = _load("background")
-        if bg:
-            data, bw, bh = bg                # typically 80×30
-            # Scale vertically using blit_scale so it covers play area (SH - GROUND_H).
-            # We use scale=1 horizontally (tile) and scale = play_h//bh vertically.
-            play_h = SH - GROUND_H
-            scale_y = max(1, play_h // bh)
-            x0 = -int(self.offset * 0.4) % bw - bw
-            x  = x0
-            while x < SW:
-                # plain tile horizontally
-                for sy in range(scale_y):
-                    d.blit(data, x, sy * bh, bw, bh)
-                x += bw
-            # fill any residual band above the ground with sky colour
-            covered = scale_y * bh
-            if covered < play_h:
-                d.rect(0, covered, SW, play_h - covered, C_SKY, fill=True)
+        if self._bg_data:
+            buf, sw, sh = self._bg_data
+            d.blit(buf, 0, 0, sw, sh)
+            # fill any band left between bg bottom and ground
+            if sh < PLAY_H:
+                d.rect(0, sh, SW, PLAY_H - sh, C_SKY, fill=True)
         else:
-            d.rect(0, 0, SW, SH - GROUND_H, C_SKY, fill=True)
+            d.rect(0, 0, SW, PLAY_H, C_SKY, fill=True)
 
     def draw_clouds(self, d):
-        bg_has_sky = _load("background") is not None
-        if bg_has_sky:
-            return     # background already has clouds painted in
-        # Fallback procedural clouds (only when background asset missing)
+        # Background asset already has clouds painted in — skip the overlay.
+        if self._bg_data is not None:
+            return
         base = int(-(self.offset * 0.25) % (SW + 80))
         for px, py in ((0, 30), (110, 22), (220, 38)):
             cx = ((px - base) % (SW + 80)) - 40
-            self._cloud(d, cx, py)
-
-    def _cloud(self, d, x, y):
-        d.rect(x +  6, y,      26, 10, C_CLOUD, fill=True)
-        d.rect(x,      y + 4,  38, 10, C_CLOUD, fill=True)
-        d.rect(x +  4, y + 12, 30,  6, C_CLOUD, fill=True)
-        d.rect(x +  6, y + 14, 26,  2, C_CLOUD_SH, fill=True)
+            d.rect(cx +  6, py,      26, 10, C_CLOUD, fill=True)
+            d.rect(cx,      py + 4,  38, 10, C_CLOUD, fill=True)
+            d.rect(cx +  4, py + 12, 30,  6, C_CLOUD, fill=True)
+            d.rect(cx +  6, py + 14, 26,  2, C_CLOUD_SH, fill=True)
 
     def draw_ground(self, d):
-        """Thick ground: dirt rect + scrolling grass tile poking above it."""
-        # solid dirt band
+        # Solid dirt rectangle
         d.rect(0, SH - GROUND_H, SW, GROUND_H, C_GROUND, fill=True)
-
-        gr = _load("grass")
-        if not gr:
-            return
-        data, gw, gh = gr   # 80×10 typically
-        # Two rows of grass tile: top row sits ON the dirt edge,
-        # second row repeats below for extra thickness.
-        y_top = SH - GROUND_H - GRASS_TOP   # grass peeks above the dirt
-        x0    = -int(self.offset) % gw - gw
-        x = x0
-        while x < SW:
-            d.blit(data, x, y_top, gw, gh)
-            x += gw
+        # Pre-built grass strip on top of the dirt edge — single blit
+        if self._gr_data:
+            buf, gw, gh = self._gr_data
+            d.blit(buf, 0, SH - GROUND_H - gh // 2, gw, gh)
 
 # ── App ──────────────────────────────────────────────────────────────────────
 
@@ -316,9 +347,10 @@ class App(lix.App):
     def on_enter(self, os):
         self._os         = os
         self._scenery    = Scenery()
+        self._scenery.build()       # one-time upscale of bg + grass (~150 ms total)
         self._panda      = None
         self._obstacles  = []
-        self._spawn_left = 0.0     # seconds until next obstacle
+        self._spawn_left = 0.0
         self._state      = INTRO
         self._hiscore    = _load_hiscore()
         self._new_hi     = False
