@@ -123,12 +123,24 @@ def optimize(src: Path):
 # ── SVG status icon processing ────────────────────────────────────────────────
 
 def optimize_app(app_name):
-    """Optimize all raw PNGs in apps/<app_name>/assets/raw/ → optimized/*.py"""
-    raw_dir = Path("apps") / app_name / "assets" / "raw"
-    out_dir = Path("apps") / app_name / "assets" / "optimized"
+    """Optimize app sprites → optimized/*.py.
+
+    Source preference per-file:
+      apps/<app>/assets/transparent/<name>.png  (background removed — preferred)
+      apps/<app>/assets/raw/<name>.png          (fallback)
+    """
+    raw_dir  = Path("apps") / app_name / "assets" / "raw"
+    tr_dir   = Path("apps") / app_name / "assets" / "transparent"
+    out_dir  = Path("apps") / app_name / "assets" / "optimized"
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    sources = sorted(s for s in raw_dir.glob("*.png"))
+    # Use raw filenames as the manifest; substitute transparent/ when present.
+    raw_pngs = sorted(raw_dir.glob("*.png"))
+    sources  = []
+    for r in raw_pngs:
+        tr = tr_dir / r.name
+        sources.append(tr if tr.exists() else r)
+
     if not sources:
         print("No raw PNGs in", raw_dir)
         return
