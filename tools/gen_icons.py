@@ -25,34 +25,37 @@ PANDA_BASE = (
 
 ICONS = {
     # "flappy_icon": (
-    #     "pixel art cartoon icon: " + PANDA_BASE + " sitting inside a small yellow biplane, "
-    #     "flying between green pipes, side view, cheerful expression, "
-    #     "blue sky background. " + STYLE
+    #     "pixel art cartoon icon: " + PANDA_BASE + " sitting inside a tiny yellow biplane, "
+    #     "flying between two green pipes, side view, arms out for balance, cheerful grin, "
+    #     "bright blue sky background, propeller spinning. " + STYLE
     # ),
     # "snake_icon": (
     #     "pixel art cartoon icon: " + PANDA_BASE + " holding a long green pixel snake "
-    #     "coiled around their arm, playful pose, dark green snake with pixel squares, "
+    #     "coiled around their arm, playful pose, dark green snake with bright pixel squares, "
     #     "white background. " + STYLE
     # ),
-    "gamepad_icon": (
-        "pixel art cartoon icon: " + PANDA_BASE + " holding a small teal game controller "
-        "with dpad and buttons, excited gaming pose, controller glowing teal, "
-        "white background. " + STYLE
-    ),
-    # "wifi_icon": (
-    #     "pixel art cartoon icon: " + PANDA_BASE + " holding up a teal wifi signal bar "
-    #     "icon and a blue bluetooth symbol, one in each hand, happy expression, "
+    # "gamepad_icon": (
+    #     "pixel art cartoon icon: " + PANDA_BASE + " holding a small teal game controller "
+    #     "with dpad and ABXY buttons, excited gaming pose, controller glowing teal, "
     #     "white background. " + STYLE
+    # ),
+    "commits_icon": (
+        "pixel art cartoon icon: " + PANDA_BASE + " typing on a tiny laptop, "
+        "green commit graph bars glowing on screen, sparkles around laptop, "
+        "coding expression, white background. " + STYLE
+    ),
+    # "settings_icon": (
+    #     "pixel art cartoon icon: " + PANDA_BASE + " holding a large gear cog in one hand "
+    #     "and a wifi signal bar in the other, bluetooth symbol floating nearby, "
+    #     "tinkering happy expression, white background. " + STYLE
     # ),
     # "about_icon": (
     #     "pixel art cartoon icon: " + PANDA_BASE + " reading a small open book, "
-    #     "studious expression with small glasses, cute pose, "
-    #     "white background. " + STYLE
+    #     "studious expression with tiny round glasses, white background. " + STYLE
     # ),
     # "identity_icon": (
-    #     "pixel art cartoon icon: " + PANDA_BASE + " holding up a badge/ID card "
-    #     "with star on it, proud pose, lanyard around neck, "
-    #     "white background. " + STYLE
+    #     "pixel art cartoon icon: " + PANDA_BASE + " holding up a conference ID badge card "
+    #     "with a star on it, proud pose, lanyard around neck, white background. " + STYLE
     # ),
 }
 
