@@ -2,7 +2,7 @@
 
 **Asset name:** `mona_sheet`
 **Output size:** 336×96 (7×2 frames of 48×48) → optimized to 168×48
-**Used in:** `apps/flappy/main.py` — panda Mona-style flight + death animations
+**Used in:** `apps/flappy/main.py` — panda flight + death animations
 **Theme reference:** See [THEME.md](../THEME.md)
 
 ## Prompt
