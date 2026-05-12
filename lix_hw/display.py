@@ -150,14 +150,18 @@ class Display(api.Display):
     # ── flush ─────────────────────────────────────────────────────────────────
 
     def present(self):
-        """Push framebuffer to display — no-op if nothing was drawn since last call."""
+        """Push framebuffer to display — no-op if nothing was drawn since last call.
+
+        Address window was set ONCE at init (full screen). We only need to
+        re-issue RAMWR (0x2C) which resets the GRAM write pointer back to (0,0)
+        per the ST7789 datasheet. This halves the per-frame command overhead.
+        """
         if not self._dirty:
             return
         self._dirty = False
         p = self._panel
-        p.set_window(0, 0, api.SCREEN_W - 1, api.SCREEN_H - 1)
         p.cs(0)
-        p.dc(0); p.spi.write(b'\x2C')
+        p.dc(0); p.spi.write(p._ramwr_cmd)   # 0x2C — reset write pointer
         p.dc(1); p.spi.write(self._buf)
         p.cs(1)
 

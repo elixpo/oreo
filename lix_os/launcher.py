@@ -13,7 +13,10 @@ import time
 from lix import api
 
 VERSION      = "v0.1"
-FRAME_MIN_MS = 16        # ≈60 fps cap
+# 30 fps cap: halves the SPI bandwidth per second versus 60 fps, giving the
+# ST7789 panel time to complete its scan-out between writes — the main
+# permanent fix for visible flicker without a wired TE pin.
+FRAME_MIN_MS = 33
 
 _APPS_CANDIDATES = ("/apps", "/remote/apps", "apps")
 

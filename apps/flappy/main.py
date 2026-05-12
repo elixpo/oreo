@@ -15,7 +15,6 @@ Sprites (under apps/flappy/assets/optimized/):
 Controls: A or UP = flap.
 """
 
-import time
 import lix
 from lix import api, font
 
@@ -147,14 +146,17 @@ class Obstacle:
 
 class Panda:
     def __init__(self):
-        self.y         = float(SH // 2)
-        self.vy        = 0.0
-        self.score     = 0
-        self.died_at_s = None     # seconds-since-death, set on die()
-        self.alive_t   = 0.0      # seconds alive (for engine-puff anim phase)
+        # start high so there's time to react
+        self.y          = float((SH - GROUND_H) // 3)
+        self.vy         = 0.0
+        self.score      = 0
+        self.died_at_s  = None     # seconds since die()
+        self.alive_t    = 0.0      # accumulated alive seconds (anim phase)
+        self.has_jumped = False    # gravity engages on first jump (hover before)
 
     def jump(self):
         if not self.is_dead():
+            self.has_jumped = True
             self.vy = FLAP_VY
 
     def update(self, dt, obstacles):
@@ -163,6 +165,11 @@ class Panda:
             self.died_at_s += dt
             return
         self.alive_t += dt
+        if not self.has_jumped:
+            # gentle bob while waiting for first input
+            import math
+            self.y = (SH - GROUND_H) / 3 + math.sin(self.alive_t * 4) * 4
+            return
         self.vy = min(self.vy + GRAVITY * dt, VY_CAP)
         self.y += self.vy * dt
         # Ceiling
@@ -230,60 +237,73 @@ class Panda:
 # ── scenery (parallax) ───────────────────────────────────────────────────────
 
 class Scenery:
+    """Parallax layers, draw order: background → clouds → (obstacles) → ground.
+
+    The background already contains sky + distant hills, so it fills the
+    full play area (above the ground). The flat-sky fill is only used as
+    a fallback when the background asset is missing.
+    """
     def __init__(self):
         self.offset = 0.0
 
     def update(self, dt):
-        self.offset += SCROLL * dt * 0.5    # parallax slower than obstacles
+        self.offset += SCROLL * dt * 0.5
 
-    def _tile_x(self, period, factor):
-        return int(-(self.offset * factor) % period)
-
-    def draw_sky(self, d):
-        # vertical sky gradient — two bands
-        d.rect(0, 0,        SW, SH // 2, C_SKY,      fill=True)
-        d.rect(0, SH // 2,  SW, SH // 2 - GROUND_H, C_SKY_DEEP, fill=True)
+    def draw_background(self, d):
+        """Tile the generated background image across the full play area."""
+        bg = _load("background")
+        if bg:
+            data, bw, bh = bg                # typically 80×30
+            # Scale vertically using blit_scale so it covers play area (SH - GROUND_H).
+            # We use scale=1 horizontally (tile) and scale = play_h//bh vertically.
+            play_h = SH - GROUND_H
+            scale_y = max(1, play_h // bh)
+            x0 = -int(self.offset * 0.4) % bw - bw
+            x  = x0
+            while x < SW:
+                # plain tile horizontally
+                for sy in range(scale_y):
+                    d.blit(data, x, sy * bh, bw, bh)
+                x += bw
+            # fill any residual band above the ground with sky colour
+            covered = scale_y * bh
+            if covered < play_h:
+                d.rect(0, covered, SW, play_h - covered, C_SKY, fill=True)
+        else:
+            d.rect(0, 0, SW, SH - GROUND_H, C_SKY, fill=True)
 
     def draw_clouds(self, d):
-        # 3 procedural clouds at different x positions, scrolling slowly
-        base = self._tile_x(SW + 80, 0.25)
-        positions = [(0, 30), (110, 22), (220, 38)]
-        for px, py in positions:
+        bg_has_sky = _load("background") is not None
+        if bg_has_sky:
+            return     # background already has clouds painted in
+        # Fallback procedural clouds (only when background asset missing)
+        base = int(-(self.offset * 0.25) % (SW + 80))
+        for px, py in ((0, 30), (110, 22), (220, 38)):
             cx = ((px - base) % (SW + 80)) - 40
             self._cloud(d, cx, py)
 
     def _cloud(self, d, x, y):
-        # Fluffy cloud: 4 overlapping circles approximated by rects
         d.rect(x +  6, y,      26, 10, C_CLOUD, fill=True)
         d.rect(x,      y + 4,  38, 10, C_CLOUD, fill=True)
         d.rect(x +  4, y + 12, 30,  6, C_CLOUD, fill=True)
-        # subtle shadow under
         d.rect(x +  6, y + 14, 26,  2, C_CLOUD_SH, fill=True)
 
-    def draw_background(self, d):
-        bg = _load("background")
-        if not bg:
-            return
-        data, bw, bh = bg                # bw=80, bh=30 typically
-        y = SH - GROUND_H - bh           # band sits just above the ground
-        x0 = -int(self.offset * 0.4) % bw - bw
-        x = x0
-        while x < SW:
-            d.blit(data, x, y, bw, bh)
-            x += bw
-
     def draw_ground(self, d):
-        # Solid ground band
+        """Thick ground: dirt rect + scrolling grass tile poking above it."""
+        # solid dirt band
         d.rect(0, SH - GROUND_H, SW, GROUND_H, C_GROUND, fill=True)
+
         gr = _load("grass")
         if not gr:
             return
-        data, gw, gh = gr   # 80×10
-        y = SH - GROUND_H
-        x0 = -int(self.offset * 1.0) % gw - gw
+        data, gw, gh = gr   # 80×10 typically
+        # Two rows of grass tile: top row sits ON the dirt edge,
+        # second row repeats below for extra thickness.
+        y_top = SH - GROUND_H - GRASS_TOP   # grass peeks above the dirt
+        x0    = -int(self.offset) % gw - gw
         x = x0
         while x < SW:
-            d.blit(data, x, y, gw, gh)
+            d.blit(data, x, y_top, gw, gh)
             x += gw
 
 # ── App ──────────────────────────────────────────────────────────────────────
@@ -349,9 +369,8 @@ class App(lix.App):
 
     def draw(self, d):
         # ── world ────────────────────────────────────────────────────────────
-        self._scenery.draw_sky(d)
-        self._scenery.draw_clouds(d)
         self._scenery.draw_background(d)
+        self._scenery.draw_clouds(d)
 
         for o in self._obstacles:
             o.draw(d)

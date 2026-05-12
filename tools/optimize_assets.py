@@ -36,25 +36,34 @@ STATUS_HW_DIR  = Path("assets/status/optimized")
 STATUS_SIZE    = 13
 STATUS_BG      = (255, 93, 104)  # pink status bar — composite SVGs onto this
 
-# Default fill colour for transparent pixels when a per-app override is missing.
-# RGB565 has no alpha, so cleared pixels must be replaced with some colour.
+# Chroma-key magenta. Packs to RGB565 0xF81F (bytes [0xF8, 0x1F]). Any sprite
+# pixel matching this value is treated as transparent by display.blit().
+CHROMA_KEY = (248, 0, 248)
+
+# Per-app: fill for OPAQUE assets (transparent pixels get this colour, no key).
 PER_APP_FILL = {
-    "flappy":   (120, 200, 240),   # bright sky blue (matches Scenery.C_SKY)
+    "flappy":   (120, 200, 240),
+}
+
+# Per-app: stems that should be treated as OPAQUE (no chroma key, full coverage).
+# Everything else uses CHROMA_KEY as the transparent fill.
+PER_APP_OPAQUE = {
+    "flappy":   {"background", "grass"},
 }
 
 # Per-app asset target sizes (W, H) by file stem.
 # Names matching neither this table nor _bg fall back to 32×32.
 PER_APP_SIZES = {
-    # flappy game
+    # flappy game — sprite sizes chosen for chroma-key transparency on hardware
     "panda_up_a":   (24, 24),   # alive frame 0 — idle engine
     "panda_up_b":   (24, 24),   # alive frame 1 — exhaust on (alternates with _a)
     "panda_down":   (24, 24),   # falling
     "panda_crash":  (24, 24),   # death frame 0 — tumbling
     "panda_blast":  (24, 24),   # death frame 1 — explosion
-    "obstacle":     (24, 24),
-    "background":   (80, 30),
+    "obstacle":     (24, 80),   # tall pipe segment so 1-2 blits cover a column
+    "background":   (80, 48),   # ×4 scale at app init → 320×192 full bg
     "cloud":        (40, 20),
-    "grass":        (80, 10),
+    "grass":        (80, 16),   # full-width tile, taller for thicker grass strip
 }
 
 

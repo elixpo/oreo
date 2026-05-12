@@ -20,10 +20,23 @@ _RASET   = 0x2B
 _RAMWR   = 0x2C
 _MADCTL  = 0x36
 _COLMOD  = 0x3A
+_PORCTRL = 0xB2     # Porch control (front/back porch lines)
+_FRCTRL2 = 0xC6     # Frame rate control in normal mode
+_VCOMS   = 0xBB     # VCOM voltage
+_LCMCTRL = 0xC0     # LCM control
+_VDVVRHEN= 0xC2
+_VRHS    = 0xC3
+_VDVS    = 0xC4
 
 # MADCTL orientation bits — landscape 320×240
 # MX=1 (0x40) | MV=1 (0x20) = 0x60 → 90° CW rotation
 _MADCTL_LANDSCAPE = 0x60
+
+# Frame-rate control (FRCTRL2) values per ST7789 datasheet:
+#   0x0F = 60Hz (default), 0x1F = 39Hz, 0x18 = 50Hz, 0x14 = 55Hz
+# Slowing the panel to ~50Hz gives more margin for SPI writes to complete
+# inside the vertical-blanking interval, reducing tearing/flicker.
+_FRAME_RATE = 0x18   # ~50 Hz
 
 
 class ST7789:
@@ -32,6 +45,8 @@ class ST7789:
         self.dc, self.cs, self.rst, self.bl = dc, cs, rst, bl
         self.width, self.height = width, height
         self._win = bytearray(4)
+        # _RAMWR_BUF cached so present() doesn't allocate every frame.
+        self._ramwr_cmd = bytes([_RAMWR])
 
     # --- low-level: send command (with optional data bytes) ---
     def _cmd(self, c, data=None):
@@ -52,11 +67,21 @@ class ST7789:
         self._hard_reset()
         self._cmd(_SWRESET); time.sleep_ms(150)
         self._cmd(_SLPOUT);  time.sleep_ms(500)
-        self._cmd(_COLMOD, b'\x55')                       # 16bpp RGB565
-        self._cmd(_MADCTL, bytes([_MADCTL_LANDSCAPE]))    # landscape 320×240
-        self._cmd(_CASET,  b'\x00\x00\x01\x3F')           # cols 0..319
-        self._cmd(_RASET,  b'\x00\x00\x00\xEF')           # rows 0..239
-        self._cmd(_INVON);  time.sleep_ms(10)        # IPS panels need inversion ON
+        self._cmd(_COLMOD, b'\x55')                        # 16bpp RGB565
+        self._cmd(_MADCTL, bytes([_MADCTL_LANDSCAPE]))     # landscape 320×240
+        # ── Power / timing config to reduce visible refresh artifacts ────
+        # PORCTRL: extend front+back porch → larger vblank window for SPI writes
+        self._cmd(_PORCTRL,  b'\x0C\x0C\x00\x33\x33')
+        self._cmd(_FRCTRL2,  bytes([_FRAME_RATE]))         # slow refresh ~50Hz
+        self._cmd(_LCMCTRL,  b'\x2C')
+        self._cmd(_VDVVRHEN, b'\x01')
+        self._cmd(_VRHS,     b'\x12')
+        self._cmd(_VDVS,     b'\x20')
+        self._cmd(_VCOMS,    b'\x20')
+        # ── Address window: set ONCE — present() reissues RAMWR only ────
+        self._cmd(_CASET,  b'\x00\x00\x01\x3F')            # cols 0..319
+        self._cmd(_RASET,  b'\x00\x00\x00\xEF')            # rows 0..239
+        self._cmd(_INVON);  time.sleep_ms(10)              # IPS needs inversion
         self._cmd(_NORON);  time.sleep_ms(10)
         self._cmd(_DISPON); time.sleep_ms(100)
         self.bl(1)

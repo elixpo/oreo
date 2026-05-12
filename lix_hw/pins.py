@@ -13,7 +13,9 @@ DISPLAY_DC    = 15
 DISPLAY_MOSI  = 11     # display silkscreen: SDA
 DISPLAY_SCK   = 12     # display silkscreen: SCL
 DISPLAY_BL    = 17     # display silkscreen: EN. Active-high, PWM-capable for brightness
-DISPLAY_BAUD  = 40_000_000  # 40MHz SPI — ST7789P3 max is 62.5MHz, 40 is safe on breadboard
+DISPLAY_BAUD  = 32_000_000  # 32MHz SPI — slower than the panel max (62.5MHz),
+                            # giving headroom for stability and reducing flicker
+                            # caused by occasional SPI bit errors on the breadboard.
 
 # ----- Buttons (active-low, internal pull-up) -----
 BTN_HOME   = 9
