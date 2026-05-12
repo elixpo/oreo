@@ -75,23 +75,29 @@ ICONS = {
     #     "happiness hunger and cleanliness, cute cozy tamagotchi virtual pet style, "
     #     "soft pastel warm background. " + STYLE
     # ),
-    "elixpo_sketch_icon": (
-        "pixel art cartoon icon: " + PANDA_BASE + " holding two large knob dials "
-        "like an Etch-A-Sketch toy, small pixel canvas behind showing a heart drawn "
-        "in chunky pixels, tiny artist beret on head, excited creative expression, "
-        "white background. " + STYLE
-    ),
-    "IR_Quest_icon": (
-        "pixel art cartoon icon: " + PANDA_BASE + " holding a glowing infrared beacon "
-        "device like a torch, shooting hot-pink IR signal arc waves outward, "
-        "explorer safari hat on head, dark navy adventure background with glowing "
-        "pink signal rings radiating out. " + STYLE
-    ),
-    "commits_breaker_icon": (
-        "pixel art cartoon icon: " + PANDA_BASE + " playing brick breaker arcade game, "
-        "rows of colourful bricks at top shaped like git commit squares, "
-        "panda swinging a paddle at the bottom, green glowing ball bouncing upward, "
-        "retro arcade cabinet style, dark background with neon colours. " + STYLE
+    # "elixpo_sketch_icon": (
+    #     "pixel art cartoon icon: " + PANDA_BASE + " holding two large knob dials "
+    #     "like an Etch-A-Sketch toy, small pixel canvas behind showing a heart drawn "
+    #     "in chunky pixels, tiny artist beret on head, excited creative expression, "
+    #     "white background. " + STYLE
+    # ),
+    # "IR_Quest_icon": (
+    #     "pixel art cartoon icon: " + PANDA_BASE + " holding a glowing infrared beacon "
+    #     "device like a torch, shooting hot-pink IR signal arc waves outward, "
+    #     "explorer safari hat on head, dark navy adventure background with glowing "
+    #     "pink signal rings radiating out. " + STYLE
+    # ),
+    # "commits_breaker_icon": (
+    #     "pixel art cartoon icon: " + PANDA_BASE + " playing brick breaker arcade game, "
+    #     "rows of colourful bricks at top shaped like git commit squares, "
+    #     "panda swinging a paddle at the bottom, green glowing ball bouncing upward, "
+    #     "retro arcade cabinet style, dark background with neon colours. " + STYLE
+    # ),
+    "wallpaper_icon": (
+        "pixel art cartoon icon: " + PANDA_BASE + " painting a tiny rectangular screen "
+        "canvas with a brush, screen showing a beautiful pixel art starfield pattern "
+        "with circuit board lines and glowing dots, artist smock on, paint palette "
+        "in other hand, neon teal and magenta colours on canvas, white background. " + STYLE
     ),
 }
 
