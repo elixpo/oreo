@@ -6,3 +6,5 @@ from .api import (
     Display, Buttons, IR, LEDs, ADC, OS,
 )
 from .app import App
+from . import font
+from .sprite import SpriteSheet, Animation
