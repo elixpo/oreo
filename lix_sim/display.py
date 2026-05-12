@@ -77,16 +77,10 @@ class SimDisplay(api.Display):
                         )
 
     def blit(self, sprite, x, y, w, h):
-        """Copy a w×h RGB565 sprite (bytes-like) to (x, y).
-
-        Fast path: convert the whole sprite to a pygame Surface at once, then
-        scale it and blit it — avoids a Python loop over every pixel.
-        """
+        """Copy a w×h big-endian RGB565 sprite to (x, y). Magenta is transparent."""
         import struct
         n = w * h
-        # Unpack big-endian RGB565 words
         words = struct.unpack_from(">%dH" % n, sprite, 0)
-        # Build a 24-bit RGB surface
         surf = pygame.Surface((w, h))
         pa   = pygame.PixelArray(surf)
         for row in range(h):
@@ -97,6 +91,8 @@ class SimDisplay(api.Display):
                 b = ( word        & 0x1F) << 3
                 pa[col][row] = surf.map_rgb(r, g, b)
         del pa
+        # Chroma-key: pygame treats this colour as transparent on subsequent blits.
+        surf.set_colorkey((248, 0, 248))
         if SCALE != 1:
             surf = pygame.transform.scale(surf, (w * SCALE, h * SCALE))
         self._surf.blit(surf, (x * SCALE, y * SCALE))

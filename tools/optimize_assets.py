@@ -140,19 +140,21 @@ def optimize(src: Path):
 def optimize_app(app_name, fill_override=None):
     """Optimize app sprites → optimized/*.py.
 
-    Source preference per-file:
+    Sources (per-file preference):
       apps/<app>/assets/transparent/<name>.png  (background removed — preferred)
       apps/<app>/assets/raw/<name>.png          (fallback)
 
-    fill_override : (r,g,b) tuple to fill transparent pixels.
-                    Falls back to PER_APP_FILL[app] or BADGE_BG.
+    Cleared (alpha=0) pixels are filled with:
+      • PER_APP_FILL[app] (e.g. sky blue) for stems in PER_APP_OPAQUE[app]
+      • CHROMA_KEY magenta for everything else → blit() treats as transparent
     """
     raw_dir  = Path("apps") / app_name / "assets" / "raw"
     tr_dir   = Path("apps") / app_name / "assets" / "transparent"
     out_dir  = Path("apps") / app_name / "assets" / "optimized"
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    fill = fill_override or PER_APP_FILL.get(app_name, BADGE_BG)
+    opaque_fill = fill_override or PER_APP_FILL.get(app_name, BADGE_BG)
+    opaque_set  = PER_APP_OPAQUE.get(app_name, set())
 
     raw_pngs = sorted(raw_dir.glob("*.png"))
     sources  = []
@@ -164,23 +166,26 @@ def optimize_app(app_name, fill_override=None):
         print("No raw PNGs in", raw_dir)
         return
 
-    print("Optimizing %d asset(s) for app '%s'  [fill=rgb%s]...\n"
-          % (len(sources), app_name, fill))
+    print("Optimizing %d asset(s) for app '%s'  [opaque-fill=rgb%s, chroma-key=rgb%s]...\n"
+          % (len(sources), app_name, opaque_fill, CHROMA_KEY))
     for src in sources:
         size = PER_APP_SIZES.get(src.stem)
         if size is None:
             size = (BG_W, BG_H) if src.stem.endswith("_bg") else (ICON_SIZE, ICON_SIZE)
 
-        w, h     = size
+        w, h = size
+        is_opaque = src.stem in opaque_set
+        fill      = opaque_fill if is_opaque else CHROMA_KEY
+
         img_raw  = Image.open(src)
         hw_img   = img_raw.convert("RGBA").resize((w, h), Image.LANCZOS)
         hw_rgb   = _fill_transparent(hw_img, fill)
         hw_data  = _to_rgb565_bytes(hw_rgb)
         out      = out_dir / ("%s.py" % src.stem)
         _write_py_module(out, hw_data, w, h)
-        flagged  = " (transparent)" if "transparent" in str(src) else ""
-        print("  %-25s  →  %dx%d  %dB%s" %
-              (src.stem, w, h, out.stat().st_size, flagged))
+        kind = "opaque" if is_opaque else "key"
+        print("  %-25s  →  %dx%d  %5dB  [%s]" %
+              (src.stem, w, h, out.stat().st_size, kind))
 
 
 def optimize_status_svgs():

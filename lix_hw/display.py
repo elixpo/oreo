@@ -25,6 +25,13 @@ def _swap(c):
     return ((c & 0xFF) << 8) | ((c >> 8) & 0xFF)
 
 
+# Chroma-key: sprite pixels equal to this 16-bit value are treated as transparent.
+# Optimizer fills cleared pixels with RGB565 magenta 0xF81F, packed big-endian as
+# bytes [0xF8, 0x1F]. framebuf.RGB565 interprets these bytes as little-endian uint16
+# → (0x1F << 8) | 0xF8 = 0x1FF8. So we pass that to framebuf.blit's `key` arg.
+CHROMA_KEY = 0x1FF8
+
+
 class Display(api.Display):
     def __init__(self):
         spi = SPI(
@@ -88,14 +95,18 @@ class Display(api.Display):
         self._dirty = True
 
     def blit(self, sprite, x, y, w, h):
-        # Sprite is big-endian RGB565 bytes. Our framebuf convention is also
-        # big-endian (primitives go through _swap() to land that way), so
-        # we just copy the raw bytes — framebuf.blit() is byte-level memcpy
-        # for matching RGB565 → RGB565.
-        n = w * h
-        buf = bytearray(sprite[:n * 2])
+        """Blit a sprite (big-endian RGB565 bytes). Magenta is transparent.
+
+        Fast path: if `sprite` is already a bytearray, framebuf wraps it
+        directly with no copy. Apps should cache loaded sprites as bytearray
+        (e.g. via the `_load()` helper) to avoid per-blit allocation.
+        """
+        if isinstance(sprite, bytearray):
+            buf = sprite
+        else:
+            buf = bytearray(sprite[:w * h * 2])
         src = framebuf.FrameBuffer(buf, w, h, framebuf.RGB565)
-        self._fb.blit(src, x, y)
+        self._fb.blit(src, x, y, CHROMA_KEY)
         self._dirty = True
 
     def blit_scale(self, sprite, x, y, w, h, scale, dim=0.0):

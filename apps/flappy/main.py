@@ -29,10 +29,11 @@ VY_CAP      = 320.0   # px/s
 SCROLL      = 90.0    # px/s
 SPAWN_SEC   = 1.7     # seconds between obstacle spawns
 OBSTACLE_W  = 24
-GAP_H       = 78
+OBSTACLE_H  = 80      # one tile is 80 px tall — usually one blit covers a column
+GAP_H       = 86
 PANDA_X     = 40
-GROUND_H    = 38      # thicker grass strip
-GRASS_TOP   = 8       # how far the grass tile pokes above the dirt
+GROUND_H    = 50      # thicker grass+dirt strip
+PLAY_H      = SH - GROUND_H
 
 # ── colours ──────────────────────────────────────────────────────────────────
 
