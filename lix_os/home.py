@@ -45,7 +45,7 @@ def _load_bg():
     if _bg_cache is not None:
         return _bg_cache if _bg_cache is not False else None
     try:
-        import assets.icons.home_bg as m
+        import assets.icons.optimized.home_bg as m
         _bg_cache = (m.DATA, m.W, m.H)
         return _bg_cache
     except (ImportError, AttributeError):
@@ -53,7 +53,7 @@ def _load_bg():
     try:
         from PIL import Image
         import struct
-        img = Image.open("asset/icons/home_bg.png").convert("RGBA")
+        img = Image.open("assets/icons/raw/home_bg.png").convert("RGBA")
         img = img.resize((80, 60), Image.LANCZOS)
         bg  = Image.new("RGBA", (80, 60),
                         (theme.BG_R, theme.BG_G, theme.BG_B, 255))
@@ -89,8 +89,8 @@ def _load_apps_icon():
 def _load_status_icon(name):
     """Try to load a pre-baked 13×13 status icon. Returns (data,w,h) or None."""
     try:
-        mod = __import__("assets.status.%s" % name,
-                         fromlist=["DATA", "W", "H"])
+        mod = __import__("assets.status.optimized.%s" % name,
+                         None, None, ["DATA", "W", "H"])
         return (mod.DATA, mod.W, mod.H)
     except ImportError:
         return None
