@@ -36,8 +36,9 @@ _DATE_Y  = _CLOCK_Y + 32 + 8                  # ≈ 125
 
 # ── asset loaders (pipeline only — no procedural fallback drawing) ─────────────
 
-_bg_cache   = None
-_apps_cache = None
+_bg_cache         = None
+_apps_cache       = None
+_scaled_bg_cache  = None   # pre-rendered 320×240 RGB565 (big-endian) bytearray
 
 
 def _load_bg():
@@ -71,6 +72,64 @@ def _load_bg():
     except Exception:
         _bg_cache = False
     return None
+
+
+def _get_scaled_bg():
+    """Return (bytes, w, h) for the pre-scaled & dimmed home background.
+
+    Built once on first call; cached for the lifetime of the process.
+    Scaling at draw time is too slow (~100ms) and causes visible flicker.
+    """
+    global _scaled_bg_cache
+    if _scaled_bg_cache is not None:
+        return _scaled_bg_cache if _scaled_bg_cache is not False else None
+
+    bg = _load_bg()
+    if not bg:
+        _scaled_bg_cache = False
+        return None
+
+    import struct
+    data, bw, bh = bg
+    SCALE = 4
+    DIM   = 0.45
+    sw    = bw * SCALE
+    sh    = bh * SCALE
+    n     = bw * bh
+    words = struct.unpack(">%dH" % n, data[:n * 2])
+
+    out  = bytearray(sw * sh * 2)
+    row  = bytearray(sw * 2)
+
+    br, bg_, bb = theme.BG_R, theme.BG_G, theme.BG_B
+
+    for src_row in range(bh):
+        base_w = src_row * bw
+        for col in range(bw):
+            v = words[base_w + col]
+            # apply dim
+            r = ((v >> 11) & 0x1F) << 3
+            g = ((v >>  5) & 0x3F) << 2
+            b = ( v        & 0x1F) << 3
+            r = int(r + (br  - r) * DIM)
+            g = int(g + (bg_ - g) * DIM)
+            b = int(b + (bb  - b) * DIM)
+            v = ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3)
+            # big-endian bytes (high byte first) — matches framebuf convention
+            b1 = v >> 8
+            b0 = v & 0xFF
+            base = col * SCALE * 2
+            for dx in range(SCALE):
+                row[base + dx * 2]     = b1
+                row[base + dx * 2 + 1] = b0
+
+        row_start = src_row * SCALE * sw * 2
+        for dy in range(SCALE):
+            s = row_start + dy * sw * 2
+            out[s:s + sw * 2] = row
+
+    _scaled_bg_cache = (out, sw, sh)
+    return _scaled_bg_cache
 
 
 def _load_apps_icon():
@@ -150,15 +209,17 @@ class Home(lix.App):
     name = "home"
 
     def __init__(self, app_list):
-        self._apps      = app_list
-        self._dock      = [_DockEntry("APPS", "__appmenu__", "apps_icon.png")]
-        self._dock_sel  = 0
-        self._dirty     = True
-        self._last_sec  = -1
-        self._blink     = True
-        self._wifi_ok   = False
-        self._bt_on     = False
-        self._last_net  = -1   # refresh network status every 5s
+        self._apps         = app_list
+        self._dock         = [_DockEntry("APPS", "__appmenu__", "apps_icon.png")]
+        self._dock_sel     = 0
+        self._dirty        = True   # full redraw (background + everything)
+        self._clock_dirty  = False  # repaint only clock+date band
+        self._status_dirty = False  # repaint only status bar
+        self._last_sec     = -1
+        self._blink        = True
+        self._wifi_ok      = False
+        self._bt_on        = False
+        self._last_net     = -1
 
     def on_enter(self, os):
         super().on_enter(os)
@@ -180,7 +241,8 @@ class Home(lix.App):
         if s != self._last_sec:
             self._last_sec = s
             self._blink    = not self._blink
-            self._dirty    = True
+            # Only the clock area needs repainting on tick — NOT the full screen
+            self._clock_dirty = True
         # Poll network status every ~5 seconds
         if s % 5 == 0 and s != self._last_net:
             self._last_net = s
@@ -192,53 +254,82 @@ class Home(lix.App):
                 wifi_ok = False
                 bt_on   = False
             if wifi_ok != self._wifi_ok or bt_on != self._bt_on:
-                self._wifi_ok  = wifi_ok
-                self._bt_on    = bt_on
-                self._dirty    = True
+                self._wifi_ok = wifi_ok
+                self._bt_on   = bt_on
+                self._status_dirty = True
 
     def draw(self, d):
-        if not self._dirty:
+        full = self._dirty
+        clock_only  = (not full) and getattr(self, "_clock_dirty", False)
+        status_only = (not full) and getattr(self, "_status_dirty", False)
+        if not (full or clock_only or status_only):
             return
 
         h, m, s, wd, day, mon, yr = timeutil.now()
 
-        # ── background ────────────────────────────────────────────────────
-        d.clear(theme.BG)   # warm ivory fallback
+        if full:
+            # ── background (uses cached pre-scaled buffer) ──────────────
+            sbg = _get_scaled_bg()
+            if sbg:
+                data, sw, sh = sbg
+                d.blit(data, 0, _MAIN_TOP, sw, sh)
+            else:
+                d.clear(theme.BG)
 
-        bg = _load_bg()
-        if bg:
-            data, bw, bh = bg
-            d.blit_scale(data, 0, _MAIN_TOP, bw, bh, 4, dim=0.45)
+            self._draw_status_bar(d, h, m)
+            self._draw_clock_area(d, h, m, wd, day, mon, yr)
+            self._draw_dock(d)
+            self._dirty = False
+            self._clock_dirty = False
+            self._status_dirty = False
+            return
 
-        # ── status bar ────────────────────────────────────────────────────
+        if clock_only:
+            # Clear ONLY the clock+date area, then redraw
+            self._draw_clock_area(d, h, m, wd, day, mon, yr)
+            self._clock_dirty = False
+
+        if status_only:
+            self._draw_status_bar(d, h, m)
+            self._status_dirty = False
+
+    def _draw_status_bar(self, d, h, m):
         d.rect(0, 0, SW, _STATUS_H, theme.STATUS_BG, fill=True)
-
-        # time on the LEFT
-        time_str = "%02d:%02d" % (h, m)
-        d.text(time_str, 6, 7, api.WHITE)
-
-        # icons on the RIGHT: battery | bt | wifi  ←  right edge
+        d.text("%02d:%02d" % (h, m), 6, 7, api.WHITE)
         _icon_battery(d, SW - 28, 6, pct=85)
         _icon_bt     (d, SW - 44, 4, active=self._bt_on)
         _icon_wifi   (d, SW - 60, 5, connected=self._wifi_ok)
 
-        # ── hero clock ────────────────────────────────────────────────────
-        char_w  = 8 * 4                   # 32px per char at scale=4
-        total_w = 5 * char_w              # 160px for "HH:MM"
-        cx      = (SW - total_w) // 2     # 80
+    def _draw_clock_area(self, d, h, m, wd, day, mon, yr):
+        # Repaint just the clock band over the (cached) background.
+        # We re-blit the relevant slice of the cached scaled bg as our "erase".
+        sbg = _get_scaled_bg()
+        if sbg:
+            data, sw, sh = sbg
+            # Slice rows _CLOCK_Y..(_DATE_Y+8) from the cached bg
+            slice_y = _CLOCK_Y - _MAIN_TOP
+            slice_h = (_DATE_Y + 8) - _CLOCK_Y
+            row_bytes = sw * 2
+            start = slice_y * row_bytes
+            end   = start + slice_h * row_bytes
+            d.blit(data[start:end], 0, _CLOCK_Y, sw, slice_h)
+        else:
+            d.rect(0, _CLOCK_Y, SW, (_DATE_Y + 8) - _CLOCK_Y, theme.BG, fill=True)
 
+        char_w  = 8 * 4
+        total_w = 5 * char_w
+        cx      = (SW - total_w) // 2
         colon_c = theme.TEXT_BRIGHT if self._blink else theme.MUTED
-
         d.text("%02d" % h, cx,              _CLOCK_Y, theme.TEXT_BRIGHT, scale=4)
         d.text(":",        cx + 2 * char_w, _CLOCK_Y, colon_c,           scale=4)
         d.text("%02d" % m, cx + 3 * char_w, _CLOCK_Y, theme.TEXT_BRIGHT, scale=4)
 
-        # ── date ──────────────────────────────────────────────────────────
         date_str = "%s %d %s %d" % (wd, day, mon, yr)
         dx = max(0, (SW - len(date_str) * 8) // 2)
         d.text(date_str, dx, _DATE_Y, api.WHITE)
 
         # ── dock ──────────────────────────────────────────────────────────
+    def _draw_dock(self, d):
         d.rect(0, _DOCK_Y, SW, _DOCK_H, theme.DOCK_BG, fill=True)
         d.rect(0, _DOCK_Y, SW, 1, theme.PRIMARY, fill=True)
 
@@ -256,26 +347,18 @@ class Home(lix.App):
                 d.rect(ix - TILE_PAD, iy - TILE_PAD,
                        ICON_SZ + TILE_PAD * 2, ICON_SZ + TILE_PAD * 2,
                        theme.SEL_BORDER, fill=False)
-
             if entry.action == "__appmenu__":
                 icon = _load_apps_icon()
-                if icon:
-                    idata, iw, ih = icon
-                    d.blit(idata, ix + (ICON_SZ - iw) // 2,
-                           iy + (ICON_SZ - ih) // 2, iw, ih)
-                else:
-                    _draw_grid_fallback(d, ix + 2, iy + 2, ICON_SZ - 4)
             else:
                 from lix_os.icons import load as _load
                 icon = _load(entry.action, entry.icon_file)
-                if icon:
-                    idata, iw, ih = icon
-                    d.blit(idata, ix + (ICON_SZ - iw) // 2,
-                           iy + (ICON_SZ - ih) // 2, iw, ih)
-
+            if icon:
+                idata, iw, ih = icon
+                d.blit(idata, ix + (ICON_SZ - iw) // 2,
+                       iy + (ICON_SZ - ih) // 2, iw, ih)
+            elif entry.action == "__appmenu__":
+                _draw_grid_fallback(d, ix + 2, iy + 2, ICON_SZ - 4)
             ix += ICON_SZ + gap
-
-        self._dirty = False
 
 
 def _draw_grid_fallback(d, x, y, size):

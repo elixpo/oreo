@@ -121,21 +121,36 @@ def show_crash(os_obj, name, err):
 # ── app menu (icon grid) — 320×240 landscape ──────────────────────────────────
 
 class _AppMenu:
-    """4-column icon grid. Icons only — no tile boxes. Faint border on select.
-    All 4 nav directions wrap around circularly."""
+    """Grid of app icons with labels underneath.
+
+    Nav:
+      LEFT/RIGHT  → linear traversal across rows (wraps at ends)
+      UP/DOWN     → row navigation (wraps top↔bottom, clamps on partial row)
+      A           → launch
+    """
 
     COLS    = 4
-    ICON_SZ = 48    # display size for each icon (px)
-    GAP_X   = 20
-    GAP_Y   = 18
-    HEADER  = 28
-    SEL_PAD = 4     # padding around selected icon for the border
+    ICON_SZ = 56          # bigger icons
+    LABEL_H = 12          # space for one line of 8x8 text + 4px gap
+    GAP_X   = 16
+    GAP_Y   = 12
+    HEADER  = 26
+    SEL_PAD = 4
 
     def __init__(self, apps):
         self.apps   = apps
         self.sel    = 0
         self._dirty = True
         self._os    = None
+        # Preload all icons up-front so first frame draws fast
+        self._icons = {}
+        if apps:
+            from lix_os import icons as _icons
+            for a in apps:
+                key = a["dir"]
+                result = _icons.load(key, a.get("icon"))
+                if result:
+                    self._icons[key] = result
 
     def on_enter(self, os_obj):
         self._os    = os_obj
@@ -144,30 +159,37 @@ class _AppMenu:
     def on_exit(self):
         pass
 
-    def _move(self, delta_col, delta_row):
-        n    = len(self.apps)
-        if not n: return
-        cols = self.COLS
-        rows = (n + cols - 1) // cols
-        col  = self.sel % cols
-        row  = self.sel // cols
-
-        new_col = (col + delta_col) % cols
-        new_row = (row + delta_row) % rows
-        new_sel = new_row * cols + new_col
-        # if last row is partial, clamp to last item
-        self.sel = min(new_sel, n - 1)
-        self._dirty = True
-
     def on_button_press(self, btn):
         n = len(self.apps)
         if not n: return
-        if   btn == api.BTN_LEFT:  self._move(-1,  0)
-        elif btn == api.BTN_RIGHT: self._move( 1,  0)
-        elif btn == api.BTN_UP:    self._move( 0, -1)
-        elif btn == api.BTN_DOWN:  self._move( 0,  1)
+        cols = self.COLS
+
+        if btn == api.BTN_LEFT:
+            self.sel = (self.sel - 1) % n
+        elif btn == api.BTN_RIGHT:
+            self.sel = (self.sel + 1) % n
+        elif btn == api.BTN_UP:
+            new = self.sel - cols
+            if new < 0:
+                # wrap to corresponding column in bottom row
+                col = self.sel % cols
+                rows = (n + cols - 1) // cols
+                new = (rows - 1) * cols + col
+                if new >= n:
+                    new -= cols
+            self.sel = new
+        elif btn == api.BTN_DOWN:
+            new = self.sel + cols
+            if new >= n:
+                # wrap to corresponding column in top row
+                new = self.sel % cols
+            self.sel = new
         elif btn == api.BTN_A:
             self._os.launch(self.apps[self.sel]["dir"])
+            return
+        else:
+            return
+        self._dirty = True
 
     def on_button_release(self, btn):
         pass
@@ -196,18 +218,18 @@ class _AppMenu:
             self._dirty = False
             return
 
-        # ── icon grid (centred) ───────────────────────────────────────────
-        cols    = self.COLS
-        n       = len(self.apps)
-        rows    = (n + cols - 1) // cols
-        cell_w  = self.ICON_SZ + self.GAP_X
-        cell_h  = self.ICON_SZ + self.GAP_Y
+        # ── icon grid (centred horizontally, snug under header) ──────────
+        cols   = self.COLS
+        n      = len(self.apps)
+        rows   = (n + cols - 1) // cols
+        cell_w = self.ICON_SZ + self.GAP_X
+        cell_h = self.ICON_SZ + self.LABEL_H + self.GAP_Y
 
-        grid_w  = cols * self.ICON_SZ + (cols - 1) * self.GAP_X
-        grid_h  = rows * self.ICON_SZ + (rows - 1) * self.GAP_Y
+        grid_w = cols * self.ICON_SZ + (cols - 1) * self.GAP_X
+        grid_h = rows * (self.ICON_SZ + self.LABEL_H) + (rows - 1) * self.GAP_Y
         avail_h = SH - self.HEADER
-        x0      = (SW - grid_w) // 2
-        y0      = self.HEADER + (avail_h - grid_h) // 2
+        x0     = (SW - grid_w) // 2
+        y0     = self.HEADER + max(6, (avail_h - grid_h) // 2)
 
         for i, app in enumerate(self.apps):
             col = i % cols
@@ -216,32 +238,32 @@ class _AppMenu:
             ty  = y0 + row * cell_h
             sel = (i == self.sel)
 
-            # No background tile — icon stands alone
             if sel:
                 d.rect(tx - self.SEL_PAD, ty - self.SEL_PAD,
                        self.ICON_SZ + self.SEL_PAD * 2,
                        self.ICON_SZ + self.SEL_PAD * 2,
                        theme.SEL_BORDER, fill=False)
 
-            # Load icon from asset pipeline
-            icon_data = None
-            if app.get("icon"):
-                from lix_os import icons as _icons
-                result = _icons.load(app["dir"], app["icon"])
-                if result:
-                    icon_data = result
-
-            if icon_data:
-                idata, iw, ih = icon_data
+            icon = self._icons.get(app["dir"])
+            if icon:
+                idata, iw, ih = icon
                 bx = tx + (self.ICON_SZ - iw) // 2
                 by = ty + (self.ICON_SZ - ih) // 2
                 d.blit(idata, bx, by, iw, ih)
             else:
-                # Letter fallback (only until icon is generated & optimised)
                 letter_c = [theme.PRIMARY, theme.TEAL, theme.GOLD,
-                             theme.ORANGE, theme.PURPLE, theme.GREEN]
+                            theme.ORANGE, theme.PURPLE, theme.GREEN]
                 lc = letter_c[i % len(letter_c)]
-                d.text(app["name"][0].upper(), tx + 8, ty + 8, lc, scale=4)
+                d.text(app["name"][0].upper(),
+                       tx + (self.ICON_SZ - 32) // 2,
+                       ty + (self.ICON_SZ - 32) // 2, lc, scale=4)
+
+            # ── label under icon (small font, dark text) ─────────────────
+            label = app["name"][:8]   # truncate to fit one cell
+            lx = tx + (self.ICON_SZ - len(label) * 8) // 2
+            ly = ty + self.ICON_SZ + 3
+            text_c = theme.PRIMARY if sel else theme.TEXT_BRIGHT
+            d.text(label, lx, ly, text_c)
 
         self._dirty = False
 

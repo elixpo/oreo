@@ -88,10 +88,12 @@ class Display(api.Display):
         self._dirty = True
 
     def blit(self, sprite, x, y, w, h):
+        # Sprite is big-endian RGB565 bytes. Our framebuf convention is also
+        # big-endian (primitives go through _swap() to land that way), so
+        # we just copy the raw bytes — framebuf.blit() is byte-level memcpy
+        # for matching RGB565 → RGB565.
         n = w * h
-        words = struct.unpack(">%dH" % n, sprite[:n * 2])
-        buf = bytearray(n * 2)
-        struct.pack_into("<%dH" % n, buf, 0, *words)
+        buf = bytearray(sprite[:n * 2])
         src = framebuf.FrameBuffer(buf, w, h, framebuf.RGB565)
         self._fb.blit(src, x, y)
         self._dirty = True
@@ -127,13 +129,13 @@ class Display(api.Display):
                     g = int(g + (bg_ - g) * dim)
                     b = int(b + (bb  - b) * dim)
                     v = ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3)
-                # store little-endian (swap bytes for framebuf)
-                hi = v & 0xFF
-                lo = v >> 8
+                # store big-endian (matches framebuf convention here)
+                b1 = v >> 8        # high byte first
+                b0 = v & 0xFF      # low byte second
                 base = col * scale * 2
                 for dx in range(scale):
-                    row[base + dx * 2]     = hi
-                    row[base + dx * 2 + 1] = lo
+                    row[base + dx * 2]     = b1
+                    row[base + dx * 2 + 1] = b0
 
             # stamp the row `scale` times vertically via memcpy
             row_start = src_row * scale * sw * 2
