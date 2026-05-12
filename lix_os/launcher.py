@@ -48,7 +48,8 @@ def list_apps():
                 "dir":   entry,
                 "name":  manifest.get("name", entry),
                 "type":  manifest.get("type", "app"),
-                "color": manifest.get("color", None),  # optional accent hex
+                "color": manifest.get("color", None),
+                "icon":  manifest.get("icon", None),
             })
         except (OSError, ValueError):
             continue
@@ -211,14 +212,21 @@ class _AppMenu:
             border_c = ic if sel else api.rgb(40, 40, 70)
             d.rect(tx, ty, self.TILE_W, self.TILE_H, border_c, fill=False)
 
-            # Large letter icon
-            d.rect(tx + 30, ty + 8, 40, 36, ic, fill=True)
-            d.text(app["name"][0].upper(), tx + 38, ty + 13, api.BLACK, scale=4)
-
-            # App name — up to 8 chars, centered
-            label = app["name"][:9]
-            lx    = tx + (self.TILE_W - len(label) * 8) // 2
-            d.text(label, lx, ty + 56, api.WHITE if sel else api.rgb(160, 160, 190))
+            # Icon: try PNG, fall back to letter tile
+            icon_data = None
+            if app.get("icon"):
+                from lix_os import icons as _icons
+                result = _icons.load(app["dir"], app["icon"])
+                if result:
+                    icon_data = result
+            if icon_data:
+                idata, iw, ih = icon_data
+                ix = tx + (self.TILE_W - iw) // 2
+                iy = ty + 8
+                d.blit(idata, ix, iy, iw, ih)
+            else:
+                d.rect(tx + 30, ty + 8, 40, 36, ic, fill=True)
+                d.text(app["name"][0].upper(), tx + 38, ty + 13, api.BLACK, scale=4)
 
             # Selection glow on bottom border
             if sel:
