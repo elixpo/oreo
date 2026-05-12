@@ -19,3 +19,4 @@ firmware/*.bin
 .vscode/settings.json
 .idea/
 *.swp
+*.env
