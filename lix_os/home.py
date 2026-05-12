@@ -96,34 +96,33 @@ def _load_status_icon(name):
         return None
 
 
-def _icon_wifi(d, x, y):
-    icon = _load_status_icon("wifi")
+def _icon_wifi(d, x, y, connected=False):
+    name = "wifi" if connected else "wifi_disabled"
+    icon = _load_status_icon(name)
     if icon:
         d.blit(icon[0], x, y, icon[1], icon[2])
         return
-    c = api.WHITE
+    c = api.WHITE if connected else api.rgb(180, 100, 100)
     d.rect(x + 5, y + 9,  3, 2, c, fill=True)
     d.rect(x + 2, y + 6,  9, 2, c, fill=True)
-    d.rect(x,     y + 3, 13, 2, c, fill=True)
+    if connected:
+        d.rect(x,   y + 3, 13, 2, c, fill=True)
 
 
-def _icon_bt(d, x, y):
+def _icon_bt(d, x, y, active=False):
     icon = _load_status_icon("bluetooth")
     if icon:
+        # Dim the icon if BT is off
         d.blit(icon[0], x, y, icon[1], icon[2])
         return
-    c = api.WHITE
-    # spine
+    c = api.WHITE if active else api.rgb(180, 100, 100)
     d.rect(x + 3, y,      2, 13, c, fill=True)
-    # upper-right arm: diagonal out then back
     d.rect(x + 5, y,      2,  2, c, fill=True)
     d.rect(x + 7, y + 2,  2,  2, c, fill=True)
     d.rect(x + 5, y + 4,  2,  2, c, fill=True)
-    # lower-right arm: diagonal out then back
     d.rect(x + 5, y + 7,  2,  2, c, fill=True)
     d.rect(x + 7, y + 9,  2,  2, c, fill=True)
     d.rect(x + 5, y + 11, 2,  2, c, fill=True)
-    # left cross-arms
     d.rect(x,     y + 3,  3,  2, c, fill=True)
     d.rect(x,     y + 8,  3,  2, c, fill=True)
 
@@ -151,12 +150,15 @@ class Home(lix.App):
     name = "home"
 
     def __init__(self, app_list):
-        self._apps     = app_list
-        self._dock     = [_DockEntry("APPS", "__appmenu__", "apps_icon.png")]
-        self._dock_sel = 0
-        self._dirty    = True
-        self._last_sec = -1
-        self._blink    = True
+        self._apps      = app_list
+        self._dock      = [_DockEntry("APPS", "__appmenu__", "apps_icon.png")]
+        self._dock_sel  = 0
+        self._dirty     = True
+        self._last_sec  = -1
+        self._blink     = True
+        self._wifi_ok   = False
+        self._bt_on     = False
+        self._last_net  = -1   # refresh network status every 5s
 
     def on_enter(self, os):
         super().on_enter(os)
@@ -179,6 +181,20 @@ class Home(lix.App):
             self._last_sec = s
             self._blink    = not self._blink
             self._dirty    = True
+        # Poll network status every ~5 seconds
+        if s % 5 == 0 and s != self._last_net:
+            self._last_net = s
+            try:
+                from lix_hw import wifi as _w, bt as _b
+                wifi_ok = _w.is_connected()
+                bt_on   = _b.is_active()
+            except Exception:
+                wifi_ok = False
+                bt_on   = False
+            if wifi_ok != self._wifi_ok or bt_on != self._bt_on:
+                self._wifi_ok  = wifi_ok
+                self._bt_on    = bt_on
+                self._dirty    = True
 
     def draw(self, d):
         if not self._dirty:
@@ -202,9 +218,9 @@ class Home(lix.App):
         d.text(time_str, 6, 7, api.WHITE)
 
         # icons on the RIGHT: battery | bt | wifi  ←  right edge
-        _icon_battery(d, SW - 28, 6, pct=85)   # 22px wide + 2px nub
-        _icon_bt     (d, SW - 44, 4)            # ~11px wide, 13px tall
-        _icon_wifi   (d, SW - 60, 5)            # 13px wide
+        _icon_battery(d, SW - 28, 6, pct=85)
+        _icon_bt     (d, SW - 44, 4, active=self._bt_on)
+        _icon_wifi   (d, SW - 60, 5, connected=self._wifi_ok)
 
         # ── hero clock ────────────────────────────────────────────────────
         char_w  = 8 * 4                   # 32px per char at scale=4

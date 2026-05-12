@@ -39,6 +39,11 @@ DEPLOY = [
     ("lix_hw/display.py",      "lix_hw/display.py"),
     ("lix_hw/os.py",           "lix_hw/os.py"),
     ("lix_hw/pins.py",         "lix_hw/pins.py"),
+    ("lix_hw/wifi.py",         "lix_hw/wifi.py"),
+    ("lix_hw/bt.py",           "lix_hw/bt.py"),
+
+    # user config (edit before deploying)
+    ("config.py",              "config.py"),
 
     # OS layer
     ("lix_os/__init__.py",     "lix_os/__init__.py"),
