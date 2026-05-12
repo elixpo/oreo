@@ -1,121 +1,147 @@
-"""Elixpo OS home screen.
+"""Elixpo OS — home screen.
 
 Layout (240×320):
-  ┌─ status bar (y=0, h=24) ─────────────────────────────┐
-  │  HH:MM        Day DD Mon   [wifi] [bt] [bat]          │
-  ├──────────────────────────────────────────────────────-┤
-  │                                                       │
-  │            [panda ps=2 → 40×36px]                    │
-  │                                                       │
-  │              HH : MM                  (scale 4)       │
-  │                        :SS            (scale 2)       │
-  │           Day, DD Month Year          (scale 1)       │
-  │                                                       │
-  ├──────────────────────────────────────────────────────-┤
-  │  bottom dock — app icon squares                       │
-  └───────────────────────────────────────────────────────┘
+  ┌─ status bar (h=22) ──────────────────────────────────┐
+  │  HH:MM   Day DD Mon      [wifi] [bt] [bat]           │
+  ├──────────────────────────────────────────────────────┤
+  │               mascot (72×72)                         │  y≈28
+  ├──────────────────────────────────────────────────────┤
+  │            HH : MM          (scale=3, 120px)         │  y≈110
+  │              : SS           (scale=2, below)         │  y≈150
+  │         Day, DD Mon YYYY    (scale=1)                │  y≈175
+  ├──────────────────────────────────────────────────────┤
+  │  dock: APPS + quick-launch tiles                     │  y=264
+  └──────────────────────────────────────────────────────┘
 
 Navigation:
-  LEFT / RIGHT  — move between dock icons
-  A             — open selected dock icon (apps panel)
+  LEFT / RIGHT  — move dock selection
+  A             — open selected tile
 """
 
 import time
 from lix import api
 from lix_os import timeutil
-from lix_os.panda import draw_panda
-
 import lix
 
 # ── palette ──────────────────────────────────────────────────────────────────
 
 BG       = api.rgb(8, 8, 20)
+BG2      = api.rgb(12, 12, 28)          # subtle secondary bg
 PRIMARY  = api.rgb(0, 220, 200)
 ACCENT   = api.rgb(255, 80, 200)
-MUTED    = api.rgb(100, 100, 130)
-STATUS   = api.rgb(15, 15, 32)
-DOCK_BG  = api.rgb(18, 18, 36)
-DOCK_SEL = api.rgb(0, 180, 160)
+MUTED    = api.rgb(90, 90, 120)
+MUTED2   = api.rgb(60, 60, 85)
+STATUS   = api.rgb(10, 10, 24)
+DOCK_BG  = api.rgb(14, 14, 30)
+DOCK_SEL = api.rgb(0, 50, 46)
+WHITE    = api.WHITE
 
-# App-icon palette (cycles over apps in dock)
 _ICON_COLORS = [
-    api.rgb(255, 80, 200),   # magenta
-    api.rgb(0, 200, 255),    # cyan
-    api.rgb(255, 160, 0),    # amber
-    api.rgb(120, 220, 80),   # lime
-    api.rgb(200, 80, 255),   # violet
+    api.rgb(255, 80, 200),
+    api.rgb(0, 180, 255),
+    api.rgb(255, 160, 0),
+    api.rgb(100, 220, 80),
+    api.rgb(180, 80, 255),
 ]
 
-# ── icons drawn with rects ───────────────────────────────────────────────────
+# ── mascot sprite (loaded once) ───────────────────────────────────────────────
 
-def _icon_wifi(d, x, y, on=True):
-    """3-bar WiFi icon (12×10 px)."""
-    c = PRIMARY if on else MUTED
-    d.rect(x + 4, y + 7, 4, 3, c, fill=True)     # bottom bar (signal)
-    d.rect(x + 2, y + 4, 8, 2, c, fill=True)     # mid arc
-    d.rect(x,     y + 1, 12, 2, c, fill=True)    # top arc
-    if not on:
-        d.rect(x, y + 9, 12, 1, api.rgb(200, 50, 50), fill=True)  # strike
+_mascot = None
 
-
-def _icon_bt(d, x, y, on=True):
-    """Stylised Bluetooth icon (8×12 px)."""
-    c = api.rgb(80, 140, 255) if on else MUTED
-    d.rect(x + 3, y,      2, 12, c, fill=True)   # vertical spine
-    d.rect(x + 3, y,      4,  2, c, fill=True)   # top right diagonal
-    d.rect(x + 3, y + 10, 4,  2, c, fill=True)   # bottom right diagonal
-    d.rect(x + 3, y + 5,  4,  2, c, fill=True)   # mid right
+def _load_mascot():
+    global _mascot
+    if _mascot is not None:
+        return _mascot
+    try:
+        import assets.mascot as m
+        _mascot = (m.DATA, m.W, m.H)
+    except ImportError:
+        _mascot = None
+    return _mascot
 
 
-def _icon_battery(d, x, y, pct=80):
-    """Horizontal battery icon (16×8 px)."""
-    d.rect(x, y, 14, 8, MUTED, fill=False)
-    d.rect(x + 14, y + 2, 2, 4, MUTED, fill=True)  # terminal nub
-    filled = max(0, int((pct / 100) * 12))
+# ── status bar icons ──────────────────────────────────────────────────────────
+
+def _icon_wifi(d, x, y):
+    c = PRIMARY
+    d.rect(x + 5, y + 8, 3, 3, c, fill=True)   # dot
+    d.rect(x + 3, y + 5, 7, 2, c, fill=True)   # inner arc
+    d.rect(x + 1, y + 2, 11, 2, c, fill=True)  # outer arc
+
+
+def _icon_bt(d, x, y):
+    c = api.rgb(80, 140, 255)
+    d.rect(x + 4, y,     2, 12, c, fill=True)
+    d.rect(x + 4, y,     5,  2, c, fill=True)
+    d.rect(x + 4, y + 5, 5,  2, c, fill=True)
+    d.rect(x + 4, y +10, 5,  2, c, fill=True)
+
+
+def _icon_battery(d, x, y, pct=85):
     fc = api.rgb(80, 220, 80) if pct > 30 else api.rgb(255, 80, 80)
-    if filled:
-        d.rect(x + 1, y + 1, filled, 6, fc, fill=True)
+    d.rect(x, y, 18, 8, MUTED, fill=False)
+    d.rect(x + 18, y + 2, 2, 4, MUTED, fill=True)
+    filled = max(1, int((pct / 100) * 16))
+    d.rect(x + 1, y + 1, filled, 6, fc, fill=True)
 
 
-def _icon_apps(d, x, y, size=14):
-    """2×2 grid of squares — 'apps' launcher icon."""
-    half = (size - 2) // 2
-    d.rect(x,        y,        half, half, PRIMARY, fill=True)
-    d.rect(x + half + 2, y,    half, half, PRIMARY, fill=True)
-    d.rect(x,        y + half + 2, half, half, PRIMARY, fill=True)
-    d.rect(x + half + 2, y + half + 2, half, half, PRIMARY, fill=True)
+# ── grid background ───────────────────────────────────────────────────────────
+
+def _draw_grid(d):
+    """Subtle dot grid on the dark background."""
+    dot = api.rgb(18, 18, 38)
+    for gy in range(24, 264, 18):
+        for gx in range(6, 240, 18):
+            d.pixel(gx, gy, dot)
 
 
-# ── dock entry ───────────────────────────────────────────────────────────────
+# ── apps icon ─────────────────────────────────────────────────────────────────
+
+def _draw_apps_icon(d, x, y, size=14):
+    h = (size - 2) // 2
+    d.rect(x,         y,         h, h, PRIMARY, fill=True)
+    d.rect(x + h + 2, y,         h, h, PRIMARY, fill=True)
+    d.rect(x,         y + h + 2, h, h, PRIMARY, fill=True)
+    d.rect(x + h + 2, y + h + 2, h, h, PRIMARY, fill=True)
+
+
+# ── dock ─────────────────────────────────────────────────────────────────────
 
 class _DockEntry:
+    __slots__ = ("label", "action", "color")
     def __init__(self, label, action, color=None):
         self.label  = label
-        self.action = action   # callable or string passed to os.launch
+        self.action = action
         self.color  = color or PRIMARY
 
 
-# ── home screen ──────────────────────────────────────────────────────────────
-
-_STATUS_H = 24
+_STATUS_H = 22
 _DOCK_H   = 56
-_DOCK_Y   = api.SCREEN_H - _DOCK_H
+_DOCK_Y   = api.SCREEN_H - _DOCK_H   # 264
 
-_PANDA_PS = 2                          # panda at 40×36 px
-_PANDA_X  = (api.SCREEN_W - 20 * _PANDA_PS) // 2
-_PANDA_Y  = _STATUS_H + 4
+_MASCOT_W = 72
+_MASCOT_H = 72
+_MASCOT_X = (api.SCREEN_W - _MASCOT_W) // 2   # 84
+_MASCOT_Y = _STATUS_H + 4                       # 26
 
+# Clock sits below mascot
+_CLOCK_Y  = _MASCOT_Y + _MASCOT_H + 6          # 104   (scale=3 → 24px tall)
+_SEC_Y    = _CLOCK_Y + 26                       # 130   (scale=2 → 16px tall)
+_DATE_Y   = _SEC_Y + 20                         # 150
+
+
+# ── home screen app ───────────────────────────────────────────────────────────
 
 class Home(lix.App):
     name = "home"
 
     def __init__(self, app_list):
-        self._apps    = app_list
-        self._dock    = []
+        self._apps     = app_list
+        self._dock     = []
         self._dock_sel = 0
-        self._dirty   = True
+        self._dirty    = True
         self._last_sec = -1
-        self._blink   = True          # colon blink state
+        self._blink    = True
 
     def on_enter(self, os):
         super().on_enter(os)
@@ -124,25 +150,23 @@ class Home(lix.App):
 
     def _build_dock(self):
         self._dock = [_DockEntry("APPS", "__appmenu__", PRIMARY)]
-        # Add the first 3 real apps as quick-launch icons
-        colors = _ICON_COLORS[:]
+        colors = list(_ICON_COLORS)
         for a in self._apps[:3]:
             c = colors.pop(0) if colors else PRIMARY
             self._dock.append(_DockEntry(a["name"][:4].upper(), a["dir"], c))
 
     def on_button_press(self, btn):
-        if btn == api.BTN_LEFT  and self._dock_sel > 0:
+        if btn == api.BTN_LEFT and self._dock_sel > 0:
             self._dock_sel -= 1
             self._dirty = True
         elif btn == api.BTN_RIGHT and self._dock_sel < len(self._dock) - 1:
             self._dock_sel += 1
             self._dirty = True
         elif btn == api.BTN_A:
-            entry = self._dock[self._dock_sel]
-            self.os.launch(entry.action)
+            self.os.launch(self._dock[self._dock_sel].action)
 
     def update(self, dt):
-        h, m, s, wd, day, mon, yr = timeutil.now()
+        _, _, s, *_ = timeutil.now()
         if s != self._last_sec:
             self._last_sec = s
             self._blink    = not self._blink
@@ -154,73 +178,114 @@ class Home(lix.App):
 
         h, m, s, wd, day, mon, yr = timeutil.now()
 
+        # ── background ────────────────────────────────────────────────────
         d.clear(BG)
+        _draw_grid(d)
 
-        # ── status bar ─────────────────────────────────────────────────────
+        # Soft card behind clock area
+        d.rect(10, _MASCOT_Y - 2, api.SCREEN_W - 20, _DOCK_Y - _MASCOT_Y + 2,
+               BG2, fill=True)
+
+        # ── status bar ────────────────────────────────────────────────────
         d.rect(0, 0, api.SCREEN_W, _STATUS_H, STATUS, fill=True)
-        d.text("%02d:%02d" % (h, m), 4, 7, api.WHITE)
+        # thin accent line under status bar
+        d.rect(0, _STATUS_H - 1, api.SCREEN_W, 1, api.rgb(0, 80, 72), fill=True)
+
+        d.text("%02d:%02d" % (h, m), 4, 6, WHITE)
         date_str = "%s %d %s" % (wd, day, mon)
-        d.text(date_str, 52, 7, MUTED)
-        _icon_wifi(d, api.SCREEN_W - 90, 6)
-        _icon_bt  (d, api.SCREEN_W - 72, 6)
-        _icon_battery(d, api.SCREEN_W - 52, 8, pct=85)
+        d.text(date_str, 52, 6, MUTED)
 
-        # ── panda mascot ───────────────────────────────────────────────────
-        draw_panda(d, _PANDA_X, _PANDA_Y, ps=_PANDA_PS)
+        _icon_wifi   (d, api.SCREEN_W - 92, 5)
+        _icon_bt     (d, api.SCREEN_W - 72, 5)
+        _icon_battery(d, api.SCREEN_W - 52, 7, pct=85)
 
-        # ── hero clock ─────────────────────────────────────────────────────
-        clock_y = _PANDA_Y + 20 * _PANDA_PS + 10   # just below panda
+        # ── mascot ────────────────────────────────────────────────────────
+        m_data = _load_mascot()
+        if m_data:
+            data, mw, mh = m_data
+            d.blit(data, _MASCOT_X, _MASCOT_Y, mw, mh)
+        else:
+            # fallback: draw code panda
+            from lix_os.panda import draw_panda
+            draw_panda(d, _MASCOT_X + 6, _MASCOT_Y + 4, ps=3)
 
-        # HH:MM at scale=4 (each char 32px wide)
-        colon = ":" if self._blink else " "
-        time_str = "%02d%s%02d" % (h, colon, m)   # "09:45" = 5 chars × 32 = 160px
-        time_x   = (api.SCREEN_W - 5 * 8 * 4) // 2  # center 160px in 240px → x=40
-        d.text(time_str, time_x, clock_y, PRIMARY, scale=4)
+        # ── hero clock ────────────────────────────────────────────────────
+        # "HH MM" at scale=3: 5 chars × 24px = 120px, centered → x=60
+        # Use a space instead of colon so we can draw a blinking colon ourselves
+        hh_str  = "%02d" % h
+        mm_str  = "%02d" % m
+        colon_c = PRIMARY if self._blink else MUTED2
 
-        # :SS at scale=2 (aligned to right of HH:MM)
-        sec_x = time_x + 5 * 8 * 4 + 4
-        d.text(":%02d" % s, sec_x - 2, clock_y + 14, MUTED, scale=2)
+        cx = (api.SCREEN_W - 5 * 8 * 3) // 2  # = 60
 
-        # Date line
-        date_y = clock_y + 38
+        d.text(hh_str,  cx,          _CLOCK_Y, PRIMARY, scale=3)
+        d.text(":",     cx + 2*8*3,  _CLOCK_Y, colon_c, scale=3)
+        d.text(mm_str,  cx + 3*8*3,  _CLOCK_Y, PRIMARY, scale=3)
+
+        # Seconds on next line, right-aligned under MM
+        sec_str = ":%02d" % s
+        sec_x   = cx + 3*8*3 + 2*8*3 - len(sec_str)*8*2   # right-align to end of MM
+        sec_x   = min(sec_x, api.SCREEN_W - len(sec_str) * 8 * 2 - 4)
+        d.text(sec_str, sec_x, _SEC_Y, MUTED, scale=2)
+
+        # Date
         full_date = "%s, %d %s %d" % (wd, day, mon, yr)
         date_px   = len(full_date) * 8
-        d.text(full_date, (api.SCREEN_W - date_px) // 2, date_y, MUTED)
+        d.text(full_date, max(0, (api.SCREEN_W - date_px) // 2), _DATE_Y, MUTED)
 
-        # ── dock ───────────────────────────────────────────────────────────
+        # ── dock ──────────────────────────────────────────────────────────
         d.rect(0, _DOCK_Y, api.SCREEN_W, _DOCK_H, DOCK_BG, fill=True)
-        d.rect(0, _DOCK_Y, api.SCREEN_W, 1, api.rgb(30, 30, 60), fill=True)
+        d.rect(0, _DOCK_Y, api.SCREEN_W, 1, PRIMARY, fill=True)
 
-        icon_w    = 44
-        gap       = 8
-        total_w   = len(self._dock) * icon_w + (len(self._dock) - 1) * gap
-        icon_x    = (api.SCREEN_W - total_w) // 2
-        icon_y    = _DOCK_Y + 6
+        icon_w = 44
+        gap    = 8
+        n      = len(self._dock)
+        total  = n * icon_w + (n - 1) * gap
+        ix     = (api.SCREEN_W - total) // 2
+        iy     = _DOCK_Y + 5
 
         for i, entry in enumerate(self._dock):
-            selected = (i == self._dock_sel)
-            bg = DOCK_SEL if selected else api.rgb(30, 30, 50)
-            d.rect(icon_x, icon_y, icon_w, icon_w - 6, bg, fill=True)
-            if selected:
-                d.rect(icon_x, icon_y, icon_w, icon_w - 6, PRIMARY, fill=False)
+            sel = (i == self._dock_sel)
+            tile_bg = DOCK_SEL if sel else api.rgb(22, 22, 44)
+            d.rect(ix, iy, icon_w, 40, tile_bg, fill=True)
 
-            # Icon
+            if sel:
+                d.rect(ix, iy, icon_w, 40, entry.color, fill=False)
+                d.rect(ix + 2, _DOCK_Y + _DOCK_H - 5, icon_w - 4, 3,
+                       entry.color, fill=True)
+
+            # Icon graphic
             if entry.action == "__appmenu__":
-                _icon_apps(d, icon_x + 15, icon_y + 4)
+                _draw_apps_icon(d, ix + 15, iy + 6, size=14)
             else:
-                # First letter of app in a small colored square
-                lbl_color = entry.color
-                d.rect(icon_x + 12, icon_y + 3, 20, 16, lbl_color, fill=True)
-                d.text(entry.label[0], icon_x + 16, icon_y + 5, api.BLACK, scale=2)
+                # Try to load app icon bitmap; fallback to letter square
+                app_icon = _try_load_icon(entry.action)
+                if app_icon:
+                    data, iw, ih = app_icon
+                    d.blit(data, ix + (icon_w - iw) // 2, iy + 2, iw, ih)
+                else:
+                    d.rect(ix + 12, iy + 3, 20, 18, entry.color, fill=True)
+                    d.text(entry.label[0], ix + 16, iy + 5, api.BLACK, scale=2)
 
-            # Label below icon
-            lbl = entry.label[:4]
-            lbl_x = icon_x + (icon_w - len(lbl) * 8) // 2
-            d.text(lbl, lbl_x, icon_y + icon_w - 12, api.WHITE if selected else MUTED)
-
-            icon_x += icon_w + gap
-
-        # Hint
-        d.text("<  >  nav    A  open", 20, api.SCREEN_H - 12, api.rgb(60, 60, 80))
+            lbl   = entry.label[:4]
+            lbl_x = ix + (icon_w - len(lbl) * 8) // 2
+            d.text(lbl, lbl_x, iy + 30, WHITE if sel else MUTED)
+            ix += icon_w + gap
 
         self._dirty = False
+
+
+# ── icon loader (cached) ──────────────────────────────────────────────────────
+
+_icon_cache: dict = {}
+
+def _try_load_icon(app_dir):
+    if app_dir in _icon_cache:
+        return _icon_cache[app_dir]
+    try:
+        mod = __import__("assets.icons.%s" % app_dir, None, None, ["DATA", "W", "H"])
+        result = (mod.DATA, mod.W, mod.H)
+    except (ImportError, AttributeError):
+        result = None
+    _icon_cache[app_dir] = result
+    return result

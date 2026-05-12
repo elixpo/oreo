@@ -77,14 +77,29 @@ class SimDisplay(api.Display):
                         )
 
     def blit(self, sprite, x, y, w, h):
-        """Copy a w×h RGB565 sprite (bytes-like) to (x, y)."""
+        """Copy a w×h RGB565 sprite (bytes-like) to (x, y).
+
+        Fast path: convert the whole sprite to a pygame Surface at once, then
+        scale it and blit it — avoids a Python loop over every pixel.
+        """
+        import struct
+        n = w * h
+        # Unpack big-endian RGB565 words
+        words = struct.unpack_from(">%dH" % n, sprite, 0)
+        # Build a 24-bit RGB surface
+        surf = pygame.Surface((w, h))
+        pa   = pygame.PixelArray(surf)
         for row in range(h):
             for col in range(w):
-                idx = (row * w + col) * 2
-                if idx + 1 >= len(sprite):
-                    break
-                word = (sprite[idx] << 8) | sprite[idx + 1]
-                self.pixel(x + col, y + row, word)
+                word = words[row * w + col]
+                r = ((word >> 11) & 0x1F) << 3
+                g = ((word >>  5) & 0x3F) << 2
+                b = ( word        & 0x1F) << 3
+                pa[col][row] = surf.map_rgb(r, g, b)
+        del pa
+        if SCALE != 1:
+            surf = pygame.transform.scale(surf, (w * SCALE, h * SCALE))
+        self._surf.blit(surf, (x * SCALE, y * SCALE))
 
     def present(self):
         """No-op: run_sim calls pygame.display.flip() after each frame."""

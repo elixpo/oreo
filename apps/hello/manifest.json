@@ -1,5 +1,1 @@
-{
-  "name": "Hello",
-  "type": "app",
-  "version": "0.1"
-}
+{"name": "Hello", "type": "app", "version": "0.1", "icon": "hello_icon.png"}
