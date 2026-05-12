@@ -111,7 +111,6 @@ def _upscale_to_bytearray(data, w, h, scale_x, scale_y):
     out  = bytearray(sw * sh * 2)
     row  = bytearray(sw * 2)
     for src_row in range(h):
-        # build one horizontal row
         for col in range(w):
             base_src = (src_row * w + col) * 2
             b1 = data[base_src]
@@ -120,12 +119,76 @@ def _upscale_to_bytearray(data, w, h, scale_x, scale_y):
             for dx in range(scale_x):
                 row[base + dx * 2]     = b1
                 row[base + dx * 2 + 1] = b0
-        # stamp the row `scale_y` times via memcpy
         row_start = src_row * scale_y * sw * 2
         for dy in range(scale_y):
             s = row_start + dy * sw * 2
             out[s: s + sw * 2] = row
     return out, sw, sh
+
+
+# ── _bluedim kernel ──────────────────────────────────────────────────────────
+# On MicroPython the kernel is compiled with @micropython.viper for near-C
+# speed (76,800 pixels in ~30-50 ms vs ~700 ms in pure Python). On CPython we
+# fall back to a regular function — perf is irrelevant in the simulator.
+#
+# The viper source lives in a string so CPython never has to parse the `ptr8`
+# annotation (which only exists inside Viper's namespace).
+
+_BLUEDIM_VIPER_SRC = """
+@micropython.viper
+def _bluedim_kernel(src: ptr8, dst: ptr8, n: int):
+    i = 0
+    while i < n:
+        off = i << 1
+        v = (src[off] << 8) | src[off + 1]
+        r = ((v >> 11) & 0x1F) * 7  >> 4   # ×0.44 darken
+        g = ((v >>  5) & 0x3F) * 7  >> 4   # ×0.44 darken
+        b = ( v        & 0x1F) * 11 >> 4   # ×0.69 keep blue warmer
+        if r > 31: r = 31
+        if g > 63: g = 63
+        if b > 31: b = 31
+        v2 = (r << 11) | (g << 5) | b
+        dst[off]     = v2 >> 8
+        dst[off + 1] = v2 & 0xFF
+        i += 1
+"""
+
+def _bluedim_kernel(src, dst, n):
+    """Pure-Python fallback (CPython simulator). Replaced by Viper on hardware."""
+    for i in range(n):
+        off = i << 1
+        v = (src[off] << 8) | src[off + 1]
+        r = ((v >> 11) & 0x1F) * 7  >> 4
+        g = ((v >>  5) & 0x3F) * 7  >> 4
+        b = ( v        & 0x1F) * 11 >> 4
+        if r > 31: r = 31
+        if g > 63: g = 63
+        if b > 31: b = 31
+        v2 = (r << 11) | (g << 5) | b
+        dst[off]     = v2 >> 8
+        dst[off + 1] = v2 & 0xFF
+
+try:
+    import micropython as _mp     # pragma: no cover (MicroPython only)
+    if hasattr(_mp, "viper"):
+        _ns = {"micropython": _mp}
+        exec(_BLUEDIM_VIPER_SRC, _ns)
+        _bluedim_kernel = _ns["_bluedim_kernel"]
+except Exception:
+    # Any failure (no Viper, Viper compile error, etc.) → keep the Python fallback.
+    pass
+
+
+def _bluedim_bytearray(buf):
+    """Darkened cool-tone copy of an RGB565-big-endian bytearray.
+
+    Each pixel becomes ~44% as bright in R/G and ~69% in B, producing a
+    night-time tint that contrasts well with bright text. Built once at
+    app init for the menu-screen background overlay.
+    """
+    out = bytearray(len(buf))
+    _bluedim_kernel(buf, out, len(buf) // 2)
+    return out
 
 # ── LCG RNG ──────────────────────────────────────────────────────────────────
 
@@ -223,8 +286,8 @@ class Panda:
         if self.y < 0:
             self.y = 0.0
             self.vy = 0.0
-        # Ground / floor
-        if self.y + 24 > SH - GROUND_H:
+        # Ground / floor — panda is PANDA_SZ tall, ground line is just above the grass strip
+        if self.y + PANDA_SZ > SH - GROUND_H:
             self.die()
             return
         # Collisions + score
@@ -240,8 +303,10 @@ class Panda:
                 self.score += 1
 
     def bounds(self):
-        # Slightly tighter than 24×24
-        return (PANDA_X + 3, int(self.y) + 3, 18, 18)
+        # Slightly tighter than PANDA_SZ to make collisions feel fair
+        pad = 4
+        return (PANDA_X + pad, int(self.y) + pad,
+                PANDA_SZ - pad * 2, PANDA_SZ - pad * 2)
 
     def is_dead(self):
         return self.died_at_s is not None
@@ -261,7 +326,7 @@ class Panda:
             data, sw, sh = sprite
             d.blit(data, PANDA_X, py, sw, sh)
         else:
-            d.rect(PANDA_X, py, 24, 24, C_TITLE, fill=True)
+            d.rect(PANDA_X, py, PANDA_SZ, PANDA_SZ, C_TITLE, fill=True)
 
     def _pick_sprite(self):
         """Choose which sprite key to render this frame.
@@ -286,46 +351,52 @@ class Panda:
 class Scenery:
     """Pre-rendered scenery — built ONCE in build(), drawn as 2 big blits/frame.
 
-    The background asset (80×48) is upscaled ×4 in both axes at app init →
-    320×192 bytearray that fills the play area. Likewise grass is upscaled
-    horizontally ×4 → 320×16. After that, the per-frame cost is two
-    chroma-key-free blits + procedural clouds + dynamic obstacles + panda.
+    background (80×60) → upscaled ×4×4 → 320×240 (FULL screen)
+    grass      (80×16) → upscaled ×4×1 → 320×16  (bottom strip)
+
+    A second 320×240 buffer holds a blue-dimmed version of the bg, drawn
+    instead of the bright bg on intro/gameover so menu text reads clearly.
+    No dirt rectangle is drawn — the bg image owns every pixel up to the
+    grass strip; collisions still use the logical ground at SH - GROUND_H.
     """
     def __init__(self):
-        self.offset    = 0.0
-        self._bg_data  = None   # (bytearray, sw, sh)
-        self._gr_data  = None
+        self.offset       = 0.0
+        self._bg_data     = None   # (bytearray, sw, sh)
+        self._bg_dim_data = None
+        self._gr_data     = None
 
     def build(self):
-        """One-time pre-render of background and grass at full screen width."""
         bg = _load("background")
         if bg:
             data, bw, bh = bg
-            sx = max(1, SW     // bw)                       # 320/80 = 4
-            sy = max(1, (PLAY_H + bh - 1) // bh)            # ceil(190/48) = 4
-            self._bg_data = _upscale_to_bytearray(data, bw, bh, sx, sy)
+            sx = max(1, SW // bw)
+            sy = max(1, SH // bh)                        # cover FULL screen
+            self._bg_data     = _upscale_to_bytearray(data, bw, bh, sx, sy)
+            self._bg_dim_data = (
+                _bluedim_bytearray(self._bg_data[0]),
+                self._bg_data[1], self._bg_data[2]
+            )
 
         gr = _load("grass")
         if gr:
             data, gw, gh = gr
-            sx = max(1, SW // gw)                           # 320/80 = 4
+            sx = max(1, SW // gw)
             self._gr_data = _upscale_to_bytearray(data, gw, gh, sx, 1)
 
     def update(self, dt):
         self.offset += SCROLL * dt * 0.5
 
-    def draw_background(self, d):
-        if self._bg_data:
-            buf, sw, sh = self._bg_data
+    def draw_background(self, d, dim=False):
+        bg = self._bg_dim_data if dim else self._bg_data
+        if bg:
+            buf, sw, sh = bg
             d.blit(buf, 0, 0, sw, sh)
-            # fill any band left between bg bottom and ground
-            if sh < PLAY_H:
-                d.rect(0, sh, SW, PLAY_H - sh, C_SKY, fill=True)
         else:
-            d.rect(0, 0, SW, PLAY_H, C_SKY, fill=True)
+            d.rect(0, 0, SW, SH, C_SKY if not dim else api.rgb(20, 30, 60), fill=True)
 
     def draw_clouds(self, d):
-        # Background asset already has clouds painted in — skip the overlay.
+        # The bg asset paints its own sky+clouds; skip the procedural overlay
+        # when we have a real background.
         if self._bg_data is not None:
             return
         base = int(-(self.offset * 0.25) % (SW + 80))
@@ -337,12 +408,11 @@ class Scenery:
             d.rect(cx +  6, py + 14, 26,  2, C_CLOUD_SH, fill=True)
 
     def draw_ground(self, d):
-        # Solid dirt rectangle
-        d.rect(0, SH - GROUND_H, SW, GROUND_H, C_GROUND, fill=True)
-        # Pre-built grass strip on top of the dirt edge — single blit
+        # No dirt rectangle — bg already shows the ground area.
+        # Just overlay the scrolling grass strip flush with the bottom.
         if self._gr_data:
             buf, gw, gh = self._gr_data
-            d.blit(buf, 0, SH - GROUND_H - gh // 2, gw, gh)
+            d.blit(buf, 0, SH - gh, gw, gh)
 
 # ── App ──────────────────────────────────────────────────────────────────────
 
@@ -407,16 +477,20 @@ class App(lix.App):
                 self._state = OVER
 
     def draw(self, d):
-        # ── world ────────────────────────────────────────────────────────────
-        self._scenery.draw_background(d)
+        # On menu screens we dim the bg so the title/score/hint text reads brightly.
+        dim = self._state in (INTRO, OVER)
+        self._scenery.draw_background(d, dim=dim)
         self._scenery.draw_clouds(d)
 
-        for o in self._obstacles:
-            o.draw(d)
+        # While playing we still show obstacles + panda animating in the foreground;
+        # on the game-over screen we keep them visible so the player sees what hit them.
+        if self._state in (PLAY, OVER):
+            for o in self._obstacles:
+                o.draw(d)
 
         self._scenery.draw_ground(d)
 
-        if self._panda:
+        if self._panda and self._state in (PLAY, OVER):
             self._panda.draw(d)
 
         # ── HUD / overlays ───────────────────────────────────────────────────
