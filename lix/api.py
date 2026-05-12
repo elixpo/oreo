@@ -83,6 +83,11 @@ class Display(ABC):
     def present(self):
         """Flush the framebuffer to the panel. The OS calls this — apps don't."""
 
+    def present_rect(self, x, y, w, h):
+        """Flush only a rectangle of the framebuffer. Backends may override for speed;
+        the default falls back to full-screen present()."""
+        self.present()
+
 
 class Buttons(ABC):
     """8-button input. Both polled and event-driven access supported."""

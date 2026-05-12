@@ -87,3 +87,18 @@ class Display(api.Display):
         p.dc(0); p.spi.write(b'\x2C')   # RAMWR
         p.dc(1); p.spi.write(self._buf)
         p.cs(1)
+
+    def present_rect(self, x, y, w, h):
+        p = self._panel
+        p.set_window(x, y, x + w - 1, y + h - 1)
+        p.cs(0)
+        p.dc(0); p.spi.write(b'\x2C')
+        p.dc(1)
+        stride = api.SCREEN_W * 2
+        row_start = y * stride + x * 2
+        row_len = w * 2
+        buf = self._buf
+        for _ in range(h):
+            p.spi.write(buf[row_start:row_start + row_len])
+            row_start += stride
+        p.cs(1)
