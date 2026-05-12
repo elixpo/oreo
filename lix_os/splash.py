@@ -43,7 +43,7 @@ def _get_mascot():
     # Try PIL first — composites cleanly on cream BG (works on sim; no PIL on hw)
     try:
         from PIL import Image
-        img = Image.open("asset/mascot.png").convert("RGBA").resize(
+        img = Image.open("assets/sprites/raw/mascot.png").convert("RGBA").resize(
             (_MW, _MH), Image.LANCZOS)
         bg = Image.new("RGBA", (_MW, _MH), (theme.BG_R, theme.BG_G, theme.BG_B, 255))
         bg.paste(img, mask=img.split()[3])
@@ -59,9 +59,9 @@ def _get_mascot():
         return _mascot
     except Exception:
         pass
-    # Hardware fallback — uses pre-baked assets/mascot.py (cream fill)
+    # Hardware fallback — uses pre-baked assets/sprites/optimized/mascot.py
     try:
-        import assets.mascot as m
+        import assets.sprites.optimized.mascot as m
         _mascot = (m.DATA, m.W, m.H)
         return _mascot
     except (ImportError, AttributeError):

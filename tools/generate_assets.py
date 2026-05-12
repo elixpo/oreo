@@ -100,7 +100,7 @@ def download(name, width=200, height=200):
         print("  SKIP %s — no prompt found (add prompts/%s.md)" % (name, name))
         return
 
-    out_dir = Path("asset/icons")
+    out_dir = Path("assets/icons/raw")
     out_dir.mkdir(parents=True, exist_ok=True)
     out = out_dir / ("%s.png" % name)
 
