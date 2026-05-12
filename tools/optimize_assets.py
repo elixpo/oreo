@@ -1,17 +1,19 @@
 """Asset optimizer for Elixpo Badge.
 
-Reads raw PNGs from assets/icons/raw/ and produces:
-  assets/icons/raw/{name}.png        — kept as source truth
-  assets/icons/optimized/{name}.py   — 32×32 RGB565 .py module for display.blit()
+Top-level icons (32×32):
+  assets/icons/raw/{name}.png   →   assets/icons/optimized/{name}.py
 
-For _bg suffix files, output is 80×60 (×4 scale = 320×240 screen).
+Status icons (13×13 white-on-pink, rasterized from SVG):
+  assets/status/raw/*.svg       →   assets/status/optimized/*.py
+
+Per-app sprites/backgrounds (arbitrary size via SIZES table or _bg suffix):
+  apps/<app>/assets/raw/*.png   →   apps/<app>/assets/optimized/*.py
 
 Run from project root:
-    python tools/optimize_assets.py              # all icons
-    python tools/optimize_assets.py snake_icon   # single icon by stem name
-
-SVG status icons:
-    python tools/optimize_assets.py --status     # rasterize assets/status/raw/*.svg
+    python tools/optimize_assets.py                 # all top-level icons
+    python tools/optimize_assets.py snake_icon      # single icon
+    python tools/optimize_assets.py --status        # SVG status icons
+    python tools/optimize_assets.py --app flappy    # all sprites in apps/flappy/assets/raw
 """
 
 import sys
@@ -33,6 +35,19 @@ STATUS_SVG_DIR = Path("assets/status/raw")
 STATUS_HW_DIR  = Path("assets/status/optimized")
 STATUS_SIZE    = 13
 STATUS_BG      = (255, 93, 104)  # pink status bar — composite SVGs onto this
+
+# Per-app asset target sizes (W, H) by file stem.
+# Names matching neither this table nor _bg fall back to 32×32.
+PER_APP_SIZES = {
+    # flappy game
+    "panda_up":    (24, 24),
+    "panda_down":  (24, 24),
+    "mona_sheet":  (168, 48),   # 7×2 frames of 24×24
+    "obstacle":    (24, 24),
+    "background":  (80, 30),
+    "cloud":       (40, 20),
+    "grass":       (80, 10),
+}
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -105,6 +120,35 @@ def optimize(src: Path):
 
 # ── SVG status icon processing ────────────────────────────────────────────────
 
+def optimize_app(app_name):
+    """Optimize all raw PNGs in apps/<app_name>/assets/raw/ → optimized/*.py"""
+    raw_dir = Path("apps") / app_name / "assets" / "raw"
+    out_dir = Path("apps") / app_name / "assets" / "optimized"
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    sources = sorted(s for s in raw_dir.glob("*.png"))
+    if not sources:
+        print("No raw PNGs in", raw_dir)
+        return
+
+    print("Optimizing %d asset(s) for app '%s'...\n" % (len(sources), app_name))
+    for src in sources:
+        size = PER_APP_SIZES.get(src.stem)
+        if size is None:
+            # default 32×32 (or _bg fallback)
+            size = (BG_W, BG_H) if src.stem.endswith("_bg") else (ICON_SIZE, ICON_SIZE)
+
+        w, h     = size
+        img_raw  = Image.open(src)
+        hw_img   = img_raw.convert("RGBA").resize((w, h), Image.LANCZOS)
+        hw_rgb   = _fill_transparent(hw_img, BADGE_BG)
+        hw_data  = _to_rgb565_bytes(hw_rgb)
+        out      = out_dir / ("%s.py" % src.stem)
+        _write_py_module(out, hw_data, w, h)
+        print("  %-30s %3dkB raw  →  %dx%d  %dB" % (
+            src.stem, src.stat().st_size // 1024, w, h, out.stat().st_size))
+
+
 def optimize_status_svgs():
     """Rasterize SVGs to white-on-pink status icons.
 
@@ -150,6 +194,14 @@ def optimize_status_svgs():
 def main():
     if "--status" in sys.argv:
         optimize_status_svgs()
+        return
+
+    if "--app" in sys.argv:
+        idx = sys.argv.index("--app")
+        if idx + 1 >= len(sys.argv):
+            print("Usage: optimize_assets.py --app <app_name>")
+            return
+        optimize_app(sys.argv[idx + 1])
         return
 
     targets = [a for a in sys.argv[1:] if not a.startswith("--")]
