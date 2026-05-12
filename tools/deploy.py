@@ -47,7 +47,6 @@ DEPLOY = [
     ("lix_os/home.py",         "lix_os/home.py"),
     ("lix_os/icons.py",        "lix_os/icons.py"),
     ("lix_os/launcher.py",     "lix_os/launcher.py"),
-    ("lix_os/panda.py",        "lix_os/panda.py"),
     ("lix_os/splash.py",       "lix_os/splash.py"),
     ("lix_os/theme.py",        "lix_os/theme.py"),
     ("lix_os/timeutil.py",     "lix_os/timeutil.py"),

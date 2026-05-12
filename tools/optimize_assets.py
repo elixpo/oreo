@@ -55,15 +55,15 @@ PER_APP_OPAQUE = {
 # Names matching neither this table nor _bg fall back to 32×32.
 PER_APP_SIZES = {
     # flappy game — sprite sizes chosen for chroma-key transparency on hardware
-    "panda_up_a":   (24, 24),   # alive frame 0 — idle engine
-    "panda_up_b":   (24, 24),   # alive frame 1 — exhaust on (alternates with _a)
-    "panda_down":   (24, 24),   # falling
-    "panda_crash":  (24, 24),   # death frame 0 — tumbling
-    "panda_blast":  (24, 24),   # death frame 1 — explosion
-    "obstacle":     (24, 80),   # tall pipe segment so 1-2 blits cover a column
-    "background":   (80, 48),   # ×4 scale at app init → 320×192 full bg
+    "panda_up_a":   (32, 32),   # alive frame 0 — idle engine
+    "panda_up_b":   (32, 32),   # alive frame 1 — exhaust on (alternates with _a)
+    "panda_down":   (32, 32),   # falling
+    "panda_crash":  (32, 32),   # death frame 0 — tumbling
+    "panda_blast":  (32, 32),   # death frame 1 — explosion
+    "obstacle":     (32, 96),   # tall pipe segment, 1-2 blits cover a column
+    "background":   (80, 60),   # ×4 scale at app init → 320×240 FULL screen
     "cloud":        (40, 20),
-    "grass":        (80, 16),   # full-width tile, taller for thicker grass strip
+    "grass":        (80, 16),
 }
 
 
@@ -73,10 +73,18 @@ def _resize_clean(src: Image.Image, size: int) -> Image.Image:
     return src.convert("RGBA").resize((size, size), Image.LANCZOS)
 
 
-def _fill_transparent(img: Image.Image, fill_rgb: tuple) -> Image.Image:
-    img = img.convert("RGBA")
-    bg  = Image.new("RGBA", img.size, (fill_rgb[0], fill_rgb[1], fill_rgb[2], 255))
-    bg.paste(img, mask=img.split()[3])
+def _fill_transparent(img: Image.Image, fill_rgb: tuple, alpha_threshold=128) -> Image.Image:
+    """Composite onto a solid fill_rgb, but use a HARD binary alpha mask.
+
+    Pixels with alpha >= alpha_threshold keep their subject RGB; pixels below
+    become pure fill_rgb. This prevents partial-alpha edge pixels from blending
+    the subject with the chroma-key colour (which manifests as a lavender halo
+    when the fill is magenta).
+    """
+    img   = img.convert("RGBA")
+    alpha = img.split()[3].point(lambda v: 255 if v >= alpha_threshold else 0)
+    bg    = Image.new("RGBA", img.size, (fill_rgb[0], fill_rgb[1], fill_rgb[2], 255))
+    bg.paste(img, mask=alpha)
     return bg.convert("RGB")
 
 

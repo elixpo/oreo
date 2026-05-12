@@ -28,12 +28,18 @@ FLAP_VY     = -180.0  # px/s
 VY_CAP      = 320.0   # px/s
 SCROLL      = 90.0    # px/s
 SPAWN_SEC   = 1.7     # seconds between obstacle spawns
-OBSTACLE_W  = 24
-OBSTACLE_H  = 80      # one tile is 80 px tall — usually one blit covers a column
-GAP_H       = 86
-PANDA_X     = 40
-GROUND_H    = 50      # thicker grass+dirt strip
-PLAY_H      = SH - GROUND_H
+
+# Sprite sizing — bumped from 24→32 so the panda reads better at landscape scale
+PANDA_SZ    = 32
+OBSTACLE_W  = 32
+OBSTACLE_H  = 96      # one tile covers ~half the playable area in a single blit
+GAP_H       = 100
+PANDA_X     = 44
+
+# The background fills the FULL screen. The "ground" is just the 16-px grass
+# strip at the bottom — no separate dirt rectangle.
+GROUND_H    = 16
+PLAY_H      = SH - GROUND_H   # 224
 
 # ── colours ──────────────────────────────────────────────────────────────────
 

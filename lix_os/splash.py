@@ -13,7 +13,6 @@ import struct
 import time
 from lix import api
 from lix_os import theme
-from lix_os.panda import draw_panda
 
 SW = api.SCREEN_W   # 320
 SH = api.SCREEN_H   # 240
@@ -132,9 +131,9 @@ def show_splash(os_obj):
                 try:
                     d.blit(data, _MX, _MY, mw, mh)
                 except Exception:
-                    draw_panda(d, _MX, _MY, ps=4)
+                    d.rect(_MX, _MY, _MW, _MH, theme.PRIMARY, fill=True)
             else:
-                draw_panda(d, _MX, _MY, ps=4)
+                d.rect(_MX, _MY, _MW, _MH, theme.PRIMARY, fill=True)
 
         p3 = _phase(elapsed, 0.18, 0.52)   # "ELIXPO OS" types in: 900ms–2600ms
         if p3 > 0:
