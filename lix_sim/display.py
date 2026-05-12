@@ -8,7 +8,7 @@ import pygame
 from lix import api
 from lix_sim.font8x8 import glyph
 
-SCALE = 3  # 240×320 → 720×960
+SCALE = 2  # 320×240 → 640×480
 
 
 def _rgb565_to_rgb(c):
@@ -99,6 +99,30 @@ class SimDisplay(api.Display):
         del pa
         if SCALE != 1:
             surf = pygame.transform.scale(surf, (w * SCALE, h * SCALE))
+        self._surf.blit(surf, (x * SCALE, y * SCALE))
+
+    def blit_scale(self, sprite, x, y, w, h, scale):
+        """Blit sprite scaled up by `scale` badge-pixels."""
+        import struct
+        n = w * h
+        words = struct.unpack_from(">%dH" % n, sprite, 0)
+        surf = pygame.Surface((w * scale, h * scale))
+        pa   = pygame.PixelArray(surf)
+        for row in range(h):
+            for col in range(w):
+                word = words[row * w + col]
+                r = ((word >> 11) & 0x1F) << 3
+                g = ((word >>  5) & 0x3F) << 2
+                b = ( word        & 0x1F) << 3
+                c = surf.map_rgb(r, g, b)
+                for dy in range(scale):
+                    for dx in range(scale):
+                        pa[col * scale + dx][row * scale + dy] = c
+        del pa
+        out_w = w * scale * SCALE
+        out_h = h * scale * SCALE
+        if SCALE != 1:
+            surf = pygame.transform.scale(surf, (out_w, out_h))
         self._surf.blit(surf, (x * SCALE, y * SCALE))
 
     def present(self):

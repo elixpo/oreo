@@ -16,8 +16,8 @@ except ImportError:
 
 
 # ---------- Display geometry ----------
-SCREEN_W = 240
-SCREEN_H = 320
+SCREEN_W = 320   # landscape 320×240
+SCREEN_H = 240
 
 
 # ---------- RGB565 colors ----------
@@ -78,6 +78,20 @@ class Display(ABC):
     @abstractmethod
     def blit(self, sprite, x, y, w, h):
         """Copy a w*h RGB565 sprite (bytes-like) to (x,y)."""
+
+    def blit_scale(self, sprite, x, y, w, h, scale):
+        """Draw sprite scaled up by `scale`. Default: per-pixel fallback."""
+        import struct
+        n = w * h
+        words = struct.unpack_from(">%dH" % n, sprite, 0)
+        for row in range(h):
+            for col in range(w):
+                word = words[row * w + col]
+                r = ((word >> 11) & 0x1F) << 3
+                g = ((word >>  5) & 0x3F) << 2
+                b = ( word        & 0x1F) << 3
+                self.rect(x + col * scale, y + row * scale,
+                          scale, scale, rgb(r, g, b), fill=True)
 
     @abstractmethod
     def present(self):

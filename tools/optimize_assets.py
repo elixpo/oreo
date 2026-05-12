@@ -25,9 +25,11 @@ RAW_DIR      = Path("asset/icons")
 OPT_DIR      = Path("asset/icons/optimized")
 HW_DIR       = Path("assets/icons")
 
-DISPLAY_SIZE = 200     # optimized PNG size
-ICON_SIZE    = 32      # hardware blit size
-BADGE_BG     = (8, 8, 20)   # badge bg color — fills transparent pixels in .py
+DISPLAY_SIZE = 200     # optimized PNG size (square)
+ICON_SIZE    = 32      # hardware blit size for icons
+BG_W         = 80      # background width  (× scale=4 → 320px)
+BG_H         = 60      # background height (× scale=4 → 240px)
+BADGE_BG     = (14, 12, 20)  # badge bg color — fills transparent pixels in .py
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -99,13 +101,21 @@ def optimize(src: Path):
     opt_rgb.save(opt_out, format="PNG", optimize=True, compress_level=9)
     print("  %3dkB opt" % (opt_out.stat().st_size // 1024), end="  |")
 
-    # ── hardware .py (32×32 RGB565, transparent → badge bg) ──────────────────
+    # ── hardware .py — backgrounds at 80×60, icons at 32×32 ─────────────────
     HW_DIR.mkdir(parents=True, exist_ok=True)
-    hw_img   = _resize_clean(img_raw, ICON_SIZE)
-    hw_rgb   = _fill_transparent(hw_img, BADGE_BG)
-    hw_data  = _to_rgb565_bytes(hw_rgb)
-    hw_out   = HW_DIR / ("%s.py" % src.stem)
-    _write_py_module(hw_out, hw_data, ICON_SIZE, ICON_SIZE)
+    is_bg = src.stem.endswith("_bg")
+    if is_bg:
+        hw_img = img_raw.convert("RGBA").resize((BG_W, BG_H), Image.LANCZOS)
+        hw_rgb = _fill_transparent(hw_img, BADGE_BG)
+        hw_data = _to_rgb565_bytes(hw_rgb)
+        hw_out  = HW_DIR / ("%s.py" % src.stem)
+        _write_py_module(hw_out, hw_data, BG_W, BG_H)
+    else:
+        hw_img  = _resize_clean(img_raw, ICON_SIZE)
+        hw_rgb  = _fill_transparent(hw_img, BADGE_BG)
+        hw_data = _to_rgb565_bytes(hw_rgb)
+        hw_out  = HW_DIR / ("%s.py" % src.stem)
+        _write_py_module(hw_out, hw_data, ICON_SIZE, ICON_SIZE)
     print("  %dB hw" % hw_out.stat().st_size)
 
 

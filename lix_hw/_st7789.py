@@ -21,8 +21,9 @@ _RAMWR   = 0x2C
 _MADCTL  = 0x36
 _COLMOD  = 0x3A
 
-# MADCTL orientation bits
-_MADCTL_RGB = 0x00
+# MADCTL orientation bits — landscape 320×240
+# MX=1 (0x40) | MV=1 (0x20) = 0x60 → 90° CW rotation
+_MADCTL_LANDSCAPE = 0x60
 
 
 class ST7789:
@@ -51,10 +52,10 @@ class ST7789:
         self._hard_reset()
         self._cmd(_SWRESET); time.sleep_ms(150)
         self._cmd(_SLPOUT);  time.sleep_ms(500)
-        self._cmd(_COLMOD, b'\x55')                  # 16bpp RGB565
-        self._cmd(_MADCTL, bytes([_MADCTL_RGB]))     # portrait, RGB order
-        self._cmd(_CASET,  b'\x00\x00\x00\xEF')      # cols 0..239
-        self._cmd(_RASET,  b'\x00\x00\x01\x3F')      # rows 0..319
+        self._cmd(_COLMOD, b'\x55')                       # 16bpp RGB565
+        self._cmd(_MADCTL, bytes([_MADCTL_LANDSCAPE]))    # landscape 320×240
+        self._cmd(_CASET,  b'\x00\x00\x01\x3F')           # cols 0..319
+        self._cmd(_RASET,  b'\x00\x00\x00\xEF')           # rows 0..239
         self._cmd(_INVON);  time.sleep_ms(10)        # IPS panels need inversion ON
         self._cmd(_NORON);  time.sleep_ms(10)
         self._cmd(_DISPON); time.sleep_ms(100)

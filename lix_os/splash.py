@@ -1,27 +1,46 @@
-"""Animated boot splash for Elixpo OS.
+"""Animated boot splash — Elixpo OS, 320×240 landscape.
 
-Sequence (total ≈ 3 seconds):
-  0.00–0.25s  dark bg + accent scanline sweep top→bottom
-  0.15–0.70s  panda materialises row-by-row from top
-  0.60–1.10s  "ELIXPO" letters type in left→right at scale 4
-  1.00–1.40s  "BADGE OS" subtitle appears + version
-  1.30–1.90s  loading bar fills left→right
-  1.90–2.60s  hold + gentle pulse on accent rails
-  2.60–3.00s  fade to black (clear) → hand off to home screen
+Sequence (~3 s):
+  0.00–0.30  gradient background sweeps in
+  0.20–0.80  mascot fades in (row-reveal top→bottom)
+  0.70–1.20  "ELIXPO" types in
+  1.10–1.50  "BADGE OS" appears
+  1.40–2.10  loading bar fills
+  2.60–3.00  fade to black
 """
 
-import time
 import struct
+import time
 from lix import api
+from lix_os import theme
 from lix_os.panda import draw_panda, PANDA_W, PANDA_H
 
-# mascot sprite — loaded once, falls back to pixel panda if missing
+SW = api.SCREEN_W   # 320
+SH = api.SCREEN_H   # 240
+
+# ── layout ────────────────────────────────────────────────────────────────────
+
+_MW, _MH = 72, 72
+_MX = 30
+_MY = (SH - _MH) // 2        # 84
+_TX = _MX + _MW + 20         # 122
+_TY = _MY + 4
+_SUB_Y = _TY + 40
+_VER_Y = _SUB_Y + 20
+_BAR_X = 20
+_BAR_Y = SH - 28
+_BAR_W = SW - 40
+
+TOTAL_MS = 3000
+
+# ── mascot loader (cached) ────────────────────────────────────────────────────
+
 _mascot = None
 
 def _get_mascot():
     global _mascot
     if _mascot is not None:
-        return _mascot
+        return _mascot if _mascot is not False else None
     try:
         import assets.mascot as m
         _mascot = (m.DATA, m.W, m.H)
@@ -30,162 +49,110 @@ def _get_mascot():
         pass
     try:
         from PIL import Image
-        import struct
-        img = Image.open("asset/mascot.png").convert("RGBA").resize((72, 72), Image.LANCZOS)
-        bg = Image.new("RGBA", (72, 72), (8, 8, 20, 255))
+        img = Image.open("asset/mascot.png").convert("RGBA").resize(
+            (_MW, _MH), Image.LANCZOS)
+        bg = Image.new("RGBA", (_MW, _MH), (theme.BG_R, theme.BG_G, theme.BG_B, 255))
         bg.paste(img, mask=img.split()[3])
         rgb = bg.convert("RGB")
-        px = rgb.load()
+        px  = rgb.load()
         words = []
-        for y in range(72):
-            for x in range(72):
+        for y in range(_MH):
+            for x in range(_MW):
                 r, g, b = px[x, y]
                 words.append(((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3))
         data = struct.pack(">%dH" % len(words), *words)
-        _mascot = (data, 72, 72)
+        _mascot = (data, _MW, _MH)
+        return _mascot
     except Exception:
-        _mascot = False  # sentinel: skip, use pixel panda
-    return _mascot
+        _mascot = False
+    return None
 
-# --- timing ------------------------------------------------------------------
+# ── helpers ───────────────────────────────────────────────────────────────────
 
-def _ms():
-    return time.ticks_ms()
+def _ms():     return time.ticks_ms()
+def _diff(a, b): return time.ticks_diff(a, b)
 
-def _diff(a, b):
-    return time.ticks_diff(a, b)
-
-
-# --- palette -----------------------------------------------------------------
-
-BG      = api.rgb(8, 8, 20)
-PRIMARY = api.rgb(0, 220, 200)
-ACCENT  = api.rgb(255, 80, 200)
-MUTED   = api.rgb(120, 120, 150)
-_BLACK  = api.BLACK
-
-# --- panda position (ps=4 → 80×72 px) ---------------------------------------
-
-_PS     = 4
-_PW     = PANDA_W * _PS   # 80
-_PH     = PANDA_H * _PS   # 72
-_PANDA_X = (api.SCREEN_W - _PW) // 2   # 80
-_PANDA_Y = 20
-
-# "ELIXPO" at scale=4: 6 chars × 32px = 192px → x=24 to x=216
-_TEXT_X   = 24
-_TEXT_Y   = _PANDA_Y + _PH + 8       # just below panda
-_SUB_Y    = _TEXT_Y + 38             # "BADGE OS" scale=2
-_VER_Y    = _SUB_Y + 20
-_BAR_X    = 20
-_BAR_Y    = _VER_Y + 18
-_BAR_W    = api.SCREEN_W - 40
-
-TOTAL_MS  = 3000
-
+def _phase(elapsed, s, e):
+    t = elapsed / TOTAL_MS
+    if t < s:  return 0.0
+    if t >= e: return 1.0
+    return (t - s) / (e - s)
 
 def _lerp(a, b, t):
-    return a + (b - a) * t
+    return int(a + (b - a) * t)
 
+def _draw_gradient(d):
+    """Vertical gradient: dark at edges, warm glow at centre."""
+    mid = SH // 2
+    for y in range(SH):
+        dist = abs(y - mid) / mid
+        t    = 1.0 - dist * dist
+        r = _lerp(theme.BG_R, 0,  t)
+        g = _lerp(theme.BG_G, 70, t)
+        b = _lerp(theme.BG_B, 65, t)
+        d.rect(0, y, SW, 1, api.rgb(r, g, b), fill=True)
 
-def _phase(elapsed, start_frac, end_frac):
-    """Return 0.0–1.0 for a sub-range of the splash, clamped."""
-    t = elapsed / TOTAL_MS
-    if t < start_frac:
-        return 0.0
-    if t >= end_frac:
-        return 1.0
-    return (t - start_frac) / (end_frac - start_frac)
-
+# ── show_splash ───────────────────────────────────────────────────────────────
 
 def show_splash(os_obj):
     d     = os_obj.display
     start = _ms()
+    drawn_bg = False
 
     while True:
         elapsed = _diff(_ms(), start)
         if elapsed >= TOTAL_MS:
             break
 
-        d.clear(BG)
+        if not drawn_bg:
+            _draw_gradient(d)
+            drawn_bg = True
 
-        # ── Phase 1: scanline sweep (0–0.25 s) ────────────────────────────
-        p1 = _phase(elapsed, 0.0, 0.25)
+        p1 = _phase(elapsed, 0.0, 0.30)
         if p1 > 0:
-            sy = int(p1 * api.SCREEN_H)
-            # Fading trail
-            d.rect(0, max(0, sy - 30), api.SCREEN_W, 30, api.rgb(0, 40, 35), fill=True)
-            d.rect(0, max(0, sy - 3),  api.SCREEN_W,  3, PRIMARY, fill=True)
+            lx = int(p1 * SW)
+            d.rect(0, _BAR_Y - 6, lx, 1, theme.TEAL, fill=True)
 
-        # ── Phase 2: mascot/panda reveal (0.15–0.72 s) ───────────────────
-        p2 = _phase(elapsed, 0.15, 0.72)
+        p2 = _phase(elapsed, 0.20, 0.80)
         if p2 > 0:
             mascot = _get_mascot()
-            if mascot and mascot is not False:
+            if mascot:
                 data, mw, mh = mascot
-                # Reveal rows top-down by clipping draw area
-                rows_visible = max(1, int(p2 * mh))
-                mx = _PANDA_X - (mw - _PW) // 2   # centre the 72px sprite
-                # blit the sprite; rows below visible count are still BG
+                rows = max(1, int(p2 * mh))
                 try:
-                    d.blit(data, mx, _PANDA_Y, mw, min(mh, rows_visible))
+                    d.blit(data, _MX, _MY, mw, min(mh, rows))
                 except Exception:
-                    draw_panda(d, _PANDA_X, _PANDA_Y, ps=_PS, max_rows=max(1, int(p2 * PANDA_H)))
+                    draw_panda(d, _MX, _MY, ps=4,
+                               max_rows=max(1, int(p2 * PANDA_H)))
             else:
-                rows = max(1, int(p2 * PANDA_H))
-                draw_panda(d, _PANDA_X, _PANDA_Y, ps=_PS, max_rows=rows)
+                draw_panda(d, _MX, _MY, ps=4,
+                           max_rows=max(1, int(p2 * PANDA_H)))
 
-        # ── Phase 3: "ELIXPO" types in (0.60–1.10 s) ─────────────────────
-        p3 = _phase(elapsed, 0.60, 1.10)
+        p3 = _phase(elapsed, 0.70, 1.20)
         if p3 > 0:
             n = max(1, int(p3 * 6))
-            d.text("ELIXPO"[:n], _TEXT_X, _TEXT_Y, PRIMARY, scale=4)
+            d.text("ELIXPO"[:n], _TX, _TY, theme.TEXT_BRIGHT, scale=4)
 
-        # ── Phase 4: subtitle + version (1.00–1.45 s) ────────────────────
-        p4 = _phase(elapsed, 1.00, 1.45)
+        p4 = _phase(elapsed, 1.10, 1.50)
         if p4 > 0:
-            # Fade in by character count
-            n_sub = max(1, int(p4 * 8))
-            d.text("BADGE OS"[:n_sub], 72, _SUB_Y, api.WHITE, scale=2)
-            if p4 > 0.8:
-                d.text("v0.1", 100, _VER_Y, MUTED)
+            n = max(1, int(p4 * 8))
+            d.text("BADGE OS"[:n], _TX + 4, _SUB_Y, theme.TEAL, scale=2)
+            if p4 > 0.9:
+                d.text("v0.1", _TX + 4, _VER_Y, theme.MUTED)
 
-        # ── Phase 5: loading bar (1.30–2.00 s) ───────────────────────────
-        p5 = _phase(elapsed, 1.30, 2.00)
+        p5 = _phase(elapsed, 1.40, 2.10)
         if p5 > 0:
-            d.rect(_BAR_X, _BAR_Y, _BAR_W, 5, api.rgb(25, 25, 40), fill=True)
-            filled = int(p5 * _BAR_W)
-            if filled > 0:
-                d.rect(_BAR_X, _BAR_Y, filled, 5, PRIMARY, fill=True)
-            # loading label
+            d.rect(_BAR_X, _BAR_Y, _BAR_W, 5, api.rgb(30, 26, 40), fill=True)
+            filled = max(2, int(p5 * _BAR_W))
+            d.rect(_BAR_X, _BAR_Y, filled, 5, theme.PRIMARY, fill=True)
             pct = int(p5 * 100)
-            d.text("%d%%" % pct, _BAR_X + _BAR_W + 4, _BAR_Y - 2, MUTED)
+            d.text("%d%%" % pct, _BAR_X + _BAR_W + 6, _BAR_Y - 2, theme.MUTED)
 
-        # ── Phase 6: accent rails pulse (1.90–2.60 s) ────────────────────
-        p6 = _phase(elapsed, 1.90, 2.60)
-        if p6 > 0:
-            # Pulse between PRIMARY and ACCENT
-            pulse = abs((p6* 2) % 2 - 1)  # triangle wave 0→1→0→1...
-            rail_c = api.rgb(
-                int(_lerp(0, 255, pulse)),
-                int(_lerp(220, 80, pulse)),
-                int(_lerp(200, 200, pulse)),
-            )
-            d.rect(20, _TEXT_Y - 6, api.SCREEN_W - 40, 2, rail_c, fill=True)
-            d.rect(20, _BAR_Y + 10, api.SCREEN_W - 40, 2, rail_c, fill=True)
-
-        # ── Phase 7: fade to black (2.60–3.00 s) ─────────────────────────
-        p7 = _phase(elapsed, 2.60, 3.00)
-        if p7 > 0:
-            # Overlay semi-transparent black using repeated dark rect
-            # (no alpha on framebuf — fake it with a dark rect at increasing opacity)
-            lvl = int(p7 * 8)
-            fade_c = api.rgb(lvl, lvl, lvl + 2)
-            for _ in range(int(p7 * 6)):
-                d.rect(0, 0, api.SCREEN_W, api.SCREEN_H, _BLACK, fill=True)
+        p6 = _phase(elapsed, 2.60, 3.00)
+        if p6 >= 1.0:
+            d.clear(api.BLACK)
 
         d.present()
 
-    # Final clear
-    d.clear(_BLACK)
+    d.clear(api.BLACK)
     d.present()

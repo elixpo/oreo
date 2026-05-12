@@ -23,7 +23,25 @@ PANDA_BASE = (
     "wearing a red badge with letter E on chest"
 )
 
+BG_STYLE = (
+    "pixel art 8-bit style, thick chunky pixels, kawaii cute aesthetic, "
+    "no text, no watermark, no characters, "
+)
+
 ICONS = {
+    # "home_bg": (
+    #     "pixel art 8-bit landscape background: lush dark jungle with tall bamboo stalks, "
+    #     "large tropical leaves, glowing fireflies, misty night atmosphere, "
+    #     "deep teal and emerald green palette, warm pink bioluminescent accents, "
+    #     "layered depth with foreground leaves and background mist, very dark moody tone. "
+    #     + BG_STYLE
+    # ),
+    # "apps_icon": (
+    #     "pixel art 8-bit icon: 3x3 grid of nine colourful tiny app squares on a dark screen, "
+    #     "each small square a different bright neon colour (pink teal orange green purple), "
+    #     "thick black outlines between squares, white background, chunky retro pixels. "
+    #     + BG_STYLE
+    # ),
     # "flappy_icon": (
     #     "pixel art cartoon icon: " + PANDA_BASE + " sitting inside a tiny yellow biplane, "
     #     "flying between two green pipes, side view, arms out for balance, cheerful grin, "
