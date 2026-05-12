@@ -68,7 +68,7 @@ class SimDisplay(api.Display):
             for row in range(8):
                 byte = bits[row]
                 for col in range(8):
-                    if byte & (0x80 >> col):
+                    if byte & (1 << col):  # LSB = leftmost pixel, matches MicroPython framebuf
                         px = cx + col * scale * SCALE
                         py = cy + row * scale * SCALE
                         pygame.draw.rect(
