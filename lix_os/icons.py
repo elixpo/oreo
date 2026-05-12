@@ -62,12 +62,15 @@ def load(app_dir: str, icon_filename: str | None = None) -> tuple | None:
 
     # ── Fall back to pre-converted .py module ─────────────────────────────
     if result is None:
-        try:
-            name = (icon_filename or app_dir).replace("-", "_").replace(".", "_")
-            mod  = __import__("assets.icons.%s" % name, None, None, ["DATA", "W", "H"])
-            result = (mod.DATA, mod.W, mod.H)
-        except (ImportError, AttributeError):
-            pass
+        # Strip file extension before using as module name
+        stem = (icon_filename or app_dir).rsplit(".", 1)[0].replace("-", "_")
+        for mod_name in [stem, "%s_icon" % app_dir]:
+            try:
+                mod = __import__("assets.icons.%s" % mod_name, None, None, ["DATA", "W", "H"])
+                result = (mod.DATA, mod.W, mod.H)
+                break
+            except (ImportError, AttributeError):
+                continue
 
     _cache[key] = result
     return result

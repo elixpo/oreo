@@ -124,10 +124,34 @@ def _rand_gap_y():
 
 # ── App ───────────────────────────────────────────────────────────────────────
 
+# ── sprite loader ────────────────────────────────────────────────────────────
+
+_sprites = {}   # "up" | "down" → (data, w, h) or None
+
+def _load_sprite(key, filename):
+    if key in _sprites:
+        return _sprites[key]
+    result = None
+    try:
+        from lix_os.icons import _png_to_rgb565
+        data = _png_to_rgb565("asset/icons/%s" % filename, size=32)
+        if data:
+            result = (data, 32, 32)
+    except Exception:
+        pass
+    _sprites[key] = result
+    return result
+
+
+# ── App ───────────────────────────────────────────────────────────────────────
+
 class App(lix.App):
 
     def on_enter(self, os):
         self._os = os
+        # pre-load sprites if generated
+        _load_sprite("up",   "flappy_panda_up.png")
+        _load_sprite("down", "flappy_panda_down.png")
         self._state   = "title"   # "title" | "play" | "over"
         self._score   = 0
         self._hiscore = 0
@@ -149,7 +173,7 @@ class App(lix.App):
 
     def update(self, dt):
         btn = self._os.buttons
-        pressed_any = btn.pressed("A") or btn.pressed("UP")
+        pressed_any = btn.just_pressed(api.BTN_A) or btn.just_pressed(api.BTN_UP)
 
         if self._state == "title":
             if pressed_any:
@@ -230,10 +254,16 @@ class App(lix.App):
         for pipe in self._pipes:
             _draw_pipe(d, int(pipe[0]), pipe[1])
 
-        # panda
-        py_int = int(self._panda_y)
-        tilt = self._vy if self._state == "play" else 0
-        _draw_panda(d, SW // 4, py_int, angle_deg=tilt)
+        # panda — use PNG sprite if generated, else pixel rects
+        py_int  = int(self._panda_y)
+        tilt_vy = self._vy if self._state == "play" else 0
+        sprite_key = "down" if tilt_vy > 60 else "up"
+        sprite = _sprites.get(sprite_key)
+        if sprite:
+            sdata, sw_s, sh_s = sprite
+            d.blit(sdata, SW // 4 - (sw_s - PW) // 2, py_int - (sh_s - PH) // 2, sw_s, sh_s)
+        else:
+            _draw_panda(d, SW // 4, py_int, angle_deg=tilt_vy)
 
         if self._state == "title":
             d.rect(40, 120, 160, 70, api.rgb(14, 14, 32), fill=True)

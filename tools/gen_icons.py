@@ -99,6 +99,17 @@ ICONS = {
         "with circuit board lines and glowing dots, artist smock on, paint palette "
         "in other hand, neon teal and magenta colours on canvas, white background. " + STYLE
     ),
+    # "flappy_panda_up": (
+    #     "pixel art sprite sheet: " + PANDA_BASE + " riding a tiny yellow biplane "
+    #     "wings tilted upward, propeller spinning, cheeks puffed, arms gripping cockpit edge, "
+    #     "side view facing right, bright blue sky sliver background, "
+    #     "clean square crop, no text. " + STYLE
+    # ),
+    # "flappy_panda_down": (
+    #     "pixel art sprite: " + PANDA_BASE + " riding a tiny yellow biplane "
+    #     "wings tilted downward, nose-diving, scared wide eyes, arms flailing, "
+    #     "side view facing right, white background, no text. " + STYLE
+    # ),
     # "gallery_icon": (
     #     "pixel art cartoon icon: " + PANDA_BASE + " holding up a large chunky polaroid "
     #     "photo frame showing a tiny landscape pixel art scene inside, a stack of more "
