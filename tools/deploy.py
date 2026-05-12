@@ -53,7 +53,14 @@ DEPLOY = [
     ("lix_os/timeutil.py",     "lix_os/timeutil.py"),
 ]
 
+# lix module — also pick up font/sprite
+DEPLOY += [
+    ("lix/font.py",   "lix/font.py"),
+    ("lix/sprite.py", "lix/sprite.py"),
+]
+
 # apps — include only dirs that have both manifest.json and main.py
+# Also pull in per-app assets/optimized/*.py
 APPS_DIR = Path("apps")
 for app_dir in sorted(APPS_DIR.iterdir()):
     if not app_dir.is_dir() or app_dir.name.startswith("_"):
@@ -65,6 +72,16 @@ for app_dir in sorted(APPS_DIR.iterdir()):
             ("%s/main.py" % rel,          "%s/main.py" % rel),
             ("%s/manifest.json" % rel,    "%s/manifest.json" % rel),
         ]
+        # Per-app assets (only optimized .py modules, not raw images)
+        opt = app_dir / "assets" / "optimized"
+        if opt.exists():
+            r_base = "%s/assets/optimized" % rel
+            DEPLOY.append(("%s/assets/__init__.py" % rel, "%s/assets/__init__.py" % rel))
+            DEPLOY.append(("%s/__init__.py" % opt, "%s/__init__.py" % r_base))
+            for py in sorted(opt.glob("*.py")):
+                if py.name == "__init__.py":
+                    continue
+                DEPLOY.append((str(py), "%s/%s" % (r_base, py.name)))
 
 # assets — only the optimized .py modules (not raw PNGs/SVGs)
 for subdir in ["icons", "sprites", "status"]:

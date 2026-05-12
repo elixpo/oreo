@@ -1,284 +1,424 @@
-"""Flappy Panda — Elixpo badge game.
+"""Flappy Panda — Elixpo Badge edition.
 
-Display: 240×320 portrait. Game area: y=24..296 (272px tall).
-Header: score / hi-score. Footer: tiny hint on title screen.
+Landscape 320×240. Mona-style physics (gravity + flap impulse), parallax
+scenery (distant hills + clouds + grass), pipe-with-spike obstacles, three
+state machine (INTRO → PLAY → GAME_OVER), persistent high score.
 
-Panda sprite: 14×12 px pixel-art, drawn with d.rect() — no image load needed.
-Pipes: chunky teal rectangles, gap of 72px, scroll left at 60px/s.
-Physics: gravity 350px/s², flap impulse −140px/s. Terminal velocity 220px/s.
+Sprites (under apps/flappy/assets/optimized/):
+  panda_up.py / panda_down.py   — 24×24, flying / diving
+  mona_sheet.py                 — 7×2 grid of 24×24 (optional; used if present)
+  obstacle.py                   — 24×24 pipe segment with spike cap
+  background.py                 — 80×30 distant hills (scaled ×4 horizontally)
+  grass.py                      — 80×10 ground tile
+  (clouds drawn procedurally)
 
-Controls: A or UP = flap. Any button on title/game-over = start / restart.
+Controls: A or UP = flap.
 """
 
+import time
 import lix
-from lix import api
+from lix import api, font
 
-# ── geometry ─────────────────────────────────────────────────────────────────
-
-SW      = api.SCREEN_W   # 240
-SH      = api.SCREEN_H   # 320
-HEADER  = 24
-FOOTER  = 24
-TOP     = HEADER
-BOTTOM  = SH - FOOTER    # 296
-PLAY_H  = BOTTOM - TOP   # 272
-
-# ── colours ──────────────────────────────────────────────────────────────────
-
-C_BG      = api.rgb(8,   8,  20)
-C_SKY     = api.rgb(14,  14, 38)
-C_PIPE    = api.rgb(0,  180, 160)
-C_PIPE_LT = api.rgb(0,  220, 200)
-C_GROUND  = api.rgb(30,  30,  55)
-C_HEAD    = api.rgb(0,  220, 200)
-C_SCORE   = api.WHITE
-C_TITLE   = api.rgb(0,  220, 200)
-C_OVER    = api.rgb(255,  60, 100)
-C_HINT    = api.rgb(90,  90, 130)
-C_STAR    = api.rgb(60,  60, 100)
-
-# panda palette
-P_FUR    = api.rgb(200, 204, 203)
-P_DARK   = api.rgb(38,  38,  48)
-P_CHEEK  = api.rgb(255,  93, 104)
-P_SHINE  = api.WHITE
-P_YELLOW = api.rgb(255, 200,  40)  # propeller / plane
+SW = api.SCREEN_W   # 320
+SH = api.SCREEN_H   # 240
 
 # ── physics ──────────────────────────────────────────────────────────────────
 
-GRAVITY   = 350   # px/s²  (applied each second)
-FLAP_VY   = -145  # px/s   (upward impulse)
-VY_CAP    =  220  # px/s   (terminal falling speed)
-PIPE_SPEED =  70  # px/s   scroll speed
-GAP        =  72  # px     pipe opening height
-PIPE_W     =  28  # px     pipe width
-SPAWN_DIST = 120  # px     horizontal distance between pipes
+GRAVITY     = 480.0   # px/s²
+FLAP_VY     = -180.0  # px/s
+VY_CAP      = 320.0   # px/s
+SCROLL      = 90.0    # px/s
+SPAWN_MS    = 1700    # ms between obstacles
+OBSTACLE_W  = 24
+GAP_H       = 78
+PANDA_X     = 40
+GROUND_H    = 24
 
-# ── panda sprite (14×12 pixels) ──────────────────────────────────────────────
-# Each row is a list of (dx, dy, w, h, color) rects relative to sprite origin.
-# Origin = top-left of bounding box.
+# ── colours ──────────────────────────────────────────────────────────────────
 
-PW = 14   # sprite width
-PH = 12   # sprite height
+C_SKY      = api.rgb(120, 200, 240)
+C_SKY_DEEP = api.rgb( 95, 175, 220)
+C_CLOUD    = api.WHITE
+C_CLOUD_SH = api.rgb(230, 230, 240)
+C_GROUND   = api.rgb( 96,  62,  40)
+C_SHADOW   = api.rgb( 20,  40,  60)
+C_TITLE    = api.rgb(255,  93, 104)
+C_TEXT     = api.WHITE
+C_DIM      = api.rgb(200, 180, 160)
+C_HI       = api.rgb(255, 230,  80)
 
-def _draw_panda(d, px, py, angle_deg=0):
-    """Draw the pixel-art panda at (px, py).
+# ── persistent high score ────────────────────────────────────────────────────
 
-    angle_deg > 0 = nose-down (just shifts the eye row down 1px for a tilt hint).
-    """
-    tilt = 1 if angle_deg > 15 else 0
+HISCORE_PATH = "apps/flappy/hiscore.txt"
 
-    # body (fur)
-    d.rect(px + 2, py + 3, 10, 8, P_FUR,  fill=True)
-    # head
-    d.rect(px + 2, py,     10, 6, P_FUR,  fill=True)
-    # ears
-    d.rect(px + 2, py,      2, 2, P_DARK, fill=True)
-    d.rect(px + 10, py,     2, 2, P_DARK, fill=True)
-    # eye patches
-    d.rect(px + 3, py + 2 + tilt, 2, 2, P_DARK, fill=True)
-    d.rect(px + 9, py + 2 + tilt, 2, 2, P_DARK, fill=True)
-    # eyes (shine)
-    d.rect(px + 4, py + 2 + tilt, 1, 1, P_SHINE, fill=True)
-    d.rect(px + 10, py + 2 + tilt, 1, 1, P_SHINE, fill=True)
-    # nose
-    d.rect(px + 6, py + 4 + tilt, 2, 1, P_DARK, fill=True)
-    # cheek blush
-    d.rect(px + 3, py + 5, 2, 1, P_CHEEK, fill=True)
-    d.rect(px + 9, py + 5, 2, 1, P_CHEEK, fill=True)
-    # tiny propeller above head
-    d.rect(px + 5, py - 3, 4, 1, P_YELLOW, fill=True)
-    d.rect(px + 6, py - 3, 1, 3, P_DARK,   fill=True)
+def _load_hiscore():
+    try:
+        with open(HISCORE_PATH, "r") as f:
+            return int(f.read().strip() or "0")
+    except Exception:
+        return 0
 
+def _save_hiscore(v):
+    try:
+        with open(HISCORE_PATH, "w") as f:
+            f.write(str(int(v)))
+    except Exception:
+        pass
 
-def _draw_pipe(d, x, gap_y):
-    """Draw a pair of pipes centred on gap_y with GAP opening."""
-    top_h    = gap_y - GAP // 2 - TOP
-    bot_y    = gap_y + GAP // 2
-    bot_h    = BOTTOM - bot_y
+# ── asset loaders ────────────────────────────────────────────────────────────
 
-    if top_h > 0:
-        d.rect(x, TOP,   PIPE_W, top_h, C_PIPE,    fill=True)
-        d.rect(x, TOP + top_h - 4, PIPE_W, 4, C_PIPE_LT, fill=True)  # cap
+_assets = {}   # name → (data, w, h) or None
 
-    if bot_h > 0:
-        d.rect(x, bot_y,  PIPE_W, 4,     C_PIPE_LT, fill=True)  # cap
-        d.rect(x, bot_y + 4, PIPE_W, bot_h - 4, C_PIPE, fill=True)
+def _try_import(modname):
+    try:
+        return __import__(modname, None, None, ["DATA", "W", "H"])
+    except (ImportError, AttributeError):
+        return None
 
+def _load(name):
+    if name in _assets:
+        return _assets[name]
+    mod = _try_import("apps.flappy.assets.optimized.%s" % name)
+    if mod and hasattr(mod, "DATA"):
+        result = (mod.DATA, mod.W, mod.H)
+    else:
+        result = None
+    _assets[name] = result
+    return result
 
-# ── LCG RNG (no random module on MicroPython) ─────────────────────────────────
+# ── LCG RNG ──────────────────────────────────────────────────────────────────
 
-_seed = 42
-
-def _lcg():
+_seed = 12345
+def _rand():
     global _seed
     _seed = (_seed * 1103515245 + 12345) & 0x7FFFFFFF
     return _seed
 
-def _rand_gap_y():
-    margin = 40
-    lo = TOP + GAP // 2 + margin
-    hi = BOTTOM - GAP // 2 - margin
-    return lo + _lcg() % max(1, hi - lo)
+def _rand_gap_y(top_margin, bot_margin):
+    lo = top_margin
+    hi = SH - GROUND_H - GAP_H - bot_margin
+    return lo + _rand() % max(1, hi - lo)
 
+# ── obstacle ─────────────────────────────────────────────────────────────────
 
-# ── App ───────────────────────────────────────────────────────────────────────
+class Obstacle:
+    def __init__(self):
+        self.x        = float(SW)
+        self.gap_y    = _rand_gap_y(24, 12)
+        self.passed   = False
 
-# ── sprite loader ────────────────────────────────────────────────────────────
+    def update(self, dt):
+        self.x -= SCROLL * dt
 
-_sprites = {}   # "up" | "down" → (data, w, h) or None
+    def bounds(self):
+        # Top hitbox (above gap), bottom hitbox (below gap)
+        return (
+            (int(self.x), 0,                                   OBSTACLE_W, self.gap_y),
+            (int(self.x), self.gap_y + GAP_H,                  OBSTACLE_W,
+                          SH - GROUND_H - self.gap_y - GAP_H),
+        )
 
-def _load_sprite(key, filename):
-    if key in _sprites:
-        return _sprites[key]
-    result = None
-    try:
-        from lix_os.icons import _png_to_rgb565
-        data = _png_to_rgb565("asset/icons/%s" % filename, size=32)
-        if data:
-            result = (data, 32, 32)
-    except Exception:
-        pass
-    _sprites[key] = result
-    return result
+    def draw(self, d):
+        obs = _load("obstacle")
+        x = int(self.x)
+        if obs:
+            data, ow, oh = obs
+            # Top: stack tiles from y=gap_y-oh upward to y=0
+            y = self.gap_y - oh
+            while y > -oh:
+                d.blit(data, x, max(0, y), ow, oh)
+                # crude clipping when y < 0: just stop drawing past the top
+                if y <= 0:
+                    break
+                y -= oh
+            # Bottom: stack tiles from y=gap_y+GAP_H downward to ground
+            y = self.gap_y + GAP_H
+            while y < SH - GROUND_H:
+                d.blit(data, x, y, ow, oh)
+                y += oh
+        else:
+            # Procedural fallback: solid pipes
+            d.rect(x, 0,                  OBSTACLE_W, self.gap_y,       api.GREEN, fill=True)
+            d.rect(x, self.gap_y + GAP_H, OBSTACLE_W,
+                   SH - GROUND_H - self.gap_y - GAP_H,                 api.GREEN, fill=True)
 
+# ── panda ────────────────────────────────────────────────────────────────────
 
-# ── App ───────────────────────────────────────────────────────────────────────
+class Panda:
+    def __init__(self):
+        self.y          = float(SH // 2)
+        self.vy         = 0.0
+        self.score      = 0
+        self.died_at_ms = None
+        self.last_ms    = None
+
+    def jump(self):
+        if not self.is_dead():
+            self.vy = FLAP_VY
+
+    def update(self, dt_ms, obstacles):
+        if self.is_dead():
+            return
+        dt = dt_ms / 1000.0
+        self.vy = min(self.vy + GRAVITY * dt, VY_CAP)
+        self.y += self.vy * dt
+        # Ceiling
+        if self.y < 0:
+            self.y = 0.0
+            self.vy = 0.0
+        # Ground / floor
+        if self.y + 24 > SH - GROUND_H:
+            self.die()
+            return
+        # Collisions + score
+        bx, by, bw, bh = self.bounds()
+        for o in obstacles:
+            for ox, oy, ow, oh in o.bounds():
+                if (bx < ox + ow and bx + bw > ox and
+                    by < oy + oh and by + bh > oy):
+                    self.die()
+                    return
+            if not o.passed and o.x + OBSTACLE_W < bx:
+                o.passed = True
+                self.score += 1
+
+    def bounds(self):
+        # Slightly tighter than 24×24
+        return (PANDA_X + 3, int(self.y) + 3, 18, 18)
+
+    def is_dead(self):
+        return self.died_at_ms is not None
+
+    def is_done_dying(self, now_ms):
+        return self.died_at_ms is not None and (now_ms - self.died_at_ms) > 1200
+
+    def die(self):
+        if self.died_at_ms is None:
+            self.died_at_ms = time.ticks_ms()
+
+    def draw(self, d):
+        sheet = _load("mona_sheet")
+        py = int(self.y)
+        if sheet:
+            # mona_sheet is 7×2 of 24×24. Pick frame by velocity.
+            data, sw, sh = sheet
+            fw, fh = sw // 7, sh // 2
+            if not self.is_dead():
+                # velocity ∈ [-3..3] mapped to frame 0..6
+                v = max(-3.0, min(self.vy / 60.0, 3.0))
+                frame = int(((v + 3) / 6) * 6)
+                row = 0
+            else:
+                t = time.ticks_diff(time.ticks_ms(), self.died_at_ms) / 120
+                frame = min(int(t), 4)
+                row = 1
+            self._blit_frame(d, data, sw, fw, fh, frame, row, PANDA_X, py)
+        else:
+            # fallback to single up/down sprite
+            key = "panda_down" if self.vy > 40 or self.is_dead() else "panda_up"
+            sprite = _load(key)
+            if sprite:
+                data, sw, sh = sprite
+                d.blit(data, PANDA_X, py, sw, sh)
+            else:
+                d.rect(PANDA_X, py, 24, 24, C_TITLE, fill=True)
+
+    def _blit_frame(self, d, sheet_data, sheet_w, fw, fh, col, row, x, y):
+        # Extract a single frame from the sheet and blit it.
+        out = bytearray(fw * fh * 2)
+        for fy in range(fh):
+            src_y = row * fh + fy
+            src_x = col * fw
+            src_off = (src_y * sheet_w + src_x) * 2
+            out[fy * fw * 2: (fy + 1) * fw * 2] = sheet_data[src_off: src_off + fw * 2]
+        d.blit(bytes(out), x, y, fw, fh)
+
+# ── scenery (parallax) ───────────────────────────────────────────────────────
+
+class Scenery:
+    def __init__(self):
+        self.offset = 0.0
+
+    def update(self, dt):
+        self.offset += SCROLL * dt * 0.5    # parallax slower than obstacles
+
+    def _tile_x(self, period, factor):
+        return int(-(self.offset * factor) % period)
+
+    def draw_sky(self, d):
+        # vertical sky gradient — two bands
+        d.rect(0, 0,        SW, SH // 2, C_SKY,      fill=True)
+        d.rect(0, SH // 2,  SW, SH // 2 - GROUND_H, C_SKY_DEEP, fill=True)
+
+    def draw_clouds(self, d):
+        # 3 procedural clouds at different x positions, scrolling slowly
+        base = self._tile_x(SW + 80, 0.25)
+        positions = [(0, 30), (110, 22), (220, 38)]
+        for px, py in positions:
+            cx = ((px - base) % (SW + 80)) - 40
+            self._cloud(d, cx, py)
+
+    def _cloud(self, d, x, y):
+        # Fluffy cloud: 4 overlapping circles approximated by rects
+        d.rect(x +  6, y,      26, 10, C_CLOUD, fill=True)
+        d.rect(x,      y + 4,  38, 10, C_CLOUD, fill=True)
+        d.rect(x +  4, y + 12, 30,  6, C_CLOUD, fill=True)
+        # subtle shadow under
+        d.rect(x +  6, y + 14, 26,  2, C_CLOUD_SH, fill=True)
+
+    def draw_background(self, d):
+        bg = _load("background")
+        if not bg:
+            return
+        data, bw, bh = bg                # bw=80, bh=30 typically
+        y = SH - GROUND_H - bh           # band sits just above the ground
+        x0 = -int(self.offset * 0.4) % bw - bw
+        x = x0
+        while x < SW:
+            d.blit(data, x, y, bw, bh)
+            x += bw
+
+    def draw_ground(self, d):
+        # Solid ground band
+        d.rect(0, SH - GROUND_H, SW, GROUND_H, C_GROUND, fill=True)
+        gr = _load("grass")
+        if not gr:
+            return
+        data, gw, gh = gr   # 80×10
+        y = SH - GROUND_H
+        x0 = -int(self.offset * 1.0) % gw - gw
+        x = x0
+        while x < SW:
+            d.blit(data, x, y, gw, gh)
+            x += gw
+
+# ── App ──────────────────────────────────────────────────────────────────────
+
+INTRO, PLAY, OVER = 1, 2, 3
 
 class App(lix.App):
 
     def on_enter(self, os):
-        self._os = os
-        # pre-load sprites if generated
-        _load_sprite("up",   "flappy_panda_up.png")
-        _load_sprite("down", "flappy_panda_down.png")
-        self._state   = "title"   # "title" | "play" | "over"
-        self._score   = 0
-        self._hiscore = 0
-        self._panda_y = float(TOP + PLAY_H // 2 - PH // 2)
-        self._vy      = 0.0
-        self._pipes   = []   # list of [x, gap_y, scored]
-        self._frame   = 0
-        self._stars   = [((_lcg() % SW), TOP + (_lcg() % PLAY_H)) for _ in range(20)]
+        self._os        = os
+        self._scenery   = Scenery()
+        self._panda     = None
+        self._obstacles = []
+        self._next_spawn_ms = 0
+        self._state     = INTRO
+        self._hiscore   = _load_hiscore()
+        self._new_hi    = False
+        self._blink_t   = 0.0
+        self._last_ms   = time.ticks_ms()
 
-    def _reset(self):
-        self._state   = "play"
-        self._score   = 0
-        self._panda_y = float(TOP + PLAY_H // 3)
-        self._vy      = 0.0
-        self._pipes   = []
-        self._frame   = 0
-        # seed first pipe off-screen right
-        self._pipes.append([SW + 20, _rand_gap_y(), False])
+    def on_button_press(self, btn):
+        if btn != api.BTN_A and btn != api.BTN_UP:
+            return
+        if self._state == INTRO:
+            self._start_play()
+        elif self._state == PLAY:
+            if self._panda and not self._panda.is_dead():
+                self._panda.jump()
+        elif self._state == OVER:
+            self._state = INTRO
+
+    def _start_play(self):
+        self._state         = PLAY
+        self._panda         = Panda()
+        self._obstacles     = []
+        self._new_hi        = False
+        self._next_spawn_ms = time.ticks_ms() + 600
 
     def update(self, dt):
-        btn = self._os.buttons
-        pressed_any = btn.just_pressed(api.BTN_A) or btn.just_pressed(api.BTN_UP)
+        self._scenery.update(dt)
+        self._blink_t += dt
 
-        if self._state == "title":
-            if pressed_any:
-                self._reset()
-            return
+        if self._state == PLAY:
+            now_ms = time.ticks_ms()
+            dt_ms  = max(1, time.ticks_diff(now_ms, self._last_ms))
+            self._last_ms = now_ms
 
-        if self._state == "over":
-            if pressed_any:
-                self._reset()
-            return
+            self._panda.update(dt_ms, self._obstacles)
 
-        # ── playing ──────────────────────────────────────────────────────────
-        self._frame += 1
+            if not self._panda.is_dead():
+                # spawn obstacles
+                if now_ms >= self._next_spawn_ms:
+                    self._obstacles.append(Obstacle())
+                    self._next_spawn_ms = now_ms + SPAWN_MS
 
-        if pressed_any:
-            self._vy = FLAP_VY
+                # tick obstacles
+                for o in self._obstacles:
+                    o.update(dt)
+                # cull
+                self._obstacles = [o for o in self._obstacles if o.x > -OBSTACLE_W]
 
-        # physics
-        self._vy = min(self._vy + GRAVITY * dt, VY_CAP)
-        self._panda_y += self._vy * dt
-
-        py_int = int(self._panda_y)
-
-        # ceiling / floor
-        if py_int <= TOP or py_int + PH >= BOTTOM:
-            self._die()
-            return
-
-        # scroll pipes
-        dx = PIPE_SPEED * dt
-        surviving = []
-        for pipe in self._pipes:
-            pipe[0] -= dx
-            # score when panda passes pipe centre
-            if not pipe[2] and pipe[0] + PIPE_W < SW // 4:
-                pipe[2] = True
-                self._score += 1
-                if self._score > self._hiscore:
-                    self._hiscore = self._score
-            if pipe[0] + PIPE_W > -4:
-                surviving.append(pipe)
-        self._pipes = surviving
-
-        # spawn new pipe
-        if not self._pipes or self._pipes[-1][0] < SW - SPAWN_DIST:
-            self._pipes.append([SW + 4, _rand_gap_y(), False])
-
-        # collision
-        px = SW // 4
-        for pipe in self._pipes:
-            if px + PW - 2 > pipe[0] and px < pipe[0] + PIPE_W:
-                top_h = pipe[1] - GAP // 2 - TOP
-                bot_y = pipe[1] + GAP // 2
-                if py_int < TOP + top_h or py_int + PH > bot_y:
-                    self._die()
-                    return
-
-    def _die(self):
-        self._state = "over"
+            if self._panda.is_done_dying(now_ms):
+                # latch high score
+                if self._panda.score > self._hiscore:
+                    self._hiscore = self._panda.score
+                    self._new_hi = True
+                    _save_hiscore(self._hiscore)
+                self._state = OVER
+        else:
+            self._last_ms = time.ticks_ms()
 
     def draw(self, d):
-        d.clear(C_BG)
+        # ── world ────────────────────────────────────────────────────────────
+        self._scenery.draw_sky(d)
+        self._scenery.draw_clouds(d)
+        self._scenery.draw_background(d)
 
-        # starfield
-        for sx, sy in self._stars:
-            d.rect(sx, sy, 1, 1, C_STAR, fill=True)
+        for o in self._obstacles:
+            o.draw(d)
 
-        # ground bar
-        d.rect(0, BOTTOM, SW, FOOTER, C_GROUND, fill=True)
+        self._scenery.draw_ground(d)
 
-        # header bar
-        d.rect(0, 0, SW, HEADER, api.rgb(10, 10, 24), fill=True)
-        d.text("FLAPPY", 4, 4, C_TITLE)
-        sc_str = "%d" % self._score
-        d.text(sc_str, SW - len(sc_str) * 8 - 4, 4, C_SCORE)
+        if self._panda:
+            self._panda.draw(d)
 
-        # pipes
-        for pipe in self._pipes:
-            _draw_pipe(d, int(pipe[0]), pipe[1])
+        # ── HUD / overlays ───────────────────────────────────────────────────
+        if self._state == INTRO:
+            self._draw_intro(d)
+        elif self._state == PLAY:
+            self._draw_hud(d)
+        elif self._state == OVER:
+            self._draw_hud(d)
+            self._draw_gameover(d)
 
-        # panda — use PNG sprite if generated, else pixel rects
-        py_int  = int(self._panda_y)
-        tilt_vy = self._vy if self._state == "play" else 0
-        sprite_key = "down" if tilt_vy > 60 else "up"
-        sprite = _sprites.get(sprite_key)
-        if sprite:
-            sdata, sw_s, sh_s = sprite
-            d.blit(sdata, SW // 4 - (sw_s - PW) // 2, py_int - (sh_s - PH) // 2, sw_s, sh_s)
+    def _shadow_text(self, d, s, x, y, scale=1):
+        font.text(d, s, x + 1, y + 1, C_SHADOW, scale=scale)
+        font.text(d, s, x,     y,     C_TEXT,   scale=scale)
+
+    def _center_text(self, d, s, y, scale=1, color=None):
+        w = font.measure(s, scale)
+        x = (SW - w) // 2
+        if color is None:
+            self._shadow_text(d, s, x, y, scale=scale)
         else:
-            _draw_panda(d, SW // 4, py_int, angle_deg=tilt_vy)
+            font.text(d, s, x + 1, y + 1, C_SHADOW, scale=scale)
+            font.text(d, s, x, y, color, scale=scale)
 
-        if self._state == "title":
-            d.rect(40, 120, 160, 70, api.rgb(14, 14, 32), fill=True)
-            d.rect(40, 120, 160, 2,  C_TITLE, fill=True)
-            d.text("FLAPPY",  72, 130, C_TITLE, scale=2)
-            d.text("PANDA",   80, 152, C_TITLE, scale=2)
-            d.text("Press A to start", 48, 178, C_HINT)
+    def _draw_intro(self, d):
+        self._center_text(d, "FLAPPY PANDA", 50, scale=3, color=C_TITLE)
+        if self._hiscore > 0:
+            self._center_text(d, "HIGH SCORE %d" % self._hiscore, 95, scale=2, color=C_HI)
+        if int(self._blink_t * 2) % 2 == 0:
+            self._center_text(d, "Press A to start", 140, scale=2)
+        self._center_text(d, "Tap A or UP to flap", 175, scale=1, color=C_DIM)
 
-        elif self._state == "over":
-            d.rect(30, 130, 180, 56, api.rgb(18, 8, 14), fill=True)
-            d.rect(30, 130, 180, 2,  C_OVER, fill=True)
-            d.text("GAME OVER", 54, 138, C_OVER, scale=2)
-            hs = "HI %d" % self._hiscore
-            d.text(hs, (SW - len(hs) * 8) // 2, 162, C_SCORE)
-            d.text("Press A to retry", 44, 178, C_HINT)
+    def _draw_hud(self, d):
+        s = "SCORE %d" % (self._panda.score if self._panda else 0)
+        self._shadow_text(d, s, 6, 4, scale=2)
+
+    def _draw_gameover(self, d):
+        self._center_text(d, "GAME OVER", 50, scale=3, color=C_TITLE)
+        sc = self._panda.score if self._panda else 0
+        self._center_text(d, "Score %d" % sc, 95, scale=2)
+        if self._new_hi:
+            self._center_text(d, "NEW HIGH SCORE!", 120, scale=2, color=C_HI)
+        else:
+            self._center_text(d, "Best %d" % self._hiscore, 120, scale=2, color=C_HI)
+        if int(self._blink_t * 2) % 2 == 0:
+            self._center_text(d, "Press A to retry", 165, scale=2)
 
     def on_exit(self):
         pass
