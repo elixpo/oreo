@@ -28,11 +28,12 @@ GRAVITY     = 480.0   # px/s²
 FLAP_VY     = -180.0  # px/s
 VY_CAP      = 320.0   # px/s
 SCROLL      = 90.0    # px/s
-SPAWN_MS    = 1700    # ms between obstacles
+SPAWN_SEC   = 1.7     # seconds between obstacle spawns
 OBSTACLE_W  = 24
 GAP_H       = 78
 PANDA_X     = 40
-GROUND_H    = 24
+GROUND_H    = 38      # thicker grass strip
+GRASS_TOP   = 8       # how far the grass tile pokes above the dirt
 
 # ── colours ──────────────────────────────────────────────────────────────────
 
@@ -146,20 +147,22 @@ class Obstacle:
 
 class Panda:
     def __init__(self):
-        self.y          = float(SH // 2)
-        self.vy         = 0.0
-        self.score      = 0
-        self.died_at_ms = None
-        self.last_ms    = None
+        self.y         = float(SH // 2)
+        self.vy        = 0.0
+        self.score     = 0
+        self.died_at_s = None     # seconds-since-death, set on die()
+        self.alive_t   = 0.0      # seconds alive (for engine-puff anim phase)
 
     def jump(self):
         if not self.is_dead():
             self.vy = FLAP_VY
 
-    def update(self, dt_ms, obstacles):
+    def update(self, dt, obstacles):
+        """dt is seconds."""
         if self.is_dead():
+            self.died_at_s += dt
             return
-        dt = dt_ms / 1000.0
+        self.alive_t += dt
         self.vy = min(self.vy + GRAVITY * dt, VY_CAP)
         self.y += self.vy * dt
         # Ceiling
@@ -187,14 +190,14 @@ class Panda:
         return (PANDA_X + 3, int(self.y) + 3, 18, 18)
 
     def is_dead(self):
-        return self.died_at_ms is not None
+        return self.died_at_s is not None
 
-    def is_done_dying(self, now_ms):
-        return self.died_at_ms is not None and (now_ms - self.died_at_ms) > 1200
+    def is_done_dying(self):
+        return self.died_at_s is not None and self.died_at_s > 1.2
 
     def die(self):
-        if self.died_at_ms is None:
-            self.died_at_ms = time.ticks_ms()
+        if self.died_at_s is None:
+            self.died_at_s = 0.0
 
     def draw(self, d):
         py  = int(self.y)
@@ -211,20 +214,17 @@ class Panda:
 
         Alive:
           vy > 50  → panda_down (falling)
-          else     → panda_up_a / panda_up_b alternating every ~150ms (engine puff)
-        Dying (≈ 1200ms total):
+          else     → panda_up_a / panda_up_b alternating every ~150 ms
+        Dying (~1.2 s total):
           first half  → panda_crash
           second half → panda_blast
         """
         if self.is_dead():
-            elapsed = time.ticks_diff(time.ticks_ms(), self.died_at_ms)
-            return "panda_crash" if elapsed < 500 else "panda_blast"
-
+            return "panda_crash" if self.died_at_s < 0.5 else "panda_blast"
         if self.vy > 50:
             return "panda_down"
-
-        # alternate every 150 ms
-        phase = (time.ticks_ms() // 150) & 1
+        # alternate every 150 ms based on accumulated alive time
+        phase = int(self.alive_t / 0.15) & 1
         return "panda_up_b" if phase else "panda_up_a"
 
 # ── scenery (parallax) ───────────────────────────────────────────────────────
@@ -293,16 +293,15 @@ INTRO, PLAY, OVER = 1, 2, 3
 class App(lix.App):
 
     def on_enter(self, os):
-        self._os        = os
-        self._scenery   = Scenery()
-        self._panda     = None
-        self._obstacles = []
-        self._next_spawn_ms = 0
-        self._state     = INTRO
-        self._hiscore   = _load_hiscore()
-        self._new_hi    = False
-        self._blink_t   = 0.0
-        self._last_ms   = time.ticks_ms()
+        self._os         = os
+        self._scenery    = Scenery()
+        self._panda      = None
+        self._obstacles  = []
+        self._spawn_left = 0.0     # seconds until next obstacle
+        self._state      = INTRO
+        self._hiscore    = _load_hiscore()
+        self._new_hi     = False
+        self._blink_t    = 0.0
 
     def on_button_press(self, btn):
         if btn != api.BTN_A and btn != api.BTN_UP:
@@ -316,44 +315,37 @@ class App(lix.App):
             self._state = INTRO
 
     def _start_play(self):
-        self._state         = PLAY
-        self._panda         = Panda()
-        self._obstacles     = []
-        self._new_hi        = False
-        self._next_spawn_ms = time.ticks_ms() + 600
+        self._state       = PLAY
+        self._panda       = Panda()
+        self._obstacles   = []
+        self._new_hi      = False
+        self._spawn_left  = 0.6        # first obstacle in 600 ms
 
     def update(self, dt):
+        # cap any pathological dt so a hiccup doesn't teleport the panda
+        if dt > 0.1: dt = 0.1
         self._scenery.update(dt)
         self._blink_t += dt
 
         if self._state == PLAY:
-            now_ms = time.ticks_ms()
-            dt_ms  = max(1, time.ticks_diff(now_ms, self._last_ms))
-            self._last_ms = now_ms
-
-            self._panda.update(dt_ms, self._obstacles)
+            self._panda.update(dt, self._obstacles)
 
             if not self._panda.is_dead():
-                # spawn obstacles
-                if now_ms >= self._next_spawn_ms:
+                self._spawn_left -= dt
+                if self._spawn_left <= 0:
                     self._obstacles.append(Obstacle())
-                    self._next_spawn_ms = now_ms + SPAWN_MS
-
-                # tick obstacles
+                    self._spawn_left = SPAWN_SEC
                 for o in self._obstacles:
                     o.update(dt)
-                # cull
                 self._obstacles = [o for o in self._obstacles if o.x > -OBSTACLE_W]
 
-            if self._panda.is_done_dying(now_ms):
+            if self._panda.is_done_dying():
                 # latch high score
                 if self._panda.score > self._hiscore:
                     self._hiscore = self._panda.score
                     self._new_hi = True
                     _save_hiscore(self._hiscore)
                 self._state = OVER
-        else:
-            self._last_ms = time.ticks_ms()
 
     def draw(self, d):
         # ── world ────────────────────────────────────────────────────────────
