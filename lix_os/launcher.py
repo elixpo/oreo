@@ -256,6 +256,14 @@ def boot():
     os_obj = OS()
     show_splash(os_obj)
 
+    # Start WiFi and BT after splash (non-blocking for BT, background for WiFi)
+    try:
+        from lix_hw import wifi, bt
+        wifi.connect_from_config()
+        bt.init_from_config()
+    except Exception:
+        pass
+
     while True:
         apps = list_apps()
         home = Home(apps)

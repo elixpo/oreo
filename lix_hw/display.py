@@ -1,15 +1,19 @@
 """Display backend — implements lix.api.Display on the badge.
 
-Strategy: keep a full 240*320*2 = 153KB RGB565 framebuffer in PSRAM, run all
-draw primitives against it via MicroPython's `framebuf` module, then push the
-whole buffer to the ST7789 in one SPI burst on present().
+Framebuffer strategy:
+  - Full 320×240×2 = 153 KB RGB565 framebuffer in PSRAM
+  - All drawing goes through MicroPython framebuf primitives
+  - present() pushes the buffer to ST7789 over SPI — but ONLY when the
+    framebuffer was actually modified (dirty flag), preventing idle flicker.
 
-Byte-order note: framebuf stores RGB565 little-endian on ESP32, but ST7789
-expects big-endian over SPI. We pre-swap colors as they enter the framebuf so
-present() can dump the buffer verbatim without per-pixel conversion.
+Byte-order:
+  framebuf stores RGB565 little-endian; ST7789 expects big-endian over SPI.
+  _swap() pre-swaps colors as they enter framebuf so present() can dump
+  the buffer verbatim without per-pixel conversion at flush time.
 """
 
 import framebuf
+import struct
 from machine import Pin, SPI
 
 from lix import api
@@ -18,7 +22,7 @@ from lix_hw._st7789 import ST7789
 
 
 def _swap(c):
-    return ((c & 0xff) << 8) | ((c >> 8) & 0xff)
+    return ((c & 0xFF) << 8) | ((c >> 8) & 0xFF)
 
 
 class Display(api.Display):
@@ -38,33 +42,38 @@ class Display(api.Display):
             bl =Pin(pins.DISPLAY_BL,    Pin.OUT, value=0),
         )
         self._panel.init()
-        self._buf = bytearray(api.SCREEN_W * api.SCREEN_H * 2)
-        self._fb = framebuf.FrameBuffer(
+        self._buf   = bytearray(api.SCREEN_W * api.SCREEN_H * 2)
+        self._fb    = framebuf.FrameBuffer(
             self._buf, api.SCREEN_W, api.SCREEN_H, framebuf.RGB565
         )
+        self._dirty = False   # only push SPI when something was drawn
+
+    # ── primitives ────────────────────────────────────────────────────────────
 
     def clear(self, color=api.BLACK):
         self._fb.fill(_swap(color))
+        self._dirty = True
 
     def pixel(self, x, y, color):
         self._fb.pixel(x, y, _swap(color))
+        self._dirty = True
 
     def line(self, x0, y0, x1, y1, color):
         self._fb.line(x0, y0, x1, y1, _swap(color))
+        self._dirty = True
 
     def rect(self, x, y, w, h, color, fill=False):
         if fill:
             self._fb.fill_rect(x, y, w, h, _swap(color))
         else:
             self._fb.rect(x, y, w, h, _swap(color))
+        self._dirty = True
 
     def text(self, s, x, y, color=api.WHITE, scale=1):
-        # framebuf has a built-in 8x8 font, no native scaling.
         if scale == 1:
             self._fb.text(s, x, y, _swap(color))
+            self._dirty = True
             return
-        # scale>1: render into a 1bpp mask, then expand any "lit" pixel to a scale*scale block.
-        # Using 1bpp avoids the "black text invisible" trap of checking RGB565 for nonzero.
         char_h = 8
         char_w = 8 * len(s)
         mask = bytearray(((char_w + 7) // 8) * char_h)
@@ -74,25 +83,86 @@ class Display(api.Display):
         for py in range(char_h):
             for px in range(char_w):
                 if mask_fb.pixel(px, py):
-                    self._fb.fill_rect(x + px * scale, y + py * scale, scale, scale, swapped)
+                    self._fb.fill_rect(
+                        x + px * scale, y + py * scale, scale, scale, swapped)
+        self._dirty = True
 
     def blit(self, sprite, x, y, w, h):
-        import struct
         n = w * h
-        words = struct.unpack(">%dH" % n, sprite[:n*2])
-        buf = struct.pack("<%dH" % n, *words)
+        words = struct.unpack(">%dH" % n, sprite[:n * 2])
+        buf = bytearray(n * 2)
+        struct.pack_into("<%dH" % n, buf, 0, *words)
         src = framebuf.FrameBuffer(buf, w, h, framebuf.RGB565)
         self._fb.blit(src, x, y)
+        self._dirty = True
+
+    def blit_scale(self, sprite, x, y, w, h, scale, dim=0.0):
+        """Scale sprite up by `scale` and blit. dim 0.0–1.0 blends toward BG.
+
+        Builds a pre-scaled bytearray (row by row with memcpy for Y repeats)
+        then stamps it with a single framebuf.blit() call.
+        """
+        n   = w * h
+        sw  = w * scale
+        sh  = h * scale
+        words = struct.unpack(">%dH" % n, sprite[:n * 2])
+
+        if dim > 0:
+            from lix_os import theme as _t
+            br, bg_, bb = _t.BG_R, _t.BG_G, _t.BG_B
+
+        out  = bytearray(sw * sh * 2)
+        row  = bytearray(sw * 2)        # one scaled row, little-endian
+
+        for src_row in range(h):
+            base_w = src_row * w
+            # build one horizontal scaled row
+            for col in range(w):
+                v = words[base_w + col]
+                if dim > 0:
+                    r = ((v >> 11) & 0x1F) << 3
+                    g = ((v >>  5) & 0x3F) << 2
+                    b = ( v        & 0x1F) << 3
+                    r = int(r + (br  - r) * dim)
+                    g = int(g + (bg_ - g) * dim)
+                    b = int(b + (bb  - b) * dim)
+                    v = ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3)
+                # store little-endian (swap bytes for framebuf)
+                hi = v & 0xFF
+                lo = v >> 8
+                base = col * scale * 2
+                for dx in range(scale):
+                    row[base + dx * 2]     = hi
+                    row[base + dx * 2 + 1] = lo
+
+            # stamp the row `scale` times vertically via memcpy
+            row_start = src_row * scale * sw * 2
+            for dy in range(scale):
+                s = row_start + dy * sw * 2
+                out[s: s + sw * 2] = row
+
+        src_fb = framebuf.FrameBuffer(out, sw, sh, framebuf.RGB565)
+        self._fb.blit(src_fb, x, y)
+        self._dirty = True
+
+    # ── flush ─────────────────────────────────────────────────────────────────
 
     def present(self):
+        """Push framebuffer to display — no-op if nothing was drawn since last call."""
+        if not self._dirty:
+            return
+        self._dirty = False
         p = self._panel
         p.set_window(0, 0, api.SCREEN_W - 1, api.SCREEN_H - 1)
         p.cs(0)
-        p.dc(0); p.spi.write(b'\x2C')   # RAMWR
+        p.dc(0); p.spi.write(b'\x2C')
         p.dc(1); p.spi.write(self._buf)
         p.cs(1)
 
     def present_rect(self, x, y, w, h):
+        if not self._dirty:
+            return
+        self._dirty = False
         p = self._panel
         p.set_window(x, y, x + w - 1, y + h - 1)
         p.cs(0)
@@ -103,6 +173,6 @@ class Display(api.Display):
         row_len = w * 2
         buf = self._buf
         for _ in range(h):
-            p.spi.write(buf[row_start:row_start + row_len])
+            p.spi.write(buf[row_start: row_start + row_len])
             row_start += stride
         p.cs(1)
