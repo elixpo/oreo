@@ -14,6 +14,39 @@ import time
 from lix import api
 from lix_os.panda import draw_panda, PANDA_W, PANDA_H
 
+# mascot sprite — loaded once, falls back to pixel panda if missing
+_mascot = None
+
+def _get_mascot():
+    global _mascot
+    if _mascot is not None:
+        return _mascot
+    try:
+        import assets.mascot as m
+        _mascot = (m.DATA, m.W, m.H)
+        return _mascot
+    except (ImportError, AttributeError):
+        pass
+    try:
+        from PIL import Image
+        import struct
+        img = Image.open("asset/mascot.png").convert("RGBA").resize((72, 72), Image.LANCZOS)
+        bg = Image.new("RGBA", (72, 72), (8, 8, 20, 255))
+        bg.paste(img, mask=img.split()[3])
+        rgb = bg.convert("RGB")
+        px = rgb.load()
+        words = []
+        for y in range(72):
+            for x in range(72):
+                r, g, b = px[x, y]
+                words.append(((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3))
+        import struct as _s
+        data = _s.pack(">%dH" % len(words), *words)
+        _mascot = (data, 72, 72)
+    except Exception:
+        _mascot = False  # sentinel: skip, use pixel panda
+    return _mascot
+
 # --- timing ------------------------------------------------------------------
 
 def _ms():
@@ -84,11 +117,20 @@ def show_splash(os_obj):
             d.rect(0, max(0, sy - 30), api.SCREEN_W, 30, api.rgb(0, 40, 35), fill=True)
             d.rect(0, max(0, sy - 3),  api.SCREEN_W,  3, PRIMARY, fill=True)
 
-        # ── Phase 2: panda reveal rows (0.15–0.72 s) ──────────────────────
+        # ── Phase 2: mascot/panda reveal (0.15–0.72 s) ───────────────────
         p2 = _phase(elapsed, 0.15, 0.72)
         if p2 > 0:
-            rows = max(1, int(p2 * PANDA_H))
-            draw_panda(d, _PANDA_X, _PANDA_Y, ps=_PS, max_rows=rows)
+            mascot = _get_mascot()
+            if mascot and mascot is not False:
+                data, mw, mh = mascot
+                # Reveal rows top-down by clipping draw area
+                rows_visible = max(1, int(p2 * mh))
+                mx = _PANDA_X - (mw - _PW) // 2   # centre the 72px sprite
+                # blit the sprite; rows below visible count are still BG
+                d.blit(data, mx, _PANDA_Y, mw, min(mh, rows_visible))
+            else:
+                rows = max(1, int(p2 * PANDA_H))
+                draw_panda(d, _PANDA_X, _PANDA_Y, ps=_PS, max_rows=rows)
 
         # ── Phase 3: "ELIXPO" types in (0.60–1.10 s) ─────────────────────
         p3 = _phase(elapsed, 0.60, 1.10)

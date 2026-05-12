@@ -224,8 +224,16 @@ def _draw_splash_frame(display, elapsed_ms):
 
     p2 = phase(elapsed_ms, 0.15, 0.72)
     if p2 > 0:
-        rows = max(1, int(p2 * _p.PANDA_H))
-        _p.draw_panda(d, _PANDA_X, _PANDA_Y, ps=_PS, max_rows=rows)
+        from lix_os.splash import _get_mascot
+        mascot = _get_mascot()
+        if mascot and mascot is not False:
+            mdata, mw, mh = mascot
+            rows_vis = max(1, int(p2 * mh))
+            mx = (api.SCREEN_W - mw) // 2
+            d.blit(mdata, mx, _PANDA_Y, mw, min(mh, rows_vis))
+        else:
+            rows = max(1, int(p2 * _p.PANDA_H))
+            _p.draw_panda(d, _PANDA_X, _PANDA_Y, ps=_PS, max_rows=rows)
 
     p3 = phase(elapsed_ms, 0.60, 1.10)
     if p3 > 0:

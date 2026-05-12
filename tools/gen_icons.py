@@ -99,6 +99,12 @@ ICONS = {
         "with circuit board lines and glowing dots, artist smock on, paint palette "
         "in other hand, neon teal and magenta colours on canvas, white background. " + STYLE
     ),
+    # "gallery_icon": (
+    #     "pixel art cartoon icon: " + PANDA_BASE + " holding up a large chunky polaroid "
+    #     "photo frame showing a tiny landscape pixel art scene inside, a stack of more "
+    #     "polaroid photos leaning beside it, excited proud expression, confetti stars "
+    #     "floating around, bright pastel colours, white background. " + STYLE
+    # ),
 }
 
 # ── download ──────────────────────────────────────────────────────────────────
