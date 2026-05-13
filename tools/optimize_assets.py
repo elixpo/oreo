@@ -92,8 +92,10 @@ PER_APP_SIZES = {
     "arena":        (40, 40),
     "food":         (10, 10),
 
-    # splash — full-screen 320×240 backdrop (dimmed in oreoOS/splash.py)
-    "splash_bg":    (320, 240),
+    # splash — quarter-res backdrop (160×120). oreoOS/splash.py upscales it
+    # to 320×240 at boot. Storing 4× smaller keeps the .py module under 200 KB
+    # so the MicroPython parser doesn't OOM the boot heap.
+    "splash_bg":    (160, 120),
 }
 
 

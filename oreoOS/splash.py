@@ -96,17 +96,58 @@ def _dim_buf(src, factor):
     return out
 
 
+def _upscale(src, sw, sh, dw, dh):
+    """Nearest-neighbour upscale of an RGB565 big-endian byte buffer.
+
+    Lets us ship the splash background at a smaller native size (cheap to
+    parse, lighter on flash) and inflate to screen dimensions once at boot.
+    """
+    out      = bytearray(dw * dh * 2)
+    sx_step  = (sw << 16) // dw
+    sy_step  = (sh << 16) // dh
+    sy       = 0
+    for dy in range(dh):
+        src_row = (sy >> 16) * sw * 2
+        sx      = 0
+        row_off = dy * dw * 2
+        for dx in range(dw):
+            s = src_row + (sx >> 16) * 2
+            out[row_off + dx * 2]     = src[s]
+            out[row_off + dx * 2 + 1] = src[s + 1]
+            sx += sx_step
+        sy += sy_step
+    return out
+
+
 def _get_bg():
-    """Return (data, w, h) for a full-screen dimmed splash backdrop, or None."""
+    """Return (data, w, h) for a full-screen dimmed splash backdrop, or None.
+
+    Catches *every* exception type — the splash_bg module is a 150 KB+ bytes
+    literal; on a tight-heap boot the parser/_dim_buf can raise MemoryError,
+    SyntaxError, or anything in between. If anything goes wrong we fall back
+    to the procedural gradient so the splash never crashes the boot path.
+    """
     global _bg
     if _bg is not None:
         return _bg if _bg is not False else None
     try:
+        # Free as much heap as possible before importing the big asset.
+        try:
+            import gc
+            gc.collect()
+        except ImportError:
+            pass
         import assets.sprites.optimized.splash_bg as m
+        # Dim FIRST (cheap, per-source-pixel), then upscale into a screen-
+        # sized buffer. Works for either a native-res 320×240 asset or the
+        # half/quarter-res asset we ship to save flash.
+        dimmed = _dim_buf(m.DATA, BG_DIM)
         if m.W == SW and m.H == SH:
-            _bg = (_dim_buf(m.DATA, BG_DIM), SW, SH)
-            return _bg
-    except (ImportError, AttributeError):
+            _bg = (dimmed, SW, SH)
+        else:
+            _bg = (_upscale(dimmed, m.W, m.H, SW, SH), SW, SH)
+        return _bg
+    except Exception:
         pass
     _bg = False
     return None
