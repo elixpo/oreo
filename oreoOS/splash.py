@@ -262,13 +262,9 @@ def show_splash(os_obj):
             filled = max(2, int(p_bar * _BAR_W))
             d.rect(_BAR_X, _BAR_Y, filled, 5, theme.PRIMARY, fill=True)
 
-        # ── final fade ─────────────────────────────────────────────────────
-        p_fade = _phase(elapsed, 0.88, 1.00)
-        if p_fade >= 1.0:
-            d.clear(api.BLACK)
-
         d.present()
         time.sleep_ms(20)
 
-    d.clear(api.BLACK)
-    d.present()
+    # No final clear — the last splash frame stays on screen until the home
+    # screen renders. That eliminates the dark gap between the splash and the
+    # home / WiFi-setup phase (which can block for several seconds).

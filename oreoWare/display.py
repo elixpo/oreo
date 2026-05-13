@@ -49,22 +49,28 @@ class Display(api.Display):
             rst=Pin(pins.DISPLAY_RESET, Pin.OUT, value=1),
             bl =Pin(pins.DISPLAY_BL,    Pin.OUT, value=0),
         )
-        self._panel.init()
+        self._panel.init()      # no longer turns BL on — see below
+        self._buf   = bytearray(api.SCREEN_W * api.SCREEN_H * 2)
+        self._fb    = framebuf.FrameBuffer(
+            self._buf, api.SCREEN_W, api.SCREEN_H, framebuf.RGB565
+        )
+        # Push one solid black frame to LCD RAM BEFORE turning the backlight
+        # on. Without this the user sees ~1s of random LCD-RAM contents
+        # (noisy flicker) on cold boot before the splash starts.
+        self._fb.fill(0)
+        self._dirty = True
+        self.present()
+        try:
+            self._panel.bl(1)
+        except Exception:
+            pass
         # PWM the backlight at ~1 kHz so brightness changes are flicker-free.
-        # MUST be initialised AFTER _panel.init() — the panel's init() calls
-        # bl(1) which re-asserts the pin as a plain digital output and would
-        # silently override any earlier PWM. Doing PWM last makes it the
-        # authoritative driver of the pin.
+        # Initialised LAST so PWM is the authoritative driver of the BL pin.
         try:
             from machine import PWM
             self._bl_pwm = PWM(Pin(pins.DISPLAY_BL, Pin.OUT), freq=1000, duty_u16=65535)
         except Exception:
             self._bl_pwm = None
-        self._buf   = bytearray(api.SCREEN_W * api.SCREEN_H * 2)
-        self._fb    = framebuf.FrameBuffer(
-            self._buf, api.SCREEN_W, api.SCREEN_H, framebuf.RGB565
-        )
-        self._dirty = False   # only push SPI when something was drawn
 
     # ── primitives ────────────────────────────────────────────────────────────
 
