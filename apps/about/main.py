@@ -87,11 +87,9 @@ class App(oreoOS.App):
             ("OS",       "Oreo OS"),
             ("Version",  _os_version()),
             ("Codename", "Sweet Sandwich"),
-            ("Board",    "ESP32-S3-DevKitC-1"),
+            ("Board",    "ESP32-S3"),
             ("Memory",   _kb(gc.mem_free()) + " free"),
             ("Display",  "ST7789  320x240"),
-            # MicroPython's sys.implementation.version is a 5-tuple
-            # (major, minor, patch, releaselevel, serial) — slice to 3 ints.
             ("Runtime",  "MicroPython %d.%d.%d" % tuple(sys.implementation.version[:3])),
             ("IP",       self._ip[:18]),
             ("Uptime",   "%02d:%02d:%02d" % (secs // 3600,
@@ -173,15 +171,8 @@ class App(oreoOS.App):
         for line, col, scale in [
                 ("Crafted by",                          theme.MUTED,       1),
                 ("@Circuit-Overtime",                   theme.PRIMARY,     2),
-                ("in India",                            theme.TEXT_BRIGHT, 1),
-                ("",                                    theme.MUTED,       1),
-                ("Powered by oreoOS HAL +",             theme.TEXT_DIM,    1),
-                ("MicroPython on the",                  theme.TEXT_DIM,    1),
-                ("Oreo Badge platform.",                theme.TEXT_DIM,    1),
-                ("",                                    theme.MUTED,       1),
                 ("Source on GitHub at",                 theme.TEXT_DIM,    1),
-                ("github.com/Circuit-",                 theme.TEAL,        1),
-                ("Overtime/oreo-badge",                 theme.TEAL,        1),
+                ("github.com/elixpo/badgr",                 theme.TEAL,        1),
         ]:
             yy = draw_y(cy_logical)
             row_h = 10 * scale

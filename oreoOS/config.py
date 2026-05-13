@@ -1,13 +1,20 @@
-from pathlib import Path
-
-
 def _load_env():
+    """Read .env / .env.local from cwd. Returns {} on MicroPython (no `.env`
+    on the device — secrets.py is generated at deploy time instead).
+
+    Done with plain `open()` rather than `pathlib` because MicroPython
+    doesn't ship `pathlib`; a top-level `from pathlib import Path` here
+    would crash the entire boot chain when launcher.py does
+    `from oreoOS.config import VERSION`.
+    """
     env = {}
     for fname in (".env", ".env.local"):
-        p = Path(fname)
-        if not p.exists():
+        try:
+            with open(fname) as f:
+                text = f.read()
+        except OSError:
             continue
-        for line in p.read_text().splitlines():
+        for line in text.splitlines():
             line = line.strip()
             if line and not line.startswith("#") and "=" in line:
                 k, _, v = line.partition("=")
@@ -19,7 +26,7 @@ _env = _load_env()
 # OS version. tools/deploy.py auto-bumps the PATCH number on every push.
 # The literal MUST stay on its own line as `VERSION = "vN.N.N"` — the
 # deploy regex relies on that exact format to rewrite in place.
-VERSION           = "v1.2.21"
+VERSION           = "v1.2.22"
 
 GITHUB_USER       = "Circuit-Overtime"
 DISPLAY_NAME      = "Ayushman Bhattacharya"
