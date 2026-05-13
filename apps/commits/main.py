@@ -51,14 +51,23 @@ def _bucket_color(level):
     return api.rgb(r, g, b)
 
 
+CACHE_PATH = "apps/commits/cache.txt"
+
+
 def _fetch_contributions(user):
-    """Return (levels[], counts[]) or (None, None) on failure."""
+    """Return (levels[], counts[], dates[]) or (None, None, None) on failure.
+
+    `dates` is the parallel list of ISO yyyy-mm-dd strings parsed from the
+    SVG (so the app can show "from X to Y" without computing calendar math).
+    """
     try:
         import urequests
         url = "https://github.com/users/%s/contributions" % user
         r = urequests.get(url, headers={"User-Agent": "OreoBadge"})
         body = r.text
         r.close()
+
+        # data-level="N" → levels[]
         levels = []
         i = 0
         while True:
@@ -75,9 +84,25 @@ def _fetch_contributions(user):
                 levels.append(0)
             i = j
         if not levels:
-            return None, None
+            return None, None, None
 
-        # Best-effort tooltip parsing for true per-day counts.
+        # data-date="yyyy-mm-dd" → dates[]
+        dates = []
+        i = 0
+        while True:
+            i = body.find('data-date="', i)
+            if i < 0:
+                break
+            i += 11
+            j = body.find('"', i)
+            if j < 0:
+                break
+            dates.append(body[i:j])
+            i = j
+        while len(dates) < len(levels):
+            dates.append("")
+
+        # Tooltip text → per-day counts (best effort).
         counts = []
         k = 0
         for _ in range(len(levels)):
@@ -95,9 +120,62 @@ def _fetch_contributions(user):
             k = j + 12
         while len(counts) < len(levels):
             counts.append(0)
-        return levels, counts
+        return levels, counts, dates
     except Exception:
-        return None, None
+        return None, None, None
+
+
+def _save_cache(user, levels, counts, dates):
+    """Persist the fetched grid so re-opening the app is instant — no spinner.
+
+    Format: one line of metadata (user + timestamp) then three CSV lines
+    (levels, counts, dates). Keeping it text means it survives soft-resets
+    on the device's tiny filesystem without struct alignment surprises.
+    """
+    try:
+        import time as _t
+        with open(CACHE_PATH, "w") as f:
+            f.write("%s|%d\n" % (user, int(_t.time())))
+            f.write(",".join("%d" % v for v in levels) + "\n")
+            f.write(",".join("%d" % v for v in counts) + "\n")
+            f.write(",".join(dates) + "\n")
+    except Exception:
+        pass
+
+
+def _load_cache(user):
+    """Return (levels, counts, dates, age_sec) for `user`, or (None,)*4."""
+    try:
+        import time as _t
+        with open(CACHE_PATH) as f:
+            head = f.readline().strip()
+            if "|" not in head:
+                return None, None, None, None
+            cached_user, ts = head.split("|", 1)
+            if cached_user != user:
+                return None, None, None, None
+            levels = [int(x) for x in f.readline().strip().split(",") if x]
+            counts = [int(x) for x in f.readline().strip().split(",") if x]
+            dates  = [x for x in f.readline().strip().split(",")]
+            age    = max(0, int(_t.time()) - int(ts))
+            return levels, counts, dates, age
+    except Exception:
+        return None, None, None, None
+
+
+_MONTHS = ("", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
+
+def _fmt_date(iso):
+    """yyyy-mm-dd → 'D Mon YYYY' for the date-range strip."""
+    if not iso or len(iso) < 10:
+        return ""
+    try:
+        y, m, d = iso[:4], int(iso[5:7]), int(iso[8:10])
+        return "%d %s %s" % (d, _MONTHS[m], y)
+    except (ValueError, IndexError):
+        return iso
 
 
 def _demo_grid():
