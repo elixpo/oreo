@@ -55,22 +55,41 @@ PER_APP_FILL = {
 # through that sky region when the tile is overlaid on the bottom of the screen.
 PER_APP_OPAQUE = {
     "flappy":   {"background"},
+    "weather":  {"background"},
+    "snake":    {"arena"},
 }
 
 # Per-app asset target sizes (W, H) by file stem.
 # Names matching neither this table nor _bg fall back to 32×32.
 PER_APP_SIZES = {
-    # flappy game — sprite sizes chosen for chroma-key transparency on hardware
-    "panda_up_a":   (32, 32),   # alive frame 0 — idle engine
-    "panda_up_b":   (32, 32),   # alive frame 1 — exhaust on (alternates with _a)
-    "panda_down":   (32, 32),   # falling
-    "panda_crash":  (32, 32),   # death frame 0 — tumbling
-    "panda_blast":  (32, 32),   # death frame 1 — explosion
-    "obstacle":     (32, 96),   # tall pipe segment, 1-2 blits cover a column
-    "background":   (80, 60),   # ×4 scale at app init → 320×240 FULL screen
+    # flappy game
+    "panda_up_a":   (32, 32),
+    "panda_up_b":   (32, 32),
+    "panda_down":   (32, 32),
+    "panda_crash":  (32, 32),
+    "panda_blast":  (32, 32),
+    "obstacle":     (32, 96),
+    "background":   (80, 60),   # also used by weather/background but bigger output OK
     "cloud":        (40, 20),
-    "grass":        (40, 40),   # SMALL tile, repeated 8× horizontally at runtime
-                                # (no stretching — preserves grass-blade aspect ratio)
+    "grass":        (40, 40),
+
+    # pet — panda expressions + heart icon (sized to fit the Pet UI)
+    "panda_happy":  (64, 64),
+    "panda_hungry": (64, 64),
+    "panda_sad":    (64, 64),
+    "panda_sleep":  (64, 64),
+    "panda_eat":    (64, 64),
+    "heart":        (16, 16),
+
+    # weather — panda condition sprites
+    "panda_sun":    (80, 80),
+    "panda_cloud":  (80, 80),
+    "panda_rain":   (80, 80),
+    "panda_snow":   (80, 80),
+    "panda_storm":  (80, 80),
+
+    # snake — tiled arena bg
+    "arena":        (40, 40),
 }
 
 
