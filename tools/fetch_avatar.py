@@ -39,9 +39,10 @@ def _project_user():
     project_root = str(Path(__file__).resolve().parent.parent)
     if project_root not in sys.path:
         sys.path.insert(0, project_root)
-    if "config" in sys.modules:
-        del sys.modules["config"]
-    import config
+    for k in ("config", "oreoOS.config"):
+        if k in sys.modules:
+            del sys.modules[k]
+    from oreoOS import config
     return getattr(config, "GITHUB_USER", "")
 
 

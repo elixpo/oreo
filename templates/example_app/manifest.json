@@ -1,6 +1,7 @@
 {
-  "name": "Template",
+  "name": "Example",
   "type": "app",
   "version": "0.1",
-  "author": "your name here"
+  "icon": "example_icon.png",
+  "author": "your-github-handle"
 }

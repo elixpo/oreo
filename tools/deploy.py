@@ -274,9 +274,11 @@ def write_secrets_local():
     project_root = str(Path(__file__).resolve().parent.parent)
     if project_root not in _sys.path:
         _sys.path.insert(0, project_root)
-    if "config" in _sys.modules:
-        del _sys.modules["config"]      # force a fresh re-read of .env
-    import config as _cfg
+    # Drop any cached config so .env edits between deploys are picked up.
+    for k in ("config", "oreoOS.config"):
+        if k in _sys.modules:
+            del _sys.modules[k]
+    from oreoOS import config as _cfg
 
     fields = (
         # name              python repr formatter

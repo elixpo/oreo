@@ -37,9 +37,14 @@ def toggle():
 
 
 def init_from_config():
+    """Enable BT on boot when the deploy-baked secrets request it.
+
+    `config.py` lives on the build host; the deploy script snapshots its
+    public attrs into `secrets.py` on the device — that's what we read here.
+    """
     try:
-        import config
-        if config.BT_AUTO_ENABLE:
+        from secrets import BT_AUTO_ENABLE
+        if BT_AUTO_ENABLE:
             set_active(True)
     except Exception:
         pass

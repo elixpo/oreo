@@ -43,7 +43,7 @@ run_sim.py      Launch the simulator
 ```bash
 python -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+pip install -r oreoOS/requirements.txt
 
 python run_sim.py
 ```
