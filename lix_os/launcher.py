@@ -92,7 +92,9 @@ def _show_loading(display, label, author=None):
     SW = api.SCREEN_W
     SH = api.SCREEN_H
     label  = (label  or "")[:16].upper()
-    byline = ("By @" + author[:14]) if author else ""
+    # Use the FULL author handle (up to 24 chars) — "Circuit-Overtime" was
+    # being clipped to 14 chars previously.
+    byline = ("By @" + author[:24]) if author else ""
 
     steps      = 12          # more keyframes = smoother slide
     frame_ms   = 33          # ≈ 30 fps
@@ -303,6 +305,15 @@ def boot():
         from lix_hw import wifi, bt
         wifi.connect_from_config()
         bt.init_from_config()
+        # Sync the system clock from an NTP server once WiFi is up. The RTC
+        # then drives the home-screen clock. ~2 s blocking, only at boot.
+        if wifi.is_connected():
+            try:
+                import ntptime
+                ntptime.host = "pool.ntp.org"
+                ntptime.settime()
+            except Exception:
+                pass
     except Exception:
         pass
 

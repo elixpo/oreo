@@ -90,7 +90,9 @@ class App(lix.App):
             ("Board",    "ESP32-S3-DevKitC-1"),
             ("Memory",   _kb(gc.mem_free()) + " free"),
             ("Display",  "ST7789  320x240"),
-            ("Runtime",  "MicroPython %d.%d.%d" % sys.implementation.version),
+            # MicroPython's sys.implementation.version is a 5-tuple
+            # (major, minor, patch, releaselevel, serial) — slice to 3 ints.
+            ("Runtime",  "MicroPython %d.%d.%d" % tuple(sys.implementation.version[:3])),
             ("IP",       self._ip[:18]),
             ("Uptime",   "%02d:%02d:%02d" % (secs // 3600,
                                             (secs % 3600) // 60,

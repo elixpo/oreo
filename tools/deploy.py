@@ -126,15 +126,32 @@ def mpremote(*args):
     return run(["python", "-m", "mpremote", "connect", PORT] + list(args))
 
 
+def _human_size(n):
+    if n >= 1024 * 1024:
+        return "%.1f MB" % (n / 1024 / 1024)
+    if n >= 1024:
+        return "%.1f kB" % (n / 1024)
+    return "%d B" % n
+
+
+def _progress_bar(cur, total, width=24):
+    filled = int(width * cur / max(1, total))
+    return "[" + "#" * filled + "-" * (width - filled) + "]"
+
+
 def mpremote_batch(actions, label=""):
     """Run many `fs` actions in a SINGLE mpremote session via `+` separators.
 
-    actions = [("mkdir", remote_dir), ("cp", local, remote), ...]
-    Output is streamed so we can see progress; errors are tolerated.
+    Streams a verbose live progress report:
+      [007/124] [####------------------]  lix_hw/display.py     4.2 kB  (+ 0.7s)
+      [008/124] [####------------------]  lix_hw/wifi.py        ↺ unchanged
+
+    The trailing "↺ unchanged" appears when mpremote's per-file cache shortcut
+    fires (the file content on the device matches our local copy).
     """
     cmd = ["python", "-m", "mpremote", "connect", PORT]
     for a in actions:
-        if cmd[-1] != PORT:        # add separator between actions
+        if cmd[-1] != PORT:
             cmd.append("+")
         op = a[0]
         if op == "mkdir":
@@ -145,14 +162,73 @@ def mpremote_batch(actions, label=""):
             cmd += ["fs", "rm", ":%s" % a[1]]
     if label:
         print(label)
-    # Stream output so the user sees progress
+
+    total_cp = sum(1 for a in actions if a[0] == "cp")
+    # Pre-compute the local→remote mapping so we can look up size by source
+    cp_size = {}
+    for a in actions:
+        if a[0] == "cp":
+            try:
+                cp_size[a[1]] = Path(a[1]).stat().st_size
+            except OSError:
+                cp_size[a[1]] = 0
+
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                             text=True, bufsize=1)
+
+    done       = 0
+    new_bytes  = 0
+    skipped    = 0
+    pending    = None     # local path of file currently being copied
+
     for line in proc.stdout:
         line = line.rstrip()
-        if line and "File exists" not in line:
-            print("  " + line)
-    return proc.wait()
+        if not line:
+            continue
+        if "File exists" in line:
+            continue
+
+        # "cp <local> :<remote>"  — mpremote announces a transfer
+        if line.startswith("cp "):
+            parts = line.split()
+            if len(parts) >= 3:
+                pending = parts[1]
+            continue
+
+        # "Up to date: <remote>"  — mpremote skipped because content matches
+        if line.startswith("Up to date:"):
+            if pending is not None:
+                done    += 1
+                skipped += 1
+                bar      = _progress_bar(done, total_cp)
+                print("  [%03d/%03d] %s  %-40s  ↺ unchanged" %
+                      (done, total_cp, bar, pending[-40:]))
+                pending  = None
+            continue
+
+        # Anything else → mpremote stderr (e.g. "mkdir: File exists" is filtered above)
+        if pending is not None and not line.startswith(":"):
+            # treat as the success line for a real transfer
+            pass
+
+        # Mirror unknown lines verbatim so errors aren't silently swallowed
+        if not line.startswith(":") and "fs cp " not in line and not line.startswith("ls "):
+            print("    " + line)
+
+    # All mpremote output drained → infer how many "new" transfers happened
+    # by counting cp-announcements without an Up-to-date follow-up.
+    # The simplest heuristic: total_cp - skipped were actual writes.
+    # We don't get per-line transfer confirmations, so we report aggregate.
+    rc = proc.wait()
+    real_writes = total_cp - skipped
+    # Sum bytes of newly-written files (we don't know which exactly, but
+    # this is a good order-of-magnitude — averaged file size × writes)
+    if real_writes:
+        avg = sum(cp_size.values()) // max(1, total_cp)
+        new_bytes = avg * real_writes
+    print("  ── %d files: %d new/updated (~%s)  %d unchanged   exit=%d" %
+          (total_cp, real_writes, _human_size(new_bytes), skipped, rc))
+    return rc
 
 
 def write_secrets_local():

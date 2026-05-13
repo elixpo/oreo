@@ -28,10 +28,14 @@ _STATUS_H   = 22
 _MAIN_TOP   = _STATUS_H            # 22
 _MAIN_H     = SH - _MAIN_TOP       # bg fills the rest now (no dock)
 
-# Clock block — kept at the original position (above where the dock used to
-# sit) so the visual rhythm stays the same after removing the dock.
-_CLOCK_Y    = 84
-_DATE_Y     = _CLOCK_Y + 32 + 8                  # 124
+# Clock + date — vertically centred in the play area below the status bar
+# and above the bottom-right APPS icon. Date uses scale=2 so it's readable.
+_CLOCK_H    = 32                    # 8×8 font scale=4
+_DATE_H     = 16                    # 8×8 font scale=2
+_CLOCK_GAP  = 12
+_BLOCK_H    = _CLOCK_H + _CLOCK_GAP + _DATE_H
+_CLOCK_Y    = _MAIN_TOP + (_MAIN_H - _BLOCK_H) // 2
+_DATE_Y     = _CLOCK_Y + _CLOCK_H + _CLOCK_GAP
 
 # APPS icon (overlaid on bg, bottom-right corner — replaces the old dock)
 _APPS_SZ    = 32
@@ -322,14 +326,31 @@ class Home(lix.App):
         d.rect(0, _STATUS_H - 1, SW, 1, theme.PRIMARY, fill=True)
         d.text("%02d:%02d" % (h, m), 6, 7, api.WHITE)
 
-        # Battery + percentage on the right edge, then BT, then WiFi
+        # Right-anchored cluster aligned to a single baseline. Layout (R→L):
+        #   [WiFi 13px] [4px] [BT 13px] [4px] [PCT text] [4px] [BAT 22px]   right edge=6px
+        # All icons start at y=4 (top of cluster) so they share a baseline;
+        # the battery icon is 10 px tall and the text is 8 px so we centre
+        # them visually using y=6 for the battery body and y=7 for the text.
+        right_pad = 6
+        bat_w     = 22
+        icon_w    = 13
+        gap       = 4
+
         pct_str = "%d%%" % self._battery_pct
-        # battery icon is 22 px wide; "%d%%" is 24 px @ 8-px font
-        bat_x   = SW - 28
-        pct_x   = bat_x - len(pct_str) * 8 - 2
-        _icon_battery(d, bat_x, 6, pct=self._battery_pct)
-        d.text(pct_str, pct_x, 7, api.WHITE)
-        _icon_bt   (d, pct_x - 16, 4, active=self._bt_on)
+        text_w  = len(pct_str) * 8
+
+        bat_x   = SW - right_pad - bat_w
+        pct_x   = bat_x - gap - text_w
+        bt_x    = pct_x - gap - icon_w
+        wifi_x  = bt_x  - gap - icon_w
+
+        icon_y = (_STATUS_H - icon_w) // 2     # vertical-centre 13-px icon
+        text_y = (_STATUS_H - 8) // 2          # vertical-centre 8-px text
+
+        _icon_wifi   (d, wifi_x, icon_y, connected=self._wifi_ok)
+        _icon_bt     (d, bt_x,   icon_y, active=self._bt_on)
+        d.text(pct_str, pct_x, text_y, api.WHITE)
+        _icon_battery(d, bat_x, (_STATUS_H - 10) // 2, pct=self._battery_pct)
         _icon_wifi (d, pct_x - 32, 5, connected=self._wifi_ok)
 
     def _draw_clock_area(self, d, h, m, wd, day, mon, yr):
@@ -357,9 +378,9 @@ class Home(lix.App):
         d.text("%02d" % m, cx + 3 * char_w, _CLOCK_Y, theme.TEXT_BRIGHT, scale=4)
 
         date_str = "%s %d %s %d" % (wd, day, mon, yr)
-        dx = max(0, (SW - len(date_str) * 8) // 2)
-        # Date in dark text so it reads cleanly against warm/orange parts of bg.
-        d.text(date_str, dx, _DATE_Y, theme.TEXT_BRIGHT)
+        # Bigger date (scale=2) for legibility; centred horizontally.
+        dx = max(0, (SW - len(date_str) * 16) // 2)
+        d.text(date_str, dx, _DATE_Y, theme.TEXT_BRIGHT, scale=2)
 
     def _draw_apps_icon(self, d):
         """Overlay the APPS icon in the bottom-right corner of the bg — no dock.

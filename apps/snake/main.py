@@ -82,14 +82,26 @@ class App(lix.App):
     name = "Snake"
 
     def on_enter(self, os):
-        self._os    = os
-        self._state = INTRO
-        self._hi    = _load_hi()
+        self._os     = os
+        self._state  = INTRO
+        self._hi     = _load_hi()
         self._new_hi = False
-        self._blink = 0.0
-        self._dirty = True
-        # Cache the food sprite once — its chroma-key transparent border lets
-        # the arena bg show around the bamboo so cells don't look boxy.
+        self._blink  = 0.0
+        self._dirty  = True
+        # INTRO state runs _draw_arena, which references self._snake and
+        # self._food — initialise both BEFORE the first frame so we don't
+        # AttributeError before _start() ever runs.
+        mid_c = COLS // 2
+        mid_r = ROWS // 2
+        self._snake    = [(mid_c - i, mid_r) for i in range(4)]
+        self._food     = (COLS // 4, mid_r)
+        self._dir      = (1, 0)
+        self._next_dir = self._dir
+        self._step_left = STEP_SEC0
+        self._step_sec  = STEP_SEC0
+        self._score    = 0
+        # Cache the food sprite once — chroma-keyed so the arena tile shows
+        # through around the bamboo.
         self._food_sprite = _load_food()
 
     def _start(self):

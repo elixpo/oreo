@@ -1,23 +1,17 @@
 """Elixpo Pet — Tamagotchi-style panda companion.
 
-Three stats (hunger / happiness / health) drift slowly so the player feels
-they're maintaining a real pet on a daily routine rather than minute-by-
-minute. Five sprite expressions are picked from current state:
+UI: panda centred on a soft bg, three "heart row" stats above (hunger /
+happiness / health — 5 hearts each, filled vs empty), a speech-bubble
+callout below showing the pet's current thought.
 
-  hungry   hunger < 35
-  sad      happiness < 35
-  sleep    while C held (and slowly heals)
-  eat      brief moment after A pressed
-  happy    default
-
-When the user feeds (A) or plays (B), short-lived "heart" particles spawn
-from the panda for tactile feedback.
+Decay is intentionally slow — you should feel like you're caring for a pet
+on a *daily* routine. Each stat drops roughly 25 pts every 24 h idle.
 
 Controls:
-  A      feed   (+30 hunger, brief 'eat' face + heart particles)
-  B      play   (+15 happiness, -10 hunger, heart particles)
+  A      feed   (+30 hunger,    spawns floating hearts)
+  B      play   (+15 happiness, spawns floating hearts)
   C      sleep  (held — regen all stats slowly)
-  HOME   apps drawer (uses OS default)
+  HOME   apps drawer (OS default)
 """
 
 import time
@@ -30,18 +24,21 @@ SH = api.SCREEN_H
 
 STATE_PATH = "apps/pet/state.txt"
 
-# Decay rates per second — TUNED to feel like a daily routine.
-# Each stat drops ~30 points over a 12-hour idle period.
-DECAY_HUNGER  = 0.0007   # ~30 pts / 12 h
-DECAY_HAPPY   = 0.0005
-EAT_FACE_MS   = 1200     # show 'eat' face for this long after a feed
+# Per-second decay — tuned so a full stat takes ~24 h to drop from 100→0.
+# 100 / (24*3600) ≈ 0.00116 — bump hunger slightly so the pet feels hungry
+# before sad, but both are still daily-routine slow.
+DECAY_HUNGER = 0.0014    # ~120 s / pt → drops ~28 pts / day
+DECAY_HAPPY  = 0.0010    #               drops ~20 pts / day
+EAT_FACE_MS  = 1200      # show 'eat' expression for this long after feeding
 
+
+# ─── helpers ─────────────────────────────────────────────────────────────────
 
 def _load_state():
     try:
         with open(STATE_PATH) as f:
-            parts = f.read().strip().split(",")
-            return (int(parts[0]), int(parts[1]), int(parts[2]))
+            a, b, c = f.read().strip().split(",")
+            return (int(a), int(b), int(c))
     except Exception:
         return (80, 80, 90)
 
@@ -52,42 +49,24 @@ def _save_state(h, hp, hl):
     except Exception:
         pass
 
-
-def _try_sprite(name):
-    """Load apps/pet/assets/optimized/<name>.py → (bytearray, w, h) or None."""
-    try:
-        m = __import__("apps.pet.assets.optimized." + name, None, None,
-                       ["DATA", "W", "H"])
-        return (bytearray(m.DATA), m.W, m.H)
-    except (ImportError, AttributeError):
-        return None
-
-
-def _try_mascot():
-    """Fallback to the OS mascot if the per-pet sprites haven't been generated."""
-    try:
-        m = __import__("assets.sprites.optimized.mascot", None, None,
-                       ["DATA", "W", "H"])
-        return (bytearray(m.DATA), m.W, m.H)
-    except (ImportError, AttributeError):
-        return None
-
-
 def _clamp(v):
     return max(0, min(100, int(v)))
 
+def _try_sprite(modpath):
+    try:
+        m = __import__(modpath, None, None, ["DATA", "W", "H"])
+        return (bytearray(m.DATA), m.W, m.H)
+    except (ImportError, AttributeError):
+        return None
 
-# ─── particle effect ─────────────────────────────────────────────────────────
+
+# ─── heart particle (rises from panda when feeding/playing) ─────────────────
 
 class _HeartParticle:
-    """One floating heart that rises from the panda for ~700 ms."""
     __slots__ = ("x", "y0", "t", "max_t", "vx")
     def __init__(self, x, y, vx):
-        self.x      = x
-        self.y0     = y
-        self.t      = 0.0
-        self.max_t  = 0.8
-        self.vx     = vx
+        self.x, self.y0, self.vx = x, y, vx
+        self.t, self.max_t = 0.0, 0.9
 
     def update(self, dt):
         self.t += dt
@@ -96,22 +75,46 @@ class _HeartParticle:
     def draw(self, d, heart_sprite):
         if self.t >= self.max_t:
             return
-        # rise upward, drift sideways
         prog = self.t / self.max_t
-        x = int(self.x + self.vx * prog)
-        y = int(self.y0 - prog * 40)
+        x    = int(self.x + self.vx * prog)
+        y    = int(self.y0 - prog * 50)
         if heart_sprite:
             data, w, h = heart_sprite
             d.blit(data, x - w // 2, y - h // 2, w, h)
         else:
-            # procedural pixel heart fallback
-            for dy, dx_pairs in [(0, [-2, -1, 1, 2]),
-                                  (1, [-3, -2, -1, 0, 1, 2, 3]),
-                                  (2, [-3, -2, -1, 0, 1, 2, 3]),
-                                  (3, [-2, -1, 0, 1, 2]),
-                                  (4, [-1, 0, 1])]:
-                for dx in dx_pairs:
+            # 5×5 pixel-heart fallback
+            for dy, cols in [(0, (-2, -1, 1, 2)),
+                              (1, range(-3, 4)),
+                              (2, range(-3, 4)),
+                              (3, range(-2, 3)),
+                              (4, (-1, 0, 1))]:
+                for dx in cols:
                     d.rect(x + dx, y + dy, 1, 1, theme.PRIMARY, fill=True)
+
+
+def _draw_heart(d, x, y, filled=True):
+    """Tiny 7×7 pixel heart — used for the stat rows."""
+    col = theme.PRIMARY if filled else theme.MUTED2
+    for dy, cols in [(0, (1, 2, 4, 5)),
+                      (1, (0, 1, 2, 3, 4, 5, 6)),
+                      (2, (0, 1, 2, 3, 4, 5, 6)),
+                      (3, (1, 2, 3, 4, 5)),
+                      (4, (2, 3, 4)),
+                      (5, (3,))]:
+        for dx in cols:
+            d.rect(x + dx, y + dy, 1, 1, col, fill=True)
+
+
+def _draw_speech_bubble(d, x, y, w, h, text, color):
+    """Centred speech-bubble callout below the panda."""
+    d.rect(x, y, w, h, theme.CARD, fill=True)
+    d.rect(x, y, w, 2, theme.PRIMARY, fill=True)
+    # Bottom-left "tail" — three short rows pointing at the panda
+    d.rect(x + 12, y + h,     6, 2, theme.CARD,    fill=True)
+    d.rect(x + 14, y + h + 2, 4, 2, theme.CARD,    fill=True)
+    # Centred text
+    tw = len(text) * 8
+    d.text(text, x + (w - tw) // 2, y + (h - 8) // 2, color)
 
 
 # ─── App ─────────────────────────────────────────────────────────────────────
@@ -121,16 +124,17 @@ class App(lix.App):
     SHOW_LOADING = False
 
     def on_enter(self, os):
-        self._os        = os
-        self._sprites   = {k: _try_sprite("panda_" + k)
-                           for k in ("happy", "hungry", "sad", "sleep", "eat")}
-        self._fallback  = _try_mascot()
-        self._heart_spr = _try_sprite("heart")
+        self._os = os
+        # Sprites
+        keys = ("happy", "hungry", "sad", "sleep", "eat")
+        self._sprites   = {k: _try_sprite("apps.pet.assets.optimized.panda_" + k)
+                           for k in keys}
+        self._fallback  = _try_sprite("assets.sprites.optimized.mascot")
+        self._heart_spr = _try_sprite("apps.pet.assets.optimized.heart")
+
         self._hunger, self._happy, self._health = _load_state()
         self._last_tick = time.ticks_ms()
         self._anim_t    = 0.0
-        self._msg       = ""
-        self._msg_left  = 0.0
         self._eat_left  = 0.0
         self._sleeping  = False
         self._hearts    = []
@@ -143,75 +147,59 @@ class App(lix.App):
         if btn == api.BTN_A:
             if self._hunger >= 95:
                 self._happy = _clamp(self._happy - 3)
-                self._flash("Too full!")
             else:
                 self._hunger    = _clamp(self._hunger + 30)
                 self._eat_left  = EAT_FACE_MS / 1000.0
-                self._flash("Yum!")
                 self._spawn_hearts(3)
         elif btn == api.BTN_B:
-            if self._hunger < 15:
-                self._flash("Too hungry to play")
-            else:
+            if self._hunger > 15:
                 self._happy  = _clamp(self._happy  + 15)
                 self._hunger = _clamp(self._hunger - 10)
-                self._flash("Plays!")
                 self._spawn_hearts(2)
         elif btn == api.BTN_C:
             self._sleeping = True
-            self._flash("zZz...")
         self._dirty = True
 
     def on_button_release(self, btn):
         if btn == api.BTN_C and self._sleeping:
             self._sleeping = False
-            self._dirty    = True
-
-    def _flash(self, s):
-        self._msg = s
-        self._msg_left = 1.2
+            self._dirty = True
 
     def _spawn_hearts(self, n):
-        """Spawn `n` heart particles drifting up from the panda."""
-        # panda is at ~(50, 80) → spawn at top of panda
         for i in range(n):
-            vx = (i - n // 2) * 10
-            self._hearts.append(_HeartParticle(80, 100, vx))
+            vx = (i - n // 2) * 12
+            self._hearts.append(_HeartParticle(SW // 2, 100, vx))
 
-    # ── update ──────────────────────────────────────────────────────────
     def update(self, dt):
-        now    = time.ticks_ms()
-        wall_dt = time.ticks_diff(now, self._last_tick) / 1000.0
+        now      = time.ticks_ms()
+        wall_dt  = time.ticks_diff(now, self._last_tick) / 1000.0
         self._last_tick = now
-        self._anim_t  += dt
-        self._msg_left = max(0.0, self._msg_left - dt)
-        self._eat_left = max(0.0, self._eat_left - dt)
+        self._anim_t   += dt
+        self._eat_left  = max(0.0, self._eat_left - dt)
 
-        rate = 0.4 if self._sleeping else 1.0
-        self._hunger = _clamp(self._hunger - DECAY_HUNGER * wall_dt * rate * 100)
-        self._happy  = _clamp(self._happy  - DECAY_HAPPY  * wall_dt * rate * 100)
+        # Decay (much slower when asleep)
+        rate = 0.3 if self._sleeping else 1.0
+        self._hunger = _clamp(self._hunger - DECAY_HUNGER * wall_dt * 100 * rate)
+        self._happy  = _clamp(self._happy  - DECAY_HAPPY  * wall_dt * 100 * rate)
         if self._sleeping:
             self._health = _clamp(self._health + 0.05 * wall_dt)
         else:
-            worst = min(self._hunger, self._happy)
-            target = (self._health + worst) / 2
-            self._health = _clamp(target * 0.99 + (1.0 if worst > 30 else -0.5))
+            worst        = min(self._hunger, self._happy)
+            target       = (self._health + worst) // 2
+            self._health = _clamp(target)
 
-        # Tick particles
         self._hearts = [p for p in self._hearts if p.update(dt)]
         self._dirty  = True
 
-    # ── sprite picker ───────────────────────────────────────────────────
-    def _pick_expression(self):
-        if self._sleeping:
-            return "sleep"
-        if self._eat_left > 0:
-            return "eat"
-        if self._hunger < 35:
-            return "hungry"
-        if self._happy < 35:
-            return "sad"
-        return "happy"
+    # ── sprite + thought picker ─────────────────────────────────────────
+    def _pick_state(self):
+        if self._sleeping:        return "sleep", "zZz..."
+        if self._eat_left > 0:    return "eat",   "Yum!"
+        if self._hunger < 35:     return "hungry","I'm hungry!"
+        if self._happy < 35:      return "sad",   "Play with me?"
+        if self._hunger > 90:     return "happy", "So full!"
+        if self._happy  > 90:     return "happy", "Heehee!"
+        return "happy", "I'm doing great"
 
     # ── render ──────────────────────────────────────────────────────────
     def draw(self, d):
@@ -221,46 +209,44 @@ class App(lix.App):
         widgets.draw_header(d, "ELIXPO PET")
         widgets.draw_hint  (d, "A=feed  B=play  C=sleep")
 
-        # ── mascot — picked by current emotional state ─────────────────
-        key      = self._pick_expression()
-        sprite   = self._sprites.get(key) or self._fallback
-        bob      = int(2 * (abs((self._anim_t * 2) % 2 - 1)))
-        sx, sy   = 16, widgets.HEADER_H + 24 + bob
+        key, thought = self._pick_state()
+
+        # ── stat rows: heart-grid above the panda ─────────────────────
+        row_y = widgets.HEADER_H + 6
+        for i, (label, val, _col) in enumerate([
+                ("Hunger",    self._hunger, theme.PRIMARY),
+                ("Happiness", self._happy,  theme.TEAL),
+                ("Health",    self._health, theme.GOLD)]):
+            ry = row_y + i * 12
+            # 5 heart pips
+            filled = val * 5 // 100
+            for k in range(5):
+                _draw_heart(d, 124 + k * 12, ry, filled=(k < filled))
+            # Label on the left
+            d.text(label, 16, ry, theme.TEXT_BRIGHT)
+            # % readout on the right
+            d.text("%d%%" % val, SW - 4 * 8 - 6, ry, theme.MUTED)
+
+        # ── centred panda ─────────────────────────────────────────────
+        sprite  = self._sprites.get(key) or self._fallback
+        bob     = int(2 * (abs((self._anim_t * 2) % 2 - 1)))
         if sprite:
             data, mw, mh = sprite
-            d.blit(data, sx, sy, mw, mh)
+            px = (SW - mw) // 2
+            py = widgets.HEADER_H + 48 + bob
+            d.blit(data, px, py, mw, mh)
         else:
-            d.rect(sx, sy, 64, 64, theme.PRIMARY, fill=True)
+            d.rect((SW - 64) // 2, widgets.HEADER_H + 48 + bob,
+                   64, 64, theme.PRIMARY, fill=True)
 
-        # ── stat rows on the right with heart icons ─────────────────────
-        bx     = 100
-        bw     = SW - bx - 20
-        bars   = [("Hunger",    self._hunger, theme.PRIMARY),
-                  ("Happiness", self._happy,  theme.TEAL),
-                  ("Health",    self._health, theme.GOLD)]
-        for i, (label, val, col) in enumerate(bars):
-            by = widgets.HEADER_H + 18 + i * 30
-            d.text(label, bx, by, theme.TEXT_BRIGHT)
-            # heart sprite as the row icon (or pink rect fallback)
-            if self._heart_spr:
-                hd, hw, hh = self._heart_spr
-                d.blit(hd, bx + bw - hw, by, hw, hh)
-            else:
-                d.rect(bx + bw - 12, by, 10, 8, theme.PRIMARY, fill=True)
-            # bar
-            d.rect(bx, by + 12, bw - 22, 8, theme.MUTED2, fill=True)
-            d.rect(bx, by + 12, (bw - 22) * val // 100, 8, col, fill=True)
-            d.text("%d" % val, bx + bw - 22 - 24, by, theme.MUTED)
-
-        # ── heart particles ─────────────────────────────────────────────
+        # ── heart particles (in front of panda) ───────────────────────
         for p in self._hearts:
             p.draw(d, self._heart_spr)
 
-        # ── status message ──────────────────────────────────────────────
-        msg = self._msg if self._msg_left > 0 else \
-              ("sleeping..." if self._sleeping else "")
-        if msg:
-            d.text(msg, (SW - len(msg) * 8) // 2,
-                   SH - widgets.HINT_H - 14, theme.PRIMARY)
+        # ── thought callout under the panda ───────────────────────────
+        bw = max(110, len(thought) * 8 + 24)
+        bx = (SW - bw) // 2
+        by = SH - widgets.HINT_H - 24
+        _draw_speech_bubble(d, bx, by, bw, 18, thought, theme.PRIMARY)
 
         self._dirty = False
