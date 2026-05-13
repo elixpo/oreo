@@ -12,7 +12,7 @@ import time
 
 from lix import api
 
-VERSION      = "v0.1"
+VERSION      = "v1.2.19"
 # Target ~33 fps (30 ms cap). At 40 MHz SPI a full framebuf push is 30.7 ms,
 # plus ~3 ms render → total ≈ 34 ms. The sleep rarely actually fires during
 # gameplay; it caps idle screens so they don't hammer the panel >50 fps.

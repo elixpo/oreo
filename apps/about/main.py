@@ -33,6 +33,15 @@ def _kb(b):
     return "%d kB" % (b // 1024)
 
 
+def _os_version():
+    """Single source of truth for the OS version string lives in launcher.VERSION."""
+    try:
+        from lix_os.launcher import VERSION
+        return VERSION
+    except Exception:
+        return "v?.?.?"
+
+
 class App(lix.App):
     name = "About"
 
@@ -76,7 +85,7 @@ class App(lix.App):
         secs = self._last_s
         return [
             ("OS",       "Oreo OS"),
-            ("Version",  "v0.1  build 0"),
+            ("Version",  _os_version()),
             ("Codename", "Sweet Sandwich"),
             ("Board",    "ESP32-S3-DevKitC-1"),
             ("Memory",   _kb(gc.mem_free()) + " free"),
