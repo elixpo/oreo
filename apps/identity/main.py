@@ -87,45 +87,60 @@ class App(oreoOS.App):
         d.rect(cx + 2, cy + 2, cw, ch, theme.MUTED2, fill=True)
         d.rect(cx,     cy,     cw, ch, theme.CARD,   fill=True)
         d.rect(cx,     cy,     cw, 3,  theme.PRIMARY, fill=True)
-
-        # ── circular avatar at top-centre, framed in pink ───────────────
-        av_sz = self._avatar[1] if self._avatar else 96
-        av_cx = SW // 2
-        av_cy = cy + 14 + av_sz // 2
-        _filled_circle(d, av_cx, av_cy, av_sz // 2 + 4, theme.PRIMARY)
         if self._avatar:
             data, aw, ah = self._avatar
+        else:
+            data, aw, ah = None, 72, 72
+        av_sz = max(aw, ah)
+
+        PAD       = 12
+        RING      = 3
+        av_x      = cx + PAD                       # left edge of pink ring
+        av_y      = cy + PAD
+        av_cx     = av_x + av_sz // 2
+        av_cy     = av_y + av_sz // 2
+
+        _filled_circle(d, av_cx, av_cy, av_sz // 2 + RING, theme.PRIMARY)
+        if data:
             d.blit(data, av_cx - aw // 2, av_cy - ah // 2, aw, ah)
         else:
             _filled_circle(d, av_cx, av_cy, av_sz // 2, theme.CARD)
             letter = (p["login"] or "?")[:1].upper()
             d.text(letter, av_cx - 16, av_cy - 16, theme.PRIMARY, scale=4)
 
-        # ── display name — word-wrap to fit, centred per line, pink scale=2.
-        #   max_chars derived from card width (scale=2 → 16 px per glyph).
-        max_chars = max(6, (cw - 16) // 16)
-        name_lines = _wrap(p["name"], max_chars)[:2]   # cap at 2 lines
-        name_top   = av_cy + av_sz // 2 + 14
+        # Name column to the right of the avatar.
+        name_x      = av_x + av_sz + RING + PAD
+        name_avail  = cx + cw - name_x - PAD
+        max_chars   = max(4, name_avail // 16)     # scale=2 → 16 px/glyph
+        name_lines  = _wrap(p["name"], max_chars)[:3]
+
+        # Vertically centre the name block on the avatar midline.
+        block_h     = len(name_lines) * 22 - 4
+        name_y      = av_cy - block_h // 2
         for i, line in enumerate(name_lines):
-            lw = len(line) * 16
-            d.text(line, (SW - lw) // 2, name_top + i * 22,
-                   theme.PRIMARY, scale=2)
+            d.text(line, name_x, name_y + i * 22, theme.PRIMARY, scale=2)
 
-        # Gold underline beneath the LAST name line (visual anchor).
-        last_lw = len(name_lines[-1]) * 16 if name_lines else 0
-        d.rect((SW - last_lw) // 2, name_top + (len(name_lines) - 1) * 22 + 20,
-               last_lw, 2, theme.GOLD, fill=True)
-
-        # ── designation, gold, bigger so it reads from a distance ──────
-        desig = p["designation"][:28]
+        # ── designation centred under the avatar+name row ──────────────
+        block_bot = max(av_y + av_sz + RING, name_y + block_h)
+        desig     = p["designation"][:32]
         if desig:
-            dw = len(desig) * 16
-            dy = name_top + len(name_lines) * 22 + 10
-            # if it'd run off the card, fall back to scale=1
-            if dw > cw - 16:
-                dw = len(desig) * 8
-                d.text(desig, (SW - dw) // 2, dy + 4, theme.GOLD)
+            dy   = block_bot + 18
+            dw   = len(desig) * 16
+            avail = cw - 16
+            if dw > avail:
+                # Two-step shrink: try scale=2 wrap, fall back to scale=1.
+                wrapped = _wrap(desig, max(6, avail // 16))[:2]
+                for i, ln in enumerate(wrapped):
+                    lw = len(ln) * 16
+                    d.text(ln, (SW - lw) // 2, dy + i * 22,
+                           theme.GOLD, scale=2)
+                dy += len(wrapped) * 22
             else:
                 d.text(desig, (SW - dw) // 2, dy, theme.GOLD, scale=2)
+                dy += 22
+
+            # Gold underline beneath the designation — visual anchor.
+            uw = min(120, cw - 60)
+            d.rect((SW - uw) // 2, dy + 2, uw, 2, theme.GOLD, fill=True)
 
         self._dirty = False
