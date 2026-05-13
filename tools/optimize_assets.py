@@ -250,8 +250,10 @@ def optimize_status_svgs():
         img  = Image.open(BytesIO(png)).convert("RGBA").resize(
             (STATUS_SIZE, STATUS_SIZE), Image.LANCZOS)
 
-        # Build white icon on pink background using alpha mask only
-        alpha = img.split()[3]
+        # Build white icon on chroma-key magenta. THRESHOLD the alpha first —
+        # without this the anti-aliased edges blend white/magenta into pink
+        # halos that aren't pure chroma-key and don't blit as transparent.
+        alpha = img.split()[3].point(lambda v: 255 if v >= 96 else 0)
         out_img = Image.new("RGB", (STATUS_SIZE, STATUS_SIZE),
                             (STATUS_BG[0], STATUS_BG[1], STATUS_BG[2]))
         white = Image.new("RGB", (STATUS_SIZE, STATUS_SIZE), (255, 255, 255))

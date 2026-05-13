@@ -28,6 +28,13 @@ DOUBLE_TAP_MS = 400
 FLASH_MS      = 150
 
 
+def _filled_circle(d, cx, cy, r, color):
+    """Scan-line filled circle. ~r horizontal d.rect() calls — cheap enough."""
+    for dy in range(-r, r + 1):
+        dx = int((r * r - dy * dy) ** 0.5)
+        d.rect(cx - dx, cy + dy, dx * 2 + 1, 1, color, fill=True)
+
+
 class App(lix.App):
     name = "Gamepad"
 
@@ -115,63 +122,57 @@ class App(lix.App):
         widgets.draw_header(d, "GAMEPAD")
         widgets.draw_hint  (d, "HOME x2 = exit")
 
-        # The "controller body" — wide pill
-        body_x = 14
-        body_y = widgets.HEADER_H + 8
-        body_w = SW - 28
-        body_h = SH - widgets.HEADER_H - widgets.HINT_H - 16
-        # subtle shadow + body
+        # Controller body — wide rounded card filling the play area.
+        body_x = 12
+        body_y = widgets.HEADER_H + 6
+        body_w = SW - 24
+        body_h = SH - widgets.HEADER_H - widgets.HINT_H - 12
         d.rect(body_x + 2, body_y + 2, body_w, body_h, theme.MUTED2, fill=True)
         d.rect(body_x,     body_y,     body_w, body_h, theme.CARD,   fill=True)
         d.rect(body_x,     body_y,     body_w, 3,      theme.PRIMARY, fill=True)
 
-        # ── D-pad cluster (left half) ─────────────────────────────────────
-        dpad_cx = body_x + 50
-        dpad_cy = body_y + body_h // 2 + 4
-        dsz     = 22
-        self._draw_btn(d, dpad_cx - dsz // 2, dpad_cy - dsz - 22,
-                       dsz, dsz, api.BTN_UP)
-        self._draw_btn(d, dpad_cx - dsz // 2, dpad_cy + 22,
-                       dsz, dsz, api.BTN_DOWN)
-        self._draw_btn(d, dpad_cx - dsz - 22, dpad_cy - dsz // 2,
-                       dsz, dsz, api.BTN_LEFT)
-        self._draw_btn(d, dpad_cx + 22,       dpad_cy - dsz // 2,
-                       dsz, dsz, api.BTN_RIGHT)
-        # cross hub
-        d.rect(dpad_cx - 4, dpad_cy - 4, 8, 8, theme.MUTED, fill=True)
-
-        # ── action cluster (right half: A/B/C in a triangle) ──────────────
-        act_cx = body_x + body_w - 60
-        act_cy = body_y + body_h // 2 + 4
-        asz    = 28
-        # A: bottom-right
-        self._draw_btn(d, act_cx + 16,        act_cy + 8,        asz, asz, api.BTN_A)
-        # B: top-right
-        self._draw_btn(d, act_cx + 16,        act_cy - asz - 6,  asz, asz, api.BTN_B)
-        # C: left
-        self._draw_btn(d, act_cx - asz - 4,   act_cy - asz // 2, asz, asz, api.BTN_C)
-
-        # ── HOME pill (centred along the top) ─────────────────────────────
-        pill_w = 56
-        pill_h = 14
+        # HOME pill centred on top of the body — gives the cluster headroom.
+        pill_w = 72
+        pill_h = 16
         pill_x = body_x + (body_w - pill_w) // 2
-        pill_y = body_y + 14
-        # held / flash colouring
+        pill_y = body_y + 10
         fill_c, text_c = self._btn_colours(api.BTN_HOME)
-        d.rect(pill_x, pill_y, pill_w, pill_h, fill_c, fill=True)
-        d.rect(pill_x, pill_y, pill_w,  1,     theme.PRIMARY, fill=True)
-        d.text("HOME", pill_x + (pill_w - 4 * 8) // 2, pill_y + 3, text_c)
+        d.rect(pill_x + 1, pill_y + 1, pill_w, pill_h, theme.MUTED2, fill=True)
+        d.rect(pill_x,     pill_y,     pill_w, pill_h, fill_c,       fill=True)
+        d.rect(pill_x,     pill_y,     pill_w,  1,     theme.PRIMARY, fill=True)
+        d.text("HOME", pill_x + (pill_w - 4 * 8) // 2, pill_y + 4, text_c)
 
-        # ── event line ────────────────────────────────────────────────────
+        # Vertical centre for the two clusters, below the HOME pill with pad.
+        cluster_cy = pill_y + pill_h + (body_h - (pill_y + pill_h - body_y)) // 2 - 4
+
+        # ── D-pad cluster (left half) — 4 round chunky buttons ────────────
+        r       = 18                          # button radius
+        spacing = r * 2 + 10                  # gap centre-to-centre
+        dpad_cx = body_x + 60
+        self._draw_round_btn(d, dpad_cx,             cluster_cy - spacing, r, api.BTN_UP)
+        self._draw_round_btn(d, dpad_cx,             cluster_cy + spacing, r, api.BTN_DOWN)
+        self._draw_round_btn(d, dpad_cx - spacing,   cluster_cy,           r, api.BTN_LEFT)
+        self._draw_round_btn(d, dpad_cx + spacing,   cluster_cy,           r, api.BTN_RIGHT)
+        # central hub dot
+        _filled_circle(d, dpad_cx, cluster_cy, 5, theme.MUTED)
+
+        # ── action cluster (right half) — A/B/C in a triangle ────────────
+        ar      = 22
+        act_cx  = body_x + body_w - 70
+        # B top-left, C top-right of the diamond, A bottom — gives a classic
+        # SNES-style three-button cluster with the action button (A) lowest.
+        self._draw_round_btn(d, act_cx,              cluster_cy + ar + 4,  ar, api.BTN_A)
+        self._draw_round_btn(d, act_cx - ar - 6,     cluster_cy - ar // 2, ar, api.BTN_B)
+        self._draw_round_btn(d, act_cx + ar + 6,     cluster_cy - ar // 2, ar, api.BTN_C)
+
+        # ── event line + home-tap hint ────────────────────────────────────
         evt = self._event[:32]
         d.text(evt, (SW - len(evt) * 8) // 2,
-               SH - widgets.HINT_H - 14, theme.PRIMARY)
-
-        # ── home-double-tap hint (gold, fades after 400 ms) ───────────────
+               SH - widgets.HINT_H - 12, theme.PRIMARY)
         if self._home_hint:
             d.text(self._home_hint,
                    (SW - len(self._home_hint) * 8) // 2,
-                   SH - widgets.HINT_H - 26, theme.GOLD)
+                   SH - widgets.HINT_H - 24, theme.GOLD)
 
         self._dirty = False
 
@@ -187,17 +188,20 @@ class App(lix.App):
             return theme.PRIMARY, api.WHITE
         return theme.DOCK_BG, theme.TEXT_BRIGHT
 
-    def _draw_btn(self, d, x, y, w, h, btn):
+    def _draw_round_btn(self, d, cx, cy, r, btn):
+        """Round chunky button — shadow, accent ring, face, label, counter."""
         fill_c, text_c = self._btn_colours(btn)
-        # raised look: shadow + face
-        d.rect(x + 1, y + 1, w, h, theme.MUTED2, fill=True)
-        d.rect(x,     y,     w, h, fill_c,       fill=True)
-        d.rect(x,     y,     w, 1, theme.PRIMARY, fill=True)
-        # label
+        # drop shadow
+        _filled_circle(d, cx + 2, cy + 2, r,     theme.MUTED2)
+        # accent ring
+        _filled_circle(d, cx,     cy,     r,     theme.PRIMARY)
+        # face inset
+        _filled_circle(d, cx,     cy,     r - 3, fill_c)
+        # label centred on the face
         lbl = self._name_for(btn)
         lw  = len(lbl) * 8
-        d.text(lbl, x + (w - lw) // 2, y + (h - 8) // 2 - 2, text_c)
-        # press counter
+        d.text(lbl, cx - lw // 2, cy - 4, text_c)
+        # press counter underneath the button
         cnt = "x%d" % self._counts.get(btn, 0)
         cw  = len(cnt) * 8
-        d.text(cnt, x + (w - cw) // 2, y + h - 9, text_c)
+        d.text(cnt, cx - cw // 2, cy + r + 4, theme.MUTED)
