@@ -1,23 +1,23 @@
 """Commits — GitHub contribution graph (the green matrix from your profile).
 
-Live-fetched from the rest of GitHub's API + a small SVG-grid scraper. When
-WiFi isn't up, we render a demo grid so the visual is meaningful during dev.
+Cached on entry. Press A to force-refresh — otherwise we keep the in-memory
+result so re-opening the app is instant. Layout:
 
-Layout:
-  ┌──────── header ────────┐
-  │ COMMITS                │
-  ├────────────────────────┤
-  │ user contributions     │
-  │                        │
-  │ ░░▓▓██▓▓░░░▓▓  ← 52 weeks
-  │ ░▓██▓▓░░▓▓████   (7 days each)
-  │ ...                    │
-  │ legend: less ▒ more █  │
-  └────────────────────────┘
+  ┌────── header ──────┐
+  │ COMMITS            │
+  ├────────────────────┤
+  │   @Circuit-Overtime    ← centred, scale=2 pink
+  │   137 active days · 9-day streak
+  │                    │
+  │   ░░▓▓██▓▓░░░▓▓    ← 52×7 contribution grid
+  │   ░▓██▓▓░░▓▓████   │
+  │   ...              │
+  │                    │
+  │ less ▒▒▓▓██ more  [LIVE]
+  └────────────────────┘
 
-The contribution data comes from GitHub's `https://github.com/users/<user>/
-contributions` SVG endpoint — a single HTTP fetch, no API token required.
-We parse out the `data-level="N"` attributes to drive the colour bucket.
+Data: `https://github.com/users/<user>/contributions` SVG endpoint — one
+HTTP fetch, no token. We parse `data-level="N"` to drive bucket colours.
 
 Controls:
   A      refresh
@@ -31,19 +31,18 @@ from lix_os import theme, widgets
 SW = api.SCREEN_W
 SH = api.SCREEN_H
 
-# Grid: 52 weeks × 7 days, ~4 px cells fit comfortably on a 320-wide screen
 WEEKS    = 52
 DAYS     = 7
-CELL_PX  = 4
+CELL_PX  = 5
 GAP_PX   = 1
 
 # Five GitHub-style buckets, light → dark
 BUCKETS = [
-    (235, 237, 240),    # 0 — no contributions (light grey)
-    (155, 233, 168),    # 1 — light green
-    ( 64, 196, 99),     # 2
-    ( 48, 161, 78),     # 3
-    ( 33,  110, 57),    # 4 — dark green
+    (235, 237, 240),
+    (155, 233, 168),
+    ( 64, 196,  99),
+    ( 48, 161,  78),
+    ( 33, 110,  57),
 ]
 
 
@@ -53,17 +52,13 @@ def _bucket_color(level):
 
 
 def _fetch_contributions(user):
-    """Return a flat list of ints 0..4 in chronological order.
-    On any failure → return None."""
+    """Return flat list of ints 0..4 in chronological order, or None."""
     try:
         import urequests
         url = "https://github.com/users/%s/contributions" % user
         r = urequests.get(url, headers={"User-Agent": "ElixpoBadge"})
         body = r.text
         r.close()
-        # Each cell is something like:
-        #   <td class="ContributionCalendar-day" data-date="2025-..."
-        #       data-level="2" ...>
         out = []
         i = 0
         while True:
@@ -79,26 +74,32 @@ def _fetch_contributions(user):
             except ValueError:
                 out.append(0)
             i = j
-        if not out:
-            return None
-        # GitHub returns up to 53 weeks × 7 days — trim/pad to fit our grid
-        return out
+        return out if out else None
     except Exception:
         return None
 
 
 def _demo_grid():
-    """Synthetic-but-plausible contribution levels used when offline."""
-    # Deterministic PRNG fold so the grid stays visually consistent
     seed = 0xC0FFEE
     out  = []
     for i in range(WEEKS * DAYS):
         seed = (seed * 1103515245 + 12345) & 0xFFFFFFFF
-        # Weekend dip, weekday hump
         wday = i % DAYS
         base = 2 if (1 <= wday <= 5) else 0
         out.append(min(4, max(0, base + ((seed >> 8) & 3) - 1)))
     return out
+
+
+def _max_streak(levels):
+    best = cur = 0
+    for v in levels:
+        if v > 0:
+            cur += 1
+            if cur > best:
+                best = cur
+        else:
+            cur = 0
+    return best
 
 
 class App(lix.App):
@@ -112,10 +113,10 @@ class App(lix.App):
             self._user = GITHUB_USER
         except Exception:
             self._user = "Circuit-Overtime"
-        live_levels = _fetch_contributions(self._user)
-        self._live    = live_levels is not None
-        self._levels  = live_levels if live_levels else _demo_grid()
-        self._dirty   = True
+        live = _fetch_contributions(self._user)
+        self._live   = live is not None
+        self._levels = live if live else _demo_grid()
+        self._dirty  = True
 
     def on_button_press(self, btn):
         if btn == api.BTN_A:
@@ -124,7 +125,7 @@ class App(lix.App):
                 self._levels = new
                 self._live   = True
             else:
-                self._live   = False
+                self._live = False
             self._dirty = True
 
     def update(self, dt):
@@ -137,30 +138,35 @@ class App(lix.App):
         widgets.draw_header(d, "COMMITS")
         widgets.draw_hint  (d, "A=refresh  HOME=back")
 
-        # Sub-header: who + status pill
-        sub_y = widgets.HEADER_H + 6
-        d.text("@" + self._user[:18], 10, sub_y, theme.PRIMARY, scale=2)
-        pill   = "LIVE" if self._live else "OFFLINE"
-        pill_c = theme.GREEN if self._live else theme.MUTED
-        pw     = len(pill) * 8 + 12
-        d.rect(SW - pw - 8, sub_y - 1, pw, 14, pill_c, fill=True)
-        d.text(pill, SW - pw - 2, sub_y + 2, api.WHITE)
+        # ── fancy centred username (scale=2 pink) ──────────────────────
+        user_str = "@" + self._user[:20]
+        uw = len(user_str) * 16
+        uy = widgets.HEADER_H + 8
+        d.text(user_str, (SW - uw) // 2, uy, theme.PRIMARY, scale=2)
 
-        # ── contribution grid ───────────────────────────────────────────
+        # underline accent that matches text width
+        d.rect((SW - uw) // 2, uy + 20, uw, 2, theme.GOLD, fill=True)
+
+        # ── stats subtitle (active days · longest streak) ──────────────
+        active = sum(1 for x in self._levels if x > 0)
+        streak = _max_streak(self._levels)
+        sub = "%d active days  ~  %d-day streak" % (active, streak)
+        sw  = len(sub) * 8
+        d.text(sub, (SW - sw) // 2, uy + 28, theme.TEXT_BRIGHT)
+
+        # ── contribution grid (centred) ────────────────────────────────
         grid_w = WEEKS * (CELL_PX + GAP_PX) - GAP_PX
         grid_h = DAYS  * (CELL_PX + GAP_PX) - GAP_PX
         gx0    = (SW - grid_w) // 2
-        gy0    = sub_y + 28
+        gy0    = uy + 52
 
-        # background panel
-        pad = 8
+        pad = 6
         d.rect(gx0 - pad, gy0 - pad,
                grid_w + pad * 2, grid_h + pad * 2,
                theme.CARD, fill=True)
         d.rect(gx0 - pad, gy0 - pad,
                grid_w + pad * 2, 2, theme.PRIMARY, fill=True)
 
-        # cells (only show as many as we have)
         n = len(self._levels)
         for i in range(min(n, WEEKS * DAYS)):
             week = i // DAYS
@@ -170,19 +176,22 @@ class App(lix.App):
             d.rect(cx, cy, CELL_PX, CELL_PX,
                    _bucket_color(self._levels[i]), fill=True)
 
-        # ── totals + legend ─────────────────────────────────────────────
-        total = sum(1 for x in self._levels if x > 0)
-        days  = "%d active days" % total
-        d.text(days, gx0 - pad, gy0 + grid_h + pad + 4,
-               theme.TEXT_BRIGHT, scale=2)
-
-        lg_y  = SH - widgets.HINT_H - 20
-        lg_x  = SW - pad - 8 - 5 * (CELL_PX + GAP_PX) - 36
+        # ── legend + LIVE pill on a single bottom row ──────────────────
+        lg_y = SH - widgets.HINT_H - 14
+        # legend on the left
+        lg_x = 12
         d.text("less", lg_x, lg_y + (CELL_PX - 8) // 2, theme.MUTED)
         for i in range(5):
-            d.rect(lg_x + 32 + i * (CELL_PX + GAP_PX), lg_y,
+            d.rect(lg_x + 36 + i * (CELL_PX + GAP_PX), lg_y,
                    CELL_PX, CELL_PX, _bucket_color(i), fill=True)
-        d.text("more", lg_x + 32 + 5 * (CELL_PX + GAP_PX) + 2,
+        d.text("more", lg_x + 36 + 5 * (CELL_PX + GAP_PX) + 4,
                lg_y + (CELL_PX - 8) // 2, theme.MUTED)
+
+        # LIVE / OFFLINE pill on the right
+        pill   = "LIVE" if self._live else "OFFLINE"
+        pill_c = theme.GREEN if self._live else theme.MUTED
+        pw     = len(pill) * 8 + 12
+        d.rect(SW - pw - 10, lg_y - 2, pw, 12, pill_c, fill=True)
+        d.text(pill, SW - pw - 4, lg_y, api.WHITE)
 
         self._dirty = False
