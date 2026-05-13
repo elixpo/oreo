@@ -1,6 +1,6 @@
 """Lix OS hardware abstraction layer.
 
-`lix_hw/*` (MicroPython on the ESP32-S3) provides the concrete display/
+`oreoWare/*` (MicroPython on the ESP32-S3) provides the concrete display/
 buttons/IR/LEDs/ADC backend. Apps depend only on this ABC interface — they
 don't know or care which backend is wired up, so a future sim re-build can
 slot in without touching app code.
@@ -85,7 +85,7 @@ class Display(ABC):
         n = w * h
         words = struct.unpack_from(">%dH" % n, sprite, 0)
         if dim > 0:
-            from lix_os import theme as _t
+            from oreoOS import theme as _t
             br, bg_, bb = _t.BG_R, _t.BG_G, _t.BG_B
         for row in range(h):
             for col in range(w):

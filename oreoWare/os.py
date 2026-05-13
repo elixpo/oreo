@@ -5,9 +5,9 @@ Holds singletons for every peripheral, mediates app-↔-launcher communication
 will land here once we have NVS / filesystem-backed storage.
 """
 
-from lix import api
-from lix_hw.display import Display
-from lix_hw.buttons import Buttons
+from oreoOS import api
+from oreoWare.display import Display
+from oreoWare.buttons import Buttons
 
 
 class OS(api.OS):

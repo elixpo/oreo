@@ -12,9 +12,9 @@ import gc
 import sys
 import time
 
-import lix
-from lix import api, pixelfont
-from lix_os import theme, widgets
+import oreoOS
+from oreoOS import api, pixelfont
+from oreoOS import theme, widgets
 
 
 SW = api.SCREEN_W
@@ -36,13 +36,13 @@ def _kb(b):
 def _os_version():
     """Single source of truth for the OS version string lives in launcher.VERSION."""
     try:
-        from lix_os.launcher import VERSION
+        from oreoOS.launcher import VERSION
         return VERSION
     except Exception:
         return "v?.?.?"
 
 
-class App(lix.App):
+class App(oreoOS.App):
     name = "About"
 
     def on_enter(self, os):
@@ -55,7 +55,7 @@ class App(lix.App):
         self._scroll  = 0
         self._max_scroll = 0
         try:
-            from lix_hw import wifi
+            from oreoWare import wifi
             self._ip = wifi.ip() or "—"
         except Exception:
             self._ip = "—"

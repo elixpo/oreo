@@ -1,7 +1,7 @@
 """Elixpo OS — app loader, generic run loop, crash screen, boot entry point.
 
 Apps live in apps/<name>/ with a manifest.json and a main.py that exposes
-an App class subclassing lix.App.  The OS launcher owns the top-level loop;
+an App class subclassing oreoOS.App.  The OS launcher owns the top-level loop;
 individual screens (splash, home, app-menu) live in separate modules.
 """
 
@@ -10,7 +10,7 @@ import json
 import os as _os
 import time
 
-from lix import api
+from oreoOS import api
 
 VERSION      = "v1.2.19"
 # Target ~33 fps (30 ms cap). At 40 MHz SPI a full framebuf push is 30.7 ms,
@@ -78,7 +78,7 @@ def load_app(app_dir):
 
 
 # ── loading transition (used for slow apps) ──────────────────────────────────
-# A flag-on-the-App-class opts in:    class App(lix.App): SHOW_LOADING = True
+# A flag-on-the-App-class opts in:    class App(oreoOS.App): SHOW_LOADING = True
 # Cost: ~210 ms slide-in animation BEFORE app.on_enter — the heavy load then
 # runs while the loading panel is the only thing on screen.
 
@@ -88,7 +88,7 @@ def _show_loading(display, label, author=None):
     Shows "LOADING / <app name>" centred, with a smaller "By @<author>" line
     underneath when the manifest carries one. Framebuf 8×8 only (~30 fps).
     """
-    from lix_os import theme
+    from oreoOS import theme
     SW = api.SCREEN_W
     SH = api.SCREEN_H
     label  = (label  or "")[:16].upper()
@@ -205,7 +205,7 @@ def show_crash(os_obj, name, err):
 
     # Pixelify display font for the app name; fall back to framebuf if missing.
     try:
-        from lix import pixelfont
+        from oreoOS import pixelfont
         title_font = pixelfont.load("pixelify_24")
     except (ImportError, AttributeError):
         title_font = None
@@ -289,9 +289,9 @@ def _wrap_text(text, max_chars):
 # ── boot entry point ─────────────────────────────────────────────────────────
 
 def boot():
-    from lix_hw.os import OS
-    from lix_os.splash import show_splash
-    from lix_os.home   import Home
+    from oreoWare.os import OS
+    from oreoOS.splash import show_splash
+    from oreoOS.home   import Home
 
     # gc.threshold() was set aggressively for LDO smoothing but caused
     # frequent GC pauses that murdered fps. Leave it at the MicroPython
@@ -302,7 +302,7 @@ def boot():
 
     # Start WiFi and BT after splash (non-blocking for BT, background for WiFi)
     try:
-        from lix_hw import wifi, bt
+        from oreoWare import wifi, bt
         wifi.connect_from_config()
         bt.init_from_config()
         # Sync the system clock from an NTP server once WiFi is up. The RTC

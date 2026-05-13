@@ -5,16 +5,16 @@ reads up to ~3.1 V. A full 4.2 V Li-Po reads as ~2.10 V at the pin, an
 empty 3.30 V cell reads ~1.65 V. We linearise to a percentage via a small
 piecewise table (loosely modelling the Li-Po discharge curve).
 
-On the pygame simulator (no ADC), `read_percent()` returns a fixed 85 so
-the home screen still has something to render.
+When the ADC isn't available (e.g. CPython on the build host), `read_percent()`
+returns a fixed 85 so callers always get a usable value.
 
 Usage:
-    from lix_hw import battery
+    from oreoWare import battery
     pct  = battery.read_percent()   # 0–100, clamped
     volt = battery.read_voltage()   # cell V (float)
 """
 
-from lix_hw import pins
+from oreoWare import pins
 
 try:
     from machine import ADC, Pin

@@ -3,15 +3,15 @@
 Goal: every app has the same visual chrome (header bar, hint footer, panel
 backgrounds) so the OS feels cohesive. Apps just call:
 
-    from lix_os import widgets
+    from oreoOS import widgets
     widgets.draw_header(d, "SETTINGS")
     widgets.draw_hint  (d, "A=select  HOME=back")
 
 and the look is consistent.
 """
 
-from lix import api, pixelfont
-from lix_os import theme
+from oreoOS import api, pixelfont
+from oreoOS import theme
 
 HEADER_H = 28
 HINT_H   = 16

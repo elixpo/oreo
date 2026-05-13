@@ -1,9 +1,9 @@
 """Minimal ST7789P3 driver for the SmartElex 2.0" 240x320 IPS panel.
 
 Low-level only: reset, init, set address window, push pixel bytes.
-Higher-level drawing (framebuf, primitives, text) belongs in lix_hw.display.
+Higher-level drawing (framebuf, primitives, text) belongs in oreoWare.display.
 
-Leading-underscore module name signals: not part of the public lix_hw API.
+Leading-underscore module name signals: not part of the public oreoWare API.
 """
 
 from machine import Pin, SPI

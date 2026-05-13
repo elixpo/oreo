@@ -1,8 +1,8 @@
 from machine import Pin, SPI
 import time
 
-from lix_hw import pins
-from lix_hw._st7789 import ST7789
+from oreoWare import pins
+from oreoWare._st7789 import ST7789
 
 RED   = 0xF800
 GREEN = 0x07E0

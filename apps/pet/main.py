@@ -15,9 +15,9 @@ Controls:
 """
 
 import time
-import lix
-from lix import api
-from lix_os import theme, widgets
+import oreoOS
+from oreoOS import api
+from oreoOS import theme, widgets
 
 SW = api.SCREEN_W
 SH = api.SCREEN_H
@@ -119,7 +119,7 @@ def _draw_speech_bubble(d, x, y, w, h, text, color):
 
 # ─── App ─────────────────────────────────────────────────────────────────────
 
-class App(lix.App):
+class App(oreoOS.App):
     name         = "Elixpo Pet"
     SHOW_LOADING = False
 

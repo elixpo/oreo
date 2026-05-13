@@ -1,4 +1,4 @@
-# Elixpo Badge — Colour Theme Reference
+# Oreo Badge — Colour Theme Reference
 
 This is a **celebration badge** — warm, festive, vibrant. NOT dark mode.
 All generated assets must use this palette.

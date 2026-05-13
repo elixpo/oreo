@@ -3,9 +3,9 @@
 Five rows, UP/DOWN to select, A toggles or actions, HOME exits.
 """
 
-import lix
-from lix import api
-from lix_os import theme, widgets
+import oreoOS
+from oreoOS import api
+from oreoOS import theme, widgets
 
 SW = api.SCREEN_W
 SH = api.SCREEN_H
@@ -24,7 +24,7 @@ class _Row:
         self.setter = setter
 
 
-class App(lix.App):
+class App(oreoOS.App):
     name = "Settings"
 
     def on_enter(self, os):
@@ -34,7 +34,7 @@ class App(lix.App):
 
         # Lazily import the WiFi / BT modules so the sim doesn't crash.
         try:
-            from lix_hw import wifi as _w, bt as _b
+            from oreoWare import wifi as _w, bt as _b
             self._wifi = _w
             self._bt   = _b
         except Exception:

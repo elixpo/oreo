@@ -1,4 +1,4 @@
-"""Display backend — implements lix.api.Display on the badge.
+"""Display backend — implements oreoOS.api.Display on the badge.
 
 Framebuffer strategy:
   - Full 320×240×2 = 153 KB RGB565 framebuffer in PSRAM
@@ -17,9 +17,9 @@ import struct
 from machine import Pin, SPI
 from time import sleep_us as utime_sleep_us
 
-from lix import api
-from lix_hw import pins
-from lix_hw._st7789 import ST7789
+from oreoOS import api
+from oreoWare import pins
+from oreoWare._st7789 import ST7789
 
 
 def _swap(c):
@@ -128,7 +128,7 @@ class Display(api.Display):
         words = struct.unpack(">%dH" % n, sprite[:n * 2])
 
         if dim > 0:
-            from lix_os import theme as _t
+            from oreoOS import theme as _t
             br, bg_, bb = _t.BG_R, _t.BG_G, _t.BG_B
 
         out  = bytearray(sw * sh * 2)

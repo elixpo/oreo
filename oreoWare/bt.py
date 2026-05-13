@@ -1,7 +1,7 @@
 """Bluetooth (BLE) manager for the Elixpo Badge.
 
 Usage:
-    from lix_hw import bt
+    from oreoWare import bt
     bt.set_active(True)
     bt.is_active()
 """

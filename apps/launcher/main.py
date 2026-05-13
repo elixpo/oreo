@@ -13,9 +13,9 @@ Controls:
 """
 
 import math
-import lix
-from lix import api
-from lix_os import theme, widgets
+import oreoOS
+from oreoOS import api
+from oreoOS import theme, widgets
 
 SW = api.SCREEN_W
 SH = api.SCREEN_H
@@ -167,18 +167,18 @@ def _rounded_outline(d, x, y, w, h, color, r=CORNER_R):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-class App(lix.App):
+class App(oreoOS.App):
     name         = "Apps"
     SHOW_LOADING = True      # ~80 ms upscaling 12 icons from 32→64 at on_enter
 
     def on_enter(self, os):
         self._os = os
-        from lix_os.launcher import list_apps
+        from oreoOS.launcher import list_apps
         self._apps = [a for a in list_apps() if a["dir"] != "launcher"]
 
         # Pre-upscale every icon 32×32 → 64×64 ONCE; cache as bytearray for
         # fast per-frame blits AND as the source of the rotation animation.
-        from lix_os import icons as _icons
+        from oreoOS import icons as _icons
         self._icons = {}
         for a in self._apps:
             res = _icons.load(a["dir"], a.get("icon"))

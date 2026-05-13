@@ -20,7 +20,7 @@ ICON_SIZE = 32
 def _png_to_rgb565(path: str, size=ICON_SIZE) -> bytes | None:
     try:
         from PIL import Image
-        from lix_os import theme
+        from oreoOS import theme
         img = Image.open(path).convert("RGBA").resize((size, size), Image.LANCZOS)
         bg = Image.new("RGBA", (size, size),
                        (theme.BG_R, theme.BG_G, theme.BG_B, 255))

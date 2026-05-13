@@ -1,4 +1,4 @@
-# Elixpo Badge OS
+# Oreo Badge OS
 
 A conference badge running a custom MicroPython OS on an **ESP32-S3-DevKitC-1-N16R8**.  
 Develop and preview apps on your laptop with the built-in pygame simulator, then deploy to hardware.
@@ -25,10 +25,10 @@ Full wiring reference: [`docs/`](docs/)
 ## Repo layout
 
 ```
-lix/            Core API — Display, Buttons, OS ABCs shared by all backends
-lix_hw/         Hardware backend (MicroPython, runs on badge)
+oreoOS/            Core API — Display, Buttons, OS ABCs shared by all backends
+oreoWare/         Hardware backend (MicroPython, runs on badge)
 lix_sim/        Simulator backend (CPython + pygame, runs on laptop)
-lix_os/         OS launcher — splash, app menu, run loop, crash screen
+oreoOS/         OS launcher — splash, app menu, run loop, crash screen
 apps/           User apps (each has manifest.json + main.py)
 templates/      Copy-paste starter for new apps
 hw_tests/       One-off hardware validation scripts (MicroPython)
@@ -71,7 +71,7 @@ esptool.py --chip esp32s3 --port /dev/ttyUSB0 write_flash 0 \
     firmware/ESP32_GENERIC_S3-SPIRAM_OCT-*.bin
 
 # Live dev (no reflash needed — badge imports from your laptop)
-mpremote connect /dev/ttyUSB0 mount . exec "import lix_os.launcher; lix_os.launcher.boot()"
+mpremote connect /dev/ttyUSB0 mount . exec "import oreoOS.launcher; oreoOS.launcher.boot()"
 ```
 
 ---
@@ -82,10 +82,10 @@ Copy [`templates/app_template/`](templates/app_template/) into `apps/<your_app>/
 
 ```python
 # apps/my_app/main.py
-import lix
-from lix import api
+import oreoOS
+from oreoOS import api
 
-class App(lix.App):
+class App(oreoOS.App):
     name = "My App"
 
     def on_enter(self, os):
@@ -115,19 +115,19 @@ class App(lix.App):
 
 ```
 Apps ──────────────────────────────────────────────────┐
-                                                       │  lix.App   lix.api
-OS Launcher (lix_os/launcher.py)  ─────────────────────┤  (shared interface)
+                                                       │  oreoOS.App   oreoOS.api
+OS Launcher (oreoOS/launcher.py)  ─────────────────────┤  (shared interface)
                                                        │
         ┌──────────────────────────────────────────────┘
         │
         ▼
-  lix_hw/   (MicroPython, badge)    lix_sim/   (CPython, laptop)
+  oreoWare/   (MicroPython, badge)    lix_sim/   (CPython, laptop)
   display.py   → ST7789P3 SPI       display.py  → pygame Surface
   buttons.py   → GPIO PULL_UP       buttons.py  → pygame keyboard
   os.py        → hardware OS        os.py       → sim OS
 ```
 
-The `lix/api.py` ABCs are the only contract apps depend on — they run identically on both backends.
+The `oreoOS/api.py` ABCs are the only contract apps depend on — they run identically on both backends.
 
 ---
 

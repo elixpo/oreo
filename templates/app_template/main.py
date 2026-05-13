@@ -7,14 +7,14 @@ To create a new app:
   4. Reboot the badge — your app appears in the menu
 
 The OS finds apps by scanning /apps/ for folders containing manifest.json.
-The class MUST be named `App` and subclass `lix.App`.
+The class MUST be named `App` and subclass `oreoOS.App`.
 """
 
-import lix
-from lix import api
+import oreoOS
+from oreoOS import api
 
 
-class App(lix.App):
+class App(oreoOS.App):
     name = "Template"
 
     # ----- lifecycle -----------------------------------------------------

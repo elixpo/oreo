@@ -4,9 +4,9 @@ Landscape 320×240. Arena under the standard header. Cell-grid: 10 px cells.
 INTRO → PLAY → OVER state machine, persistent hi-score in apps/snake/hiscore.txt.
 """
 
-import lix
-from lix import api
-from lix_os import theme, widgets
+import oreoOS
+from oreoOS import api
+from oreoOS import theme, widgets
 
 SW = api.SCREEN_W
 SH = api.SCREEN_H
@@ -78,7 +78,7 @@ def _dim_color(c):
     return (r << 11) | (g << 5) | b
 
 
-class App(lix.App):
+class App(oreoOS.App):
     name = "Snake"
 
     def on_enter(self, os):

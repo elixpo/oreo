@@ -17,9 +17,9 @@ HOME-double-tap behaviour without ever leaving the test screen.
 """
 
 import time
-import lix
-from lix import api
-from lix_os import theme, widgets
+import oreoOS
+from oreoOS import api
+from oreoOS import theme, widgets
 
 SW = api.SCREEN_W
 SH = api.SCREEN_H
@@ -35,7 +35,7 @@ def _filled_circle(d, cx, cy, r, color):
         d.rect(cx - dx, cy + dy, dx * 2 + 1, 1, color, fill=True)
 
 
-class App(lix.App):
+class App(oreoOS.App):
     name = "Gamepad"
 
     def on_enter(self, os):

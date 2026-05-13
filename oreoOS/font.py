@@ -5,7 +5,7 @@ row, bit 6 = bottom row. The 7th bit (0x80) is unused. Drawing renders the
 glyph at any scale by stamping rectangles for set pixels.
 
 Usage:
-    from lix import font
+    from oreoOS import font
     font.text(d, "Hello", x=10, y=20, color=api.WHITE, scale=2)
     w = font.measure("Hello", scale=2)         # pixel width
     h = font.height(scale=2)                   # pixel height (7 * scale)
@@ -14,7 +14,7 @@ Drop-in friendly: Display.text() still uses framebuf's 8x8 font for hardware-
 side speed. Use font.text(d, ...) explicitly when you want the pixel font.
 """
 
-from lix import api
+from oreoOS import api
 
 GLYPH_W      = 5
 GLYPH_H      = 7

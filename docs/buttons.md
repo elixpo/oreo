@@ -5,7 +5,7 @@ Canonical reference for the Lix badge's input. If anything here disagrees with
 
 ## Mapping (button ↔ ESP32-S3 GPIO)
 
-| Badge button | GPIO | Row on badge | Constant in `lix.api` | Constant in `lix_hw.pins` |
+| Badge button | GPIO | Row on badge | Constant in `oreoOS.api` | Constant in `oreoWare.pins` |
 |---|---:|---|---|---|
 | UP    | 4  | direction | `api.BTN_UP`    | `pins.BTN_UP`    |
 | DOWN  | 5  | direction | `api.BTN_DOWN`  | `pins.BTN_DOWN`  |
@@ -29,7 +29,7 @@ Canonical reference for the Lix badge's input. If anything here disagrees with
 - One leg → common GND rail
 - Diagonally-opposite-side leg → its assigned ESP32-S3 GPIO
 - **No external pull-up resistor** — the internal ~45kΩ pull-up is enabled in
-  software by `Pin(n, Pin.IN, Pin.PULL_UP)` in `lix_hw/buttons.py`.
+  software by `Pin(n, Pin.IN, Pin.PULL_UP)` in `oreoWare/buttons.py`.
 
 Active-low: idle reads `1` (pulled to 3V3 internally), pressed reads `0`
 (shorted to GND through the switch).
@@ -51,11 +51,11 @@ Active-low: idle reads `1` (pulled to 3V3 internally), pressed reads `0`
 
 ## Software access
 
-Apps don't talk to GPIOs — they use the lix API:
+Apps don't talk to GPIOs — they use the oreoOS API:
 
 ```python
-from lix import api
-from lix_hw.buttons import Buttons
+from oreoOS import api
+from oreoWare.buttons import Buttons
 
 btns = Buttons()
 

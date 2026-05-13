@@ -11,7 +11,7 @@ Mascot reference palette:
 Background is a warm ivory/cream — feels like a party invitation, not a terminal.
 """
 
-from lix import api
+from oreoOS import api
 
 # ── raw RGB triplets (for PIL / math) ─────────────────────────────────────────
 

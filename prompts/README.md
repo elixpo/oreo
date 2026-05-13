@@ -1,6 +1,6 @@
 # Asset Prompts
 
-Each `.md` file in this folder defines one asset for the Elixpo Badge.
+Each `.md` file in this folder defines one asset for the Oreo Badge.
 
 ## How to generate an asset
 
@@ -20,7 +20,7 @@ Each `.md` file in this folder defines one asset for the Elixpo Badge.
 
 ## Theme reference
 
-All assets must use the panda mascot colour palette (see `lix_os/theme.py`):
+All assets must use the panda mascot colour palette (see `oreoOS/theme.py`):
 - Background dark: rgb(14, 12, 20)
 - Primary pink: rgb(255, 93, 104)
 - Teal accent: rgb(0, 180, 165)

@@ -8,9 +8,9 @@ Controls: LEFT/RIGHT page through photos; A = refresh; HOME = exit.
 """
 
 import os as _os
-import lix
-from lix import api
-from lix_os import theme, widgets
+import oreoOS
+from oreoOS import api
+from oreoOS import theme, widgets
 
 SW = api.SCREEN_W
 SH = api.SCREEN_H
@@ -38,7 +38,7 @@ def _load_photo(name):
         return None
 
 
-class App(lix.App):
+class App(oreoOS.App):
     name = "Gallery"
 
     def on_enter(self, os):

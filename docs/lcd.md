@@ -21,7 +21,7 @@ datasheet we ordered.
 
 ## Pin map (display ↔ ESP32-S3-DevKitC-1-N16R8)
 
-| Display silkscreen | Function | DevKit pin | Our name in `lix_hw/pins.py` |
+| Display silkscreen | Function | DevKit pin | Our name in `oreoWare/pins.py` |
 |---|---|---|---|
 | **VCC** | Power input (3.3–5V) | **5V** | — |
 | **GND** | Ground | GND | — |

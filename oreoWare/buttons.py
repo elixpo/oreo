@@ -1,4 +1,4 @@
-"""Buttons backend — implements lix.api.Buttons via INPUT_PULLUP GPIOs.
+"""Buttons backend — implements oreoOS.api.Buttons via INPUT_PULLUP GPIOs.
 
 Edge detection (just_pressed / just_released) works against the *previous* frame,
 so update() must be called exactly once per frame by the OS loop. Apps don't
@@ -8,8 +8,8 @@ date.
 
 from machine import Pin
 
-from lix import api
-from lix_hw import pins
+from oreoOS import api
+from oreoWare import pins
 
 
 _BTN_TO_GPIO = {

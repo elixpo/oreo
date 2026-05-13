@@ -1,4 +1,4 @@
-# Elixpo Badge — Breadboard Phase BOM
+# Oreo Badge — Breadboard Phase BOM
 
 Goal: validate the full feature set (display, touch, buttons, IR TX/RX, corner LEDs, battery monitor stub) on solderless breadboard before committing to PCB.
 

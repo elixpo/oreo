@@ -7,9 +7,9 @@ SPI-wipe that causes flicker on every-frame redraws.
 
 import time
 
-from lix import api
-from lix_hw.buttons import Buttons
-from lix_hw.display import Display
+from oreoOS import api
+from oreoWare.buttons import Buttons
+from oreoWare.display import Display
 
 
 NAMES = {

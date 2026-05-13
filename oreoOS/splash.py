@@ -11,8 +11,8 @@ Sequence (~3 s):
 
 import struct
 import time
-from lix import api
-from lix_os import theme
+from oreoOS import api
+from oreoOS import theme
 
 SW = api.SCREEN_W   # 320
 SH = api.SCREEN_H   # 240

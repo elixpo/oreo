@@ -14,7 +14,7 @@ COLORS = [
     (16,  0, 32),   # purple
 ]
 
-print("blink: lix says hello")
+print("blink: oreoOS says hello")
 while True:
     for c in COLORS:
         np[0] = c

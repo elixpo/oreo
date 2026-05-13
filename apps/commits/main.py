@@ -24,9 +24,9 @@ Controls:
   HOME   apps drawer
 """
 
-import lix
-from lix import api
-from lix_os import theme, widgets
+import oreoOS
+from oreoOS import api
+from oreoOS import theme, widgets
 
 SW = api.SCREEN_W
 SH = api.SCREEN_H
@@ -102,7 +102,7 @@ def _max_streak(levels):
     return best
 
 
-class App(lix.App):
+class App(oreoOS.App):
     name         = "Commits"
     SHOW_LOADING = True
 

@@ -11,9 +11,9 @@ Controls:
   HOME    — exit
 """
 
-import lix
-from lix import api
-from lix_os import theme, widgets
+import oreoOS
+from oreoOS import api
+from oreoOS import theme, widgets
 
 SW = api.SCREEN_W
 SH = api.SCREEN_H
@@ -63,7 +63,7 @@ DIALOGUE = {
 }
 
 
-class App(lix.App):
+class App(oreoOS.App):
     name         = "IR Quest"
     SHOW_LOADING = False
 

@@ -2,7 +2,7 @@
 
 **Asset name:** `apps_icon`  
 **Output size:** 200×200 → optimized to 32×32  
-**Used in:** `lix_os/home.py` — the single dock button that opens the app menu  
+**Used in:** `oreoOS/home.py` — the single dock button that opens the app menu  
 **Theme reference:** See [THEME.md](THEME.md)
 
 ## Prompt

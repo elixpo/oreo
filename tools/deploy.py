@@ -1,4 +1,4 @@
-"""Deploy Elixpo Badge OS to the ESP32-S3 via mpremote.
+"""Deploy Oreo Badge OS to the ESP32-S3 via mpremote.
 
 Usage:
     python tools/deploy.py              # auto-detect port
@@ -57,40 +57,34 @@ def _save_hash_cache(cache):
 # (local_path, remote_path)  — directories are copied recursively
 
 DEPLOY = [
-    # entry point
-    ("entry/badgr.py",                "main.py"),
+    # entry point — oreoOS.entry → /main.py on the device
+    ("oreoOS/entry.py",         "main.py"),
 
-    # core framework
-    ("lix/__init__.py",        "lix/__init__.py"),
-    ("lix/api.py",             "lix/api.py"),
-    ("lix/app.py",             "lix/app.py"),
+    # OS layer (flat namespace: api, app, theme, widgets, font, …)
+    ("oreoOS/__init__.py",      "oreoOS/__init__.py"),
+    ("oreoOS/api.py",           "oreoOS/api.py"),
+    ("oreoOS/app.py",           "oreoOS/app.py"),
+    ("oreoOS/font.py",          "oreoOS/font.py"),
+    ("oreoOS/pixelfont.py",     "oreoOS/pixelfont.py"),
+    ("oreoOS/sprite.py",        "oreoOS/sprite.py"),
+    ("oreoOS/home.py",          "oreoOS/home.py"),
+    ("oreoOS/icons.py",         "oreoOS/icons.py"),
+    ("oreoOS/launcher.py",      "oreoOS/launcher.py"),
+    ("oreoOS/splash.py",        "oreoOS/splash.py"),
+    ("oreoOS/theme.py",         "oreoOS/theme.py"),
+    ("oreoOS/timeutil.py",      "oreoOS/timeutil.py"),
+    ("oreoOS/widgets.py",       "oreoOS/widgets.py"),
 
-    # hardware drivers
-    ("lix_hw/__init__.py",     "lix_hw/__init__.py"),
-    ("lix_hw/_st7789.py",      "lix_hw/_st7789.py"),
-    ("lix_hw/buttons.py",      "lix_hw/buttons.py"),
-    ("lix_hw/display.py",      "lix_hw/display.py"),
-    ("lix_hw/os.py",           "lix_hw/os.py"),
-    ("lix_hw/pins.py",         "lix_hw/pins.py"),
-    ("lix_hw/wifi.py",         "lix_hw/wifi.py"),
-    ("lix_hw/bt.py",           "lix_hw/bt.py"),
-
-    # OS layer
-    ("lix_os/__init__.py",     "lix_os/__init__.py"),
-    ("lix_os/home.py",         "lix_os/home.py"),
-    ("lix_os/icons.py",        "lix_os/icons.py"),
-    ("lix_os/launcher.py",     "lix_os/launcher.py"),
-    ("lix_os/splash.py",       "lix_os/splash.py"),
-    ("lix_os/theme.py",        "lix_os/theme.py"),
-    ("lix_os/timeutil.py",     "lix_os/timeutil.py"),
-    ("lix_os/widgets.py",      "lix_os/widgets.py"),
-]
-
-# lix module — also pick up font/sprite/pixelfont
-DEPLOY += [
-    ("lix/font.py",      "lix/font.py"),
-    ("lix/sprite.py",    "lix/sprite.py"),
-    ("lix/pixelfont.py", "lix/pixelfont.py"),
+    # Hardware drivers
+    ("oreoWare/__init__.py",    "oreoWare/__init__.py"),
+    ("oreoWare/_st7789.py",     "oreoWare/_st7789.py"),
+    ("oreoWare/buttons.py",     "oreoWare/buttons.py"),
+    ("oreoWare/display.py",     "oreoWare/display.py"),
+    ("oreoWare/battery.py",     "oreoWare/battery.py"),
+    ("oreoWare/os.py",          "oreoWare/os.py"),
+    ("oreoWare/pins.py",        "oreoWare/pins.py"),
+    ("oreoWare/wifi.py",        "oreoWare/wifi.py"),
+    ("oreoWare/bt.py",          "oreoWare/bt.py"),
 ]
 
 # Pixelify Sans bitmap-font modules (.py only — skip the TTF, it's build-time)
@@ -176,8 +170,8 @@ def mpremote_batch(actions, label=""):
     """Run many `fs` actions in a SINGLE mpremote session via `+` separators.
 
     Streams a verbose live progress report:
-      [007/124] [####------------------]  lix_hw/display.py     4.2 kB  (+ 0.7s)
-      [008/124] [####------------------]  lix_hw/wifi.py        ↺ unchanged
+      [007/124] [####------------------]  oreoWare/display.py    4.2 kB  (+ 0.7s)
+      [008/124] [####------------------]  oreoWare/wifi.py       ↺ unchanged
 
     The trailing "↺ unchanged" appears when mpremote's per-file cache shortcut
     fires (the file content on the device matches our local copy).
@@ -323,7 +317,7 @@ remote_dirs = sorted(remote_dirs, key=lambda p: p.count("/"))
 def main():
     import time as _t
     t0 = _t.time()
-    print("Deploying Elixpo Badge OS → %s\n" % PORT)
+    print("Deploying Oreo Badge OS → %s\n" % PORT)
 
     # Verify device reachable
     r = mpremote("fs", "ls", ":")
@@ -402,7 +396,7 @@ def main():
         print("\nDone in %.1fs.  WIFI_SSID=%r" % (elapsed, ssid or "<unset>"))
         print("Resetting device...")
         mpremote("reset")
-        print("Elixpo OS is booting.")
+        print("Oreo OS is booting.")
     else:
         print("\nBatch exited with code %d after %.1fs." % (rc, elapsed))
 

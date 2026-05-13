@@ -2,7 +2,7 @@
 
 **Asset name:** `home_bg`  
 **Output size:** 200×200 (optimizer scales to 80×60 for 4× upscale to 320×240)  
-**Used in:** `lix_os/home.py` — background behind clock and dock  
+**Used in:** `oreoOS/home.py` — background behind clock and dock  
 **Theme reference:** See [THEME.md](THEME.md)
 
 ## Prompt

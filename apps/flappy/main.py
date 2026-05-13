@@ -15,8 +15,8 @@ Sprites (under apps/flappy/assets/optimized/):
 Controls: A or UP = flap.
 """
 
-import lix
-from lix import api, font
+import oreoOS
+from oreoOS import api, font
 
 SW = api.SCREEN_W   # 320
 SH = api.SCREEN_H   # 240
@@ -161,7 +161,7 @@ def _upscale_to_bytearray(data, w, h, scale_x, scale_y):
 # ── _bluedim kernel ──────────────────────────────────────────────────────────
 # On MicroPython the kernel is compiled with @micropython.viper for near-C
 # speed (76,800 pixels in ~30-50 ms vs ~700 ms in pure Python). On CPython we
-# fall back to a regular function — perf is irrelevant in the simulator.
+# fall back to a regular function — perf doesn't matter on the build host.
 #
 # The viper source lives in a string so CPython never has to parse the `ptr8`
 # annotation (which only exists inside Viper's namespace).
@@ -186,7 +186,7 @@ def _bluedim_kernel(src: ptr8, dst: ptr8, n: int):
 """
 
 def _bluedim_kernel(src, dst, n):
-    """Pure-Python fallback (CPython simulator). Replaced by Viper on hardware."""
+    """Pure-Python fallback for the build host. Replaced by Viper on hardware."""
     for i in range(n):
         off = i << 1
         v = (src[off] << 8) | src[off + 1]
@@ -452,7 +452,7 @@ class Scenery:
 
 INTRO, PLAY, OVER, PAUSE = 1, 2, 3, 4
 
-class App(lix.App):
+class App(oreoOS.App):
     name          = "Flappy Oreo"
     SHOW_LOADING  = True   # scenery + dim-bg build can take ~150 ms on hardware
 

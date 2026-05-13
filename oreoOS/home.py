@@ -17,9 +17,9 @@ Nav: LEFT/RIGHT wrap, A to open.
 """
 
 import time
-from lix import api
-from lix_os import theme, timeutil
-import lix
+from oreoOS import api
+from oreoOS import theme, timeutil
+import oreoOS
 
 SW = api.SCREEN_W   # 320
 SH = api.SCREEN_H   # 240
@@ -65,7 +65,7 @@ def _poll_network():
         return False
     _net_cache["checked_ms"] = now
     try:
-        from lix_hw import wifi as _w, bt as _b
+        from oreoWare import wifi as _w, bt as _b
         _net_cache["wifi"] = bool(_w.is_connected())
         _net_cache["bt"]   = bool(_b.is_active())
     except Exception:
@@ -175,7 +175,7 @@ def _load_apps_icon():
     global _apps_cache
     if _apps_cache is not None:
         return _apps_cache if _apps_cache is not False else None
-    from lix_os.icons import load
+    from oreoOS.icons import load
     result = load("apps", "apps_icon.png")
     _apps_cache = result if result else False
     return result
@@ -244,7 +244,7 @@ class _DockEntry:
 
 # ── Home app ─────────────────────────────────────────────────────────────────
 
-class Home(lix.App):
+class Home(oreoOS.App):
     name = "home"
 
     def __init__(self, app_list):
@@ -259,7 +259,7 @@ class Home(lix.App):
         self._wifi_ok      = _net_cache["wifi"]
         self._bt_on        = _net_cache["bt"]
         try:
-            from lix_hw import battery
+            from oreoWare import battery
             self._battery_pct = battery.read_percent()
         except Exception:
             self._battery_pct = 85
@@ -298,7 +298,7 @@ class Home(lix.App):
         if self._last_batt_ms is None or _t.ticks_diff(now, self._last_batt_ms) > 30000:
             self._last_batt_ms = now
             try:
-                from lix_hw import battery
+                from oreoWare import battery
                 new_pct = battery.read_percent()
                 if new_pct != self._battery_pct:
                     self._battery_pct  = new_pct
