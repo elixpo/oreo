@@ -186,13 +186,17 @@ ICON_STYLE = (
 
 # ── Download ──────────────────────────────────────────────────────────────────
 
-def download(name, width=200, height=200):
-    """Top-level icon: prompts/<name>.md → assets/icons/raw/<name>.png."""
-    prompt = _read_prompt("prompts/%s.md" % name) or _FALLBACK_PROMPTS.get(name)
+def download(name, width=200, height=200, seed=42):
+    """Top-level icon: prompts/{name,icons/<name>}.md → assets/icons/raw/<name>.png."""
+    prompt = (_read_prompt("prompts/%s.md" % name)
+              or _read_prompt("prompts/icons/%s.md" % name)
+              or _FALLBACK_PROMPTS.get(name))
     if not prompt:
-        print("  SKIP %s — no prompt at prompts/%s.md" % (name, name))
+        print("  SKIP %s — no prompt at prompts/%s.md or prompts/icons/%s.md"
+              % (name, name, name))
         return
-    download_to(prompt, "assets/icons/raw/%s.png" % name, width, height)
+    download_to(prompt, "assets/icons/raw/%s.png" % name,
+                width, height, seed=seed)
 
 
 def _pop_seed(args):
@@ -235,9 +239,12 @@ def main():
     print("Generating %d asset(s)  [seed=%d]...\n" % (len(active), seed))
     for name, dims in active.items():
         w, h = dims if dims else (200, 200)
-        prompt = _read_prompt("prompts/%s.md" % name) or _FALLBACK_PROMPTS.get(name)
+        prompt = (_read_prompt("prompts/%s.md" % name)
+                  or _read_prompt("prompts/icons/%s.md" % name)
+                  or _FALLBACK_PROMPTS.get(name))
         if not prompt:
-            print("  SKIP %s — no prompt at prompts/%s.md" % (name, name))
+            print("  SKIP %s — no prompt at prompts/%s.md or prompts/icons/%s.md"
+                  % (name, name, name))
             continue
         download_to(prompt, "assets/icons/raw/%s.png" % name, w, h, seed=seed)
         time.sleep(8)

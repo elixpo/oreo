@@ -156,156 +156,6 @@ def show_crash(os_obj, name, err):
         time.sleep_ms(20)
 
 
-# ── app menu (icon grid) — 320×240 landscape ──────────────────────────────────
-
-class _AppMenu:
-    """Grid of app icons with labels underneath.
-
-    Nav:
-      LEFT/RIGHT  → linear traversal across rows (wraps at ends)
-      UP/DOWN     → row navigation (wraps top↔bottom, clamps on partial row)
-      A           → launch
-    """
-
-    COLS    = 4
-    ICON_SZ = 56          # bigger icons
-    LABEL_H = 12          # space for one line of 8x8 text + 4px gap
-    GAP_X   = 16
-    GAP_Y   = 12
-    HEADER  = 26
-    SEL_PAD = 4
-
-    def __init__(self, apps):
-        self.apps   = apps
-        self.sel    = 0
-        self._dirty = True
-        self._os    = None
-        # Preload all icons up-front so first frame draws fast
-        self._icons = {}
-        if apps:
-            from lix_os import icons as _icons
-            for a in apps:
-                key = a["dir"]
-                result = _icons.load(key, a.get("icon"))
-                if result:
-                    self._icons[key] = result
-
-    def on_enter(self, os_obj):
-        self._os    = os_obj
-        self._dirty = True
-
-    def on_exit(self):
-        pass
-
-    def on_button_press(self, btn):
-        n = len(self.apps)
-        if not n: return
-        cols = self.COLS
-
-        if btn == api.BTN_LEFT:
-            self.sel = (self.sel - 1) % n
-        elif btn == api.BTN_RIGHT:
-            self.sel = (self.sel + 1) % n
-        elif btn == api.BTN_UP:
-            new = self.sel - cols
-            if new < 0:
-                # wrap to corresponding column in bottom row
-                col = self.sel % cols
-                rows = (n + cols - 1) // cols
-                new = (rows - 1) * cols + col
-                if new >= n:
-                    new -= cols
-            self.sel = new
-        elif btn == api.BTN_DOWN:
-            new = self.sel + cols
-            if new >= n:
-                # wrap to corresponding column in top row
-                new = self.sel % cols
-            self.sel = new
-        elif btn == api.BTN_A:
-            self._os.launch(self.apps[self.sel]["dir"])
-            return
-        else:
-            return
-        self._dirty = True
-
-    def on_button_release(self, btn):
-        pass
-
-    def update(self, dt):
-        pass
-
-    def draw(self, d):
-        from lix_os import theme
-        if not self._dirty:
-            return
-
-        SW = api.SCREEN_W
-        SH = api.SCREEN_H
-
-        d.clear(theme.BG)
-
-        # ── header ────────────────────────────────────────────────────────
-        d.rect(0, 0, SW, self.HEADER, theme.STATUS_BG, fill=True)
-        title = "APPS"
-        tx = (SW - len(title) * 8 * 2) // 2
-        d.text(title, tx, (self.HEADER - 16) // 2, api.WHITE, scale=2)
-
-        if not self.apps:
-            d.text("no apps found", 40, SH // 2, theme.MUTED, scale=2)
-            self._dirty = False
-            return
-
-        # ── icon grid (centred horizontally, snug under header) ──────────
-        cols   = self.COLS
-        n      = len(self.apps)
-        rows   = (n + cols - 1) // cols
-        cell_w = self.ICON_SZ + self.GAP_X
-        cell_h = self.ICON_SZ + self.LABEL_H + self.GAP_Y
-
-        grid_w = cols * self.ICON_SZ + (cols - 1) * self.GAP_X
-        grid_h = rows * (self.ICON_SZ + self.LABEL_H) + (rows - 1) * self.GAP_Y
-        avail_h = SH - self.HEADER
-        x0     = (SW - grid_w) // 2
-        y0     = self.HEADER + max(6, (avail_h - grid_h) // 2)
-
-        for i, app in enumerate(self.apps):
-            col = i % cols
-            row = i // cols
-            tx  = x0 + col * cell_w
-            ty  = y0 + row * cell_h
-            sel = (i == self.sel)
-
-            if sel:
-                d.rect(tx - self.SEL_PAD, ty - self.SEL_PAD,
-                       self.ICON_SZ + self.SEL_PAD * 2,
-                       self.ICON_SZ + self.SEL_PAD * 2,
-                       theme.SEL_BORDER, fill=False)
-
-            icon = self._icons.get(app["dir"])
-            if icon:
-                idata, iw, ih = icon
-                bx = tx + (self.ICON_SZ - iw) // 2
-                by = ty + (self.ICON_SZ - ih) // 2
-                d.blit(idata, bx, by, iw, ih)
-            else:
-                letter_c = [theme.PRIMARY, theme.TEAL, theme.GOLD,
-                            theme.ORANGE, theme.PURPLE, theme.GREEN]
-                lc = letter_c[i % len(letter_c)]
-                d.text(app["name"][0].upper(),
-                       tx + (self.ICON_SZ - 32) // 2,
-                       ty + (self.ICON_SZ - 32) // 2, lc, scale=4)
-
-            # ── label under icon (small font, dark text) ─────────────────
-            label = app["name"][:8]   # truncate to fit one cell
-            lx = tx + (self.ICON_SZ - len(label) * 8) // 2
-            ly = ty + self.ICON_SZ + 3
-            text_c = theme.PRIMARY if sel else theme.TEXT_BRIGHT
-            d.text(label, lx, ly, text_c)
-
-        self._dirty = False
-
-
 # ── boot entry point ─────────────────────────────────────────────────────────
 
 def boot():
@@ -335,10 +185,11 @@ def boot():
 
         target = os_obj._launch_request
 
+        # Home's APPS dock sends "__appmenu__" — route it to the new
+        # first-class apps/launcher/ instead of the legacy inline _AppMenu
+        # (kept around in this file only for back-compat / fallback).
         if target == "__appmenu__":
-            menu = _AppMenu(apps)
-            run_app(os_obj, menu)
-            target = os_obj._launch_request
+            target = "launcher"
 
         if target and target not in (None, "__appmenu__"):
             try:
