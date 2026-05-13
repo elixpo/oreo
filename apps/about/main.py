@@ -189,8 +189,15 @@ class App(oreoOS.App):
             cy_logical += row_h + 4
 
         # ── scrollbar
-        if cy_logical > panel_h - 12:
-            self._max_scroll = cy_logical - panel_h + 16
+        # cy_logical is in the same coord space as content_top (PAD_TOP px
+        # below the panel top). The scroll range needs to be large enough
+        # that draw_y(last_row) lands at content_bot — otherwise the final
+        # "github.com/elixpo/badgr" credit gets clipped by _visible() at
+        # the bottom edge no matter how far the user scrolls.
+        inner_h    = panel_h - PAD_TOP - PAD_BOT
+        total_need = cy_logical
+        if total_need > inner_h:
+            self._max_scroll = total_need - inner_h + PAD_BOT
             track_h = panel_h - 8
             thumb_h = max(16, track_h * panel_h // cy_logical)
             thumb_y = panel_y + 4 + (track_h - thumb_h) * self._scroll \

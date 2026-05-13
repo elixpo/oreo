@@ -95,8 +95,24 @@ class App(oreoOS.App):
 
         PAD       = 12
         RING      = 3
+        # Pre-compute total block height (avatar row + designation row) so
+        # we can vertically centre the whole stack inside the card instead
+        # of pinning it to the top.
+        desig_row_h = 0
+        if p["designation"]:
+            desig = p["designation"][:32]
+            avail = cw - 16
+            dw    = len(desig) * 16
+            if dw > avail:
+                # rough estimate: 2 wrapped lines at scale=2
+                desig_row_h = 18 + 2 * 22 + 4
+            else:
+                desig_row_h = 18 + 22 + 4
+        block_h = (av_sz + RING * 2) + desig_row_h
+        block_y = cy + max(PAD, (ch - block_h) // 2)
+
         av_x      = cx + PAD                       # left edge of pink ring
-        av_y      = cy + PAD
+        av_y      = block_y
         av_cx     = av_x + av_sz // 2
         av_cy     = av_y + av_sz // 2
 

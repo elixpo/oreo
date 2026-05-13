@@ -26,7 +26,7 @@ _env = _load_env()
 # OS version. tools/deploy.py auto-bumps the PATCH number on every push.
 # The literal MUST stay on its own line as `VERSION = "vN.N.N"` — the
 # deploy regex relies on that exact format to rewrite in place.
-VERSION           = "v1.2.24"
+VERSION           = "v1.2.25"
 
 GITHUB_USER       = "Circuit-Overtime"
 DISPLAY_NAME      = "Ayushman Bhattacharya"
