@@ -41,6 +41,31 @@ class PixelFont:
         self.bpr   = mod.BPR
         self.kern  = mod.KERN
         self._font = mod._FONT
+        # Proportional metrics: per-glyph (left_trim, advance). Scanned once
+        # so text() can lay glyphs out edge-to-edge (with KERN) instead of
+        # at fixed glyph-box width — fixes "P I X E L I F Y" looking spaced.
+        self._metrics = self._compute_metrics()
+
+    def _compute_metrics(self):
+        bpr = self.bpr
+        gw  = self.w
+        gh  = self.h
+        out = {}
+        # Space — keep a sensible width since its bitmap is empty.
+        space_w = max(3, gw // 3)
+        for ch, bits in self._font.items():
+            lo, hi = gw, -1
+            for row in range(gh):
+                row_off = row * bpr
+                for col in range(gw):
+                    if bits[row_off + (col >> 3)] & (0x80 >> (col & 7)):
+                        if col < lo: lo = col
+                        if col > hi: hi = col
+            if hi < 0:
+                out[ch] = (0, space_w)
+            else:
+                out[ch] = (lo, hi - lo + 1)
+        return out
 
     # ── metrics ──────────────────────────────────────────────────────────
     def char_width(self, scale=1):
@@ -52,36 +77,40 @@ class PixelFont:
     def measure(self, text, scale=1):
         if not text:
             return 0
-        return (len(text) * (self.w + self.kern) - self.kern) * scale
+        total = 0
+        for ch in text:
+            _, adv = self._metrics.get(ch, (0, self.w))
+            total += adv + self.kern
+        return (total - self.kern) * scale
 
     # ── render ───────────────────────────────────────────────────────────
     def char(self, d, ch, x, y, color, scale=1):
-        """Draw a single glyph."""
+        """Draw a single glyph at (x, y) using its trimmed left edge."""
         bits = self._font.get(ch)
         if not bits:
-            # fallback: filled rectangle marker
             d.rect(x, y, self.w * scale, self.h * scale, color, fill=False)
             return
+        lo, _adv = self._metrics.get(ch, (0, self.w))
         bpr = self.bpr
         gw  = self.w
         gh  = self.h
         for row in range(gh):
             row_off = row * bpr
-            for col in range(gw):
-                byte = bits[row_off + (col >> 3)]
-                if byte & (0x80 >> (col & 7)):
-                    d.rect(x + col * scale, y + row * scale,
+            for col in range(lo, gw):
+                if bits[row_off + (col >> 3)] & (0x80 >> (col & 7)):
+                    d.rect(x + (col - lo) * scale, y + row * scale,
                            scale, scale, color, fill=True)
 
     def text(self, d, s, x, y, color=None, scale=1):
         """Draw a string at (x, y). Returns x after the last glyph."""
         if color is None:
             color = api.WHITE
-        cx = x
-        step = (self.w + self.kern) * scale
+        cx   = x
+        kern = self.kern * scale
         for ch in s:
+            _, adv = self._metrics.get(ch, (0, self.w))
             self.char(d, ch, cx, y, color, scale)
-            cx += step
+            cx += adv * scale + kern
         return cx
 
     def text_center(self, d, s, cx, y, color=None, scale=1):

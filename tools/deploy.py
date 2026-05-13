@@ -9,6 +9,8 @@ Must be run from the project root.
 """
 
 import sys
+import json
+import hashlib
 import subprocess
 import time
 from pathlib import Path
@@ -18,7 +20,38 @@ for arg in sys.argv[1:]:
     if arg.startswith("/dev/") or "COM" in arg:
         PORT = arg
 
-CLEAN = "--clean" in sys.argv
+CLEAN  = "--clean" in sys.argv
+FORCE  = "--force" in sys.argv     # bypass local hash cache, push everything
+NOSKIP = CLEAN or FORCE
+
+HASH_CACHE_PATH = Path(".deploy_hashes.json")
+
+
+def _hash_file(path):
+    h = hashlib.sha1()
+    with open(path, "rb") as f:
+        while True:
+            chunk = f.read(65536)
+            if not chunk:
+                break
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _load_hash_cache():
+    if NOSKIP or not HASH_CACHE_PATH.exists():
+        return {}
+    try:
+        return json.loads(HASH_CACHE_PATH.read_text())
+    except (OSError, ValueError):
+        return {}
+
+
+def _save_hash_cache(cache):
+    try:
+        HASH_CACHE_PATH.write_text(json.dumps(cache, indent=2, sort_keys=True))
+    except OSError:
+        pass
 
 # ── Files and directories to deploy ──────────────────────────────────────────
 # (local_path, remote_path)  — directories are copied recursively
@@ -323,19 +356,36 @@ def main():
     ) % list(remote_dirs)
     mpremote("exec", mkdir_script)
 
-    # Build cp action list
-    actions = []
-    files   = []
+    # Build cp action list, skipping files whose hash matches the local cache.
+    cache       = _load_hash_cache()
+    new_cache   = dict(cache)
+    actions     = []
+    files       = []
+    skipped_pre = 0
     for local, remote in DEPLOY:
         if not Path(local).exists():
             print("SKIP  %s (not found locally)" % local)
             continue
+        try:
+            h = _hash_file(local)
+        except OSError:
+            h = None
+        if h is not None and cache.get(remote) == h:
+            skipped_pre += 1
+            continue
         files.append((local, remote))
         actions.append(("cp", local, remote))
+        if h is not None:
+            new_cache[remote] = h
 
-    # Write + queue secrets.py
+    # Write + queue secrets.py (always re-push — .env can change without
+    # touching any tracked file)
     secrets_tmp, ssid = write_secrets_local()
     actions.append(("cp", str(secrets_tmp), "secrets.py"))
+
+    if skipped_pre:
+        print("  ↺ %d files unchanged since last deploy — skipping (use --force to override)"
+              % skipped_pre)
 
     try:
         rc = mpremote_batch(actions,
@@ -343,6 +393,9 @@ def main():
                                   % (len(files) + 1))
     finally:
         secrets_tmp.unlink(missing_ok=True)
+
+    if rc == 0:
+        _save_hash_cache(new_cache)
 
     elapsed = _t.time() - t0
     if rc == 0:

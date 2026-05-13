@@ -21,3 +21,4 @@ firmware/*.bin
 .secrets_tmp.py
 *.swp
 *.env
+.deploy_hashes.json

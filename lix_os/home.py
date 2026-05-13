@@ -258,7 +258,12 @@ class Home(lix.App):
         # flash the icons "disconnected" before the next 5-s poll catches up.
         self._wifi_ok      = _net_cache["wifi"]
         self._bt_on        = _net_cache["bt"]
-        self._battery_pct  = 85     # TODO wire to lix_hw.adc.battery_voltage()
+        try:
+            from lix_hw import battery
+            self._battery_pct = battery.read_percent()
+        except Exception:
+            self._battery_pct = 85
+        self._last_batt_ms = None
 
     def on_enter(self, os):
         super().on_enter(os)
@@ -284,6 +289,22 @@ class Home(lix.App):
                 self._wifi_ok      = _net_cache["wifi"]
                 self._bt_on        = _net_cache["bt"]
                 self._status_dirty = True
+
+        # Battery: re-sample every ~30 s. ADC reads are ~1 ms, but the
+        # percentage changes slowly enough that anything more frequent is
+        # noise.
+        import time as _t
+        now = _t.ticks_ms()
+        if self._last_batt_ms is None or _t.ticks_diff(now, self._last_batt_ms) > 30000:
+            self._last_batt_ms = now
+            try:
+                from lix_hw import battery
+                new_pct = battery.read_percent()
+                if new_pct != self._battery_pct:
+                    self._battery_pct  = new_pct
+                    self._status_dirty = True
+            except Exception:
+                pass
 
     def draw(self, d):
         full = self._dirty
