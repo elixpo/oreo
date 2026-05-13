@@ -52,7 +52,7 @@ class App(oreoOS.App):
         sw  = len(sub) * 8
         d.text(sub, (SW - sw) // 2, cy + 70, theme.TEXT_BRIGHT)
 
-        hint = "check back after the next deploy"
+        hint = "keep an eye up @elixpo"
         hw   = len(hint) * 8
         d.text(hint, (SW - hw) // 2, cy + 92, theme.MUTED)
 

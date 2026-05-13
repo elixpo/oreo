@@ -128,29 +128,36 @@ class App(oreoOS.App):
         cy_logical = 0    # logical y inside the padded content region
         draw_y     = lambda y: content_top + y - self._scroll
 
-        # mascot + title block
+        # mascot + "OREO OS" — stacked, both horizontally centred in the panel.
+        # Mascot on top, single-line title beneath. Replaces the old
+        # side-by-side layout where OREO and OS sat on two separate lines.
         if self._mascot:
             data, mw, mh = self._mascot
-            mx = panel_x + 12
+            mx = panel_x + (panel_w - mw) // 2
             my = draw_y(cy_logical)
             if _visible(my, mh):
                 d.blit(data, mx, my, mw, mh)
+            cy_logical += mh + 8
 
-        tcol_x = panel_x + 96
-        ty = draw_y(cy_logical + 4)
-        if _visible(ty, 24):
-            if self._pf_title:
-                self._pf_title.text(d, "OREO", tcol_x, ty, theme.PRIMARY)
-            else:
-                d.text("OREO", tcol_x, ty, theme.PRIMARY, scale=3)
-        ty2 = draw_y(cy_logical + 32)
-        if _visible(ty2, 16):
-            if self._pf_body:
-                self._pf_body.text(d, "OS", tcol_x, ty2, theme.TEAL)
-            else:
-                d.text("OS", tcol_x, ty2, theme.TEAL, scale=2)
+        title = "OREO OS"
+        if self._pf_title:
+            tw = self._pf_title.measure(title)
+            ty = draw_y(cy_logical)
+            if _visible(ty, 24):
+                self._pf_title.text(d, title,
+                                    panel_x + (panel_w - tw) // 2,
+                                    ty, theme.PRIMARY)
+            cy_logical += 28
+        else:
+            tw = len(title) * 24             # scale=3 → 8*3 px per glyph
+            ty = draw_y(cy_logical)
+            if _visible(ty, 24):
+                d.text(title,
+                       panel_x + (panel_w - tw) // 2,
+                       ty, theme.PRIMARY, scale=3)
+            cy_logical += 32
 
-        cy_logical += 84    # mascot block
+        cy_logical += 6     # gap before info rows
 
         # ── info rows
         for label, value in self._info_rows():

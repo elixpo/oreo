@@ -315,15 +315,12 @@ def boot():
     os_obj = OS()
     # Splash must NEVER kill the boot — if the big bg asset OOMs or the
     # mascot module is missing we just want to fall through to the home
-    # screen with a black flash rather than freeze on a dead screen.
+    # screen. Whatever's on the LCD stays visible (initial black frame from
+    # Display.__init__, or partial splash) until Home draws its first frame.
     try:
         show_splash(os_obj)
     except Exception:
-        try:
-            os_obj.display.clear(api.BLACK)
-            os_obj.display.present()
-        except Exception:
-            pass
+        pass
 
     # Start WiFi and BT after splash (non-blocking for BT, background for WiFi)
     try:
