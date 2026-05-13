@@ -35,6 +35,12 @@ CHROMA_KEY = 0x1FF8
 
 class Display(api.Display):
     def __init__(self):
+        # PWM the backlight at ~1 kHz so brightness changes are flicker-free.
+        try:
+            from machine import PWM
+            self._bl_pwm = PWM(Pin(pins.DISPLAY_BL, Pin.OUT), freq=1000, duty_u16=65535)
+        except Exception:
+            self._bl_pwm = None
         spi = SPI(
             1,
             baudrate=pins.DISPLAY_BAUD,
