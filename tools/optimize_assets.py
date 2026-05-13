@@ -203,22 +203,40 @@ def optimize_app(app_name, fill_override=None):
 
     print("Optimizing %d asset(s) for app '%s'  [opaque-fill=rgb%s, chroma-key=rgb%s]...\n"
           % (len(sources), app_name, opaque_fill, CHROMA_KEY))
+    # Gallery is the one app where we want to preserve the source aspect
+    # ratio rather than squash into a fixed-size sprite. We fit each photo
+    # into the play area (320×196) and let the renderer letterbox it.
+    GALLERY_MAX_W, GALLERY_MAX_H = 320, 196
+
     for src in sources:
-        size = PER_APP_SIZES.get(src.stem)
-        if size is None:
-            size = (BG_W, BG_H) if src.stem.endswith("_bg") else (ICON_SIZE, ICON_SIZE)
+        img_raw = Image.open(src)
 
-        w, h = size
-        is_opaque = src.stem in opaque_set
-        fill      = opaque_fill if is_opaque else CHROMA_KEY
+        if app_name == "gallery":
+            sw, sh = img_raw.size
+            scale  = min(GALLERY_MAX_W / sw, GALLERY_MAX_H / sh, 1.0)
+            w      = max(1, int(round(sw * scale)))
+            h      = max(1, int(round(sh * scale)))
+            # Force even dimensions so the row stride packs cleanly.
+            w -= w & 1
+            h -= h & 1
+            hw_img = img_raw.convert("RGBA").resize((w, h), Image.LANCZOS)
+            # Photos are always opaque — no chroma-key.
+            hw_rgb = hw_img.convert("RGB")
+        else:
+            size = PER_APP_SIZES.get(src.stem)
+            if size is None:
+                size = (BG_W, BG_H) if src.stem.endswith("_bg") else (ICON_SIZE, ICON_SIZE)
+            w, h      = size
+            is_opaque = src.stem in opaque_set
+            fill      = opaque_fill if is_opaque else CHROMA_KEY
+            hw_img    = img_raw.convert("RGBA").resize((w, h), Image.LANCZOS)
+            hw_rgb    = _fill_transparent(hw_img, fill)
 
-        img_raw  = Image.open(src)
-        hw_img   = img_raw.convert("RGBA").resize((w, h), Image.LANCZOS)
-        hw_rgb   = _fill_transparent(hw_img, fill)
-        hw_data  = _to_rgb565_bytes(hw_rgb)
-        out      = out_dir / ("%s.py" % src.stem)
+        hw_data = _to_rgb565_bytes(hw_rgb)
+        out     = out_dir / ("%s.py" % src.stem)
         _write_py_module(out, hw_data, w, h)
-        kind = "opaque" if is_opaque else "key"
+        kind = "photo" if app_name == "gallery" else (
+               "opaque" if src.stem in opaque_set else "key")
         print("  %-25s  →  %dx%d  %5dB  [%s]" %
               (src.stem, w, h, out.stat().st_size, kind))
 
