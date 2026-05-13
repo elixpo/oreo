@@ -1,21 +1,28 @@
 from pathlib import Path
 
+
 def _load_env():
     env = {}
-    for f in (".env", ".env.local"):
-        p = Path(f)
-        if p.exists():
-            for line in p.read_text().splitlines():
-                line = line.strip()
-                if line and not line.startswith("#") and "=" in line:
-                    k, _, v = line.partition("=")
-                    env[k.strip()] = v.strip()
+    for fname in (".env", ".env.local"):
+        p = Path(fname)
+        if not p.exists():
+            continue
+        for line in p.read_text().splitlines():
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, _, v = line.partition("=")
+                env[k.strip()] = v.strip()
     return env
 
-_e = _load_env()
+_env = _load_env()
 
-WIFI_SSID         = _e.get("WIFI_SSID", "")
-WIFI_PASSWORD     = _e.get("WIFI_PASSWORD", "")
-WIFI_AUTO_CONNECT = bool(WIFI_SSID)
-
+GITHUB_USER       = "Circuit-Overtime"
+WEATHER_LAT       = 22.57
+WEATHER_LON       = 88.36
+WEATHER_NAME      = ""
 BT_AUTO_ENABLE    = False
+WIFI_SSID         = _env.get("WIFI_SSID", "")
+WIFI_PASSWORD     = _env.get("WIFI_PASSWORD", "")
+OWM_API_KEY       = _env.get("OWM_API_KEY", "")
+
+WIFI_AUTO_CONNECT = bool(WIFI_SSID)
