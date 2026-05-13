@@ -1,5 +1,10 @@
 # Boot splash background — `splash_bg`
 
+## Prompt
+
+festive pixel-art conference confetti scene, soft pink and gold balloons in upper-left corner, teal and gold confetti dots scattered in lower-right corner, warm cream sky gradient from coral pink at top to butter cream in middle to honey gold at bottom, flat colour blocks with light pixel-art shading no photoreal gradients, palette of #FF5D68 pink #FFBE1E gold #00B4A5 teal #FFF8EB cream, centre area of the image left empty as a calm cream wash so a logo can sit on top, no text no letters no numbers no faces no UI, 320x240 landscape orientation, kawaii celebration vibe
+
+
 **Size:** 320×240 (full-screen, landscape)
 **Optimiser bucket:** `splash_bg`
 
