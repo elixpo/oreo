@@ -12,7 +12,6 @@ import sys
 import json
 import hashlib
 import subprocess
-import time
 from pathlib import Path
 
 PORT = "/dev/ttyACM0"
@@ -382,19 +381,31 @@ def main():
     secrets_tmp, ssid = write_secrets_local()
     actions.append(("cp", str(secrets_tmp), "secrets.py"))
 
-    if skipped_pre:
-        print("  ↺ %d files unchanged since last deploy — skipping (use --force to override)"
-              % skipped_pre)
+    cache_state = "miss" if not cache else "hit (%d entries)" % len(cache)
+    print("  hash cache: %s   |   to push: %d   skipped: %d"
+          % (cache_state, len(files) + 1, skipped_pre))
+    if skipped_pre and len(cache) == 0:
+        print("  (cache was empty — first run after a hash-cache reset will push everything)")
+    print()
 
+    push_t0 = _t.time()
     try:
         rc = mpremote_batch(actions,
                             label="Pushing %d files in a single session..."
                                   % (len(files) + 1))
     finally:
         secrets_tmp.unlink(missing_ok=True)
+    push_elapsed = _t.time() - push_t0
+    print("  mpremote batch took %.1fs" % push_elapsed)
 
-    if rc == 0:
-        _save_hash_cache(new_cache)
+    # Save the cache regardless of rc. mpremote's exit code reflects the LAST
+    # command in the `+`-chained session — a stray "File exists" mkdir or a
+    # transient warning was previously dropping us into the `rc != 0` branch
+    # and the cache never persisted, which is why "2 changed files" ended up
+    # pushing everything on the next run. We always persist the hashes for
+    # files we queued; if a single transfer actually corrupted, --force on
+    # the next deploy will re-push everything.
+    _save_hash_cache(new_cache)
 
     elapsed = _t.time() - t0
     if rc == 0:
@@ -403,7 +414,7 @@ def main():
         mpremote("reset")
         print("Oreo OS is booting.")
     else:
-        print("\nBatch exited with code %d after %.1fs." % (rc, elapsed))
+        print("\nBatch exited with code %d after %.1fs (cache still saved)." % (rc, elapsed))
 
 
 if __name__ == "__main__":
