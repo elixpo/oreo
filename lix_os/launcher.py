@@ -313,12 +313,9 @@ def boot():
     from lix_os.splash import show_splash
     from lix_os.home   import Home
 
-   
-    try:
-        gc.threshold(8_000)        # auto-GC after every 8 KB of growth
-    except AttributeError:
-        # CPython simulator has no gc.threshold — ignore.
-        pass
+    # gc.threshold() was set aggressively for LDO smoothing but caused
+    # frequent GC pauses that murdered fps. Leave it at the MicroPython
+    # default — manual gc.collect() runs at app exit in run_app's finally.
 
     os_obj = OS()
     show_splash(os_obj)
