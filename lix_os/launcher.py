@@ -13,10 +13,11 @@ import time
 from lix import api
 
 VERSION      = "v0.1"
-# 30 fps cap: halves the SPI bandwidth per second versus 60 fps, giving the
-# ST7789 panel time to complete its scan-out between writes — the main
-# permanent fix for visible flicker without a wired TE pin.
-FRAME_MIN_MS = 33
+# 25 fps cap (40 ms): at 26 MHz SPI a full framebuf takes ~47 ms to push,
+# so we can't realistically hit 30 fps. 25 fps still feels smooth for
+# games and removes most visible tearing by keeping us inside the panel's
+# slowed (39 Hz) scan-out window.
+FRAME_MIN_MS = 40
 
 _APPS_CANDIDATES = ("/apps", "/remote/apps", "apps")
 
@@ -65,11 +66,46 @@ def load_app(app_dir):
     return mod.App()
 
 
+# ── loading transition (used for slow apps) ──────────────────────────────────
+# A flag-on-the-App-class opts in:    class App(lix.App): SHOW_LOADING = True
+# Cost: ~210 ms slide-in animation BEFORE app.on_enter — the heavy load then
+# runs while the loading panel is the only thing on screen.
+
+def _show_loading(display, label):
+    """Slide a primary-coloured panel down from the top, covering the screen."""
+    from lix_os import theme
+    from lix import font
+    SW = api.SCREEN_W
+    SH = api.SCREEN_H
+    steps = 7
+    for i in range(steps + 1):
+        progress = i / steps
+        panel_h  = int(progress * SH)
+        # Pink panel from y=0 to y=panel_h
+        display.rect(0, 0, SW, panel_h, theme.PRIMARY, fill=True)
+        # Below the panel: solid cream (leftover from previous screen is fine
+        # since it'll be overwritten — but cream looks tidier on partial slide).
+        if panel_h < SH:
+            display.rect(0, panel_h, SW, SH - panel_h, theme.BG, fill=True)
+        if panel_h > 50:
+            cy = panel_h // 2
+            font.text_center(display, "LOADING", SW // 2, cy - 14, api.WHITE, scale=2)
+            font.text_center(display, label.upper(), SW // 2, cy + 4,  api.WHITE)
+        display.present()
+        time.sleep_ms(30)
+
+
 # ── generic app run loop ──────────────────────────────────────────────────────
 
 def run_app(os_obj, app):
     os_obj._quit_requested = False
     os_obj._launch_request = None
+
+    # Optional loading transition for heavy apps. The panel covers the screen
+    # while on_enter does its work; the very next frame fully overwrites it.
+    if getattr(app, "SHOW_LOADING", False):
+        label = getattr(app, "name", app.__class__.__name__)
+        _show_loading(os_obj.display, label)
 
     app.on_enter(os_obj)
     last = time.ticks_ms()

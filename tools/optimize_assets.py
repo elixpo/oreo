@@ -47,8 +47,11 @@ PER_APP_FILL = {
 
 # Per-app: stems that should be treated as OPAQUE (no chroma key, full coverage).
 # Everything else uses CHROMA_KEY as the transparent fill.
+# Note: grass is NOT opaque — its source PNG contains sky at the top, which
+# gets stripped in transparent/grass.png. The chroma key lets the bg show
+# through that sky region when the tile is overlaid on the bottom of the screen.
 PER_APP_OPAQUE = {
-    "flappy":   {"background", "grass"},
+    "flappy":   {"background"},
 }
 
 # Per-app asset target sizes (W, H) by file stem.
@@ -63,7 +66,8 @@ PER_APP_SIZES = {
     "obstacle":     (32, 96),   # tall pipe segment, 1-2 blits cover a column
     "background":   (80, 60),   # ×4 scale at app init → 320×240 FULL screen
     "cloud":        (40, 20),
-    "grass":        (80, 16),
+    "grass":        (40, 40),   # SMALL tile, repeated 8× horizontally at runtime
+                                # (no stretching — preserves grass-blade aspect ratio)
 }
 
 

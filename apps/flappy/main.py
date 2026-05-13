@@ -38,8 +38,8 @@ PANDA_X     = 44
 
 # The background fills the FULL screen. The "ground" is just the 16-px grass
 # strip at the bottom — no separate dirt rectangle.
-GROUND_H    = 16
-PLAY_H      = SH - GROUND_H   # 224
+GROUND_H    = 40              # bottom grass strip (one 40-px-tall tile)
+PLAY_H      = SH - GROUND_H   # 200
 
 # ── colours ──────────────────────────────────────────────────────────────────
 
@@ -98,6 +98,38 @@ def _load(name):
         result = None
     _assets[name] = result
     return result
+
+
+def _flip_v_bytearray(data, w, h):
+    """Vertically-flip an RGB565 big-endian bytearray; returns a new buffer."""
+    row_bytes = w * 2
+    out = bytearray(len(data))
+    for y in range(h):
+        src = (h - 1 - y) * row_bytes
+        dst = y * row_bytes
+        out[dst: dst + row_bytes] = data[src: src + row_bytes]
+    return out
+
+
+def _tile_horizontal(tile, tw, th, repeats):
+    """Repeat a w×h tile `repeats` times horizontally → (w*repeats, h) bytearray.
+
+    Unlike `_upscale_to_bytearray`, this preserves the tile's original pixel
+    aspect ratio — useful for repeating asset like grass where pixel-doubling
+    would visibly stretch each grass blade.
+    """
+    sw      = tw * repeats
+    out     = bytearray(sw * th * 2)
+    row_in  = tw * 2
+    row_out = sw * 2
+    for y in range(th):
+        src_off = y * row_in
+        dst_off = y * row_out
+        src_row = tile[src_off: src_off + row_in]
+        for i in range(repeats):
+            base = dst_off + i * row_in
+            out[base: base + row_in] = src_row
+    return out, sw, th
 
 
 def _upscale_to_bytearray(data, w, h, scale_x, scale_y):
@@ -223,26 +255,26 @@ class Obstacle:
         )
 
     def draw(self, d):
-        obs = _load("obstacle")
+        obs       = _load("obstacle")
+        obs_flip  = _assets.get("__obstacle_flipped__")
         x = int(self.x)
         if obs:
-            data, ow, oh = obs   # 24 × OBSTACLE_H
-            # Top column: anchor the bottom tile flush with the gap, extend upward.
+            data, ow, oh = obs
+            flip = obs_flip[0] if obs_flip else data   # fallback if flip not built
+            # ── top column ──────────────────────────────────────────────
+            # Spike cap should point DOWN toward the gap → use the flipped sprite.
             top_h = self.gap_y
             if top_h > 0:
-                y = self.gap_y - oh                 # bottom of the top column
-                # Anchored tile sits flush at the gap edge.
-                d.blit(data, x, y, ow, oh)
-                # Extend upward with extra tiles if the column is taller than one tile.
+                y = self.gap_y - oh                  # bottom tile flush with gap
+                d.blit(flip, x, y, ow, oh)
                 y -= oh
                 while y > -oh:
-                    d.blit(data, x, y, ow, oh)
+                    d.blit(flip, x, y, ow, oh)
                     y -= oh
-
-            # Bottom column: anchor top tile flush with the gap edge.
+            # ── bottom column ───────────────────────────────────────────
+            # Spike cap naturally points UP toward the gap → original orientation.
             bot_y0 = self.gap_y + GAP_H
-            bot_h  = SH - GROUND_H - bot_y0
-            if bot_h > 0:
+            if bot_y0 < SH - GROUND_H:
                 y = bot_y0
                 while y < SH - GROUND_H:
                     d.blit(data, x, y, ow, oh)
@@ -256,30 +288,22 @@ class Obstacle:
 
 class Panda:
     def __init__(self):
-        # start high so there's time to react
-        self.y          = float((SH - GROUND_H) // 3)
-        self.vy         = 0.0
-        self.score      = 0
-        self.died_at_s  = None     # seconds since die()
-        self.alive_t    = 0.0      # accumulated alive seconds (anim phase)
-        self.has_jumped = False    # gravity engages on first jump (hover before)
+        self.y         = float((SH - GROUND_H) // 3)
+        self.vy        = 0.0
+        self.score     = 0
+        self.died_at_s = None     # seconds since die()
+        self.alive_t   = 0.0      # accumulated alive seconds (anim phase)
 
     def jump(self):
         if not self.is_dead():
-            self.has_jumped = True
             self.vy = FLAP_VY
 
     def update(self, dt, obstacles):
-        """dt is seconds."""
+        """dt is seconds. Gravity is always on once the panda exists."""
         if self.is_dead():
             self.died_at_s += dt
             return
         self.alive_t += dt
-        if not self.has_jumped:
-            # gentle bob while waiting for first input
-            import math
-            self.y = (SH - GROUND_H) / 3 + math.sin(self.alive_t * 4) * 4
-            return
         self.vy = min(self.vy + GRAVITY * dt, VY_CAP)
         self.y += self.vy * dt
         # Ceiling
@@ -303,8 +327,9 @@ class Panda:
                 self.score += 1
 
     def bounds(self):
-        # Slightly tighter than PANDA_SZ to make collisions feel fair
-        pad = 4
+        # Generous padding so the player only dies on visually-clear hits.
+        # 8 px on each side = 16×16 hitbox inside a 32×32 sprite.
+        pad = 8
         return (PANDA_X + pad, int(self.y) + pad,
                 PANDA_SZ - pad * 2, PANDA_SZ - pad * 2)
 
@@ -380,8 +405,17 @@ class Scenery:
         gr = _load("grass")
         if gr:
             data, gw, gh = gr
-            sx = max(1, SW // gw)
-            self._gr_data = _upscale_to_bytearray(data, gw, gh, sx, 1)
+            repeats = max(1, (SW + gw - 1) // gw)         # ceil(320/40) = 8
+            self._gr_data = _tile_horizontal(data, gw, gh, repeats)
+
+        # Pre-build a vertically-flipped obstacle sprite so the spike on
+        # the TOP column points DOWN toward the gap (mirror of the bottom).
+        obs = _load("obstacle")
+        if obs:
+            data, ow, oh = obs
+            _assets["__obstacle_flipped__"] = (
+                _flip_v_bytearray(data, ow, oh), ow, oh
+            )
 
     def update(self, dt):
         self.offset += SCROLL * dt * 0.5
@@ -416,9 +450,11 @@ class Scenery:
 
 # ── App ──────────────────────────────────────────────────────────────────────
 
-INTRO, PLAY, OVER = 1, 2, 3
+INTRO, PLAY, OVER, PAUSE = 1, 2, 3, 4
 
 class App(lix.App):
+    name          = "Flappy"
+    SHOW_LOADING  = True   # scenery + dim-bg build can take ~150 ms on hardware
 
     def on_enter(self, os):
         self._os         = os
@@ -433,15 +469,30 @@ class App(lix.App):
         self._blink_t    = 0.0
 
     def on_button_press(self, btn):
+        # ── B = pause toggle while playing ───────────────────────────────────
+        if btn == api.BTN_B:
+            if self._state == PLAY:
+                self._state = PAUSE
+            elif self._state == PAUSE:
+                self._state = PLAY
+            return
+
         if btn != api.BTN_A and btn != api.BTN_UP:
             return
+
         if self._state == INTRO:
+            # First A press starts the game AND counts as the first jump,
+            # so gravity engages immediately on the very same tap.
             self._start_play()
+            self._panda.jump()
         elif self._state == PLAY:
             if self._panda and not self._panda.is_dead():
                 self._panda.jump()
         elif self._state == OVER:
             self._state = INTRO
+        elif self._state == PAUSE:
+            # A while paused also resumes (in addition to B).
+            self._state = PLAY
 
     def _start_play(self):
         self._state       = PLAY
@@ -453,8 +504,11 @@ class App(lix.App):
     def update(self, dt):
         # cap any pathological dt so a hiccup doesn't teleport the panda
         if dt > 0.1: dt = 0.1
-        self._scenery.update(dt)
         self._blink_t += dt
+        # Scenery scroll + physics are frozen while paused.
+        if self._state == PAUSE:
+            return
+        self._scenery.update(dt)
 
         if self._state == PLAY:
             self._panda.update(dt, self._obstacles)
@@ -477,20 +531,18 @@ class App(lix.App):
                 self._state = OVER
 
     def draw(self, d):
-        # On menu screens we dim the bg so the title/score/hint text reads brightly.
-        dim = self._state in (INTRO, OVER)
+        # Dim the bg on menu screens (INTRO/OVER/PAUSE) for text readability.
+        dim = self._state in (INTRO, OVER, PAUSE)
         self._scenery.draw_background(d, dim=dim)
         self._scenery.draw_clouds(d)
 
-        # While playing we still show obstacles + panda animating in the foreground;
-        # on the game-over screen we keep them visible so the player sees what hit them.
-        if self._state in (PLAY, OVER):
+        if self._state in (PLAY, OVER, PAUSE):
             for o in self._obstacles:
                 o.draw(d)
 
         self._scenery.draw_ground(d)
 
-        if self._panda and self._state in (PLAY, OVER):
+        if self._panda and self._state in (PLAY, OVER, PAUSE):
             self._panda.draw(d)
 
         # ── HUD / overlays ───────────────────────────────────────────────────
@@ -501,6 +553,9 @@ class App(lix.App):
         elif self._state == OVER:
             self._draw_hud(d)
             self._draw_gameover(d)
+        elif self._state == PAUSE:
+            self._draw_hud(d)
+            self._draw_paused(d)
 
     def _shadow_text(self, d, s, x, y, scale=1):
         font.text(d, s, x + 1, y + 1, C_SHADOW, scale=scale)
@@ -537,6 +592,11 @@ class App(lix.App):
             self._center_text(d, "Best %d" % self._hiscore, 120, scale=2, color=C_HI)
         if int(self._blink_t * 2) % 2 == 0:
             self._center_text(d, "Press A to retry", 165, scale=2)
+
+    def _draw_paused(self, d):
+        self._center_text(d, "PAUSED", 70, scale=3, color=C_TITLE)
+        if int(self._blink_t * 2) % 2 == 0:
+            self._center_text(d, "Press B to resume", 130, scale=2)
 
     def on_exit(self):
         pass

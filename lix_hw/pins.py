@@ -13,11 +13,13 @@ DISPLAY_DC    = 15
 DISPLAY_MOSI  = 11     # display silkscreen: SDA
 DISPLAY_SCK   = 12     # display silkscreen: SCL
 DISPLAY_BL    = 17     # display silkscreen: EN. Active-high, PWM-capable for brightness
-DISPLAY_BAUD  = 40_000_000  # 40MHz SPI. Each full framebuf transfer is
-                            # 320×240×2 = 153,600 bytes → ~30.7 ms on the wire.
-                            # At 30 fps that's ~92 % SPI utilisation — close to
-                            # the ceiling but feasible. Drop to 32 MHz if any
-                            # sparkle / corruption returns on the breadboard.
+DISPLAY_BAUD  = 26_000_000  # 26MHz SPI. Each full framebuf transfer is
+                            # 320×240×2 = 153,600 bytes → ~47 ms on the wire.
+                            # Slower than 40 MHz but more robust against
+                            # breadboard signal integrity issues (the
+                            # "vertical stripe" sparkle on the panel's edge
+                            # disappears below ~30 MHz). At 25 fps frame cap
+                            # we have ~93 % SPI utilisation — fine for now.
 
 # ----- Buttons (active-low, internal pull-up) -----
 BTN_HOME   = 9

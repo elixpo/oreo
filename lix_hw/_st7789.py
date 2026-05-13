@@ -33,10 +33,10 @@ _VDVS    = 0xC4
 _MADCTL_LANDSCAPE = 0x60
 
 # Frame-rate control (FRCTRL2) values per ST7789 datasheet:
-#   0x0F = 60Hz (default), 0x1F = 39Hz, 0x18 = 50Hz, 0x14 = 55Hz
-# Slowing the panel to ~50Hz gives more margin for SPI writes to complete
-# inside the vertical-blanking interval, reducing tearing/flicker.
-_FRAME_RATE = 0x18   # ~50 Hz
+#   0x0F = 60Hz (default), 0x14 = 55Hz, 0x18 = 50Hz, 0x1F = 39Hz
+# Slower panel scan → bigger vblank window → more time for a 47ms SPI
+# write to fit between scans, drastically reducing visible tearing.
+_FRAME_RATE = 0x1F   # ~39 Hz
 
 
 class ST7789:
