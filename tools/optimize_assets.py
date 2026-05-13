@@ -296,9 +296,50 @@ def optimize_status_svgs():
 
 # ── entry point ───────────────────────────────────────────────────────────────
 
+def optimize_sprites(targets=None):
+    """Optimize top-level sprites: assets/sprites/raw/* → assets/sprites/optimized/*.py.
+
+    Uses PER_APP_SIZES for known stems (e.g. splash_bg → 320×240, mascot → 72×72).
+    Sprites are treated as opaque — no chroma-key, no transparency stripping.
+    """
+    raw_dir = Path("assets/sprites/raw")
+    out_dir = Path("assets/sprites/optimized")
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    sources = sorted(
+        s for s in raw_dir.iterdir()
+        if s.is_file() and s.suffix.lower() in (".png", ".jpg", ".jpeg")
+    )
+    if targets:
+        sources = [s for s in sources if s.stem in targets]
+    if not sources:
+        print("No matching sprites in", raw_dir)
+        return
+
+    print("Optimizing %d sprite(s)...\n" % len(sources))
+    for src in sources:
+        size = PER_APP_SIZES.get(src.stem)
+        if size is None:
+            print("  SKIP %s (no entry in PER_APP_SIZES — add one to set its size)"
+                  % src.name)
+            continue
+        w, h    = size
+        img     = Image.open(src).convert("RGB").resize((w, h), Image.LANCZOS)
+        data    = _to_rgb565_bytes(img)
+        out     = out_dir / ("%s.py" % src.stem)
+        _write_py_module(out, data, w, h)
+        print("  %-25s  →  %dx%d  %5dB" % (src.stem, w, h, out.stat().st_size))
+
+
 def main():
     if "--status" in sys.argv:
         optimize_status_svgs()
+        return
+
+    if "--sprites" in sys.argv:
+        targets = [a for a in sys.argv[1:]
+                   if not a.startswith("--") and a != "--sprites"]
+        optimize_sprites(targets or None)
         return
 
     if "--app" in sys.argv:
