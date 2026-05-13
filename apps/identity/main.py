@@ -37,6 +37,28 @@ def _filled_circle(d, cx, cy, r, color):
         d.rect(cx - dx, cy + dy, dx * 2 + 1, 1, color, fill=True)
 
 
+def _wrap(text, max_chars):
+    """Greedy word-wrap so long display names ('Ayushman Bhattacharya') break
+    cleanly onto multiple centred lines instead of trailing off the screen."""
+    if not text:
+        return [""]
+    out, cur = [], ""
+    for w in text.split():
+        cand = (cur + " " + w).strip()
+        if len(cand) <= max_chars:
+            cur = cand
+        else:
+            if cur:
+                out.append(cur)
+            while len(w) > max_chars:
+                out.append(w[:max_chars])
+                w = w[max_chars:]
+            cur = w
+    if cur:
+        out.append(cur)
+    return out
+
+
 def _try_avatar():
     try:
         m = __import__("apps.identity.assets.optimized.avatar", None, None,
@@ -93,10 +115,10 @@ class App(oreoOS.App):
         d.rect(cx,     cy,     cw, 3,  theme.PRIMARY, fill=True)
 
         # ── circular avatar at top-centre, framed in pink ───────────────
-        av_sz = self._avatar[1] if self._avatar else 64
+        av_sz = self._avatar[1] if self._avatar else 96
         av_cx = SW // 2
-        av_cy = cy + 16 + av_sz // 2
-        _filled_circle(d, av_cx, av_cy, av_sz // 2 + 3, theme.PRIMARY)
+        av_cy = cy + 14 + av_sz // 2
+        _filled_circle(d, av_cx, av_cy, av_sz // 2 + 4, theme.PRIMARY)
         if self._avatar:
             data, aw, ah = self._avatar
             d.blit(data, av_cx - aw // 2, av_cy - ah // 2, aw, ah)
@@ -105,23 +127,26 @@ class App(oreoOS.App):
             letter = (p["login"] or "?")[:1].upper()
             d.text(letter, av_cx - 16, av_cy - 16, theme.PRIMARY, scale=4)
 
-        # ── display name, big pink, with a gold accent underline ────────
-        name   = p["name"][:24]
-        nw     = len(name) * 16
-        name_y = av_cy + av_sz // 2 + 14
-        d.text(name, (SW - nw) // 2, name_y, theme.PRIMARY, scale=2)
-        d.rect((SW - nw) // 2, name_y + 20, nw, 2, theme.GOLD, fill=True)
+        # ── display name — word-wrap to fit, centred per line, pink scale=2.
+        #   max_chars derived from card width (scale=2 → 16 px per glyph).
+        max_chars = max(6, (cw - 16) // 16)
+        name_lines = _wrap(p["name"], max_chars)[:2]   # cap at 2 lines
+        name_top   = av_cy + av_sz // 2 + 14
+        for i, line in enumerate(name_lines):
+            lw = len(line) * 16
+            d.text(line, (SW - lw) // 2, name_top + i * 22,
+                   theme.PRIMARY, scale=2)
 
-        # ── @login in teal ─────────────────────────────────────────────
-        login = "@" + p["login"][:24]
-        lw    = len(login) * 8
-        d.text(login, (SW - lw) // 2, name_y + 28, theme.TEAL)
+        # Gold underline beneath the LAST name line (visual anchor).
+        last_lw = len(name_lines[-1]) * 16 if name_lines else 0
+        d.rect((SW - last_lw) // 2, name_top + (len(name_lines) - 1) * 22 + 20,
+               last_lw, 2, theme.GOLD, fill=True)
 
         # ── designation, gold, bigger so it reads from a distance ──────
         desig = p["designation"][:28]
         if desig:
             dw = len(desig) * 16
-            dy = name_y + 50
+            dy = name_top + len(name_lines) * 22 + 10
             # if it'd run off the card, fall back to scale=1
             if dw > cw - 16:
                 dw = len(desig) * 8

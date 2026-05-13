@@ -142,14 +142,31 @@ for app_dir in sorted(APPS_DIR.iterdir()):
             ("%s/main.py" % rel,          "%s/main.py" % rel),
             ("%s/manifest.json" % rel,    "%s/manifest.json" % rel),
         ]
-        # Per-app assets (only optimized .py modules, not raw images)
+        # Per-app assets (only optimized .py modules, not raw images).
+        # Gallery is special: filter the optimized list to ONLY the stems
+        # that still have a corresponding raw image — old photos that the
+        # user deleted from raw/ should also vanish from the device.
         opt = app_dir / "assets" / "optimized"
         if opt.exists():
             r_base = "%s/assets/optimized" % rel
             DEPLOY.append(("%s/assets/__init__.py" % rel, "%s/assets/__init__.py" % rel))
             DEPLOY.append(("%s/__init__.py" % opt, "%s/__init__.py" % r_base))
+
+            raw_dir   = app_dir / "assets" / "raw"
+            raw_stems = None
+            if app_dir.name == "gallery" and raw_dir.exists():
+                raw_stems = {
+                    p.stem for p in raw_dir.iterdir()
+                    if p.suffix.lower() in (".png", ".jpg", ".jpeg")
+                }
+
             for py in sorted(opt.glob("*.py")):
                 if py.name == "__init__.py":
+                    continue
+                if raw_stems is not None and py.stem not in raw_stems:
+                    # The matching raw image was removed — don't push the
+                    # stale optimized module. The device-side cleanup below
+                    # will remove it from flash on the next deploy.
                     continue
                 DEPLOY.append((str(py), "%s/%s" % (r_base, py.name)))
 
@@ -424,6 +441,30 @@ def main():
     # touching any tracked file)
     secrets_tmp, ssid = write_secrets_local()
     actions.append(("cp", str(secrets_tmp), "secrets.py"))
+
+    # Gallery sync: remove device-side .py files whose raw counterpart has
+    # been deleted locally. Frees flash from past uploads and keeps the
+    # carousel showing only the photos the user actually has in raw/.
+    gallery_raw = Path("apps/gallery/assets/raw")
+    if gallery_raw.exists():
+        keep = sorted({
+            p.stem for p in gallery_raw.iterdir()
+            if p.suffix.lower() in (".png", ".jpg", ".jpeg")
+        })
+        cleanup = (
+            "import os\n"
+            "keep = set(%r)\n"
+            "keep.add('__init__')\n"
+            "d = 'apps/gallery/assets/optimized'\n"
+            "try:\n"
+            "    for f in os.listdir(d):\n"
+            "        if f.endswith('.py') and f[:-3] not in keep:\n"
+            "            try: os.remove(d + '/' + f)\n"
+            "            except OSError: pass\n"
+            "except OSError: pass\n"
+        ) % keep
+        print("  pruning stale gallery photos on device (keep=%d)" % len(keep))
+        mpremote("exec", cleanup)
 
     cache_state = "miss" if not cache else "hit (%d entries)" % len(cache)
     print("  hash cache: %s   |   to push: %d   skipped: %d"

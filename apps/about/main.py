@@ -114,39 +114,50 @@ class App(oreoOS.App):
         d.rect(panel_x, panel_y, panel_w, panel_h, theme.CARD, fill=True)
         d.rect(panel_x, panel_y, panel_w, 2, theme.PRIMARY, fill=True)
 
+        # Inner content region with breathing-room margins so scrolling text
+        # never bleeds into the pink accent at the top or hint bar below.
+        PAD_TOP = 14
+        PAD_BOT = 12
+        content_top = panel_y + PAD_TOP
+        content_bot = panel_y + panel_h - PAD_BOT
+
+        # Clip-helper: only draw the row when its full height fits inside the
+        # padded content region (no half-glyphs grazing the edges).
+        def _visible(yy, h):
+            return yy >= content_top and yy + h <= content_bot
+
         # ── content layout (drawn into "virtual" Y, then translated by scroll)
-        cy_logical = 0    # logical y inside the panel; 0 = top of panel
-        draw_y     = lambda y: panel_y + 6 + y - self._scroll
+        cy_logical = 0    # logical y inside the padded content region
+        draw_y     = lambda y: content_top + y - self._scroll
 
         # mascot + title block
         if self._mascot:
             data, mw, mh = self._mascot
             mx = panel_x + 12
             my = draw_y(cy_logical)
-            if panel_y <= my <= panel_y + panel_h - mh:
-                d.blit(data, mx, my, mw, mh)
-            elif my + mh > panel_y and my < panel_y + panel_h:
-                # partial — let display clip handle it
+            if _visible(my, mh):
                 d.blit(data, mx, my, mw, mh)
 
         tcol_x = panel_x + 96
         ty = draw_y(cy_logical + 4)
-        if self._pf_title and panel_y <= ty <= panel_y + panel_h - 24:
-            self._pf_title.text(d, "OREO", tcol_x, ty, theme.PRIMARY)
-        elif panel_y <= ty <= panel_y + panel_h - 24:
-            d.text("OREO", tcol_x, ty, theme.PRIMARY, scale=3)
+        if _visible(ty, 24):
+            if self._pf_title:
+                self._pf_title.text(d, "OREO", tcol_x, ty, theme.PRIMARY)
+            else:
+                d.text("OREO", tcol_x, ty, theme.PRIMARY, scale=3)
         ty2 = draw_y(cy_logical + 32)
-        if self._pf_body and panel_y <= ty2 <= panel_y + panel_h - 16:
-            self._pf_body.text(d, "OS", tcol_x, ty2, theme.TEAL)
-        elif panel_y <= ty2 <= panel_y + panel_h - 16:
-            d.text("OS", tcol_x, ty2, theme.TEAL, scale=2)
+        if _visible(ty2, 16):
+            if self._pf_body:
+                self._pf_body.text(d, "OS", tcol_x, ty2, theme.TEAL)
+            else:
+                d.text("OS", tcol_x, ty2, theme.TEAL, scale=2)
 
         cy_logical += 84    # mascot block
 
         # ── info rows
         for label, value in self._info_rows():
             yy = draw_y(cy_logical)
-            if panel_y - 12 <= yy <= panel_y + panel_h:
+            if _visible(yy, 10):
                 d.text(label, panel_x + 16, yy, theme.MUTED)
                 d.text(str(value), panel_x + 100, yy, theme.TEXT_BRIGHT)
             cy_logical += 14
@@ -155,7 +166,7 @@ class App(oreoOS.App):
 
         # ── credits section
         sep_y = draw_y(cy_logical)
-        if panel_y <= sep_y <= panel_y + panel_h:
+        if _visible(sep_y, 1):
             d.rect(panel_x + 16, sep_y, panel_w - 32, 1, theme.PRIMARY, fill=True)
         cy_logical += 8
 
@@ -164,19 +175,20 @@ class App(oreoOS.App):
                 ("@Circuit-Overtime",                   theme.PRIMARY,     2),
                 ("in India",                            theme.TEXT_BRIGHT, 1),
                 ("",                                    theme.MUTED,       1),
-                ("Powered by Lix HAL +",                theme.TEXT_DIM,    1),
+                ("Powered by oreoOS HAL +",             theme.TEXT_DIM,    1),
                 ("MicroPython on the",                  theme.TEXT_DIM,    1),
-                ("Oreo Badge platform.",              theme.TEXT_DIM,    1),
+                ("Oreo Badge platform.",                theme.TEXT_DIM,    1),
                 ("",                                    theme.MUTED,       1),
                 ("Source on GitHub at",                 theme.TEXT_DIM,    1),
                 ("github.com/Circuit-",                 theme.TEAL,        1),
-                ("Overtime/elixpo-badge",               theme.TEAL,        1),
+                ("Overtime/oreo-badge",                 theme.TEAL,        1),
         ]:
             yy = draw_y(cy_logical)
-            if panel_y - 16 <= yy <= panel_y + panel_h:
+            row_h = 10 * scale
+            if _visible(yy, row_h):
                 lw = len(line) * 8 * scale
                 d.text(line, panel_x + (panel_w - lw) // 2, yy, col, scale=scale)
-            cy_logical += 10 * scale + 4
+            cy_logical += row_h + 4
 
         # ── scrollbar
         if cy_logical > panel_h - 12:

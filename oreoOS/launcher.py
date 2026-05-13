@@ -125,7 +125,7 @@ def _show_loading(os_obj, label, author=None):
             display.text(label_lbl, label_x_l, cy - 16, api.WHITE, scale=2)
             display.text(label,     label_x_n, cy +  6, api.WHITE)
             if byline and panel_h > 100:
-                display.text(byline, byline_x, cy + 24, theme.GOLD)
+                display.text(byline, byline_x, cy + 24, api.WHITE)
             if panel_h > 140:
                 display.text(hint, hint_x, panel_h - 22, api.WHITE)
 
