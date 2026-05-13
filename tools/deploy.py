@@ -285,6 +285,8 @@ def write_secrets_local():
         ("WIFI_AUTO_CONNECT","%r"),
         ("BT_AUTO_ENABLE",   "%r"),
         ("GITHUB_USER",      "%r"),
+        ("DISPLAY_NAME",     "%r"),
+        ("DESIGNATION",      "%r"),
         ("OWM_API_KEY",      "%r"),
         ("WEATHER_LAT",      "%s"),
         ("WEATHER_LON",      "%s"),

@@ -17,6 +17,8 @@ def _load_env():
 _env = _load_env()
 
 GITHUB_USER       = "Circuit-Overtime"
+DISPLAY_NAME      = "Ayushman Bhattacharya"
+DESIGNATION       = "Founder, Elixpo"
 WEATHER_LAT       = 22.57
 WEATHER_LON       = 88.36
 WEATHER_NAME      = ""
