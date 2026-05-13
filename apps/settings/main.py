@@ -71,8 +71,13 @@ class App(lix.App):
 
     def _set_brightness(self, v):
         self._brightness = max(0, min(100, v))
-        # No PWM on the backlight pin yet — toggle the BL between full on/off as a
-        # crude proxy. When we add LEDC PWM in lix_hw.display, hook it in here.
+        # Drive the LCD backlight via the PWM helper on the Display object.
+        try:
+            setter = getattr(self._os.display, "set_brightness", None)
+            if setter:
+                setter(self._brightness)
+        except Exception:
+            pass
 
     def _reboot(self):
         try:

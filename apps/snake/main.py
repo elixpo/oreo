@@ -45,7 +45,26 @@ def _rand():
     return _seed
 
 
-INTRO, PLAY, OVER = 1, 2, 3
+INTRO, PLAY, OVER, PAUSE = 1, 2, 3, 4
+
+
+def _load_bg():
+    """Optional grid-arena bg sprite (apps/snake/assets/optimized/arena.py).
+    Returns (data, w, h) or None — caller falls back to a solid card."""
+    try:
+        m = __import__("apps.snake.assets.optimized.arena", None, None,
+                       ["DATA", "W", "H"])
+        return (bytearray(m.DATA), m.W, m.H)
+    except (ImportError, AttributeError):
+        return None
+
+
+def _dim_color(c):
+    """Cheap rgb565 dim by halving R/G/B for the pause/over overlay."""
+    r = ((c >> 11) & 0x1F) >> 1
+    g = ((c >>  5) & 0x3F) >> 1
+    b = ( c        & 0x1F) >> 1
+    return (r << 11) | (g << 5) | b
 
 
 class App(lix.App):
@@ -85,6 +104,12 @@ class App(lix.App):
             self._start(); return
         if self._state == OVER and btn == api.BTN_A:
             self._state = INTRO; self._dirty = True; return
+        # B toggles pause while playing or already paused.
+        if btn == api.BTN_B:
+            if self._state == PLAY:
+                self._state = PAUSE; self._dirty = True; return
+            if self._state == PAUSE:
+                self._state = PLAY;  self._dirty = True; return
         if self._state != PLAY:
             return
         # No 180° reversals
@@ -145,20 +170,57 @@ class App(lix.App):
         widgets.draw_header(d, "SNAKE")
 
         if self._state == INTRO:
+            self._draw_arena(d)
+            self._dim_arena(d)
             self._draw_intro(d)
         elif self._state == PLAY:
             self._draw_arena(d)
             self._draw_hud(d, "%d" % self._score)
+        elif self._state == PAUSE:
+            self._draw_arena(d)
+            self._draw_hud(d, "%d" % self._score)
+            self._dim_arena(d)
+            self._draw_paused(d)
         elif self._state == OVER:
             self._draw_arena(d)
             self._draw_hud(d, "%d" % self._score)
+            self._dim_arena(d)
             self._draw_gameover(d)
 
-        widgets.draw_hint(d, "A=start  arrows=move")
+        widgets.draw_hint(d, "A=start  B=pause  arrows=move")
+
+    def _dim_arena(self, d):
+        """Translucent-looking dim overlay using sparse scanlines (every other
+        row of black). Cheap, gives the world a faded look behind the panel."""
+        for y in range(ARENA_Y, ARENA_Y + ARENA_H, 2):
+            d.rect(ARENA_X, y, ARENA_W, 1, api.rgb(0, 0, 0), fill=True)
+
+    def _draw_paused(self, d):
+        panel_w = 200
+        panel_h = 76
+        px = (SW - panel_w) // 2
+        py = (SH - panel_h) // 2
+        d.rect(px, py, panel_w, panel_h, theme.STATUS_BG, fill=True)
+        d.rect(px, py, panel_w,  2,      theme.PRIMARY,   fill=True)
+        d.text("PAUSED", px + (panel_w - 6 * 16) // 2, py + 14, api.WHITE, scale=2)
+        if int(self._blink * 2) % 2 == 0:
+            msg = "Press B to resume"
+            d.text(msg, px + (panel_w - len(msg) * 8) // 2, py + 48, api.WHITE)
 
     def _draw_arena(self, d):
-        # Background panel
-        d.rect(ARENA_X, ARENA_Y, ARENA_W, ARENA_H, theme.CARD, fill=True)
+        # Arena background — tile the asset if available, else a flat panel.
+        bg = _load_bg()
+        if bg:
+            data, bw, bh = bg
+            y = ARENA_Y
+            while y < ARENA_Y + ARENA_H:
+                x = ARENA_X
+                while x < ARENA_X + ARENA_W:
+                    d.blit(data, x, y, bw, bh)
+                    x += bw
+                y += bh
+        else:
+            d.rect(ARENA_X, ARENA_Y, ARENA_W, ARENA_H, theme.CARD, fill=True)
         # Food
         fc, fr = self._food
         d.rect(ARENA_X + fc * CELL + 1, ARENA_Y + fr * CELL + 1,

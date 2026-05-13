@@ -167,6 +167,15 @@ class Display(api.Display):
 
     # ── flush ─────────────────────────────────────────────────────────────────
 
+    def set_brightness(self, pct):
+        """Set backlight brightness (0..100). PWM-based, flicker-free."""
+        pct = max(0, min(100, int(pct)))
+        if self._bl_pwm is not None:
+            self._bl_pwm.duty_u16(int(pct / 100.0 * 65535))
+        else:
+            # No PWM available — fall back to plain on/off
+            self._panel.bl(1 if pct > 0 else 0)
+
     def present(self):
         """Push framebuffer to display — no-op if nothing was drawn since last call.
 

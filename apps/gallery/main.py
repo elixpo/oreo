@@ -79,10 +79,7 @@ class App(lix.App):
         widgets.draw_hint  (d, "L/R=prev/next  A=refresh")
 
         if not self._names:
-            d.text("No photos.",      (SW - 10 * 16) // 2, 90,  theme.MUTED, scale=2)
-            d.text("Drop them in",    (SW - 12 * 8) // 2, 130, theme.TEXT_BRIGHT)
-            d.text("apps/gallery/",   (SW - 13 * 8) // 2, 144, theme.TEXT_BRIGHT)
-            d.text("assets/raw/*.png",(SW - 17 * 8) // 2, 158, theme.TEXT_BRIGHT)
+            self._draw_empty_state(d)
             self._dirty = False
             return
 
@@ -105,3 +102,60 @@ class App(lix.App):
         d.text(idx_str, SW - len(idx_str) * 8 - 6, ay - 1, theme.PRIMARY)
 
         self._dirty = False
+
+    # ── empty state ──────────────────────────────────────────────────────
+    def _draw_empty_state(self, d):
+        """Fancy card prompting the user to drop photos in."""
+        # Card geometry
+        card_w = SW - 40
+        card_h = SH - widgets.HEADER_H - widgets.HINT_H - 40
+        card_x = (SW - card_w) // 2
+        card_y = widgets.HEADER_H + 20
+
+        # Soft shadow
+        d.rect(card_x + 3, card_y + 3, card_w, card_h, theme.MUTED2, fill=True)
+        # Card body
+        d.rect(card_x,     card_y,     card_w, card_h, theme.CARD, fill=True)
+        # Accent stripes (top + side)
+        d.rect(card_x,     card_y,     card_w, 4,      theme.PRIMARY, fill=True)
+        d.rect(card_x,     card_y + 4, 4,      card_h - 4, theme.TEAL, fill=True)
+
+        # Picture-frame decoration in the upper area
+        fx, fy = card_x + 16, card_y + 16
+        fw, fh = 56, 44
+        d.rect(fx,     fy,     fw, fh, theme.BG, fill=True)
+        d.rect(fx,     fy,     fw,  2, theme.PRIMARY, fill=True)
+        d.rect(fx,     fy+fh-2, fw, 2, theme.PRIMARY, fill=True)
+        d.rect(fx,     fy,      2, fh, theme.PRIMARY, fill=True)
+        d.rect(fx+fw-2, fy,     2, fh, theme.PRIMARY, fill=True)
+        # tiny "mountain + sun" inside the frame
+        d.rect(fx + 38, fy + 8,  6, 6, theme.GOLD,    fill=True)
+        d.rect(fx + 8,  fy + 28, 14, 12, theme.TEAL,  fill=True)
+        d.rect(fx + 22, fy + 22, 24, 18, theme.GREEN, fill=True)
+        d.rect(fx + 14, fy + fh - 6, fw - 28, 2, theme.MUTED, fill=True)
+
+        # Big heading
+        title = "Your gallery"
+        tx = card_x + 84
+        d.text(title, tx, card_y + 14, theme.PRIMARY, scale=2)
+        sub = "is empty"
+        d.text(sub, tx, card_y + 32, theme.TEXT_BRIGHT, scale=2)
+
+        # Instruction lines (centred)
+        msg_y = card_y + 72
+        lines = [
+            ("Share some moments!",        theme.PRIMARY,     2),
+            ("",                           None,              1),
+            ("Drop pictures into",         theme.TEXT_BRIGHT, 1),
+            ("apps/gallery/assets/raw/",   theme.TEAL,        1),
+            ("(.jpg .jpeg .png)",          theme.MUTED,       1),
+            ("",                           None,              1),
+            ("Then run:",                  theme.TEXT_BRIGHT, 1),
+            ("optimize_assets --app",      theme.GOLD,        1),
+            ("gallery",                    theme.GOLD,        1),
+        ]
+        for line, col, sc in lines:
+            if line:
+                lw = len(line) * 8 * sc
+                d.text(line, (SW - lw) // 2, msg_y, col, scale=sc)
+            msg_y += (10 * sc) + 2
