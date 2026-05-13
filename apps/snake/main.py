@@ -59,6 +59,17 @@ def _load_bg():
         return None
 
 
+def _load_food():
+    """Bamboo food sprite (apps/snake/assets/optimized/food.py).
+    Returns (bytearray, w, h) or None — caller draws a coloured rect instead."""
+    try:
+        m = __import__("apps.snake.assets.optimized.food", None, None,
+                       ["DATA", "W", "H"])
+        return (bytearray(m.DATA), m.W, m.H)
+    except (ImportError, AttributeError):
+        return None
+
+
 def _dim_color(c):
     """Cheap rgb565 dim by halving R/G/B for the pause/over overlay."""
     r = ((c >> 11) & 0x1F) >> 1
@@ -77,6 +88,9 @@ class App(lix.App):
         self._new_hi = False
         self._blink = 0.0
         self._dirty = True
+        # Cache the food sprite once — its chroma-key transparent border lets
+        # the arena bg show around the bamboo so cells don't look boxy.
+        self._food_sprite = _load_food()
 
     def _start(self):
         mid_c = COLS // 2
@@ -221,10 +235,19 @@ class App(lix.App):
                 y += bh
         else:
             d.rect(ARENA_X, ARENA_Y, ARENA_W, ARENA_H, theme.CARD, fill=True)
-        # Food
+        # Food — bamboo sprite (or coloured rect fallback before the
+        # asset has been generated/optimised)
         fc, fr = self._food
-        d.rect(ARENA_X + fc * CELL + 1, ARENA_Y + fr * CELL + 1,
-               CELL - 2, CELL - 2, theme.PRIMARY, fill=True)
+        fx, fy = ARENA_X + fc * CELL, ARENA_Y + fr * CELL
+        if self._food_sprite:
+            fdata, fw, fh = self._food_sprite
+            d.blit(fdata,
+                   fx + (CELL - fw) // 2,
+                   fy + (CELL - fh) // 2,
+                   fw, fh)
+        else:
+            d.rect(fx + 1, fy + 1, CELL - 2, CELL - 2,
+                   theme.PRIMARY, fill=True)
         # Snake body — head brighter
         for i, (c, r) in enumerate(self._snake):
             color = theme.TEAL if i == 0 else theme.GREEN

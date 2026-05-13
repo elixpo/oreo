@@ -126,9 +126,9 @@ class App(lix.App):
             d.text("OREO", tcol_x, ty, theme.PRIMARY, scale=3)
         ty2 = draw_y(cy_logical + 32)
         if self._pf_body and panel_y <= ty2 <= panel_y + panel_h - 16:
-            self._pf_body.text(d, "BADGE OS", tcol_x, ty2, theme.TEAL)
+            self._pf_body.text(d, "OS", tcol_x, ty2, theme.TEAL)
         elif panel_y <= ty2 <= panel_y + panel_h - 16:
-            d.text("BADGE OS", tcol_x, ty2, theme.TEAL, scale=2)
+            d.text("OS", tcol_x, ty2, theme.TEAL, scale=2)
 
         cy_logical += 84    # mascot block
 

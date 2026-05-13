@@ -88,8 +88,9 @@ PER_APP_SIZES = {
     "panda_snow":   (80, 80),
     "panda_storm":  (80, 80),
 
-    # snake — tiled arena bg
+    # snake — tiled arena bg + bamboo food sprite (CELL_PX size)
     "arena":        (40, 40),
+    "food":         (10, 10),
 }
 
 
