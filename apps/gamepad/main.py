@@ -1,38 +1,37 @@
-"""Gamepad — button-press tester with a stylised gamepad layout.
+"""Gamepad — full-screen button-state tester.
 
-A faux-controller is drawn on-screen with a D-pad on the left, three action
-buttons (A/B/C) on the right, and the HOME button as a thin centre pill.
-Each on-screen button:
+Landscape list of every badge button, each row showing its name on the
+left and ON/OFF on the right. Held buttons light up green (with white
+text); idle rows are a dim slate so the live state reads at a glance.
 
-  • lights up PRIMARY while held (live `is_pressed`)
-  • flashes GOLD for ~150 ms on every `just_pressed` edge
-  • shows a small press-count number underneath
+A short-lived gold flash overlays each row on the rising edge so you
+can see brief presses that wouldn't otherwise leave the row green long
+enough to notice.
 
 HOME button:
-  • Single tap: registered as a button event (does NOT exit).
-  • Double tap within 400 ms: returns to the apps drawer.
-
-This makes it useful as both a wiring sanity-check AND a way to confirm the
-HOME-double-tap behaviour without ever leaving the test screen.
+  • Single tap registers like any other (does NOT exit).
+  • Double tap within 400 ms returns to the apps drawer.
 """
 
 import time
 import oreoOS
-from oreoOS import api
-from oreoOS import theme, widgets
+from oreoOS import api, theme, widgets
 
 SW = api.SCREEN_W
 SH = api.SCREEN_H
 
 DOUBLE_TAP_MS = 400
-FLASH_MS      = 150
+FLASH_MS      = 180
 
 
-def _filled_circle(d, cx, cy, r, color):
-    """Scan-line filled circle. ~r horizontal d.rect() calls — cheap enough."""
-    for dy in range(-r, r + 1):
-        dx = int((r * r - dy * dy) ** 0.5)
-        d.rect(cx - dx, cy + dy, dx * 2 + 1, 1, color, fill=True)
+# Colour palette tuned to read on the badge LCD. The "off" row uses a
+# slate-grey card so the green "on" stripe pops.
+ROW_OFF_BG   = api.rgb( 56,  62,  78)
+ROW_OFF_TXT  = api.rgb(190, 196, 210)
+ROW_ON_BG    = theme.GREEN
+ROW_ON_TXT   = api.WHITE
+ROW_FLASH_BG = theme.GOLD
+HEADER_BG    = api.rgb( 30,  34,  46)
 
 
 class App(oreoOS.App):
@@ -42,9 +41,8 @@ class App(oreoOS.App):
         self._os         = os
         self._held       = {b: False for b, _ in self._labels()}
         self._counts     = {b: 0     for b, _ in self._labels()}
-        self._flash      = {b: 0     for b, _ in self._labels()}   # 0 or absolute ticks_ms expiry
-        self._event      = "tap any button"
-        self._home_t     = -10000                                  # last HOME tick
+        self._flash      = {b: 0     for b, _ in self._labels()}
+        self._home_t     = -10000
         self._home_hint  = ""
         self._dirty      = True
 
@@ -56,152 +54,103 @@ class App(oreoOS.App):
             (api.BTN_B,     "B"),
             (api.BTN_C,     "C"),
             (api.BTN_UP,    "UP"),
-            (api.BTN_DOWN,  "DN"),
-            (api.BTN_LEFT,  "L"),
-            (api.BTN_RIGHT, "R"),
+            (api.BTN_DOWN,  "DOWN"),
+            (api.BTN_LEFT,  "LEFT"),
+            (api.BTN_RIGHT, "RIGHT"),
         ]
 
-    # ── HOME intercept (OS-level run_loop calls this BEFORE quitting) ────
     def on_home_press(self):
-        """Double-tap to exit. Returning True suppresses the OS default
-        (which would route to the apps drawer)."""
+        """Double-tap HOME to leave; first tap is consumed as a button event."""
         now = time.ticks_ms()
         if time.ticks_diff(now, self._home_t) < DOUBLE_TAP_MS:
-            # second tap within window → let OS take it (return False)
             return False
-        # first tap (or stale)
         self._home_t                = now
         self._counts[api.BTN_HOME]  = self._counts.get(api.BTN_HOME, 0) + 1
         self._flash[api.BTN_HOME]   = now + FLASH_MS
-        self._event                 = "HOME (tap again to exit)"
         self._home_hint             = "tap again to exit"
         self._dirty                 = True
-        return True   # don't exit yet
+        return True
 
     def on_button_press(self, btn):
-        # HOME comes through on_home_press; all others come here.
-        self._event              = "PRESS %s" % self._name_for(btn)
-        self._counts[btn]        = self._counts.get(btn, 0) + 1
-        self._flash[btn]         = time.ticks_ms() + FLASH_MS
-        self._dirty              = True
+        self._counts[btn] = self._counts.get(btn, 0) + 1
+        self._flash[btn]  = time.ticks_ms() + FLASH_MS
+        self._dirty       = True
 
     def on_button_release(self, btn):
-        self._event = "RELEASE %s" % self._name_for(btn)
         self._dirty = True
-
-    def _name_for(self, btn):
-        for b, lbl in self._labels():
-            if b == btn:
-                return lbl
-        return "?"
 
     def update(self, dt):
         btns = self._os.buttons
         now  = time.ticks_ms()
-        # live held state
         for b, _ in self._labels():
             held = btns.is_pressed(b)
             if held != self._held[b]:
                 self._held[b] = held
                 self._dirty   = True
-        # expire flash timers
         for b in list(self._flash.keys()):
             if self._flash[b] and time.ticks_diff(now, self._flash[b]) >= 0:
                 self._flash[b] = 0
                 self._dirty    = True
-        # clear stale HOME "tap again" hint after the window closes
         if self._home_hint and time.ticks_diff(now, self._home_t) > DOUBLE_TAP_MS:
             self._home_hint = ""
             self._dirty     = True
 
-    # ── render: stylised gamepad layout ───────────────────────────────────
+    # ── render: full-width list rows, landscape ─────────────────────────
     def draw(self, d):
         if not self._dirty:
             return
-        d.clear(theme.BG)
-        widgets.draw_header(d, "GAMEPAD")
+        # Solid dark backdrop covering the whole screen — the rows then sit
+        # edge-to-edge with no cream border peeking through.
+        d.rect(0, 0, SW, SH, HEADER_BG, fill=True)
+        widgets.draw_header(d, "BUTTONS")
         widgets.draw_hint  (d, "HOME x2 = exit")
 
-        # Controller body — wide rounded card filling the play area.
-        body_x = 12
-        body_y = widgets.HEADER_H + 6
-        body_w = SW - 24
-        body_h = SH - widgets.HEADER_H - widgets.HINT_H - 12
-        d.rect(body_x + 2, body_y + 2, body_w, body_h, theme.MUTED2, fill=True)
-        d.rect(body_x,     body_y,     body_w, body_h, theme.CARD,   fill=True)
-        d.rect(body_x,     body_y,     body_w, 3,      theme.PRIMARY, fill=True)
+        rows     = self._labels()
+        play_top = widgets.HEADER_H + 4
+        play_h   = SH - widgets.HEADER_H - widgets.HINT_H - 8
+        row_h    = play_h // len(rows)
+        row_gap  = 2
+        cell_h   = row_h - row_gap
+        text_y   = (cell_h - 16) // 2     # for scale=2 label
+        sub_y    = (cell_h - 8) // 2      # for scale=1 ON/OFF
 
-        # HOME pill centred on top of the body — gives the cluster headroom.
-        pill_w = 72
-        pill_h = 16
-        pill_x = body_x + (body_w - pill_w) // 2
-        pill_y = body_y + 10
-        fill_c, text_c = self._btn_colours(api.BTN_HOME)
-        d.rect(pill_x + 1, pill_y + 1, pill_w, pill_h, theme.MUTED2, fill=True)
-        d.rect(pill_x,     pill_y,     pill_w, pill_h, fill_c,       fill=True)
-        d.rect(pill_x,     pill_y,     pill_w,  1,     theme.PRIMARY, fill=True)
-        d.text("HOME", pill_x + (pill_w - 4 * 8) // 2, pill_y + 4, text_c)
+        now = time.ticks_ms()
+        for i, (btn, lbl) in enumerate(rows):
+            y       = play_top + i * row_h
+            held    = self._held.get(btn, False)
+            flash   = self._flash.get(btn, 0)
+            flashing = flash and time.ticks_diff(now, flash) < 0
+            if flashing:
+                bg, fg = ROW_FLASH_BG, api.WHITE
+            elif held:
+                bg, fg = ROW_ON_BG, ROW_ON_TXT
+            else:
+                bg, fg = ROW_OFF_BG, ROW_OFF_TXT
 
-        # Vertical centre for the two clusters, below the HOME pill with pad.
-        cluster_cy = pill_y + pill_h + (body_h - (pill_y + pill_h - body_y)) // 2 - 4
+            # Row card with a thin accent stripe on the left (pink when active)
+            d.rect(0, y, SW, cell_h, bg, fill=True)
+            d.rect(0, y, 4, cell_h, theme.PRIMARY if (held or flashing) else theme.MUTED2,
+                   fill=True)
 
-        # ── D-pad cluster (left half) — 4 round chunky buttons ────────────
-        r       = 18                          # button radius
-        spacing = r * 2 + 10                  # gap centre-to-centre
-        dpad_cx = body_x + 60
-        self._draw_round_btn(d, dpad_cx,             cluster_cy - spacing, r, api.BTN_UP)
-        self._draw_round_btn(d, dpad_cx,             cluster_cy + spacing, r, api.BTN_DOWN)
-        self._draw_round_btn(d, dpad_cx - spacing,   cluster_cy,           r, api.BTN_LEFT)
-        self._draw_round_btn(d, dpad_cx + spacing,   cluster_cy,           r, api.BTN_RIGHT)
-        # central hub dot
-        _filled_circle(d, dpad_cx, cluster_cy, 5, theme.MUTED)
+            # Label (scale=2) on the left
+            d.text(lbl, 16, y + text_y, fg, scale=2)
 
-        # ── action cluster (right half) — A/B/C in a triangle ────────────
-        ar      = 22
-        act_cx  = body_x + body_w - 70
-        # B top-left, C top-right of the diamond, A bottom — gives a classic
-        # SNES-style three-button cluster with the action button (A) lowest.
-        self._draw_round_btn(d, act_cx,              cluster_cy + ar + 4,  ar, api.BTN_A)
-        self._draw_round_btn(d, act_cx - ar - 6,     cluster_cy - ar // 2, ar, api.BTN_B)
-        self._draw_round_btn(d, act_cx + ar + 6,     cluster_cy - ar // 2, ar, api.BTN_C)
+            # ON / OFF state on the right
+            state = "ON" if held else "OFF"
+            sw    = len(state) * 8
+            d.text(state, SW - sw - 16, y + sub_y, fg)
 
-        # ── event line + home-tap hint ────────────────────────────────────
-        evt = self._event[:32]
-        d.text(evt, (SW - len(evt) * 8) // 2,
-               SH - widgets.HINT_H - 12, theme.PRIMARY)
+            # Press counter centred — only show once user has actually pressed
+            cnt = self._counts.get(btn, 0)
+            if cnt:
+                tag = "x%d" % cnt
+                tw  = len(tag) * 8
+                d.text(tag, (SW - tw) // 2, y + sub_y, fg)
+
+        # Gold home-tap hint above the hint bar
         if self._home_hint:
             d.text(self._home_hint,
                    (SW - len(self._home_hint) * 8) // 2,
-                   SH - widgets.HINT_H - 24, theme.GOLD)
+                   SH - widgets.HINT_H - 12, theme.GOLD)
 
         self._dirty = False
-
-    # ── helpers ──────────────────────────────────────────────────────────
-    def _btn_colours(self, btn):
-        now    = time.ticks_ms()
-        flash  = self._flash.get(btn, 0)
-        held   = self._held.get(btn, False)
-        flashing = flash and time.ticks_diff(now, flash) < 0
-        if flashing:
-            return theme.GOLD, api.WHITE
-        if held:
-            return theme.PRIMARY, api.WHITE
-        return theme.DOCK_BG, theme.TEXT_BRIGHT
-
-    def _draw_round_btn(self, d, cx, cy, r, btn):
-        """Round chunky button — shadow, accent ring, face, label, counter."""
-        fill_c, text_c = self._btn_colours(btn)
-        # drop shadow
-        _filled_circle(d, cx + 2, cy + 2, r,     theme.MUTED2)
-        # accent ring
-        _filled_circle(d, cx,     cy,     r,     theme.PRIMARY)
-        # face inset
-        _filled_circle(d, cx,     cy,     r - 3, fill_c)
-        # label centred on the face
-        lbl = self._name_for(btn)
-        lw  = len(lbl) * 8
-        d.text(lbl, cx - lw // 2, cy - 4, text_c)
-        # press counter underneath the button
-        cnt = "x%d" % self._counts.get(btn, 0)
-        cw  = len(cnt) * 8
-        d.text(cnt, cx - cw // 2, cy + r + 4, theme.MUTED)
