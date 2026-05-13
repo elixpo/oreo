@@ -10,25 +10,48 @@ backgrounds) so the OS feels cohesive. Apps just call:
 and the look is consistent.
 """
 
-from lix import api
+from lix import api, pixelfont
 from lix_os import theme
 
-HEADER_H = 26
+HEADER_H = 28
 HINT_H   = 16
 
+# Forest-green header for the home screen (matches the bg image's tones).
+HEADER_HOME_BG = api.rgb(46, 102,  74)
 
-def draw_header(d, title, color=None):
-    """Pink app header with a centred title in framebuf 8×8 (scale=2).
+# Lazy-loaded title font (Pixelify Sans 16 — fits the 28-px header bar nicely).
+_TITLE_FONT = None
 
-    Drawn at the top of the screen. Single C-call text render — cheap to
-    repaint every frame.
+
+def _title_font():
+    global _TITLE_FONT
+    if _TITLE_FONT is None:
+        try:
+            _TITLE_FONT = pixelfont.load("pixelify_16")
+        except (ImportError, AttributeError):
+            _TITLE_FONT = False
+    return _TITLE_FONT if _TITLE_FONT else None
+
+
+def draw_header(d, title, color=None, accent=None):
+    """App header bar with a centred Pixelify Sans title.
+
+    color  : header bg colour (default theme.STATUS_BG — crimson)
+    accent : 1-px line under the header (default theme.PRIMARY)
     """
     SW = api.SCREEN_W
-    bg = color or theme.STATUS_BG
+    bg = color  or theme.STATUS_BG
+    ac = accent or theme.PRIMARY
     d.rect(0, 0, SW, HEADER_H, bg, fill=True)
-    d.rect(0, HEADER_H - 1, SW, 1, theme.PRIMARY, fill=True)   # accent line
-    tx = (SW - len(title) * 8 * 2) // 2
-    d.text(title, tx, (HEADER_H - 16) // 2, api.WHITE, scale=2)
+    d.rect(0, HEADER_H - 1, SW, 1, ac, fill=True)
+
+    pf = _title_font()
+    if pf:
+        tw = pf.measure(title)
+        pf.text(d, title, (SW - tw) // 2, (HEADER_H - pf.h) // 2, api.WHITE)
+    else:
+        tx = (SW - len(title) * 16) // 2
+        d.text(title, tx, (HEADER_H - 16) // 2, api.WHITE, scale=2)
 
 
 def draw_hint(d, text, color=None):

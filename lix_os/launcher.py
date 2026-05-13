@@ -139,21 +139,106 @@ def run_app(os_obj, app):
 # ── crash screen ──────────────────────────────────────────────────────────────
 
 def show_crash(os_obj, name, err):
-    d = os_obj.display
-    d.clear(api.rgb(60, 0, 0))
-    d.rect(0, 0, api.SCREEN_W, 30, api.rgb(180, 30, 30), fill=True)
-    d.text("APP CRASHED", 50, 11, api.WHITE, scale=2)
-    d.text(name[:14], 20, 50, api.rgb(255, 220, 100), scale=2)
-    msg = str(err)
-    for i, start in enumerate(range(0, min(len(msg), 150), 28)):
-        d.text(msg[start:start + 28], 8, 90 + i * 14, api.WHITE)
-    d.text("any key to continue", 16, api.SCREEN_H - 22, api.rgb(160, 160, 160))
+    """Centred, themed crash screen — Pixelify Sans title + app name,
+    framebuf body text. Press any button to dismiss."""
+    d  = os_obj.display
+    SW = api.SCREEN_W
+    SH = api.SCREEN_H
+
+    BG     = api.rgb( 40,   8,  16)
+    HDR    = api.rgb(255,  93, 104)
+    ACCENT = api.rgb(255, 230,  80)
+    TEXT   = api.rgb(245, 230, 220)
+    DIM    = api.rgb(180, 150, 150)
+
+    d.clear(BG)
+
+    # Header bar
+    HDR_H = 30
+    d.rect(0, 0, SW, HDR_H,    HDR,    fill=True)
+    d.rect(0, HDR_H, SW, 1,    ACCENT, fill=True)
+
+    # Pixelify display font for the app name; fall back to framebuf if missing.
+    try:
+        from lix import pixelfont
+        title_font = pixelfont.load("pixelify_24")
+    except (ImportError, AttributeError):
+        title_font = None
+
+    # ── title "APP CRASHED" centred inside the header (small) ────────────
+    short_title = "APP CRASHED"
+    tw = len(short_title) * 16
+    d.text(short_title, (SW - tw) // 2, (HDR_H - 16) // 2, api.WHITE, scale=2)
+
+    # ── big Pixelify app name below the header ──────────────────────────
+    nm = (name or "?")[:14]
+    name_y = HDR_H + 14
+    if title_font:
+        nw = title_font.measure(nm)
+        title_font.text(d, nm, (SW - nw) // 2, name_y, ACCENT)
+        name_h = title_font.h
+    else:
+        nw = len(nm) * 16
+        d.text(nm, (SW - nw) // 2, name_y, ACCENT, scale=2)
+        name_h = 16
+
+    # ── error message panel ─────────────────────────────────────────────
+    panel_y = name_y + name_h + 12
+    panel_h = SH - panel_y - 26          # leave room for footer hint
+    d.rect(8, panel_y - 4, SW - 16, panel_h + 8, api.rgb(56, 16, 24), fill=True)
+    d.rect(8, panel_y - 4, SW - 16, 1, HDR, fill=True)
+
+    msg       = str(err)
+    max_chars = (SW - 32) // 8
+    lines     = _wrap_text(msg, max_chars)
+    max_lns   = panel_h // 12
+    lines     = lines[:max_lns]
+    block_h   = len(lines) * 12
+    text_y    = panel_y + max(0, (panel_h - block_h) // 2)
+    for i, line in enumerate(lines):
+        lw = len(line) * 8
+        d.text(line, (SW - lw) // 2, text_y + i * 12, TEXT)
+
+    # ── centred footer hint ──────────────────────────────────────────────
+    hint = "press any button to continue"
+    hw   = len(hint) * 8
+    d.text(hint, (SW - hw) // 2, SH - 18, DIM)
+
     d.present()
+
+    # Wait for any keypress
     while True:
         os_obj.buttons.update()
         if any(os_obj.buttons.just_pressed(b) for b in api.BUTTONS):
             return
         time.sleep_ms(20)
+
+
+def _wrap_text(text, max_chars):
+    """Greedy word-wrap to ≤ max_chars per line; hard-breaks oversized words."""
+    if not text:
+        return [""]
+    out = []
+    cur = ""
+    for w in text.split():
+        if not cur:
+            if len(w) > max_chars:
+                while len(w) > max_chars:
+                    out.append(w[:max_chars])
+                    w = w[max_chars:]
+                cur = w
+            else:
+                cur = w
+        else:
+            candidate = cur + " " + w
+            if len(candidate) <= max_chars:
+                cur = candidate
+            else:
+                out.append(cur)
+                cur = w
+    if cur:
+        out.append(cur)
+    return out
 
 
 # ── boot entry point ─────────────────────────────────────────────────────────
@@ -190,7 +275,19 @@ def boot():
         if target == "__appmenu__":
             target = "launcher"
 
-        if target and target not in (None, "__appmenu__"):
+        # If the user picked the launcher, run it then CHAIN into whichever
+        # app it selected. `run_app` clears _launch_request on entry, so we
+        # have to re-read it after the launcher exits — otherwise pressing A
+        # on a tile would drop us back to home instead of launching the app.
+        if target == "launcher":
+            try:
+                app = load_app("launcher")
+                run_app(os_obj, app)
+            except Exception as e:
+                show_crash(os_obj, "launcher", e)
+            target = os_obj._launch_request   # ← the launcher's selection
+
+        if target and target not in (None, "launcher", "__appmenu__"):
             try:
                 app = load_app(target)
                 run_app(os_obj, app)

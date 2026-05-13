@@ -50,13 +50,25 @@ DEPLOY = [
     ("lix_os/splash.py",       "lix_os/splash.py"),
     ("lix_os/theme.py",        "lix_os/theme.py"),
     ("lix_os/timeutil.py",     "lix_os/timeutil.py"),
+    ("lix_os/widgets.py",      "lix_os/widgets.py"),
 ]
 
-# lix module — also pick up font/sprite
+# lix module — also pick up font/sprite/pixelfont
 DEPLOY += [
-    ("lix/font.py",   "lix/font.py"),
-    ("lix/sprite.py", "lix/sprite.py"),
+    ("lix/font.py",      "lix/font.py"),
+    ("lix/sprite.py",    "lix/sprite.py"),
+    ("lix/pixelfont.py", "lix/pixelfont.py"),
 ]
+
+# Pixelify Sans bitmap-font modules (.py only — skip the TTF, it's build-time)
+_fonts_dir = Path("assets/fonts/optimized")
+if _fonts_dir.exists():
+    DEPLOY.append(("assets/fonts/__init__.py",
+                   "assets/fonts/__init__.py"))
+    DEPLOY.append(("assets/fonts/optimized/__init__.py",
+                   "assets/fonts/optimized/__init__.py"))
+    for _f in sorted(_fonts_dir.glob("pixelify_*.py")):
+        DEPLOY.append((str(_f), "assets/fonts/optimized/" + _f.name))
 
 # apps — include only dirs that have both manifest.json and main.py
 # Also pull in per-app assets/optimized/*.py
