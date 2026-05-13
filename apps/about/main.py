@@ -1,25 +1,24 @@
-"""About — system info: OS, chip, RAM, uptime. Uptime doubles as a 'time since
-boot' clock until we add a real RTC module."""
+"""About — mascot + Elixpo OS info + build metadata.
+
+Standardized header, optional mascot sprite on the left, info column on
+the right with version / IP / uptime / free-RAM.
+"""
 
 import gc
-import sys
 import time
+import sys
 
 import lix
 from lix import api
+from lix_os import theme, widgets
 
 
-PRIMARY = (0, 220, 200)
-ACCENT  = (255, 80, 200)
-MUTED   = (140, 140, 170)
-
-
-def _format_uptime_ms(ms):
-    secs = ms // 1000
-    h = secs // 3600
-    m = (secs % 3600) // 60
-    s = secs % 60
-    return "%02d:%02d:%02d" % (h, m, s)
+def _load_mascot():
+    try:
+        m = __import__("assets.sprites.optimized.mascot", None, None, ["DATA", "W", "H"])
+        return (bytearray(m.DATA), m.W, m.H)
+    except (ImportError, AttributeError):
+        return None
 
 
 def _kb(b):
@@ -31,54 +30,59 @@ class App(lix.App):
 
     def on_enter(self, os):
         super().on_enter(os)
-        self.boot_ms = time.ticks_ms()
-        self.last_sec = -1
-        self.dirty = True
+        self._os      = os
+        self._dirty   = True
+        self._mascot  = _load_mascot()
+        self._boot_ms = time.ticks_ms()
+        self._last_s  = -1
+        try:
+            from lix_hw import wifi
+            self._ip = wifi.ip() or "—"
+        except Exception:
+            self._ip = "—"
 
     def update(self, dt):
-        elapsed_sec = time.ticks_diff(time.ticks_ms(), self.boot_ms) // 1000
-        if elapsed_sec != self.last_sec:
-            self.last_sec = elapsed_sec
-            self.dirty = True
+        s = time.ticks_diff(time.ticks_ms(), self._boot_ms) // 1000
+        if s != self._last_s:
+            self._last_s = s
+            self._dirty  = True
+
+    def on_button_press(self, btn):
+        if btn == api.BTN_A:
+            self._os.quit()
 
     def draw(self, d):
-        if not self.dirty:
+        if not self._dirty:
             return
-        bg = api.rgb(8, 8, 20)
-        primary = api.rgb(*PRIMARY)
-        muted = api.rgb(*MUTED)
+        d.clear(theme.BG)
+        widgets.draw_header(d, "ABOUT")
+        widgets.draw_hint  (d, "A=close  HOME=back")
 
-        d.clear(bg)
-        # header
-        d.rect(0, 0, api.SCREEN_W, 30, primary, fill=True)
-        d.text("ABOUT", 8, 11, api.BLACK, scale=2)
-        d.text("ELIXPO", api.SCREEN_W - 70, 11, api.BLACK, scale=2)
+        # Mascot on the left
+        if self._mascot:
+            data, mw, mh = self._mascot
+            d.blit(data, 16, widgets.HEADER_H + 24, mw, mh)
+        else:
+            d.rect(16, widgets.HEADER_H + 24, 72, 72, theme.PRIMARY, fill=True)
 
-        # body — labels left, values right
-        free = gc.mem_free()
-        used = gc.mem_alloc()
-        total = free + used
-        uptime = _format_uptime_ms(time.ticks_diff(time.ticks_ms(), self.boot_ms))
-        impl = sys.implementation
-        mp_ver = ".".join(str(p) for p in impl.version)
+        # Info column on the right
+        col_x = 110
+        y     = widgets.HEADER_H + 12
+        d.text("ELIXPO",   col_x, y, theme.PRIMARY,     scale=3); y += 28
+        d.text("BADGE OS", col_x, y, theme.TEAL,        scale=2); y += 20
 
+        secs = self._last_s
         rows = [
-            ("OS",     "Elixpo v0.1"),
-            ("Chip",   "ESP32-S3"),
-            ("Python", "MicroPython"),
-            ("Ver",    mp_ver),
-            ("RAM",    "%s / %s" % (_kb(used), _kb(total))),
-            ("Free",   _kb(free)),
-            ("Uptime", uptime),
+            ("Ver",    "v0.1"),
+            ("IP",     self._ip[:14]),
+            ("Free",   _kb(gc.mem_free())),
+            ("Up",     "%02d:%02d:%02d" % (secs // 3600,
+                                          (secs % 3600) // 60,
+                                           secs % 60)),
         ]
-        y = 50
         for label, value in rows:
-            d.text(label, 16, y, muted, scale=2)
-            d.text(value, 110, y, api.WHITE, scale=2)
-            y += 24
+            d.text(label, col_x,     y, theme.MUTED)
+            d.text(value, col_x + 36, y, theme.TEXT_BRIGHT)
+            y += 12
 
-        # divider + footer
-        d.rect(0, api.SCREEN_H - 40, api.SCREEN_W, 40, api.rgb(*ACCENT), fill=True)
-        d.text("HOME  menu", 70, api.SCREEN_H - 28, api.BLACK, scale=2)
-
-        self.dirty = False
+        self._dirty = False
