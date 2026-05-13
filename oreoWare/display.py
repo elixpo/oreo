@@ -35,12 +35,6 @@ CHROMA_KEY = 0x1FF8
 
 class Display(api.Display):
     def __init__(self):
-        # PWM the backlight at ~1 kHz so brightness changes are flicker-free.
-        try:
-            from machine import PWM
-            self._bl_pwm = PWM(Pin(pins.DISPLAY_BL, Pin.OUT), freq=1000, duty_u16=65535)
-        except Exception:
-            self._bl_pwm = None
         spi = SPI(
             1,
             baudrate=pins.DISPLAY_BAUD,
@@ -56,6 +50,16 @@ class Display(api.Display):
             bl =Pin(pins.DISPLAY_BL,    Pin.OUT, value=0),
         )
         self._panel.init()
+        # PWM the backlight at ~1 kHz so brightness changes are flicker-free.
+        # MUST be initialised AFTER _panel.init() — the panel's init() calls
+        # bl(1) which re-asserts the pin as a plain digital output and would
+        # silently override any earlier PWM. Doing PWM last makes it the
+        # authoritative driver of the pin.
+        try:
+            from machine import PWM
+            self._bl_pwm = PWM(Pin(pins.DISPLAY_BL, Pin.OUT), freq=1000, duty_u16=65535)
+        except Exception:
+            self._bl_pwm = None
         self._buf   = bytearray(api.SCREEN_W * api.SCREEN_H * 2)
         self._fb    = framebuf.FrameBuffer(
             self._buf, api.SCREEN_W, api.SCREEN_H, framebuf.RGB565

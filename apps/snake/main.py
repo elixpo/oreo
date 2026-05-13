@@ -270,27 +270,50 @@ class App(oreoOS.App):
         d.text(score_str, SW - len(score_str) * 16 - 6, 6, api.WHITE, scale=2)
 
     def _draw_intro(self, d):
-        d.text("SNAKE", (SW - 5 * 24) // 2, 70, theme.PRIMARY, scale=3)
+        # Centred title — white on the dimmed arena so it reads from across
+        # the room. Title uses scale=3, glyph cell = 8 * 3 = 24 px wide.
+        title = "SNAKE"
+        d.text(title, (SW - len(title) * 24) // 2, 60, api.WHITE, scale=3)
+
         if self._hi:
-            d.text("HIGH %d" % self._hi, (SW - 7 * 16) // 2, 110, theme.GOLD, scale=2)
+            hi = "HIGH %d" % self._hi
+            d.text(hi, (SW - len(hi) * 16) // 2, 104, theme.GOLD, scale=2)
+
+        # Blink the prompt so it reads as a call-to-action.
         if int(self._blink * 2) % 2 == 0:
-            d.text("Press A to start", (SW - 16 * 8) // 2, 150, theme.TEXT_BRIGHT)
+            msg = "Press A to start"
+            d.text(msg, (SW - len(msg) * 16) // 2, 150, api.WHITE, scale=2)
 
     def _draw_gameover(self, d):
-        # Semi-cover the arena with a card
-        panel_w = 220
-        panel_h = 100
-        px = (SW - panel_w) // 2
-        py = (SH - panel_h) // 2
-        d.rect(px, py, panel_w, panel_h, theme.STATUS_BG, fill=True)
-        d.rect(px, py, panel_w, 2,       theme.PRIMARY, fill=True)
-        d.text("GAME OVER", px + (panel_w - 9 * 16) // 2, py + 12, api.WHITE, scale=2)
+        # Full-width dark overlay band that crosses the entire arena, so the
+        # GAME OVER message reads as an arcade-style "kill cam" rather than a
+        # tiny popup floating above the snake.
+        band_h = 120
+        band_y = (SH - band_h) // 2
+        # Dark backdrop with a soft inner card.
+        d.rect(0,         band_y,         SW,        band_h, api.rgb(10, 14, 28), fill=True)
+        d.rect(0,         band_y,         SW,        3,      theme.PRIMARY,       fill=True)
+        d.rect(0,         band_y + band_h - 3, SW,   3,      theme.PRIMARY,       fill=True)
+
+        # Massive scale=3 GAME OVER title in white — primary readable focus.
+        title = "GAME OVER"
+        d.text(title, (SW - len(title) * 24) // 2, band_y + 14,
+               api.WHITE, scale=3)
+
+        # Score + best on the same row so the eye groups them.
+        score = "Score %d" % self._score
         if self._new_hi:
-            d.text("NEW HIGH!", px + (panel_w - 9 * 16) // 2, py + 38, theme.GOLD, scale=2)
+            note   = "NEW HIGH!"
+            note_c = theme.GOLD
         else:
-            d.text("Best %d" % self._hi,
-                   px + (panel_w - (len("Best %d" % self._hi) * 16)) // 2, py + 38,
-                   theme.GOLD, scale=2)
+            note   = "Best %d" % self._hi
+            note_c = theme.GOLD if self._hi else theme.MUTED
+        d.text(score, (SW - len(score) * 16) // 2, band_y + 52,
+               api.WHITE, scale=2)
+        d.text(note,  (SW - len(note)  * 16) // 2, band_y + 76,
+               note_c, scale=2)
+
         if int(self._blink * 2) % 2 == 0:
             msg = "Press A to retry"
-            d.text(msg, px + (panel_w - len(msg) * 8) // 2, py + 72, api.WHITE)
+            d.text(msg, (SW - len(msg) * 8) // 2, band_y + band_h - 18,
+                   api.WHITE)

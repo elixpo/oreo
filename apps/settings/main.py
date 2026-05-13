@@ -55,7 +55,7 @@ class App(oreoOS.App):
                  getter=lambda: self._brightness,
                  setter=lambda v: self._set_brightness(v)),
             _Row("Version",    "info",
-                 getter=lambda: "v0.1"),
+                 getter=self._os_version),
             _Row("Reboot",     "action",
                  setter=lambda v: self._reboot()),
         ]
@@ -78,6 +78,16 @@ class App(oreoOS.App):
                 setter(self._brightness)
         except Exception:
             pass
+
+    @staticmethod
+    def _os_version():
+        """Pull the live VERSION constant from the launcher so the Settings
+        row stays in sync with the actual deployed OS — no double bookkeeping."""
+        try:
+            from oreoOS import launcher
+            return getattr(launcher, "VERSION", "?")
+        except Exception:
+            return "?"
 
     def _reboot(self):
         try:
