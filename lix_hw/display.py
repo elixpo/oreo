@@ -15,6 +15,7 @@ Byte-order:
 import framebuf
 import struct
 from machine import Pin, SPI
+from time import sleep_us as utime_sleep_us
 
 from lix import api
 from lix_hw import pins
@@ -163,17 +164,32 @@ class Display(api.Display):
     def present(self):
         """Push framebuffer to display — no-op if nothing was drawn since last call.
 
-        Address window was set ONCE at init (full screen). We only need to
-        re-issue RAMWR (0x2C) which resets the GRAM write pointer back to (0,0)
-        per the ST7789 datasheet. This halves the per-frame command overhead.
+        Address window was set ONCE at init (full screen); we only re-issue
+        RAMWR (0x2C) to reset the GRAM write pointer to (0,0).
+
+        The full-frame transfer (153,600 bytes at 26 MHz ≈ 47 ms) is
+        split into 4 quarters with brief idle gaps. The chunking spreads
+        the current spike over a longer window so the breadboard 3V3 LDO
+        sees a smoother load — eliminates the ~2 Hz backlight dim pulse
+        that otherwise tracks the auto-GC cycle.
         """
         if not self._dirty:
             return
         self._dirty = False
-        p = self._panel
+        p   = self._panel
+        mv  = memoryview(self._buf)
+        n   = len(self._buf)
+        q   = n >> 2          # 1/4 of the buffer (38,400 bytes)
         p.cs(0)
-        p.dc(0); p.spi.write(p._ramwr_cmd)   # 0x2C — reset write pointer
-        p.dc(1); p.spi.write(self._buf)
+        p.dc(0); p.spi.write(p._ramwr_cmd)
+        p.dc(1)
+        p.spi.write(mv[0:    q])
+        utime_sleep_us(200)
+        p.spi.write(mv[q:   2*q])
+        utime_sleep_us(200)
+        p.spi.write(mv[2*q: 3*q])
+        utime_sleep_us(200)
+        p.spi.write(mv[3*q:    n])
         p.cs(1)
 
     def present_rect(self, x, y, w, h):

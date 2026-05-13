@@ -13,11 +13,10 @@ import time
 from lix import api
 
 VERSION      = "v0.1"
-# 25 fps cap (40 ms): at 26 MHz SPI a full framebuf takes ~47 ms to push,
-# so we can't realistically hit 30 fps. 25 fps still feels smooth for
-# games and removes most visible tearing by keeping us inside the panel's
-# slowed (39 Hz) scan-out window.
-FRAME_MIN_MS = 40
+# Target ~33 fps (30 ms cap). At 40 MHz SPI a full framebuf push is 30.7 ms,
+# plus ~3 ms render → total ≈ 34 ms. The sleep rarely actually fires during
+# gameplay; it caps idle screens so they don't hammer the panel >50 fps.
+FRAME_MIN_MS = 30
 
 _APPS_CANDIDATES = ("/apps", "/remote/apps", "apps")
 
@@ -313,6 +312,13 @@ def boot():
     from lix_hw.os import OS
     from lix_os.splash import show_splash
     from lix_os.home   import Home
+
+   
+    try:
+        gc.threshold(8_000)        # auto-GC after every 8 KB of growth
+    except AttributeError:
+        # CPython simulator has no gc.threshold — ignore.
+        pass
 
     os_obj = OS()
     show_splash(os_obj)
