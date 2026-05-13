@@ -91,6 +91,9 @@ PER_APP_SIZES = {
     # snake — tiled arena bg + bamboo food sprite (CELL_PX size)
     "arena":        (40, 40),
     "food":         (10, 10),
+
+    # splash — full-screen 320×240 backdrop (dimmed in oreoOS/splash.py)
+    "splash_bg":    (320, 240),
 }
 
 

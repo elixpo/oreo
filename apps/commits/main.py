@@ -267,23 +267,34 @@ class App(oreoOS.App):
             _save_cache(self._user, self._levels, self._counts, self._dates)
 
         self._dirty = True
+        # Two-frame refresh state machine so the "Refreshing…" overlay paints
+        # before the blocking fetch locks the UI.
+        #   0 = idle, 1 = A pressed, 2 = overlay drawn → go fetch
+        self._refresh_state = 0
 
     def on_button_press(self, btn):
-        if btn == api.BTN_A:
-            lv, ct, dt = _fetch_contributions(self._user)
+        if btn == api.BTN_A and self._refresh_state == 0:
+            self._refresh_state = 1
+            self._dirty         = True
+
+    def update(self, dt):
+        if self._refresh_state == 1:
+            # Wait one frame so draw() can paint the overlay first.
+            self._refresh_state = 2
+            return
+        if self._refresh_state == 2:
+            lv, ct, dt2 = _fetch_contributions(self._user)
             if lv:
                 self._levels = lv
                 self._counts = ct or [0] * len(lv)
-                self._dates  = dt or [""] * len(lv)
+                self._dates  = dt2 or [""] * len(lv)
                 self._live   = True
                 self._age    = 0
                 _save_cache(self._user, self._levels, self._counts, self._dates)
             else:
                 self._live = False
-            self._dirty = True
-
-    def update(self, dt):
-        pass
+            self._refresh_state = 0
+            self._dirty         = True
 
     def draw(self, d):
         if not self._dirty:
@@ -377,5 +388,18 @@ class App(oreoOS.App):
         pw     = len(pill) * 8 + 12
         d.rect(card_x + card_w - pw - 10, lg_y - 2, pw, 12, pill_c, fill=True)
         d.text(pill, card_x + card_w - pw - 4, lg_y, api.WHITE)
+
+        # "Refreshing…" overlay — drawn on top while the next-frame fetch is
+        # pending so the user sees acknowledgement before the UI locks.
+        if self._refresh_state:
+            msg = "Refreshing..."
+            mw  = len(msg) * 16
+            ow  = mw + 32
+            oh  = 32
+            ox  = (SW - ow) // 2
+            oy  = (SH - oh) // 2
+            d.rect(ox + 2, oy + 2, ow, oh, theme.MUTED2, fill=True)
+            d.rect(ox,     oy,     ow, oh, theme.PRIMARY, fill=True)
+            d.text(msg, ox + 16, oy + (oh - 16) // 2, api.WHITE, scale=2)
 
         self._dirty = False

@@ -82,18 +82,18 @@ def load_app(app_dir):
 # Cost: ~210 ms slide-in animation BEFORE app.on_enter — the heavy load then
 # runs while the loading panel is the only thing on screen.
 
-def _show_loading(display, label, author=None):
+def _show_loading(os_obj, label, author=None):
     """Slide a primary-coloured panel down from the top, covering the screen.
 
-    Shows "LOADING / <app name>" centred, with a smaller "By @<author>" line
-    underneath when the manifest carries one. Framebuf 8×8 only (~30 fps).
+    Polls HOME each frame so the user can abort a slow app launch without
+    waiting for the on_enter to finish — returns True when interrupted.
     """
     from oreoOS import theme
+    display = os_obj.display
+    buttons = os_obj.buttons
     SW = api.SCREEN_W
     SH = api.SCREEN_H
     label  = (label  or "")[:16].upper()
-    # Use the FULL author handle (up to 24 chars) — "Circuit-Overtime" was
-    # being clipped to 14 chars previously.
     byline = ("By @" + author[:24]) if author else ""
 
     steps      = 12          # more keyframes = smoother slide
@@ -102,8 +102,16 @@ def _show_loading(display, label, author=None):
     label_x_l  = (SW - len(label_lbl) * 16) // 2
     label_x_n  = (SW - len(label)     *  8) // 2
     byline_x   = (SW - len(byline)    *  8) // 2
+    hint       = "HOME to cancel"
+    hint_x     = (SW - len(hint) * 8) // 2
 
     for i in range(steps + 1):
+        # HOME interrupt — the only escape hatch while the slide plays,
+        # since the app's on_enter blocks the main loop once we exit.
+        buttons.update()
+        if buttons.just_pressed(api.BTN_HOME):
+            return True
+
         t        = i / steps
         eased    = 1.0 - (1.0 - t) ** 3
         panel_h  = int(eased * SH)
@@ -118,9 +126,12 @@ def _show_loading(display, label, author=None):
             display.text(label,     label_x_n, cy +  6, api.WHITE)
             if byline and panel_h > 100:
                 display.text(byline, byline_x, cy + 24, theme.GOLD)
+            if panel_h > 140:
+                display.text(hint, hint_x, panel_h - 22, api.WHITE)
 
         display.present()
         time.sleep_ms(frame_ms)
+    return False
 
 
 # ── generic app run loop ──────────────────────────────────────────────────────
