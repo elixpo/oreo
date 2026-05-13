@@ -165,10 +165,9 @@ def main():
 
         target = os_obj._launch_request
 
+        # APPS dock routes to the first-class apps/launcher/ implementation.
         if target == "__appmenu__":
-            menu = launcher._AppMenu(apps)
-            _run_app(os_obj, buttons, menu, badge_surf, win, clock, legend_font)
-            target = os_obj._launch_request
+            target = "launcher"
 
         if target and target not in (None, "__appmenu__"):
             try:

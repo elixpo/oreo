@@ -185,9 +185,8 @@ def boot():
 
         target = os_obj._launch_request
 
-        # Home's APPS dock sends "__appmenu__" — route it to the new
-        # first-class apps/launcher/ instead of the legacy inline _AppMenu
-        # (kept around in this file only for back-compat / fallback).
+        # Home's APPS dock sends "__appmenu__" — route it to the
+        # first-class apps/launcher/ implementation.
         if target == "__appmenu__":
             target = "launcher"
 
