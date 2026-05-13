@@ -1,9 +1,9 @@
 """Lix OS hardware abstraction layer.
 
-Two implementations of these ABCs exist: `lix_sim` (pygame, runs on laptop)
-and the `lix` C module compiled into our MicroPython port (runs on the badge).
-Apps and the Lix OS launcher depend only on this interface — they do not
-know or care which backend is active.
+`lix_hw/*` (MicroPython on the ESP32-S3) provides the concrete display/
+buttons/IR/LEDs/ADC backend. Apps depend only on this ABC interface — they
+don't know or care which backend is wired up, so a future sim re-build can
+slot in without touching app code.
 """
 
 try:
