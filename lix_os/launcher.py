@@ -63,7 +63,18 @@ def list_apps():
 def load_app(app_dir):
     module_path = "apps.%s.main" % app_dir
     mod = __import__(module_path, None, None, ["App"])
-    return mod.App()
+    app = mod.App()
+    # Pull the `author` field off the manifest and stamp it onto the app
+    # instance so `_show_loading()` can render "By @author" without each
+    # app needing to declare the attribute on the class.
+    try:
+        with open("%s/%s/manifest.json" % (APPS_DIR, app_dir)) as f:
+            manifest = json.loads(f.read())
+        if manifest.get("author"):
+            app.author = manifest["author"]
+    except (OSError, ValueError):
+        pass
+    return app
 
 
 # ── loading transition (used for slow apps) ──────────────────────────────────
@@ -71,33 +82,31 @@ def load_app(app_dir):
 # Cost: ~210 ms slide-in animation BEFORE app.on_enter — the heavy load then
 # runs while the loading panel is the only thing on screen.
 
-def _show_loading(display, label):
+def _show_loading(display, label, author=None):
     """Slide a primary-coloured panel down from the top, covering the screen.
 
-    Uses framebuf 8×8 (single C call) instead of the pixel font (200+ Python
-    rect calls per word) so each frame is cheap and the animation actually
-    looks like a 30 fps pull-down rather than a 7 fps jerk.
+    Shows "LOADING / <app name>" centred, with a smaller "By @<author>" line
+    underneath when the manifest carries one. Framebuf 8×8 only (~30 fps).
     """
     from lix_os import theme
     SW = api.SCREEN_W
     SH = api.SCREEN_H
-    label = (label or "")[:16].upper()
+    label  = (label  or "")[:16].upper()
+    byline = ("By @" + author[:14]) if author else ""
 
     steps      = 12          # more keyframes = smoother slide
     frame_ms   = 33          # ≈ 30 fps
     label_lbl  = "LOADING"
-    label_x_l  = (SW - len(label_lbl) * 16) // 2   # framebuf 8×8 × scale=2
-    label_x_n  = (SW - len(label)     *  8) // 2   # framebuf 8×8 × scale=1
+    label_x_l  = (SW - len(label_lbl) * 16) // 2
+    label_x_n  = (SW - len(label)     *  8) // 2
+    byline_x   = (SW - len(byline)    *  8) // 2
 
     for i in range(steps + 1):
-        # Ease-out cubic: progress accelerates then settles — feels less mechanical
         t        = i / steps
         eased    = 1.0 - (1.0 - t) ** 3
         panel_h  = int(eased * SH)
 
-        # Pink panel from y=0 to y=panel_h (just paint the strip, not the full screen)
         display.rect(0, 0, SW, panel_h, theme.PRIMARY, fill=True)
-        # Below the panel: cream so the partial slide doesn't show stale content
         if panel_h < SH:
             display.rect(0, panel_h, SW, SH - panel_h, theme.BG, fill=True)
 
@@ -105,6 +114,8 @@ def _show_loading(display, label):
             cy = panel_h // 2
             display.text(label_lbl, label_x_l, cy - 16, api.WHITE, scale=2)
             display.text(label,     label_x_n, cy +  6, api.WHITE)
+            if byline and panel_h > 100:
+                display.text(byline, byline_x, cy + 24, theme.GOLD)
 
         display.present()
         time.sleep_ms(frame_ms)
@@ -119,8 +130,9 @@ def run_app(os_obj, app):
     # Optional loading transition for heavy apps. The panel covers the screen
     # while on_enter does its work; the very next frame fully overwrites it.
     if getattr(app, "SHOW_LOADING", False):
-        label = getattr(app, "name", app.__class__.__name__)
-        _show_loading(os_obj.display, label)
+        label  = getattr(app, "name",   app.__class__.__name__)
+        author = getattr(app, "author", None)
+        _show_loading(os_obj.display, label, author)
 
     app.on_enter(os_obj)
     last = time.ticks_ms()
@@ -134,9 +146,6 @@ def run_app(os_obj, app):
             for b in api.BUTTONS:
                 if os_obj.buttons.just_pressed(b):
                     if b == api.BTN_HOME:
-                        # Apps can intercept HOME by defining `on_home_press()`
-                        # and returning True (e.g. gamepad uses this to make
-                        # HOME a regular button until double-tapped).
                         handled = False
                         hook = getattr(app, "on_home_press", None)
                         if hook is not None:

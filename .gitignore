@@ -18,5 +18,6 @@ firmware/*.bin
 # IDE
 .vscode/settings.json
 .idea/
+.secrets_tmp.py
 *.swp
 *.env
