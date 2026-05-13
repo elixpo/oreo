@@ -237,19 +237,47 @@ class App(oreoOS.App):
             self._user = GITHUB_USER
         except Exception:
             self._user = "Circuit-Overtime"
-        lv, ct = _fetch_contributions(self._user)
-        self._live   = lv is not None
-        self._levels = lv if lv else _demo_grid()
-        self._counts = ct if ct else [0] * len(self._levels)
-        self._dirty  = True
+
+        # Show the disk cache immediately if present — no network spinner on
+        # re-entry. We then attempt a refresh in the background; if it works,
+        # the next frame swaps in the fresh data and re-saves the cache.
+        lv, ct, dt, age = _load_cache(self._user)
+        if lv:
+            self._levels = lv
+            self._counts = ct
+            self._dates  = dt
+            self._live   = False        # we'll flip to True once refresh lands
+            self._age    = age
+        else:
+            self._levels = _demo_grid()
+            self._counts = [0] * len(self._levels)
+            self._dates  = [""] * len(self._levels)
+            self._live   = False
+            self._age    = None
+
+        # Try a fresh fetch; skip silently if WiFi/network isn't up so the
+        # cached grid stays on-screen instead of falling back to the demo.
+        lv, ct, dt = _fetch_contributions(self._user)
+        if lv:
+            self._levels = lv
+            self._counts = ct or [0] * len(lv)
+            self._dates  = dt or [""] * len(lv)
+            self._live   = True
+            self._age    = 0
+            _save_cache(self._user, self._levels, self._counts, self._dates)
+
+        self._dirty = True
 
     def on_button_press(self, btn):
         if btn == api.BTN_A:
-            lv, ct = _fetch_contributions(self._user)
+            lv, ct, dt = _fetch_contributions(self._user)
             if lv:
                 self._levels = lv
                 self._counts = ct or [0] * len(lv)
+                self._dates  = dt or [""] * len(lv)
                 self._live   = True
+                self._age    = 0
+                _save_cache(self._user, self._levels, self._counts, self._dates)
             else:
                 self._live = False
             self._dirty = True
@@ -287,13 +315,22 @@ class App(oreoOS.App):
         sw  = len(sub) * 8
         d.text(sub, (SW - sw) // 2, uy + 28, theme.TEXT_BRIGHT)
 
+        # Date range strip — "from 12 May 2025 to 13 May 2026" — pulled from
+        # the SVG so the user knows exactly what window this grid covers.
+        first = _fmt_date(self._dates[0])  if self._dates else ""
+        last  = _fmt_date(self._dates[-1]) if self._dates else ""
+        if first and last:
+            rng = "%s  -  %s" % (first, last)
+            rw  = len(rng) * 8
+            d.text(rng, (SW - rw) // 2, uy + 40, theme.MUTED)
+
         # Grid — centred horizontally and vertically between subtitle and
         # stat strip so it fills the cream void.
         grid_w = WEEKS * (CELL_PX + GAP_PX) - GAP_PX
         grid_h = DAYS  * (CELL_PX + GAP_PX) - GAP_PX
         gx0    = (SW - grid_w) // 2
 
-        sub_bot   = uy + 40
+        sub_bot   = uy + 52                  # subtitle + date range
         strip_top = card_y + card_h - 60     # reserve for stat strip + legend
         gy0       = sub_bot + max(0, (strip_top - sub_bot - grid_h) // 2)
 
