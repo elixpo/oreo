@@ -69,7 +69,7 @@ class App(lix.App):
         col_x = 110
         y     = widgets.HEADER_H + 12
         d.text("ELIXPO",   col_x, y, theme.PRIMARY,     scale=3); y += 28
-        d.text("BADGE OS", col_x, y, theme.TEAL,        scale=2); y += 20
+        d.text("OS", col_x, y, theme.TEAL,        scale=2); y += 20
 
         secs = self._last_s
         rows = [

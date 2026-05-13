@@ -3,8 +3,8 @@
 Sequence (~3 s):
   0.00–0.30  gradient background sweeps in
   0.20–0.80  mascot fades in (row-reveal top→bottom)
-  0.70–1.20  "ELIXPO" types in
-  1.10–1.50  "BADGE OS" appears
+  0.70–1.20  "OREO" types in
+  1.10–1.50  "OS" appears
   1.40–2.10  loading bar fills
   2.60–3.00  fade to black
 """
@@ -135,9 +135,9 @@ def show_splash(os_obj):
             else:
                 d.rect(_MX, _MY, _MW, _MH, theme.PRIMARY, fill=True)
 
-        p3 = _phase(elapsed, 0.18, 0.52)   # "ELIXPO OS" types in: 900ms–2600ms
+        p3 = _phase(elapsed, 0.18, 0.52)   # "OREO OS" types in: 900ms–2600ms
         if p3 > 0:
-            label = "ELIXPO OS"
+            label = "OREO OS"
             n = max(1, int(p3 * len(label)))
             d.text(label[:n], _TX, _TY, theme.TEXT_BRIGHT, scale=2)
 
