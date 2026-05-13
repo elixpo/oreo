@@ -34,7 +34,10 @@ BADGE_BG     = (255, 248, 235)   # warm cream — fills transparent pixels
 STATUS_SVG_DIR = Path("assets/status/raw")
 STATUS_HW_DIR  = Path("assets/status/optimized")
 STATUS_SIZE    = 13
-STATUS_BG      = (255, 93, 104)  # pink status bar — composite SVGs onto this
+# Fill OUTSIDE the SVG's alpha with the chroma-key sentinel so display.blit()
+# treats those pixels as transparent. The icons then read correctly on ANY
+# header colour (crimson on the launcher, forest-green on the home screen, …).
+STATUS_BG      = (248, 0, 248)   # magenta → RGB565 0xF81F → blit chroma-key
 
 # Chroma-key magenta. Packs to RGB565 0xF81F (bytes [0xF8, 0x1F]). Any sprite
 # pixel matching this value is treated as transparent by display.blit().

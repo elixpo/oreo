@@ -268,7 +268,7 @@ class App(lix.App):
 
         # Compute the slice of rows that are at least partially on-screen.
         viewport_top    = PAD_TOP
-        viewport_bottom = PAD_TOP + VISIBLE_ROWS * CELL_H + PEEK_H
+        viewport_bottom = PAD_TOP + VISIBLE_ROWS * CELL_H
 
         for app_idx in range(n):
             row = app_idx // COLS
@@ -346,12 +346,6 @@ class App(lix.App):
             thumb_y = track_y + (track_h - thumb_h) * self._top_row \
                                  // max(1, rows_total - VISIBLE_ROWS)
             d.rect(track_x, thumb_y, 2, thumb_h, theme.PRIMARY, fill=True)
-
-        # ── peek line at the bottom: visual cue there's more below ──────
-        if self._top_row + VISIBLE_ROWS < rows_total:
-            peek_y = SH - widgets.HINT_H - PEEK_H + 1
-            for i in range(0, SW, 8):
-                d.rect(i, peek_y, 4, 1, theme.PRIMARY, fill=True)
 
         # keep dirty while scrolling / animating
         if (abs(self._scroll_y - self._top_row * CELL_H) > 0.5 or

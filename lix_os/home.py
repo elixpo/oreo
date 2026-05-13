@@ -24,15 +24,50 @@ import lix
 SW = api.SCREEN_W   # 320
 SH = api.SCREEN_H   # 240
 
-_STATUS_H = 22
-_DOCK_H   = 44
-_DOCK_Y   = SH - _DOCK_H        # 196
-_MAIN_TOP = _STATUS_H            # 22
-_MAIN_H   = _DOCK_Y - _MAIN_TOP  # 174
+_STATUS_H   = 22
+_MAIN_TOP   = _STATUS_H            # 22
+_MAIN_H     = SH - _MAIN_TOP       # bg fills the rest now (no dock)
 
-# Clock block: 32px (HH:MM scale=4) + 8 gap + 8 (date) = 48px, centred
-_CLOCK_Y = _MAIN_TOP + (_MAIN_H - 48) // 2   # ≈ 85
-_DATE_Y  = _CLOCK_Y + 32 + 8                  # ≈ 125
+# Clock block — kept at the original position (above where the dock used to
+# sit) so the visual rhythm stays the same after removing the dock.
+_CLOCK_Y    = 84
+_DATE_Y     = _CLOCK_Y + 32 + 8                  # 124
+
+# APPS icon (overlaid on bg, bottom-right corner — replaces the old dock)
+_APPS_SZ    = 32
+_APPS_MARGIN = 12
+_APPS_X     = SW - _APPS_SZ - _APPS_MARGIN
+_APPS_Y     = SH - _APPS_SZ - _APPS_MARGIN
+
+# Forest-green status bar (matches the bg image's tones; the launcher app
+# keeps the original crimson via the widgets default).
+_HOME_STATUS_BG = api.rgb(46, 102,  74)
+
+# ── network-status cache (module-level so it persists across Home() instances)
+# Without this, every return to the home screen would re-init wifi_ok/bt_on
+# to False and we'd see a brief disconnected-icon flicker until the next poll.
+_NET_INTERVAL_MS = 5000          # 5 s — cron-style refresh while ANY screen is open
+_net_cache = {"wifi": False, "bt": False, "checked_ms": None, "ever_checked": False}
+
+
+def _poll_network():
+    """Refresh the wifi/bt cache if the interval has elapsed. Cheap on miss
+    (clock compare only); cheap on hit (just `isconnected()` / `active()` —
+    both are non-blocking radio-state queries, not scans)."""
+    import time
+    now = time.ticks_ms()
+    last = _net_cache["checked_ms"]
+    if last is not None and time.ticks_diff(now, last) < _NET_INTERVAL_MS:
+        return False
+    _net_cache["checked_ms"] = now
+    try:
+        from lix_hw import wifi as _w, bt as _b
+        _net_cache["wifi"] = bool(_w.is_connected())
+        _net_cache["bt"]   = bool(_b.is_active())
+    except Exception:
+        pass
+    _net_cache["ever_checked"] = True
+    return True
 
 # ── asset loaders (pipeline only — no procedural fallback drawing) ─────────────
 
@@ -210,31 +245,26 @@ class Home(lix.App):
 
     def __init__(self, app_list):
         self._apps         = app_list
-        self._dock         = [_DockEntry("APPS", "__appmenu__", "apps_icon.png")]
-        self._dock_sel     = 0
         self._dirty        = True   # full redraw (background + everything)
         self._clock_dirty  = False  # repaint only clock+date band
         self._status_dirty = False  # repaint only status bar
         self._last_sec     = -1
         self._blink        = True
-        self._wifi_ok      = False
-        self._bt_on        = False
-        self._last_net     = -1
+        # Initialise from the cross-instance cache so re-entering home doesn't
+        # flash the icons "disconnected" before the next 5-s poll catches up.
+        self._wifi_ok      = _net_cache["wifi"]
+        self._bt_on        = _net_cache["bt"]
+        self._battery_pct  = 85     # TODO wire to lix_hw.adc.battery_voltage()
 
     def on_enter(self, os):
         super().on_enter(os)
         self._dirty = True
 
     def on_button_press(self, btn):
-        n = len(self._dock)
-        if btn == api.BTN_LEFT:
-            self._dock_sel = (self._dock_sel - 1) % n
-            self._dirty = True
-        elif btn == api.BTN_RIGHT:
-            self._dock_sel = (self._dock_sel + 1) % n
-            self._dirty = True
-        elif btn == api.BTN_A:
-            self.os.launch(self._dock[self._dock_sel].action)
+        # A always opens the apps drawer — the dock is gone, the icon
+        # in the bottom-right of the bg is purely a visual hint now.
+        if btn == api.BTN_A:
+            self.os.launch("__appmenu__")
 
     def update(self, dt):
         _, _, s, *_ = timeutil.now()
@@ -243,19 +273,12 @@ class Home(lix.App):
             self._blink    = not self._blink
             # Only the clock area needs repainting on tick — NOT the full screen
             self._clock_dirty = True
-        # Poll network status every ~5 seconds
-        if s % 5 == 0 and s != self._last_net:
-            self._last_net = s
-            try:
-                from lix_hw import wifi as _w, bt as _b
-                wifi_ok = _w.is_connected()
-                bt_on   = _b.is_active()
-            except Exception:
-                wifi_ok = False
-                bt_on   = False
-            if wifi_ok != self._wifi_ok or bt_on != self._bt_on:
-                self._wifi_ok = wifi_ok
-                self._bt_on   = bt_on
+
+        # Refresh the network cache (no-op unless _NET_INTERVAL_MS elapsed).
+        if _poll_network():
+            if _net_cache["wifi"] != self._wifi_ok or _net_cache["bt"] != self._bt_on:
+                self._wifi_ok      = _net_cache["wifi"]
+                self._bt_on        = _net_cache["bt"]
                 self._status_dirty = True
 
     def draw(self, d):
@@ -278,7 +301,7 @@ class Home(lix.App):
 
             self._draw_status_bar(d, h, m)
             self._draw_clock_area(d, h, m, wd, day, mon, yr)
-            self._draw_dock(d)
+            self._draw_apps_icon(d)
             self._dirty = False
             self._clock_dirty = False
             self._status_dirty = False
@@ -294,11 +317,20 @@ class Home(lix.App):
             self._status_dirty = False
 
     def _draw_status_bar(self, d, h, m):
-        d.rect(0, 0, SW, _STATUS_H, theme.STATUS_BG, fill=True)
+        # Forest-green to match the bg image's foliage; thin pink accent line.
+        d.rect(0, 0, SW, _STATUS_H, _HOME_STATUS_BG, fill=True)
+        d.rect(0, _STATUS_H - 1, SW, 1, theme.PRIMARY, fill=True)
         d.text("%02d:%02d" % (h, m), 6, 7, api.WHITE)
-        _icon_battery(d, SW - 28, 6, pct=85)
-        _icon_bt     (d, SW - 44, 4, active=self._bt_on)
-        _icon_wifi   (d, SW - 60, 5, connected=self._wifi_ok)
+
+        # Battery + percentage on the right edge, then BT, then WiFi
+        pct_str = "%d%%" % self._battery_pct
+        # battery icon is 22 px wide; "%d%%" is 24 px @ 8-px font
+        bat_x   = SW - 28
+        pct_x   = bat_x - len(pct_str) * 8 - 2
+        _icon_battery(d, bat_x, 6, pct=self._battery_pct)
+        d.text(pct_str, pct_x, 7, api.WHITE)
+        _icon_bt   (d, pct_x - 16, 4, active=self._bt_on)
+        _icon_wifi (d, pct_x - 32, 5, connected=self._wifi_ok)
 
     def _draw_clock_area(self, d, h, m, wd, day, mon, yr):
         # Repaint just the clock band over the (cached) background.
@@ -326,39 +358,24 @@ class Home(lix.App):
 
         date_str = "%s %d %s %d" % (wd, day, mon, yr)
         dx = max(0, (SW - len(date_str) * 8) // 2)
-        d.text(date_str, dx, _DATE_Y, api.WHITE)
+        # Date in dark text so it reads cleanly against warm/orange parts of bg.
+        d.text(date_str, dx, _DATE_Y, theme.TEXT_BRIGHT)
 
-        # ── dock ──────────────────────────────────────────────────────────
-    def _draw_dock(self, d):
-        d.rect(0, _DOCK_Y, SW, _DOCK_H, theme.DOCK_BG, fill=True)
-        d.rect(0, _DOCK_Y, SW, 1, theme.PRIMARY, fill=True)
-
-        ICON_SZ  = 32
-        TILE_PAD = 4
-        n        = len(self._dock)
-        gap      = 20
-        total    = n * ICON_SZ + (n - 1) * gap
-        ix       = (SW - total) // 2
-        iy       = _DOCK_Y + (_DOCK_H - ICON_SZ) // 2
-
-        for i, entry in enumerate(self._dock):
-            sel = (i == self._dock_sel)
-            if sel:
-                d.rect(ix - TILE_PAD, iy - TILE_PAD,
-                       ICON_SZ + TILE_PAD * 2, ICON_SZ + TILE_PAD * 2,
-                       theme.SEL_BORDER, fill=False)
-            if entry.action == "__appmenu__":
-                icon = _load_apps_icon()
-            else:
-                from lix_os.icons import load as _load
-                icon = _load(entry.action, entry.icon_file)
-            if icon:
-                idata, iw, ih = icon
-                d.blit(idata, ix + (ICON_SZ - iw) // 2,
-                       iy + (ICON_SZ - ih) // 2, iw, ih)
-            elif entry.action == "__appmenu__":
-                _draw_grid_fallback(d, ix + 2, iy + 2, ICON_SZ - 4)
-            ix += ICON_SZ + gap
+    def _draw_apps_icon(self, d):
+        """Overlay the APPS icon in the bottom-right corner of the bg — no dock.
+        Pressing A always opens the apps drawer; the icon is a visual cue only.
+        """
+        icon = _load_apps_icon()
+        ix, iy = _APPS_X, _APPS_Y
+        if icon:
+            idata, iw, ih = icon
+            # Centre the actual icon inside the _APPS_SZ box (handles smaller icons)
+            d.blit(idata,
+                   ix + (_APPS_SZ - iw) // 2,
+                   iy + (_APPS_SZ - ih) // 2,
+                   iw, ih)
+        else:
+            _draw_grid_fallback(d, ix + 2, iy + 2, _APPS_SZ - 4)
 
 
 def _draw_grid_fallback(d, x, y, size):
