@@ -1,13 +1,13 @@
 """Asset optimizer for Oreo Badge.
 
 Top-level icons (32×32):
-  assets/icons/raw/{name}.png   →   assets/icons/optimized/{name}.py
+  assets/icons/raw/{name}.{png,jpg,jpeg}   →   assets/icons/optimized/{name}.py
 
 Status icons (13×13 white-on-pink, rasterized from SVG):
-  assets/status/raw/*.svg       →   assets/status/optimized/*.py
+  assets/status/raw/*.svg                  →   assets/status/optimized/*.py
 
 Per-app sprites/backgrounds (arbitrary size via SIZES table or _bg suffix):
-  apps/<app>/assets/raw/*.png   →   apps/<app>/assets/optimized/*.py
+  apps/<app>/assets/raw/*.{png,jpg,jpeg}   →   apps/<app>/assets/optimized/*.py
 
 Run from project root:
     python tools/optimize_assets.py                 # all top-level icons
@@ -191,14 +191,22 @@ def optimize_app(app_name, fill_override=None):
     opaque_fill = fill_override or PER_APP_FILL.get(app_name, BADGE_BG)
     opaque_set  = PER_APP_OPAQUE.get(app_name, set())
 
-    raw_pngs = sorted(raw_dir.glob("*.png"))
-    sources  = []
-    for r in raw_pngs:
-        tr = tr_dir / r.name
+    # Accept .png / .jpg / .jpeg (case-insensitive). PIL decodes all three;
+    # we treat them uniformly downstream since each is converted to RGBA.
+    raws = []
+    for p in sorted(raw_dir.iterdir() if raw_dir.exists() else []):
+        if p.suffix.lower() in (".png", ".jpg", ".jpeg") and p.is_file():
+            raws.append(p)
+
+    sources = []
+    for r in raws:
+        # Prefer the matching transparent PNG when one exists (the background
+        # stripper always writes .png regardless of source format).
+        tr = tr_dir / (r.stem + ".png")
         sources.append(tr if tr.exists() else r)
 
     if not sources:
-        print("No raw PNGs in", raw_dir)
+        print("No raw images (.png / .jpg / .jpeg) in", raw_dir)
         return
 
     print("Optimizing %d asset(s) for app '%s'  [opaque-fill=rgb%s, chroma-key=rgb%s]...\n"
@@ -312,11 +320,14 @@ def main():
         return
 
     targets = [a for a in sys.argv[1:] if not a.startswith("--")]
-    sources = sorted(s for s in RAW_DIR.glob("*.png") if s.parent == RAW_DIR)
+    sources = sorted(
+        s for s in RAW_DIR.iterdir()
+        if s.is_file() and s.suffix.lower() in (".png", ".jpg", ".jpeg")
+    )
     if targets:
         sources = [s for s in sources if s.stem in targets]
     if not sources:
-        print("No PNGs found in", RAW_DIR)
+        print("No images (.png / .jpg / .jpeg) found in", RAW_DIR)
         return
 
     print("Optimizing %d icon(s)...\n" % len(sources))
