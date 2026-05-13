@@ -1,29 +1,3 @@
-"""Identity — minimalist conference badge card.
-
-Shows just the things a stranger needs to read across the room:
-
-  ┌──────── header (pink) ──────────┐
-  │            IDENTITY             │
-  ├─────────────────────────────────┤
-  │                                 │
-  │           ╭───────╮             │
-  │           │ AVTR  │  ← circular │
-  │           ╰───────╯             │
-  │       Ayushman Bhattacharya     │  ← display name, scale=2 pink
-  │       ─────────────────         │  ← gold underline
-  │         @Circuit-Overtime       │  ← teal handle
-  │                                 │
-  │       Founder, Elixpo           │  ← designation, gold
-  └─────────────────────────────────┘
-
-All three text fields come from config.py: DISPLAY_NAME, GITHUB_USER,
-DESIGNATION. The avatar is baked at deploy time by tools/fetch_avatar.py
-(re-uses apps/badge's source if you copy it across).
-
-Controls:
-  HOME   apps drawer
-"""
-
 import oreoOS
 from oreoOS import api, theme, widgets
 

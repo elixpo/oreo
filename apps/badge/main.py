@@ -140,40 +140,37 @@ class App(oreoOS.App):
         d.rect(cx,     cy,     cw, ch, theme.CARD,   fill=True)
         d.rect(cx,     cy,     cw,  3, theme.PRIMARY, fill=True)
 
-        # ── avatar (top-centred, 64×64 rounded clipped to circle) ────
-        av_sz  = 64
-        av_cx  = SW // 2
-        av_cy  = cy + 12 + av_sz // 2
-        # Circle base — placed on the card so it reads as a "framed photo"
-        _filled_circle(d, av_cx, av_cy, av_sz // 2 + 3, theme.PRIMARY)
+        # ── avatar (top-centred, sized to the baked asset, pink ring) ──
         if self._avatar:
             data, aw, ah = self._avatar
+            av_sz = max(aw, ah)
+        else:
+            aw = ah = av_sz = 48
+            data = None
+        av_cx = SW // 2
+        av_cy = cy + 14 + av_sz // 2
+        _filled_circle(d, av_cx, av_cy, av_sz // 2 + 3, theme.PRIMARY)
+        if data:
             d.blit(data, av_cx - aw // 2, av_cy - ah // 2, aw, ah)
         else:
-            # initial letter inside a paler inner circle
             _filled_circle(d, av_cx, av_cy, av_sz // 2, theme.CARD)
             letter = (p["login"] or "?")[:1].upper()
-            d.text(letter, av_cx - 16, av_cy - 16, theme.PRIMARY, scale=4)
+            d.text(letter, av_cx - 12, av_cy - 12, theme.PRIMARY, scale=3)
 
-        # ── name + @login centred under avatar (wrapping if needed) ──
-        name_y = av_cy + av_sz // 2 + 12
+        # ── name + @login centred under avatar, with breathing-room margin
+        # so the text block doesn't crowd the pfp.
+        TEXT_MARGIN = 18                     # gap between avatar bottom and name
+        name_y = av_cy + av_sz // 2 + TEXT_MARGIN
         for line in _wrap(p["name"][:32], 18)[:1]:
             lw = len(line) * 16
             d.text(line, (SW - lw) // 2, name_y, theme.PRIMARY, scale=2)
         name_y += 22
 
-        # @login — wrap aggressively so Circuit-Overtime (16) fits one line
         login_lines = _wrap("@" + p["login"], 24)[:2]
         for ln in login_lines:
             lw = len(ln) * 8
             d.text(ln, (SW - lw) // 2, name_y, theme.TEAL)
             name_y += 10
-
-        if p.get("location"):
-            loc = "[ " + p["location"] + " ]"
-            lw  = len(loc) * 8
-            d.text(loc, (SW - lw) // 2, name_y, theme.MUTED)
-            name_y += 12
 
         # ── stats row at the bottom of the card ──────────────────────
         stats_y = cy + ch - 30

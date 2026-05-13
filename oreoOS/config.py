@@ -30,7 +30,7 @@ VERSION           = "v1.2.23"
 
 GITHUB_USER       = "Circuit-Overtime"
 DISPLAY_NAME      = "Ayushman Bhattacharya"
-DESIGNATION       = "Founder, Elixpo"
+DESIGNATION       = "Developer @Myceli.ai"
 WEATHER_LAT       = 22.57
 WEATHER_LON       = 88.36
 WEATHER_NAME      = ""
