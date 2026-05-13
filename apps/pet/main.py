@@ -1,4 +1,4 @@
-"""Elixpo Pet — Tamagotchi-style panda companion.
+"""Oreo Pet — Tamagotchi-style panda companion.
 
 UI: panda centred on a soft bg, three "heart row" stats above (hunger /
 happiness / health — 5 hearts each, filled vs empty), a speech-bubble
@@ -120,7 +120,7 @@ def _draw_speech_bubble(d, x, y, w, h, text, color):
 # ─── App ─────────────────────────────────────────────────────────────────────
 
 class App(oreoOS.App):
-    name         = "Elixpo Pet"
+    name         = "Oreo Pet"
     SHOW_LOADING = False
 
     def on_enter(self, os):

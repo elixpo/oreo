@@ -32,7 +32,7 @@ def _fetch_profile(username):
     try:
         import urequests
         r = urequests.get("https://api.github.com/users/" + username,
-                          headers={"User-Agent": "ElixpoBadge"})
+                          headers={"User-Agent": "OreoBadge"})
         if r.status_code != 200:
             r.close()
             return None

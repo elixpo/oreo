@@ -1,4 +1,4 @@
-"""Elixpo Badge — unified colour theme.
+"""Oreo Badge — unified colour theme.
 
 This is a CELEBRATION badge — warm, festive, vibrant. NOT dark mode.
 

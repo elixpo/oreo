@@ -166,7 +166,7 @@ class App(oreoOS.App):
                 ("",                                    theme.MUTED,       1),
                 ("Powered by Lix HAL +",                theme.TEXT_DIM,    1),
                 ("MicroPython on the",                  theme.TEXT_DIM,    1),
-                ("Elixpo Badge platform.",              theme.TEXT_DIM,    1),
+                ("Oreo Badge platform.",              theme.TEXT_DIM,    1),
                 ("",                                    theme.MUTED,       1),
                 ("Source on GitHub at",                 theme.TEXT_DIM,    1),
                 ("github.com/Circuit-",                 theme.TEAL,        1),

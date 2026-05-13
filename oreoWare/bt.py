@@ -1,4 +1,4 @@
-"""Bluetooth (BLE) manager for the Elixpo Badge.
+"""Bluetooth (BLE) manager for the Oreo Badge.
 
 Usage:
     from oreoWare import bt

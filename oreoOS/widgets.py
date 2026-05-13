@@ -1,4 +1,4 @@
-"""Shared UI widgets used across Elixpo OS apps.
+"""Shared UI widgets used across Oreo OS apps.
 
 Goal: every app has the same visual chrome (header bar, hint footer, panel
 backgrounds) so the OS feels cohesive. Apps just call:

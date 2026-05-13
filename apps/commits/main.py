@@ -56,7 +56,7 @@ def _fetch_contributions(user):
     try:
         import urequests
         url = "https://github.com/users/%s/contributions" % user
-        r = urequests.get(url, headers={"User-Agent": "ElixpoBadge"})
+        r = urequests.get(url, headers={"User-Agent": "OreoBadge"})
         body = r.text
         r.close()
         out = []

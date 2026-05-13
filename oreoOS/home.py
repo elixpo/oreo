@@ -1,4 +1,4 @@
-"""Elixpo OS — home screen, 320×240 landscape, celebration theme.
+"""Oreo OS — home screen, 320×240 landscape, celebration theme.
 
 Layout:
   ┌─ status bar h=22 (pink bar) ───────────────────────────────┐

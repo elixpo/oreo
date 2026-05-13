@@ -1,4 +1,4 @@
-"""Asset optimizer for Elixpo Badge.
+"""Asset optimizer for Oreo Badge.
 
 Top-level icons (32×32):
   assets/icons/raw/{name}.png   →   assets/icons/optimized/{name}.py

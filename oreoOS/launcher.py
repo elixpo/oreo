@@ -1,4 +1,4 @@
-"""Elixpo OS — app loader, generic run loop, crash screen, boot entry point.
+"""Oreo OS — app loader, generic run loop, crash screen, boot entry point.
 
 Apps live in apps/<name>/ with a manifest.json and a main.py that exposes
 an App class subclassing oreoOS.App.  The OS launcher owns the top-level loop;
@@ -309,9 +309,20 @@ def boot():
         # then drives the home-screen clock. ~2 s blocking, only at boot.
         if wifi.is_connected():
             try:
-                import ntptime
+                import ntptime, machine, time as _t
                 ntptime.host = "pool.ntp.org"
                 ntptime.settime()
+                # ntptime always sets the RTC to UTC. Shift by the user's
+                # TIMEZONE_OFFSET (hours) so localtime() reads correctly.
+                try:
+                    from secrets import TIMEZONE_OFFSET as _TZ
+                    if _TZ:
+                        shifted = _t.localtime(_t.time() + int(_TZ * 3600))
+                        machine.RTC().datetime(
+                            (shifted[0], shifted[1], shifted[2], shifted[6] + 1,
+                             shifted[3], shifted[4], shifted[5], 0))
+                except Exception:
+                    pass
             except Exception:
                 pass
     except Exception:

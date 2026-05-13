@@ -47,14 +47,14 @@ def _project_user():
 
 def _fetch_profile(user):
     req = Request("https://api.github.com/users/" + user,
-                  headers={"User-Agent": "ElixpoBadge"})
+                  headers={"User-Agent": "OreoBadge"})
     with urlopen(req, timeout=15) as r:
         import json
         return json.loads(r.read().decode("utf-8"))
 
 
 def _fetch_png(url):
-    req = Request(url, headers={"User-Agent": "ElixpoBadge"})
+    req = Request(url, headers={"User-Agent": "OreoBadge"})
     with urlopen(req, timeout=20) as r:
         return r.read()
 

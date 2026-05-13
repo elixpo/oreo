@@ -21,6 +21,11 @@ WEATHER_LAT       = 22.57
 WEATHER_LON       = 88.36
 WEATHER_NAME      = ""
 BT_AUTO_ENABLE    = False
+
+# Local timezone offset from UTC, in hours. India = +5.5, GMT = 0, EST = -5.
+# Applied after NTP sync so the home-screen clock reads correctly.
+TIMEZONE_OFFSET   = 5.5
+
 WIFI_SSID         = _env.get("WIFI_SSID", "")
 WIFI_PASSWORD     = _env.get("WIFI_PASSWORD", "")
 OWM_API_KEY       = _env.get("OWM_API_KEY", "")

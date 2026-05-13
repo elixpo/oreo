@@ -1,4 +1,4 @@
-"""Convert PNG → RGB565 bitmap for the Elixpo badge display.
+"""Convert PNG → RGB565 bitmap for the Oreo badge display.
 
 Usage:
     python tools/convert_asset.py asset/mascot.png assets/mascot.py --size 64 64

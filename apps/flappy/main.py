@@ -1,4 +1,4 @@
-"""Flappy Panda — Elixpo Badge edition.
+"""Flappy Panda — Oreo Badge edition.
 
 Landscape 320×240. Mona-style physics (gravity + flap impulse), parallax
 scenery (distant hills + clouds + grass), pipe-with-spike obstacles, three

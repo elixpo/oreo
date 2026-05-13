@@ -79,7 +79,7 @@ def _fetch_owm(lat, lon, api_key):
         import urequests
         url = ("https://api.openweathermap.org/data/2.5/weather"
                "?lat=%.3f&lon=%.3f&units=metric&appid=%s" % (lat, lon, api_key))
-        r = urequests.get(url, headers={"User-Agent": "ElixpoBadge"})
+        r = urequests.get(url, headers={"User-Agent": "OreoBadge"})
         if r.status_code != 200:
             r.close()
             return None

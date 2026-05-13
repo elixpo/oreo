@@ -1,4 +1,4 @@
-"""Animated boot splash — Elixpo OS, 320×240 landscape.
+"""Animated boot splash — Oreo OS, 320×240 landscape.
 
 Sequence (~3 s):
   0.00–0.30  gradient background sweeps in
