@@ -9,6 +9,7 @@ Must be run from the project root.
 """
 
 import sys
+import re
 import json
 import hashlib
 import subprocess
@@ -52,6 +53,37 @@ def _save_hash_cache(cache):
     except OSError:
         pass
 
+
+# ── version auto-bump ─────────────────────────────────────────────────────────
+
+CONFIG_PATH      = Path("oreoOS/config.py")
+_VERSION_PATTERN = re.compile(
+    r'^(VERSION\s*=\s*")v(\d+)\.(\d+)\.(\d+)(")',
+    re.MULTILINE,
+)
+
+
+def bump_patch_version():
+    """Rewrite the VERSION literal in oreoOS/config.py, +1 to the patch.
+
+    Returns (old, new) as strings, or (None, None) when no line matched
+    (so the caller can warn instead of silently shipping a stale version).
+    The file is edited in place — comments and the rest of the config
+    are preserved because we only touch the matched line.
+    """
+    if not CONFIG_PATH.exists():
+        return None, None
+    text = CONFIG_PATH.read_text()
+    m    = _VERSION_PATTERN.search(text)
+    if not m:
+        return None, None
+    major, minor, patch = int(m.group(2)), int(m.group(3)), int(m.group(4))
+    old = "v%d.%d.%d" % (major, minor, patch)
+    new = "v%d.%d.%d" % (major, minor, patch + 1)
+    new_line = "%s%s%s" % (m.group(1), new, m.group(5))
+    CONFIG_PATH.write_text(text[:m.start()] + new_line + text[m.end():])
+    return old, new
+
 # ── Files and directories to deploy ──────────────────────────────────────────
 # (local_path, remote_path)  — directories are copied recursively
 
@@ -61,6 +93,7 @@ DEPLOY = [
 
     # OS layer (flat namespace: api, app, theme, widgets, font, …)
     ("oreoOS/__init__.py",      "oreoOS/__init__.py"),
+    ("oreoOS/config.py",        "oreoOS/config.py"),
     ("oreoOS/api.py",           "oreoOS/api.py"),
     ("oreoOS/app.py",           "oreoOS/app.py"),
     ("oreoOS/font.py",          "oreoOS/font.py"),
@@ -321,6 +354,17 @@ remote_dirs = sorted(remote_dirs, key=lambda p: p.count("/"))
 def main():
     import time as _t
     t0 = _t.time()
+
+    # Bump the patch BEFORE we hash files, so the new oreoOS/config.py is what
+    # gets pushed in this same deploy. --no-bump skips it (useful when you're
+    # just iterating locally and don't want VERSION churn in git history).
+    if "--no-bump" not in sys.argv:
+        old, new = bump_patch_version()
+        if new:
+            print("Version: %s → %s" % (old, new))
+        else:
+            print("Version: could not locate VERSION line in %s — skipping bump"
+                  % CONFIG_PATH)
     print("Deploying Oreo Badge OS → %s\n" % PORT)
 
     # Verify device reachable

@@ -12,7 +12,7 @@ import time
 
 from oreoOS import api
 
-VERSION      = "v1.2.19"
+from oreoOS.config import VERSION   # single source of truth; deploy bumps PATCH
 # Target ~33 fps (30 ms cap). At 40 MHz SPI a full framebuf push is 30.7 ms,
 # plus ~3 ms render → total ≈ 34 ms. The sleep rarely actually fires during
 # gameplay; it caps idle screens so they don't hammer the panel >50 fps.
@@ -142,10 +142,14 @@ def run_app(os_obj, app):
 
     # Optional loading transition for heavy apps. The panel covers the screen
     # while on_enter does its work; the very next frame fully overwrites it.
+    # If the user mashes HOME during the slide, abort the launch entirely and
+    # route them back to the apps drawer instead of waiting for on_enter.
     if getattr(app, "SHOW_LOADING", False):
         label  = getattr(app, "name",   app.__class__.__name__)
         author = getattr(app, "author", None)
-        _show_loading(os_obj.display, label, author)
+        if _show_loading(os_obj, label, author):
+            os_obj._launch_request = "__appmenu__"
+            return
 
     app.on_enter(os_obj)
     last = time.ticks_ms()

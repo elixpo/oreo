@@ -126,12 +126,12 @@ class App(oreoOS.App):
         else:
             widgets.draw_hint(d, "L/R=prev/next  A=refresh")
 
-        # Top-right counter — counts the ADD tile too so the user knows
-        # there's something after the last photo.
-        total = len(self._names) + 1
+        # n/n counter inside the header bar (right-aligned). ADD tile counts
+        # too so the user knows there's something after the last photo.
+        total   = len(self._names) + 1
         idx_str = "%d/%d" % (self._idx + 1, total)
-        d.text(idx_str, SW - len(idx_str) * 8 - 6, widgets.HEADER_H + 2,
-               theme.PRIMARY)
+        d.text(idx_str, SW - len(idx_str) * 8 - 6,
+               (widgets.HEADER_H - 8) // 2, api.WHITE)
 
         if self._is_add_tile():
             self._draw_add_tile(d)
@@ -154,9 +154,12 @@ class App(oreoOS.App):
             d.text("broken photo", (SW - 12 * 16) // 2, ay + 40,
                    theme.MUTED, scale=2)
 
-        name = self._names[self._idx]
-        d.text(name[:18], (SW - len(name[:18]) * 8) // 2,
-               SH - widgets.HINT_H - 14, theme.TEXT_BRIGHT)
+        # ◀ / ▶ chevrons on the edges so the user knows the carousel cycles.
+        # The carousel always wraps (includes the ADD tile), so both sides
+        # are always navigable — render both arrows unconditionally.
+        ar_y = ay + ah // 2 - 8
+        d.text("<", 4,      ar_y, theme.PRIMARY, scale=2)
+        d.text(">", SW - 18, ar_y, theme.PRIMARY, scale=2)
 
     # ── ADD tile: scrollable instructions ────────────────────────────────
     def _draw_add_tile(self, d):
