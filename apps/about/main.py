@@ -172,7 +172,7 @@ class App(oreoOS.App):
                 ("Crafted by",                          theme.MUTED,       1),
                 ("@Circuit-Overtime",                   theme.PRIMARY,     2),
                 ("Source on GitHub at",                 theme.TEXT_DIM,    1),
-                ("github.com/elixpo/badgr",                 theme.TEAL,        1),
+                ("github.com/elixpo/badgr",             theme.TEAL,        1)
         ]:
             yy = draw_y(cy_logical)
             row_h = 10 * scale

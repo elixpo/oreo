@@ -84,7 +84,10 @@ class ST7789:
         self._cmd(_INVON);  time.sleep_ms(10)              # IPS needs inversion
         self._cmd(_NORON);  time.sleep_ms(10)
         self._cmd(_DISPON); time.sleep_ms(100)
-        self.bl(1)
+        # Backlight is NOT turned on here — the Display wrapper pushes a
+        # solid black frame first and only then enables BL. That way the
+        # user never sees the random LCD-RAM contents that produce a noisy
+        # boot flash before the first present().
 
     def set_window(self, x0, y0, x1, y1):
         w = self._win
