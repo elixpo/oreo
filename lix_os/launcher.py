@@ -71,27 +71,42 @@ def load_app(app_dir):
 # runs while the loading panel is the only thing on screen.
 
 def _show_loading(display, label):
-    """Slide a primary-coloured panel down from the top, covering the screen."""
+    """Slide a primary-coloured panel down from the top, covering the screen.
+
+    Uses framebuf 8×8 (single C call) instead of the pixel font (200+ Python
+    rect calls per word) so each frame is cheap and the animation actually
+    looks like a 30 fps pull-down rather than a 7 fps jerk.
+    """
     from lix_os import theme
-    from lix import font
     SW = api.SCREEN_W
     SH = api.SCREEN_H
-    steps = 7
+    label = (label or "")[:16].upper()
+
+    steps      = 12          # more keyframes = smoother slide
+    frame_ms   = 33          # ≈ 30 fps
+    label_lbl  = "LOADING"
+    label_x_l  = (SW - len(label_lbl) * 16) // 2   # framebuf 8×8 × scale=2
+    label_x_n  = (SW - len(label)     *  8) // 2   # framebuf 8×8 × scale=1
+
     for i in range(steps + 1):
-        progress = i / steps
-        panel_h  = int(progress * SH)
-        # Pink panel from y=0 to y=panel_h
+        # Ease-out cubic: progress accelerates then settles — feels less mechanical
+        t        = i / steps
+        eased    = 1.0 - (1.0 - t) ** 3
+        panel_h  = int(eased * SH)
+
+        # Pink panel from y=0 to y=panel_h (just paint the strip, not the full screen)
         display.rect(0, 0, SW, panel_h, theme.PRIMARY, fill=True)
-        # Below the panel: solid cream (leftover from previous screen is fine
-        # since it'll be overwritten — but cream looks tidier on partial slide).
+        # Below the panel: cream so the partial slide doesn't show stale content
         if panel_h < SH:
             display.rect(0, panel_h, SW, SH - panel_h, theme.BG, fill=True)
-        if panel_h > 50:
+
+        if panel_h > 60:
             cy = panel_h // 2
-            font.text_center(display, "LOADING", SW // 2, cy - 14, api.WHITE, scale=2)
-            font.text_center(display, label.upper(), SW // 2, cy + 4,  api.WHITE)
+            display.text(label_lbl, label_x_l, cy - 16, api.WHITE, scale=2)
+            display.text(label,     label_x_n, cy +  6, api.WHITE)
+
         display.present()
-        time.sleep_ms(30)
+        time.sleep_ms(frame_ms)
 
 
 # ── generic app run loop ──────────────────────────────────────────────────────
