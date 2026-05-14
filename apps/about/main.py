@@ -193,7 +193,7 @@ class App(oreoOS.App):
                 ("Crafted by",                          theme.MUTED,       1),
                 ("@Circuit-Overtime",                   theme.PRIMARY,     2),
                 ("Source on GitHub at",                 theme.TEXT_DIM,    1),
-                ("github.com/elixpo/badgr",             theme.TEAL,        1)
+                ("https://github.com/elixpo/oreo",             theme.TEAL,        1)
         ]:
             yy = draw_y(cy_logical)
             row_h = 10 * scale
@@ -202,12 +202,7 @@ class App(oreoOS.App):
                 d.text(line, panel_x + (panel_w - lw) // 2, yy, col, scale=scale)
             cy_logical += row_h + 4
 
-        # ── scrollbar
-        # cy_logical is in the same coord space as content_top (PAD_TOP px
-        # below the panel top). The scroll range needs to be large enough
-        # that draw_y(last_row) lands at content_bot — otherwise the final
-        # "github.com/elixpo/badgr" credit gets clipped by _visible() at
-        # the bottom edge no matter how far the user scrolls.
+
         inner_h    = panel_h - PAD_TOP - PAD_BOT
         total_need = cy_logical
         if total_need > inner_h:

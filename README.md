@@ -6,8 +6,12 @@
 
 <div align="center">
 
-<!-- TODO: drop a hero shot at docs/images/hero.png -->
-<img src="docs/images/hero.png" alt="Oreo Badge on a desk" width="520">
+<!-- Hero banner — regenerate any time with: python tools/_gen_banner.py -->
+<img src="docs/images/banner.png" alt="OreoOS — the Oreo Badge" width="100%">
+
+<br><br>
+
+<img src="assets/sprites/raw/mascot.png" alt="Oreo, the panda mascot" width="180">
 
 ### A conference badge that's also a tiny console, a hacker's notebook, and a panda. 🐼
 
