@@ -1,21 +1,20 @@
 name: release
 
-# Cuts an OreoOS OTA release whenever a tag of the form
-#   stable/v*  or  beta/v*  is pushed.
+# OreoOS releases are CUT MANUALLY. There is no auto-trigger on tag push
+# because we want a human to look at the badge running the release
+# candidate before any other badge in the world tries to pull it.
 #
-# The job builds the manifest + bundle with tools/build_release.py,
-# uploads every shipping file as an individual GitHub Release asset
-# (so the manifest's per-file URLs are addressable), and attaches
-# manifest.json + bundle.tar alongside.
+# Two ways to cut a release:
+#   1. Local:  python tools/release.py vX.Y.Z [--channel stable|beta]
+#      (uses the gh CLI — preferred for solo or workshop releases)
+#   2. Cloud:  Actions tab → "release" workflow → Run workflow
+#      (this file — useful when you don't have a dev machine handy)
 #
-# Badge-side oreoOS.ota.check() then sees the new release on the
-# matching channel and downloads each file by URL.
+# Both paths converge on tools/build_release.py + a GitHub Release with
+# manifest.json + per-file assets attached. The badge's OTA client
+# picks up whichever release matches its channel.
 
 on:
-  push:
-    tags:
-      - "stable/v*"
-      - "beta/v*"
   workflow_dispatch:
     inputs:
       version:
@@ -43,28 +42,18 @@ jobs:
       - name: Resolve channel + version
         id: meta
         run: |
-          # If triggered by tag: split <channel>/<version> from the ref.
-          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
-            TAG="${GITHUB_REF#refs/tags/}"
-            CHANNEL="${TAG%%/*}"
-            VERSION="${TAG#*/}"
-          else
-            CHANNEL="${{ github.event.inputs.channel }}"
-            VERSION="${{ github.event.inputs.version }}"
-            if [ -z "$VERSION" ]; then
-              VERSION=$(python - <<'PY'
-import re, pathlib
-m = re.search(r'VERSION\s*=\s*"(v\d+\.\d+\.\d+)"',
-              pathlib.Path("oreoOS/config.py").read_text())
-print(m.group(1) if m else "v0.0.0")
-PY
-)
-            fi
-            TAG="$CHANNEL/$VERSION"
+          CHANNEL="${{ github.event.inputs.channel }}"
+          VERSION="${{ github.event.inputs.version }}"
+          # Fall back to the literal in oreoOS/config.py when the input is
+          # empty. grep -oP for the v-prefixed semver; no python here so we
+          # don't fight YAML's indentation rules around heredocs.
+          if [ -z "$VERSION" ]; then
+            VERSION=$(grep -oP 'VERSION\s*=\s*"\Kv\d+\.\d+\.\d+' oreoOS/config.py || echo "v0.0.0")
           fi
-          echo "tag=$TAG"           >> "$GITHUB_OUTPUT"
-          echo "channel=$CHANNEL"   >> "$GITHUB_OUTPUT"
-          echo "version=$VERSION"   >> "$GITHUB_OUTPUT"
+          TAG="$CHANNEL/$VERSION"
+          echo "tag=$TAG"         >> "$GITHUB_OUTPUT"
+          echo "channel=$CHANNEL" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Build release artefacts
         run: |
