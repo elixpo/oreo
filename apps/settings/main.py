@@ -12,28 +12,39 @@ SH = api.SCREEN_H
 
 ROW_H        = 28
 ROW_PAD_X    = 18
-ROW_TOP_Y    = widgets.HEADER_H + 8
+PAD_TOP      = 8                  # breathing-room below the header
+PAD_BOT      = 8                  # breathing-room above the hint bar
+ROW_TOP_Y    = widgets.HEADER_H + PAD_TOP
+
+# How many full rows fit inside the play area (used as the scroll window).
+_PLAY_H       = SH - widgets.HEADER_H - widgets.HINT_H - PAD_TOP - PAD_BOT
+VISIBLE_ROWS  = max(1, _PLAY_H // ROW_H)
 
 
 class _Row:
-    __slots__ = ("label", "kind", "getter", "setter", "step")
-    def __init__(self, label, kind, getter=None, setter=None, step=10):
-        self.label  = label
-        self.kind   = kind        # "toggle" | "info" | "action" | "slider"
-        self.getter = getter
-        self.setter = setter
+    __slots__ = ("label", "kind", "getter", "setter", "step", "max_val")
+    def __init__(self, label, kind, getter=None, setter=None, step=10, max_val=100):
+        self.label   = label
+        self.kind    = kind        # "toggle" | "info" | "action" | "slider"
+        self.getter  = getter
+        self.setter  = setter
         # Per-row L/R adjustment step. 10 is right for percent-style sliders
         # (brightness 0-100); minute counters use 1 so 1->30 isn't 3 jumps.
-        self.step   = step
+        self.step    = step
+        # Full-scale value the slider's progress-bar fills at. 100 for
+        # brightness; 10 for the auto-sleep timer (so the bar reads full
+        # when sleep-after is at its max 10 min).
+        self.max_val = max_val
 
 
 class App(oreoOS.App):
     name = "Settings"
 
     def on_enter(self, os):
-        self._os    = os
-        self._sel   = 0
-        self._dirty = True
+        self._os         = os
+        self._sel        = 0
+        self._scroll_top = 0           # first visible row index
+        self._dirty      = True
 
         # Lazily import the WiFi / BT modules so the sim doesn't crash.
         try:
@@ -74,7 +85,7 @@ class App(oreoOS.App):
             _Row("Sleep After", "slider",
                  getter=self._idle_minutes,
                  setter=self._set_idle_minutes,
-                 step=1),
+                 step=1, max_val=10),
             _Row("Touch Wake",  "toggle",
                  getter=self._touch_wake,
                  setter=self._set_touch_wake),
@@ -119,11 +130,13 @@ class App(oreoOS.App):
 
     def _idle_minutes(self):
         if not self._pm: return 2
-        return max(1, int(self._pm.SETTINGS.get("idle_seconds", 120) / 60))
+        return max(0, int(self._pm.SETTINGS.get("idle_seconds", 120) / 60))
 
     def _set_idle_minutes(self, v):
         if not self._pm: return
-        v = max(1, min(30, int(v)))
+        # 0 = auto-sleep off (power.py also skips when seconds == 0).
+        # 10 = top cap so the slider doesn't run off into hours.
+        v = max(0, min(10, int(v)))
         self._pm.SETTINGS["idle_seconds"] = v * 60
         self._pm.save_settings(self._os)
 
@@ -156,14 +169,23 @@ class App(oreoOS.App):
     # ── input ────────────────────────────────────────────────────────────
     def on_button_press(self, btn):
         n = len(self._rows)
-        if   btn == api.BTN_UP:    self._sel = (self._sel - 1) % n; self._dirty = True
-        elif btn == api.BTN_DOWN:  self._sel = (self._sel + 1) % n; self._dirty = True
-        elif btn == api.BTN_LEFT:
-            self._adjust(-1); self._dirty = True
-        elif btn == api.BTN_RIGHT:
-            self._adjust(+1); self._dirty = True
-        elif btn == api.BTN_A:
-            self._activate(); self._dirty = True
+        if   btn == api.BTN_UP:    self._sel = (self._sel - 1) % n
+        elif btn == api.BTN_DOWN:  self._sel = (self._sel + 1) % n
+        elif btn == api.BTN_LEFT:  self._adjust(-1)
+        elif btn == api.BTN_RIGHT: self._adjust(+1)
+        elif btn == api.BTN_A:     self._activate()
+        # Auto-scroll: keep the selected row inside the visible window.
+        if self._sel < self._scroll_top:
+            self._scroll_top = self._sel
+        elif self._sel >= self._scroll_top + VISIBLE_ROWS:
+            self._scroll_top = self._sel - VISIBLE_ROWS + 1
+        # Clamp (handles wrap-around from DOWN past last row → 0)
+        max_top = max(0, n - VISIBLE_ROWS)
+        if self._scroll_top > max_top:
+            self._scroll_top = max_top
+        if self._scroll_top < 0:
+            self._scroll_top = 0
+        self._dirty = True
 
     def _adjust(self, sign):
         """sign is +1 or -1 — multiplied by the row's own step."""
@@ -189,17 +211,26 @@ class App(oreoOS.App):
         widgets.draw_header(d, "SETTINGS")
         widgets.draw_hint  (d, "A=toggle  L/R=slider  HOME=back")
 
-        for i, row in enumerate(self._rows):
-            y   = ROW_TOP_Y + i * ROW_H
+        n        = len(self._rows)
+        top      = self._scroll_top
+        end      = min(n, top + VISIBLE_ROWS)
+        for vis_i, i in enumerate(range(top, end)):
+            row = self._rows[i]
+            y   = ROW_TOP_Y + vis_i * ROW_H
             sel = (i == self._sel)
             if sel:
                 d.rect(0, y - 2, SW, ROW_H - 2, theme.DOCK_SEL, fill=True)
                 d.rect(0, y - 2, 4, ROW_H - 2, theme.PRIMARY,  fill=True)
-
             d.text(row.label, ROW_PAD_X, y + 6, theme.TEXT_BRIGHT, scale=2)
+            self._draw_value(d, row, SW - 18, y)
 
-            val_x = SW - 18
-            self._draw_value(d, row, val_x, y)
+        # Scroll indicators — small pink chevrons on the right edge of the
+        # play area when more rows exist above / below the window.
+        if top > 0:
+            d.text("^", SW - 14, ROW_TOP_Y - 2, theme.PRIMARY, scale=2)
+        if end < n:
+            d.text("v", SW - 14, ROW_TOP_Y + VISIBLE_ROWS * ROW_H - 14,
+                   theme.PRIMARY, scale=2)
 
         self._dirty = False
 
@@ -210,14 +241,18 @@ class App(oreoOS.App):
             color = theme.GREEN if on else theme.MUTED
             d.text(label, right_x - len(label) * 8 * 2, y + 6, color, scale=2)
         elif row.kind == "slider":
-            v = int(row.getter())
-            # Slider bar
+            v       = int(row.getter())
+            max_val = max(1, int(row.max_val))
             bar_w = 80
             bar_x = right_x - bar_w
-            d.rect(bar_x, y + 10,         bar_w, 4, theme.MUTED2, fill=True)
-            fill_w = int(bar_w * v / 100)
+            d.rect(bar_x, y + 10, bar_w, 4, theme.MUTED2, fill=True)
+            fill_w = int(bar_w * v / max_val)
             d.rect(bar_x, y + 10, fill_w, 4, theme.PRIMARY, fill=True)
-            d.text("%d" % v, bar_x - 32, y + 6, theme.TEXT_BRIGHT)
+            # 0 on a sleep-style slider should read as "off" rather than "0";
+            # for the brightness slider 0 is still "0" since the value is a
+            # percentage and that's the unambiguous meaning.
+            label = "off" if (v == 0 and row.max_val <= 30) else "%d" % v
+            d.text(label, bar_x - 32, y + 6, theme.TEXT_BRIGHT)
         elif row.kind == "info":
             s = str(row.getter() or "—")[:14]
             d.text(s, right_x - len(s) * 8, y + 7, theme.MUTED)

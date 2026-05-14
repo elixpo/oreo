@@ -72,14 +72,21 @@ class PowerManager:
         self._last_event = time.ticks_ms()
 
     def tick(self, app):
-        """Once per frame. Triggers deep sleep when the threshold elapses."""
+        """Once per frame. Triggers deep sleep when the threshold elapses.
+
+        Auto-sleep is disabled when EITHER the toggle is off OR the
+        Sleep-After slider sits at 0 minutes. The slider's 0 acts as a
+        quick "never sleep" without having to flip the toggle row.
+        """
         if not SETTINGS["idle_enable"]:
+            return
+        idle_seconds = SETTINGS.get("idle_seconds", 0)
+        if idle_seconds <= 0:
             return
         if getattr(app, "BLOCK_IDLE", False):
             self._last_event = time.ticks_ms()
             return
-        idle_ms = SETTINGS["idle_seconds"] * 1000
-        if time.ticks_diff(time.ticks_ms(), self._last_event) >= idle_ms:
+        if time.ticks_diff(time.ticks_ms(), self._last_event) >= idle_seconds * 1000:
             self.enter_deep_sleep()
 
     # ── transitions ──────────────────────────────────────────────────────

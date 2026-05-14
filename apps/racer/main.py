@@ -251,8 +251,14 @@ class App(oreoOS.App):
                                      ROAD_X + 4,
                                      ROAD_X + ROAD_W - CAR_W - 4)
 
+            # Top speed climbs with score so the game gets faster the longer
+            # you survive. +0.5 % per point puts you at ~50 % faster by 100,
+            # 2x faster by 200. Caps at 1.8x so it stays playable on a
+            # 320-px-tall screen at 30 fps.
+            speed_mult = min(1.8, 1.0 + 0.005 * self._score)
+            effective_max = ROAD_SCROLL_MAX * speed_mult
             target = ROAD_SCROLL_MIN + (
-                ROAD_SCROLL_MAX - ROAD_SCROLL_MIN) * max(0.0, throttle)
+                effective_max - ROAD_SCROLL_MIN) * max(0.0, throttle)
             if throttle < -0.2:
                 target = ROAD_SCROLL_MIN * 0.3
             self._scroll_v += (target - self._scroll_v) * min(1.0, dt * 4)
@@ -266,9 +272,31 @@ class App(oreoOS.App):
                     ENEMY_SPAWN_FLOOR,
                     ENEMY_SPAWN_SEC0 - self._score * 0.01)
                 self._spawn_left = self._spawn_int
-                lane = ENEMY_LANES[int(self._blink * 31) % 3]
-                spr  = self._spr_enemy_a if int(self._blink * 17) & 1 else self._spr_enemy_b
-                self._enemies.append(_Enemy(lane, PLAY_TOP - ENEMY_H, spr))
+                # Lane choice rule: never spawn in a lane that's blocked at
+                # the top of the screen, AND never block all three lanes at
+                # the same vertical band. Reaction-distance heuristic: any
+                # enemy whose top is still within REACTION_PX of the spawn
+                # row counts as "still up there" — the new spawn must avoid
+                # those lane indices.
+                REACTION_PX = ENEMY_H + 70    # 1 car length + room to weave
+                blocked = set()
+                for e in self._enemies:
+                    if e.y < PLAY_TOP + REACTION_PX:
+                        # find which lane this enemy occupies
+                        for i, lx in enumerate(ENEMY_LANES):
+                            if abs(e.x - lx) < ENEMY_W // 2:
+                                blocked.add(i)
+                                break
+                free = [i for i in range(len(ENEMY_LANES)) if i not in blocked]
+                if not free:
+                    # All three blocked — skip this spawn entirely so the
+                    # player always has a way through.
+                    pass
+                else:
+                    pick = free[int(self._blink * 31) % len(free)]
+                    spr  = self._spr_enemy_a if int(self._blink * 17) & 1 else self._spr_enemy_b
+                    self._enemies.append(_Enemy(ENEMY_LANES[pick],
+                                                PLAY_TOP - ENEMY_H, spr))
 
             new_enemies = []
             for e in self._enemies:
@@ -389,11 +417,15 @@ class App(oreoOS.App):
         # Score top-right with a 1-px shadow, no opaque box.
         s = "%d" % self._score
         self._shadow_text(d, s, SW - len(s) * 16 - 6, 6, C_TEXT, scale=2)
-        # Thin speed bar bottom-left.
+        # Thin speed bar bottom-left. Scaled against the current effective
+        # max (which climbs with score) so a full bar always means "flat out".
         bar_w = 60
         d.rect(8, SH - 12, bar_w, 4, C_SHADOW, fill=True)
+        speed_mult    = min(1.8, 1.0 + 0.005 * self._score)
+        effective_max = ROAD_SCROLL_MAX * speed_mult
         v_pct = (self._scroll_v - ROAD_SCROLL_MIN) / max(
-            1.0, ROAD_SCROLL_MAX - ROAD_SCROLL_MIN)
+            1.0, effective_max - ROAD_SCROLL_MIN)
+        v_pct = max(0.0, min(1.0, v_pct))
         d.rect(8, SH - 12, int(bar_w * v_pct), 4, C_HI, fill=True)
 
     # ── overlay helpers (scan-line dim + shadow text) ────────────────────
@@ -410,24 +442,38 @@ class App(oreoOS.App):
         self._shadow_text(d, s, (SW - w) // 2, y, color, scale)
 
     # ── menus ────────────────────────────────────────────────────────────
+    def _mode_label(self):
+        if self._mode == "IMU":
+            return "TILT" if self._imu else "TILT (no IMU)"
+        return "BUTTONS"
+
+    def _mode_hint(self):
+        if self._mode == "IMU":
+            return "hold flat - roll=steer, pitch=throttle"
+        return "L/R = steer,  UP/DOWN = throttle"
+
     def _draw_intro(self, d):
-        self._center_text(d, "PANDA RACER", 40, C_TITLE, scale=3)
+        self._center_text(d, "PANDA RACER", 36, C_TITLE, scale=3)
         if self._hi:
-            self._center_text(d, "HIGH %d" % self._hi, 90, C_HI, scale=2)
-        if not self._imu:
-            self._center_text(d, "no IMU - sensor offline", 120, C_TITLE, scale=1)
+            self._center_text(d, "HIGH %d" % self._hi, 80, C_HI, scale=2)
+        # Active mode + how to swap. B from a menu toggles between
+        # TILT (MPU6050) and BUTTONS (D-pad).
+        self._center_text(d, "Mode: %s  (B = swap)" % self._mode_label(),
+                          108, C_TITLE, scale=1)
         if int(self._blink * 2) % 2 == 0:
-            self._center_text(d, "Press A to start", 140, C_TEXT, scale=2)
-        self._center_text(d, "tilt to steer + throttle", 180, C_DIM, scale=1)
-        self._center_text(d, "HOME = back",              200, C_DIM, scale=1)
+            self._center_text(d, "Press A to start", 132, C_TEXT, scale=2)
+        self._center_text(d, self._mode_hint(), 180, C_DIM, scale=1)
+        self._center_text(d, "HOME = back",     200, C_DIM, scale=1)
 
     def _draw_over(self, d):
-        self._center_text(d, "GAME OVER", 40, C_TITLE, scale=3)
-        self._center_text(d, "Score %d" % self._score, 90, C_TEXT, scale=2)
+        self._center_text(d, "GAME OVER", 36, C_TITLE, scale=3)
+        self._center_text(d, "Score %d" % self._score, 80, C_TEXT, scale=2)
         if self._new_hi:
-            self._center_text(d, "NEW HIGH!", 120, C_HI, scale=2)
+            self._center_text(d, "NEW HIGH!", 108, C_HI, scale=2)
         else:
-            self._center_text(d, "Best %d" % self._hi, 120, C_HI, scale=2)
+            self._center_text(d, "Best %d" % self._hi, 108, C_HI, scale=2)
+        self._center_text(d, "Mode: %s  (B = swap)" % self._mode_label(),
+                          136, C_TITLE, scale=1)
         if int(self._blink * 2) % 2 == 0:
             self._center_text(d, "Press A to retry", 160, C_TEXT, scale=2)
         self._center_text(d, "HOME = back", 200, C_DIM, scale=1)
