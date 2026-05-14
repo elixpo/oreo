@@ -107,6 +107,7 @@ DEPLOY = [
     ("oreoOS/theme.py",         "oreoOS/theme.py"),
     ("oreoOS/timeutil.py",      "oreoOS/timeutil.py"),
     ("oreoOS/widgets.py",       "oreoOS/widgets.py"),
+    ("oreoOS/cache.py",         "oreoOS/cache.py"),
 
     # Hardware drivers
     ("oreoWare/__init__.py",    "oreoWare/__init__.py"),
