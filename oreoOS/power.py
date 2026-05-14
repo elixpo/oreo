@@ -97,56 +97,74 @@ class PowerManager:
         except Exception:
             pass
 
-        # Resolve the wake-from-sleep IRQ flag. MicroPython exposes
-        # machine.SLEEP on most ESP32 builds but a few stripped builds omit
-        # it; fall back to the documented integer value (5 = SLEEP) when
-        # the constant is missing so we still register the wake source.
-        wake_flag = getattr(machine, "SLEEP", None)
-        if wake_flag is None:
-            wake_flag = 5
-
-        # Configure wake-on-pin for buttons + (optional) touch. Each pin
-        # gets its own try/except so a single failure doesn't strand the
-        # chip in sleep with no other wake source.
-        wake_pins = []
-        for p in (pins.BTN_HOME, pins.BTN_A, pins.BTN_B, pins.BTN_C,
-                  pins.BTN_UP, pins.BTN_DOWN, pins.BTN_LEFT, pins.BTN_RIGHT):
-            try:
-                pin = machine.Pin(p, machine.Pin.IN, machine.Pin.PULL_UP)
-                pin.irq(trigger=machine.Pin.IRQ_FALLING, wake=wake_flag)
-                wake_pins.append(pin)
-            except Exception:
-                # That single pin's wake didn't register; keep going.
-                pass
-
-        if SETTINGS["touch_wake"]:
-            try:
-                tp = machine.Pin(pins.TOUCH_OUT, machine.Pin.IN)
-                tp.irq(trigger=machine.Pin.IRQ_RISING, wake=wake_flag)
-                wake_pins.append(tp)
-            except Exception:
-                pass
-
-        if not wake_pins:
-            # No wake source got registered — entering lightsleep here would
-            # only ever return on the chip's max timeout. Bail.
-            try:
-                self._os.display.set_brightness(prev_brightness)
-            except Exception:
-                pass
-            return
-
-        # ── sleep here. Resumes when any configured pin IRQ fires. ──
-        # We pass a 24-hour ceiling so a borked wake source can't strand the
-        # chip forever — worst case it ticks back to the run loop tomorrow.
+        # Sleep loop — soft, polled. Earlier attempts at machine.lightsleep()
+        # + Pin.irq(wake=SLEEP) silently failed on this firmware, leaving the
+        # chip either sleeping forever or never sleeping at all. Polling at
+        # 20 Hz with the LCD backlight off draws ~20-30 mA — far less than
+        # the run loop (~80 mA) — and is GUARANTEED to wake on any input.
+        # We can revisit true light-sleep once we have a build whose Pin.irq
+        # honours the wake flag.
         try:
-            machine.lightsleep(24 * 60 * 60 * 1000)
+            btns = self._os.buttons
         except Exception:
-            try:
-                # Older MP builds want no argument.
-                machine.lightsleep()
-            except Exception:
-                pass
+            btns = None
+
+        # Read the TTP touch line directly so wake-on-touch doesn't depend
+        # on the buttons module knowing about it.
+        try:
+            touch_pin = machine.Pin(pins.TOUCH_OUT, machine.Pin.IN)
+        except Exception:
+            touch_pin = None
+
+        # Snapshot button states so we wake only on an EDGE (press), not on
+        # a button that was already held when we entered sleep.
+        initial = {}
+        if btns is not None:
+            for b in (pins.BTN_HOME, pins.BTN_A, pins.BTN_B, pins.BTN_C,
+                      pins.BTN_UP, pins.BTN_DOWN, pins.BTN_LEFT, pins.BTN_RIGHT):
+                try:
+                    initial[b] = machine.Pin(b, machine.Pin.IN,
+                                              machine.Pin.PULL_UP).value()
+                except Exception:
+                    initial[b] = 1
+
+        # 24 h ceiling so a stuck-press doesn't lock us in forever.
+        deadline = time.ticks_add(time.ticks_ms(), 24 * 60 * 60 * 1000)
+
+        while True:
+            # Wake on a button transitioning to pressed (active-low → 0).
+            woke = False
+            for b, was in initial.items():
+                try:
+                    v = machine.Pin(b, machine.Pin.IN,
+                                     machine.Pin.PULL_UP).value()
+                except Exception:
+                    continue
+                if v == 0 and was == 1:
+                    woke = True
+                    break
+                initial[b] = v
+            if woke:
+                break
+
+            # Wake on TTP touch (active-high pulse) when enabled.
+            if SETTINGS["touch_wake"] and touch_pin is not None:
+                try:
+                    if touch_pin.value() == 1:
+                        woke = True
+                except Exception:
+                    pass
+            if woke:
+                break
+
+            if time.ticks_diff(deadline, time.ticks_ms()) <= 0:
+                break
+
+            # 50 ms poll → 20 Hz responsiveness, plenty for a tap-to-wake.
+            # During this sleep the CPU is in WAIT mode between ticks; the
+            # display is off; the WiFi/BT stacks keep running because
+            # connecting + reconnecting takes longer than a wake cycle.
+            time.sleep_ms(50)
 
         # Restore the screen on wake. The next frame the run-loop draws
         # will repaint everything because each app's _dirty flag is still

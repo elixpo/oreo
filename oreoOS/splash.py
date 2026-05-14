@@ -45,9 +45,35 @@ BG_DIM         = 0.30          # fraction of original brightness
 _mascot = None
 
 def _get_mascot():
+    """Return (data, w, h) for the mascot sprite. Prefers the chroma-key
+    transparent variant so the splash bg shows through around the mascot.
+
+    Resolution order:
+      1. assets/sprites/optimized/mascot_transparent.py   (chroma-key, *preferred*)
+      2. assets/sprites/optimized/mascot.py               (cream-bg fallback)
+      3. PIL bake at runtime (build-host only; never on device)
+    """
     global _mascot
     if _mascot is not None:
         return _mascot if _mascot is not False else None
+    # 1) Transparent (chroma-key magenta) variant — corners blit as
+    # transparent so the dimmed splash bg shows through.
+    try:
+        import assets.sprites.optimized.mascot_transparent as m
+        _mascot = (m.DATA, m.W, m.H)
+        return _mascot
+    except (ImportError, AttributeError):
+        pass
+    # 2) Cream-bg version (older asset) — still readable, just sits in a
+    # square; better than no mascot.
+    try:
+        import assets.sprites.optimized.mascot as m
+        _mascot = (m.DATA, m.W, m.H)
+        return _mascot
+    except (ImportError, AttributeError):
+        pass
+    # 3) Build-host fallback: bake from the raw PNG via PIL (never runs
+    # on the badge — PIL isn't installed there).
     try:
         from PIL import Image
         img = Image.open("assets/sprites/raw/mascot.png").convert("RGBA").resize(
@@ -65,12 +91,6 @@ def _get_mascot():
         _mascot = (data, _MW, _MH)
         return _mascot
     except Exception:
-        pass
-    try:
-        import assets.sprites.optimized.mascot as m
-        _mascot = (m.DATA, m.W, m.H)
-        return _mascot
-    except (ImportError, AttributeError):
         pass
     _mascot = False
     return None
