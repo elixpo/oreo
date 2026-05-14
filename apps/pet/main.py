@@ -38,12 +38,23 @@ EAT_FACE_MS  = 1200      # show 'eat' expression for this long after feeding
 # ─── helpers ─────────────────────────────────────────────────────────────────
 
 def _load_state():
+    """Read persisted (hunger, happy, health) from disk.
+
+    First-launch / post-flash behaviour: state.txt does not exist yet (a
+    deploy --clean wipes it; a fresh badge has never written it), so we
+    return (100, 100, 100). The pet starts maxed-out and only decays
+    while the user is actually looking at the app.
+
+    Persisted state is preserved across power-cycles and reboots because
+    state.txt sits on the regular filesystem partition — it survives
+    until the user re-flashes with --clean.
+    """
     try:
         with open(STATE_PATH) as f:
             a, b, c = f.read().strip().split(",")
             return (int(a), int(b), int(c))
     except Exception:
-        return (80, 80, 90)
+        return (100, 100, 100)
 
 def _save_state(h, hp, hl):
     try:
@@ -54,6 +65,33 @@ def _save_state(h, hp, hl):
 
 def _clamp(v):
     return max(0, min(100, int(v)))
+
+def _upscale_sprite_2x(data, w, h):
+    """Nearest-neighbour 2x of an RGB565 big-endian bytearray sprite.
+
+    Used to render the panda BIG in the centre of the pet stage. Source
+    sprites are 64x64; we cache the upscaled 128x128 buffer on the app
+    instance so per-frame draw stays a single d.blit.
+    """
+    dw = w * 2
+    dh = h * 2
+    out = bytearray(dw * dh * 2)
+    for y in range(h):
+        src_row = y * w * 2
+        dst_y0  = (y * 2) * dw * 2
+        dst_y1  = dst_y0 + dw * 2
+        for x in range(w):
+            si = src_row + x * 2
+            b0 = data[si]
+            b1 = data[si + 1]
+            di0 = dst_y0 + (x * 2) * 2
+            di1 = dst_y1 + (x * 2) * 2
+            out[di0]     = b0; out[di0 + 1] = b1
+            out[di0 + 2] = b0; out[di0 + 3] = b1
+            out[di1]     = b0; out[di1 + 1] = b1
+            out[di1 + 2] = b0; out[di1 + 3] = b1
+    return out, dw, dh
+
 
 def _try_sprite(modpath):
     try:
@@ -128,20 +166,26 @@ class App(oreoOS.App):
 
     def on_enter(self, os):
         self._os = os
-        # Sprites
+        # Sprites — load once, then 2x upscale so the pet reads BIG in the
+        # middle of the screen. Source sprites are 64x64; cached as 128x128
+        # bytearrays so per-frame draw is a single blit.
         keys = ("happy", "hungry", "sad", "sleep", "eat")
-        self._sprites   = {k: _try_sprite("apps.pet.assets.optimized.panda_" + k)
-                           for k in keys}
+        self._sprites = {}
+        for k in keys:
+            src = _try_sprite("apps.pet.assets.optimized.panda_" + k)
+            if src:
+                self._sprites[k] = _upscale_sprite_2x(*src)
         self._fallback  = _try_sprite("assets.sprites.optimized.mascot")
         self._heart_spr = _try_sprite("apps.pet.assets.optimized.heart")
 
         self._hunger, self._happy, self._health = _load_state()
-        self._last_tick = time.ticks_ms()
-        self._anim_t    = 0.0
-        self._eat_left  = 0.0
-        self._sleeping  = False
-        self._hearts    = []
-        self._dirty     = True
+        self._last_tick   = time.ticks_ms()
+        self._last_save_t = time.ticks_ms()
+        self._anim_t      = 0.0
+        self._eat_left    = 0.0
+        self._sleeping    = False
+        self._hearts      = []
+        self._dirty       = True
 
     def on_exit(self):
         _save_state(self._hunger, self._happy, self._health)
