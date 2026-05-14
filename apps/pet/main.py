@@ -238,6 +238,13 @@ class App(oreoOS.App):
         self._hearts = [p for p in self._hearts if p.update(dt)]
         self._dirty  = True
 
+        # Persist every ~10 s so an unexpected power-cycle doesn't lose
+        # progress (on_exit also saves, but only when the user HOMEs out
+        # of the app cleanly — and the badge can brown out mid-play).
+        if time.ticks_diff(now, self._last_save_t) > 10000:
+            _save_state(self._hunger, self._happy, self._health)
+            self._last_save_t = now
+
     # ── sprite + thought picker ─────────────────────────────────────────
     def _pick_state(self):
         if self._sleeping:        return "sleep", "zZz..."
@@ -253,45 +260,60 @@ class App(oreoOS.App):
         if not self._dirty:
             return
         d.clear(theme.BG)
-        widgets.draw_header(d, "ELIXPO PET")
+        widgets.draw_header(d, "OREO PET")
         widgets.draw_hint  (d, "A=feed  B=play  C=sleep")
 
         key, thought = self._pick_state()
 
-        # ── stat rows: heart-grid above the panda ─────────────────────
-        row_y = widgets.HEADER_H + 6
-        for i, (label, val, _col) in enumerate([
+        # ── compact stat strip across the top ─────────────────────────
+        # Three columns: label + segmented bar + % readout. Reads at a
+        # glance without dominating the screen — the pet is the hero.
+        strip_y    = widgets.HEADER_H + 4
+        strip_h    = 28
+        col_w      = SW // 3
+        for i, (label, val, color) in enumerate([
                 ("Hunger",    self._hunger, theme.PRIMARY),
                 ("Happiness", self._happy,  theme.TEAL),
                 ("Health",    self._health, theme.GOLD)]):
-            ry = row_y + i * 12
-            # 5 heart pips
-            filled = val * 5 // 100
-            for k in range(5):
-                _draw_heart(d, 124 + k * 12, ry, filled=(k < filled))
-            # Label on the left
-            d.text(label, 16, ry, theme.TEXT_BRIGHT)
-            # % readout on the right
-            d.text("%d%%" % val, SW - 4 * 8 - 6, ry, theme.MUTED)
+            cx = col_w * i
+            d.text(label, cx + 6, strip_y, theme.MUTED)
+            # Segmented bar — 10 cells, filled proportionally to val/100.
+            bar_y = strip_y + 12
+            bar_x = cx + 6
+            bar_w = col_w - 12
+            cell  = (bar_w - 9) // 10
+            filled = val // 10
+            for k in range(10):
+                fx = bar_x + k * (cell + 1)
+                col = color if k < filled else theme.MUTED2
+                d.rect(fx, bar_y, cell, 6, col, fill=True)
+            # % readout under the bar.
+            pct = "%d%%" % val
+            d.text(pct, cx + col_w - len(pct) * 8 - 6, bar_y + 8, theme.MUTED)
 
-        # ── centred panda ─────────────────────────────────────────────
-        sprite  = self._sprites.get(key) or self._fallback
-        bob     = int(2 * (abs((self._anim_t * 2) % 2 - 1)))
+        # ── BIG centred panda ─────────────────────────────────────────
+        # 128x128 upscaled sprite — fills the middle band of the screen
+        # so the pet itself is the focal point.
+        stage_top = strip_y + strip_h + 4
+        stage_bot = SH - widgets.HINT_H - 32     # leave room for thought
+        sprite    = self._sprites.get(key) or self._fallback
+        bob       = int(3 * (abs((self._anim_t * 2) % 2 - 1)))
         if sprite:
             data, mw, mh = sprite
             px = (SW - mw) // 2
-            py = widgets.HEADER_H + 48 + bob
+            py = stage_top + (stage_bot - stage_top - mh) // 2 + bob
             d.blit(data, px, py, mw, mh)
         else:
-            d.rect((SW - 64) // 2, widgets.HEADER_H + 48 + bob,
-                   64, 64, theme.PRIMARY, fill=True)
+            d.rect((SW - 128) // 2,
+                   stage_top + (stage_bot - stage_top - 128) // 2 + bob,
+                   128, 128, theme.PRIMARY, fill=True)
 
-        # ── heart particles (in front of panda) ───────────────────────
+        # ── heart particles in front of the panda ─────────────────────
         for p in self._hearts:
             p.draw(d, self._heart_spr)
 
-        # ── thought callout under the panda ───────────────────────────
-        bw = max(110, len(thought) * 8 + 24)
+        # ── thought callout at the bottom ─────────────────────────────
+        bw = max(120, len(thought) * 8 + 28)
         bx = (SW - bw) // 2
         by = SH - widgets.HINT_H - 24
         _draw_speech_bubble(d, bx, by, bw, 18, thought, theme.PRIMARY)
