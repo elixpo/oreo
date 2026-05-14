@@ -1,12 +1,4 @@
 def _load_env():
-    """Read .env / .env.local from cwd. Returns {} on MicroPython (no `.env`
-    on the device — secrets.py is generated at deploy time instead).
-
-    Done with plain `open()` rather than `pathlib` because MicroPython
-    doesn't ship `pathlib`; a top-level `from pathlib import Path` here
-    would crash the entire boot chain when launcher.py does
-    `from oreoOS.config import VERSION`.
-    """
     env = {}
     for fname in (".env", ".env.local"):
         try:
@@ -26,7 +18,7 @@ _env = _load_env()
 # OS version. tools/deploy.py auto-bumps the PATCH number on every push.
 # The literal MUST stay on its own line as `VERSION = "vN.N.N"` — the
 # deploy regex relies on that exact format to rewrite in place.
-VERSION           = "v1.3.0"
+VERSION           = "v1.3.1"
 
 GITHUB_USER       = "Circuit-Overtime"
 DISPLAY_NAME      = "Ayushman Bhattacharya"
@@ -45,33 +37,9 @@ WIFI_PASSWORD     = _env.get("WIFI_PASSWORD", "")
 OWM_API_KEY       = _env.get("OWM_API_KEY", "")
 
 WIFI_AUTO_CONNECT = True
-
-# ── radio power budget ──────────────────────────────────────────────────────
-# Cap the peak current drawn by WiFi+BT so big bursts don't trip the supply
-# even with the dead-LDO + 2000 µF bulk-cap setup. These translate roughly
-# to peak TX current:
-#   WIFI_TX_DBM = 19.5 → ~240 mA peak (default, "shout the loudest")
-#   WIFI_TX_DBM = 11   → ~140 mA peak (still ~30 m range indoors)
-#   WIFI_TX_DBM = 8    → ~110 mA peak (~15 m range)
-#   WIFI_TX_DBM = 2    → ~80 mA peak  (next-room range, ~5 m)
-#
-# Power-save mode lets the radio nap between AP beacons; drops idle current
-# from ~100 mA to ~15 mA while still maintaining the connection. Trade-off:
-# +30–100 ms wake-up latency for the first packet of a burst.
 WIFI_TX_DBM       = 11
 WIFI_POWERSAVE    = True
-
-# BLE TX power is controlled indirectly via the advertising interval. Longer
-# interval = less average RF activity. 500 ms is a balance between fast
-# discovery and low current draw.
 BT_ADV_INTERVAL_MS = 500
-
-# ── Apps drawer view ───────────────────────────────────────────────────────
-# Group apps in the "Category" view of the launcher. Each entry is
-#   (display_name, icon_stem, (app_dir, app_dir, ...))
-# where icon_stem looks up assets/icons/optimized/<stem>.py. Apps absent
-# from this map go into a "More" bucket that re-uses its first app's icon.
-# Settings → "App View" toggle picks Grid (flat) or Category (grouped).
 APP_CATEGORIES = (
     ("Games",  "cat_games",  ("flappy", "snake", "racer", "pet")),
     ("GitHub", "cat_github", ("badge",  "identity", "commits")),
