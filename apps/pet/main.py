@@ -24,11 +24,14 @@ SH = api.SCREEN_H
 
 STATE_PATH = "apps/pet/state.txt"
 
-# Per-second decay — tuned so a full stat takes ~24 h to drop from 100→0.
-# 100 / (24*3600) ≈ 0.00116 — bump hunger slightly so the pet feels hungry
-# before sad, but both are still daily-routine slow.
-DECAY_HUNGER = 0.0014    # ~120 s / pt → drops ~28 pts / day
-DECAY_HAPPY  = 0.0010    #               drops ~20 pts / day
+# Per-second decay — slowed ~3× from the previous tune so the pet survives
+# a normal multi-day on-off cadence without auto-starving. At 0.00045 pt/s
+# a full hunger bar drains in roughly 60 hours of *foreground* time on the
+# badge (the OS only ticks update() while the pet app is open). Combine
+# with the badge being off most of the day and real-world feed frequency
+# is about every 2–3 days.
+DECAY_HUNGER = 0.00045
+DECAY_HAPPY  = 0.00030
 EAT_FACE_MS  = 1200      # show 'eat' expression for this long after feeding
 
 

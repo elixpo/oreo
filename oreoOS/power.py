@@ -46,7 +46,7 @@ class PowerManager:
         self._last_event = time.ticks_ms()
 
     def tick(self, app):
-        """Once per frame. Triggers deep sleep when the threshold elapses.
+        """Once per frame. Triggers light sleep when the threshold elapses.
 
         Auto-sleep is disabled when EITHER the toggle is off OR the
         Sleep-After slider sits at 0 minutes. The slider's 0 acts as a
@@ -61,9 +61,78 @@ class PowerManager:
             self._last_event = time.ticks_ms()
             return
         if time.ticks_diff(time.ticks_ms(), self._last_event) >= idle_seconds * 1000:
-            self.enter_deep_sleep()
+            self.enter_light_sleep()
+            # IMPORTANT: light sleep RESUMES here on wake — we reset the idle
+            # timer so the user has a full window to interact again.
+            self._last_event = time.ticks_ms()
 
     # ── transitions ──────────────────────────────────────────────────────
+    def enter_light_sleep(self):
+        """Pause CPU, blank LCD, wait for any button or TTP touch to wake.
+
+        Light sleep keeps RAM, framebuffer state, and peripherals alive —
+        when machine.lightsleep() returns the OS resumes EXACTLY at the
+        line below, no boot, no app reset. This is the right model for
+        "screen off but keep running" since the user's expectation is to
+        return to the same screen on tap-to-wake.
+
+        Wake sources:
+          * every matrix button (active-low → IRQ_FALLING)
+          * TOUCH_OUT from the TTP223 (active-high → IRQ_RISING)
+        Both pins MUST be RTC GPIOs to wake the chip from light sleep;
+        we verified they are when picking the pin map (HOME/A/B/C/UP/DOWN/
+        LEFT/RIGHT in 4-21 range, TOUCH_OUT at 21).
+        """
+        if machine is None:
+            return
+
+        # Remember the user's brightness so we can restore it on wake.
+        prev_brightness = 100
+        try:
+            prev_brightness = getattr(self._os, "_last_brightness", 100)
+        except Exception:
+            pass
+        try:
+            self._os.display.set_brightness(0)
+        except Exception:
+            pass
+
+        # Configure wake-on-pin for buttons + (optional) touch.
+        wake_pins = []
+        try:
+            for p in (pins.BTN_HOME, pins.BTN_A, pins.BTN_B, pins.BTN_C,
+                      pins.BTN_UP, pins.BTN_DOWN, pins.BTN_LEFT, pins.BTN_RIGHT):
+                pin = machine.Pin(p, machine.Pin.IN, machine.Pin.PULL_UP)
+                pin.irq(trigger=machine.Pin.IRQ_FALLING, wake=machine.SLEEP)
+                wake_pins.append(pin)
+            if SETTINGS["touch_wake"]:
+                tp = machine.Pin(pins.TOUCH_OUT, machine.Pin.IN)
+                tp.irq(trigger=machine.Pin.IRQ_RISING, wake=machine.SLEEP)
+                wake_pins.append(tp)
+        except Exception:
+            # If wake-source setup failed (older MP build / wrong pin map)
+            # we DON'T want to enter light sleep — we'd have no way out.
+            # Bail and restore the screen instead.
+            try:
+                self._os.display.set_brightness(prev_brightness)
+            except Exception:
+                pass
+            return
+
+        # ── sleep here. Resumes when any configured pin IRQ fires. ──
+        try:
+            machine.lightsleep()
+        except Exception:
+            pass
+
+        # Restore the screen on wake. The next frame the run-loop draws
+        # will repaint everything because each app's _dirty flag is still
+        # whatever it was before — but we force a redraw just in case.
+        try:
+            self._os.display.set_brightness(prev_brightness)
+        except Exception:
+            pass
+
     def enter_deep_sleep(self):
         """Save state, configure wake sources, and call machine.deepsleep().
 

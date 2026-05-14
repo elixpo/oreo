@@ -33,7 +33,10 @@ MAX_LBL_CHARS = 9        # chars per label line (8-px font @ ~72 px cell width)
 
 PAD_X        = 14
 PAD_TOP      = widgets.HEADER_H + 4
-PAD_BOT      = widgets.HINT_H   + 12     # subtle gap above the hint bar
+# Bigger gap above the hint bar so the bottom row of icons doesn't visually
+# crash into the chrome (used to be 12 → too tight). 32 leaves room for the
+# selection rectangle's drop shadow and the label's second line.
+PAD_BOT      = widgets.HINT_H   + 32
 
 CELL_W       = (SW - 2 * PAD_X) // COLS
 CELL_H       = (SH - PAD_TOP - PAD_BOT) // VISIBLE_ROWS
