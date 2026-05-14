@@ -96,6 +96,9 @@ class App(oreoOS.App):
             _Row("Touch Wake",  "toggle",
                  getter=self._touch_wake,
                  setter=self._set_touch_wake),
+            _Row("Categorical", "toggle",
+                 getter=self._app_view_categorical,
+                 setter=self._set_app_view_categorical),
             _Row("App View",    "toggle",
                  getter=self._app_view_is_categories,
                  setter=self._set_app_view_categories,
@@ -159,6 +162,16 @@ class App(oreoOS.App):
         if not self._pm: return
         self._pm.SETTINGS["touch_wake"] = bool(v)
         self._pm.save_settings(self._os)
+
+    # ── apps drawer view ────────────────────────────────────────────────
+    # The launcher reads os.settings_get("app_view", "grid"). We toggle it
+    # between "categories" (grouped per APP_CATEGORIES in config.py) and
+    # "grid" (flat 4-col grid of every app).
+    def _app_view_categorical(self):
+        return self._os.settings_get("app_view", "grid") == "categories"
+
+    def _set_app_view_categorical(self, v):
+        self._os.settings_set("app_view", "categories" if v else "grid")
 
     # ── Apps-drawer view mode ───────────────────────────────────────────
     # Persisted on the OS settings dict; the launcher reads this each time

@@ -8,9 +8,10 @@ except ImportError:
 from oreoWare import pins
 
 
-DEFAULT_IDLE_SECONDS = 0      # 0 → auto-sleep disabled by default. The user
-                              # opts in from Settings → "Sleep After" once
-                              # the deep-sleep / wake path is fully trusted.
+DEFAULT_IDLE_SECONDS = 120    # 2 min default — short enough to save battery
+                              # in a pocket, long enough that idle reading
+                              # the home screen doesn't get cut short.
+                              # Slider in Settings goes 0..10 min; 0 = off.
 SETTINGS = {
     "idle_enable":  True,
     "idle_seconds": DEFAULT_IDLE_SECONDS,

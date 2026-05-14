@@ -53,11 +53,18 @@ PLAYER_Y     = PLAY_BOT - CAR_H - 18
 ENEMY_W, ENEMY_H = 32, 40
 ENEMY_LANES  = (ROAD_X + 28, ROAD_X + ROAD_W // 2 - ENEMY_W // 2, ROAD_X + ROAD_W - ENEMY_W - 28)
 
-MAX_STEER_PX_PER_S   = 220.0
-ROAD_SCROLL_MIN      = 30.0
-ROAD_SCROLL_MAX      = 220.0
+MAX_STEER_PX_PER_S   = 260.0   # was 220 — keeps lane changes ahead of the
+                                # faster scroll so the game stays playable.
+ROAD_SCROLL_MIN      = 40.0
+ROAD_SCROLL_MAX      = 280.0   # was 220 — flat-out scroll baseline.
 ENEMY_SPAWN_SEC0     = 1.6
-ENEMY_SPAWN_FLOOR    = 0.55
+ENEMY_SPAWN_FLOOR    = 0.40    # was 0.55 — tighter cap so high scores keep
+                                # tightening the cadence.
+
+# Collision tightness — how many pixels we deduct from each axis of the
+# overlap test. Higher = more forgiving (smaller effective hitbox). 14 leaves
+# roughly the body of the car as the hit-zone, ignoring the rounded fenders.
+HIT_SLACK_PX         = 14
 
 ROLL_DEADZONE_DEG    = 4.0
 ROLL_SATURATION_DEG  = 30.0
@@ -251,11 +258,11 @@ class App(oreoOS.App):
                                      ROAD_X + 4,
                                      ROAD_X + ROAD_W - CAR_W - 4)
 
-            # Top speed climbs with score so the game gets faster the longer
-            # you survive. +0.5 % per point puts you at ~50 % faster by 100,
-            # 2x faster by 200. Caps at 1.8x so it stays playable on a
-            # 320-px-tall screen at 30 fps.
-            speed_mult = min(1.8, 1.0 + 0.005 * self._score)
+            # Top speed climbs with score. +1.2 % per point — much steeper
+            # than before, so the game actually feels harder around score 20.
+            # Capped at 2.2x so it stays playable; the spawn-spacing rule
+            # below keeps the field navigable even at full speed.
+            speed_mult = min(2.2, 1.0 + 0.012 * self._score)
             effective_max = ROAD_SCROLL_MAX * speed_mult
             target = ROAD_SCROLL_MIN + (
                 effective_max - ROAD_SCROLL_MIN) * max(0.0, throttle)
@@ -272,31 +279,48 @@ class App(oreoOS.App):
                     ENEMY_SPAWN_FLOOR,
                     ENEMY_SPAWN_SEC0 - self._score * 0.01)
                 self._spawn_left = self._spawn_int
-                # Lane choice rule: never spawn in a lane that's blocked at
-                # the top of the screen, AND never block all three lanes at
-                # the same vertical band. Reaction-distance heuristic: any
-                # enemy whose top is still within REACTION_PX of the spawn
-                # row counts as "still up there" — the new spawn must avoid
-                # those lane indices.
-                REACTION_PX = ENEMY_H + 70    # 1 car length + room to weave
-                blocked = set()
+
+                # Spacing rule: the new enemy spawns at y = PLAY_TOP - ENEMY_H.
+                # If ANY existing enemy is closer than MIN_VGAP px (in any
+                # lane), skip this spawn entirely. That guarantees a minimum
+                # vertical breathing room between consecutive enemies so the
+                # player can always weave through.
+                #
+                # MIN_VGAP scales with current scroll speed: faster road →
+                # player needs more time to react → bigger gap. At minimum
+                # speed it's ENEMY_H * 1.5 (~60 px); at top speed it's
+                # ENEMY_H * 2.4 (~96 px).
+                speed_frac   = (self._scroll_v - ROAD_SCROLL_MIN) / max(
+                    1.0, ROAD_SCROLL_MAX * 2.2 - ROAD_SCROLL_MIN)
+                speed_frac   = max(0.0, min(1.0, speed_frac))
+                MIN_VGAP     = ENEMY_H * (1.5 + 0.9 * speed_frac)
+                too_close = False
                 for e in self._enemies:
-                    if e.y < PLAY_TOP + REACTION_PX:
-                        # find which lane this enemy occupies
-                        for i, lx in enumerate(ENEMY_LANES):
-                            if abs(e.x - lx) < ENEMY_W // 2:
-                                blocked.add(i)
-                                break
-                free = [i for i in range(len(ENEMY_LANES)) if i not in blocked]
-                if not free:
-                    # All three blocked — skip this spawn entirely so the
-                    # player always has a way through.
-                    pass
+                    if e.y < PLAY_TOP + MIN_VGAP:
+                        too_close = True
+                        break
+                if too_close:
+                    # Re-arm the spawn timer to a short retry — try again
+                    # next frame batch instead of forfeiting the whole slot.
+                    self._spawn_left = 0.15
                 else:
-                    pick = free[int(self._blink * 31) % len(free)]
-                    spr  = self._spr_enemy_a if int(self._blink * 17) & 1 else self._spr_enemy_b
-                    self._enemies.append(_Enemy(ENEMY_LANES[pick],
-                                                PLAY_TOP - ENEMY_H, spr))
+                    # Lane choice: avoid lanes that still have an enemy in
+                    # the upper REACTION_PX band (gives the player room to
+                    # leave that lane before this new car arrives).
+                    REACTION_PX = ENEMY_H + 90
+                    blocked = set()
+                    for e in self._enemies:
+                        if e.y < PLAY_TOP + REACTION_PX:
+                            for i, lx in enumerate(ENEMY_LANES):
+                                if abs(e.x - lx) < ENEMY_W // 2:
+                                    blocked.add(i)
+                                    break
+                    free = [i for i in range(len(ENEMY_LANES)) if i not in blocked]
+                    if free:
+                        pick = free[int(self._blink * 31) % len(free)]
+                        spr  = self._spr_enemy_a if int(self._blink * 17) & 1 else self._spr_enemy_b
+                        self._enemies.append(_Enemy(ENEMY_LANES[pick],
+                                                    PLAY_TOP - ENEMY_H, spr))
 
             new_enemies = []
             for e in self._enemies:
@@ -304,10 +328,13 @@ class App(oreoOS.App):
                 if e.y > PLAY_BOT:
                     self._score += 1
                     continue
+                # AABB collision with a HIT_SLACK_PX deduction on each axis
+                # so only a real body-on-body overlap counts. Was -6 which
+                # treated rounded fenders as solid.
                 if (abs((e.x + ENEMY_W // 2) - (self._player_x + CAR_W // 2))
-                        < (CAR_W + ENEMY_W) // 2 - 6
+                        < (CAR_W + ENEMY_W) // 2 - HIT_SLACK_PX
                     and abs((e.y + ENEMY_H // 2) - (PLAYER_Y + CAR_H // 2))
-                        < (CAR_H + ENEMY_H) // 2 - 6):
+                        < (CAR_H + ENEMY_H) // 2 - HIT_SLACK_PX):
                     self._on_crash()
                     return
                 new_enemies.append(e)

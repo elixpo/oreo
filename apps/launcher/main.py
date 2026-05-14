@@ -33,7 +33,7 @@ MAX_LBL_CHARS = 9        # chars per label line (8-px font @ ~72 px cell width)
 
 PAD_X        = 14
 PAD_TOP      = widgets.HEADER_H + 4
-PAD_BOT      = widgets.HINT_H   + 4
+PAD_BOT      = widgets.HINT_H   + 12     # subtle gap above the hint bar
 
 CELL_W       = (SW - 2 * PAD_X) // COLS
 CELL_H       = (SH - PAD_TOP - PAD_BOT) // VISIBLE_ROWS
