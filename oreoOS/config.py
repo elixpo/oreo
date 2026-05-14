@@ -65,3 +65,15 @@ WIFI_POWERSAVE    = True
 # interval = less average RF activity. 500 ms is a balance between fast
 # discovery and low current draw.
 BT_ADV_INTERVAL_MS = 500
+
+# ── Apps drawer view ───────────────────────────────────────────────────────
+# Group apps in the "Category" view of the launcher. Keys are folder names
+# under apps/. Apps absent from this map go into a "More" bucket. The
+# Settings → "App View" toggle picks Grid (flat) or Category (grouped).
+APP_CATEGORIES = (
+    ("Games",     ("flappy", "snake", "racer", "pet")),
+    ("GitHub",    ("badge",  "identity", "commits")),
+    ("Connected", ("weather",)),
+    ("Tools",     ("gallery", "color_picker", "gamepad", "quest")),
+    ("System",    ("settings", "about")),
+)

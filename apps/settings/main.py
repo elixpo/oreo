@@ -22,8 +22,11 @@ VISIBLE_ROWS  = max(1, _PLAY_H // ROW_H)
 
 
 class _Row:
-    __slots__ = ("label", "kind", "getter", "setter", "step", "max_val")
-    def __init__(self, label, kind, getter=None, setter=None, step=10, max_val=100):
+    __slots__ = ("label", "kind", "getter", "setter", "step", "max_val",
+                 "on_label", "off_label")
+    def __init__(self, label, kind, getter=None, setter=None,
+                 step=10, max_val=100,
+                 on_label="ON", off_label="OFF"):
         self.label   = label
         self.kind    = kind        # "toggle" | "info" | "action" | "slider"
         self.getter  = getter
@@ -35,6 +38,10 @@ class _Row:
         # brightness; 10 for the auto-sleep timer (so the bar reads full
         # when sleep-after is at its max 10 min).
         self.max_val = max_val
+        # Custom labels for toggle rows where ON/OFF doesn't read well
+        # ("App View" reads "Cat" / "Grid" instead).
+        self.on_label  = on_label
+        self.off_label = off_label
 
 
 class App(oreoOS.App):
@@ -89,6 +96,10 @@ class App(oreoOS.App):
             _Row("Touch Wake",  "toggle",
                  getter=self._touch_wake,
                  setter=self._set_touch_wake),
+            _Row("App View",    "toggle",
+                 getter=self._app_view_is_categories,
+                 setter=self._set_app_view_categories,
+                 on_label="Cat", off_label="Grid"),
             _Row("Version",     "info",
                  getter=self._os_version),
             _Row("Reboot",      "action",
@@ -148,6 +159,21 @@ class App(oreoOS.App):
         if not self._pm: return
         self._pm.SETTINGS["touch_wake"] = bool(v)
         self._pm.save_settings(self._os)
+
+    # ── Apps-drawer view mode ───────────────────────────────────────────
+    # Persisted on the OS settings dict; the launcher reads this each time
+    # it loads to decide grid-vs-category layout.
+    def _app_view_is_categories(self):
+        try:
+            return self._os.settings_get("app_view", "grid") == "categories"
+        except Exception:
+            return False
+
+    def _set_app_view_categories(self, v):
+        try:
+            self._os.settings_set("app_view", "categories" if v else "grid")
+        except Exception:
+            pass
 
     @staticmethod
     def _os_version():
@@ -224,35 +250,31 @@ class App(oreoOS.App):
             d.text(row.label, ROW_PAD_X, y + 6, theme.TEXT_BRIGHT, scale=2)
             self._draw_value(d, row, SW - 18, y)
 
-        # Scroll indicators — small pink chevrons on the right edge of the
-        # play area when more rows exist above / below the window.
-        if top > 0:
-            d.text("^", SW - 14, ROW_TOP_Y - 2, theme.PRIMARY, scale=2)
-        if end < n:
-            d.text("v", SW - 14, ROW_TOP_Y + VISIBLE_ROWS * ROW_H - 14,
-                   theme.PRIMARY, scale=2)
-
         self._dirty = False
 
     def _draw_value(self, d, row, right_x, y):
         if row.kind == "toggle":
-            on = bool(row.getter())
-            label = "ON" if on else "OFF"
+            on    = bool(row.getter())
+            label = row.on_label if on else row.off_label
             color = theme.GREEN if on else theme.MUTED
             d.text(label, right_x - len(label) * 8 * 2, y + 6, color, scale=2)
         elif row.kind == "slider":
             v       = int(row.getter())
             max_val = max(1, int(row.max_val))
-            bar_w = 80
-            bar_x = right_x - bar_w
+            # "off" reads better than "0" for the sleep-after slider; the
+            # brightness slider keeps numeric 0 (unambiguous percent).
+            value_s = "off" if (v == 0 and row.max_val <= 30) else "%d" % v
+            val_w   = len(value_s) * 8
+            val_x   = right_x - val_w                          # right-aligned
+            # Bar sits to the LEFT of the value with a comfortable gap. With
+            # the value now anchored to the right edge there is no more risk
+            # of overlapping a long label like "Sleep After".
+            bar_w   = 50
+            bar_x   = val_x - bar_w - 10
             d.rect(bar_x, y + 10, bar_w, 4, theme.MUTED2, fill=True)
-            fill_w = int(bar_w * v / max_val)
+            fill_w  = int(bar_w * v / max_val)
             d.rect(bar_x, y + 10, fill_w, 4, theme.PRIMARY, fill=True)
-            # 0 on a sleep-style slider should read as "off" rather than "0";
-            # for the brightness slider 0 is still "0" since the value is a
-            # percentage and that's the unambiguous meaning.
-            label = "off" if (v == 0 and row.max_val <= 30) else "%d" % v
-            d.text(label, bar_x - 32, y + 6, theme.TEXT_BRIGHT)
+            d.text(value_s, val_x, y + 6, theme.TEXT_BRIGHT)
         elif row.kind == "info":
             s = str(row.getter() or "—")[:14]
             d.text(s, right_x - len(s) * 8, y + 7, theme.MUTED)

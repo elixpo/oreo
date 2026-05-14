@@ -1,32 +1,3 @@
-"""Power manager - drives the badge into low-power states when idle.
-
-Lifecycle (all timers reset by ANY input event: button, IMU motion, touch):
-
-    ACTIVE      normal frame loop, backlight 100%
-        |
-        | idle_seconds elapsed without an event
-        v
-    DEEP_SLEEP  CPU + RAM powered down (RTC alive), ~20 uA
-                Wake sources we configure:
-                  * any matrix button (ext1)
-                  * TOUCH_OUT high pulse from the TTP223 (ext1)
-
-The intermediate "screen-off / light-sleep" tier from the original power
-plan is intentionally NOT implemented here. Reason: with the dead onboard
-LDO we cannot reliably hold WiFi during light-sleep, and the extra UI tier
-adds complexity without much battery win once the RAM is preserved by
-deep-sleep RTC memory. Easy to add later.
-
-Settings persisted on the device's RTC memory survive deep sleep:
-    settings_get('idle_enable')   -> bool
-    settings_get('idle_seconds')  -> int, default 120
-    settings_get('touch_wake')    -> bool, default True
-
-Apps can opt out for one frame by setting `BLOCK_IDLE = True` as a class
-attribute (the racer does this so the inactivity timer never fires
-mid-race even though no buttons are pressed).
-"""
-
 import time
 
 try:
@@ -37,7 +8,9 @@ except ImportError:
 from oreoWare import pins
 
 
-DEFAULT_IDLE_SECONDS = 120
+DEFAULT_IDLE_SECONDS = 0      # 0 → auto-sleep disabled by default. The user
+                              # opts in from Settings → "Sleep After" once
+                              # the deep-sleep / wake path is fully trusted.
 SETTINGS = {
     "idle_enable":  True,
     "idle_seconds": DEFAULT_IDLE_SECONDS,
