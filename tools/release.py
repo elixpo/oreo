@@ -286,14 +286,24 @@ def main():
         # placeholder; the real command on a wet run gets a real list.
         upload_files = ["<expanded at runtime>"]
 
-    run([
-        "gh", "release", "create", tag,
-        "--title", title,
-        "--notes", notes,
-        *prerelease_flag,
-        "--target", "main",
-        *upload_files,
-    ], dry)
+    if resume == "upload":
+        # Release row already exists from a half-failed previous run. We
+        # only need to (re-)upload the asset files. --clobber replaces
+        # any partial uploads from before.
+        run([
+            "gh", "release", "upload", tag,
+            "--clobber",
+            *upload_files,
+        ], dry)
+    else:
+        run([
+            "gh", "release", "create", tag,
+            "--title", title,
+            "--notes", notes,
+            *prerelease_flag,
+            "--target", "main",
+            *upload_files,
+        ], dry)
 
     print("\n✓ release %s pushed and published." % tag)
     if not dry:
