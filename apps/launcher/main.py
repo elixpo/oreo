@@ -436,6 +436,25 @@ class App(oreoOS.App):
                        cx - 16, iy + (ICON_SZ - 32) // 2,
                        theme.PRIMARY, scale=4)
 
+            # ── OTA notification dot on the Settings tile ────────────────
+            # If a system update is sitting waiting for the user's
+            # confirmation, we draw a small pink badge in the top-right of
+            # the Settings tile so it's discoverable without opening it.
+            if self._apps[app_idx]["dir"] == "settings":
+                try:
+                    status = self._os.settings_get("ota_status", "")
+                except Exception:
+                    status = ""
+                if status in ("needs-confirm", "ready"):
+                    dot_x = ix + ICON_SZ - 6
+                    dot_y = iy - 2
+                    # shadow + body + tiny inner highlight
+                    d.rect(dot_x - 5, dot_y - 5, 12, 12, theme.SHADOW
+                           if hasattr(theme, "SHADOW") else theme.MUTED2,
+                           fill=True)
+                    d.rect(dot_x - 6, dot_y - 6, 12, 12, theme.PRIMARY, fill=True)
+                    d.rect(dot_x - 4, dot_y - 5,  4,  3, api.WHITE,     fill=True)
+
             # ── multi-line label (centred under the icon) ──
             label_top = iy + ICON_SZ + SEL_PAD + LABEL_GAP
             for li, line in enumerate(self._labels[app_idx]):

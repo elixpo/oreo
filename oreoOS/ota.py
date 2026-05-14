@@ -457,3 +457,82 @@ def discard_pending():
     apply a download the user changed their mind about.
     """
     _rm_tree(STAGE_DIR)
+
+
+def background_check(os_obj, min_interval_s=6 * 3600):
+    """Cheap periodic version probe — runs in the OS run-loop tail.
+
+    Behaviour:
+      * Skips if WiFi isn't up.
+      * Skips if a check ran in the last `min_interval_s` (6 h default).
+      * Calls check() (single GitHub-API hit, hard-bounded by T_GH_API).
+      * On result, stashes flags on the OS settings dict:
+            ota_status            -> "needs-confirm" / "up-to-date" / "error"
+            ota_pending_version   -> "vX.Y.Z" of the new release
+            ota_pending_major     -> bool
+            ota_pending_warn_seen -> reset to False so the popup fires once
+      * Does NOT download anything. The user (or the Check Update action)
+        decides whether to fetch.
+
+    Returns True iff a new release was discovered this call.
+    """
+    if _http is None:
+        return False
+    last = 0
+    try:
+        last = int(os_obj.settings_get("ota_last_check_s", 0) or 0)
+    except Exception:
+        pass
+    try:
+        now = int(time.time())
+    except Exception:
+        return False
+    if now - last < min_interval_s:
+        return False
+
+    # Only probe when there's a working network connection — silently
+    # skips when offline so the boot is never gated on DNS.
+    try:
+        from oreoWare import wifi
+        if not wifi.is_connected():
+            return False
+    except Exception:
+        return False
+
+    try:
+        os_obj.settings_set("ota_last_check_s", now)
+    except Exception:
+        pass
+
+    try:
+        rel = check()
+    except Exception:
+        rel = None
+    if not rel:
+        try:
+            os_obj.settings_set("ota_status", "up-to-date")
+        except Exception:
+            pass
+        return False
+
+    # New release found — surface it. The home-screen + launcher tile dot
+    # render off these flags; the warn popup fires once per `version`.
+    try:
+        os_obj.settings_set("ota_status",            "needs-confirm")
+        os_obj.settings_set("ota_pending_version",   rel.get("version", ""))
+        os_obj.settings_set("ota_pending_major",     bool(rel.get("major")))
+        # Reset the "have we already warned the user about THIS version"
+        # flag so the popup fires once when the user sees a new dot.
+        prev_warn_for = os_obj.settings_get("ota_warned_for_version", "")
+        if prev_warn_for != rel.get("version", ""):
+            os_obj.settings_set("ota_pending_warn_seen", False)
+    except Exception:
+        pass
+    return True
+
+
+def has_attention():
+    """Single-call helper for the launcher: True iff the user should see a
+    notification dot on the Settings tile + a one-shot warn popup."""
+    return False    # populated by the launcher via os.settings_get()
+

@@ -228,6 +228,56 @@ def _draw_text_centered(d, s, y, color, scale=1):
 
 # ── show_splash ──────────────────────────────────────────────────────────────
 
+def show_updating(os_obj, target_version, total_files):
+    """Draw a system-update splash while OTA files are being copied.
+
+    Modelled on the app-loader slide: a pink panel fills the screen with
+    "UPDATING OREOOS" at the top + the target version + a progress bar
+    that the caller advances via update_progress(). Returns a callable
+    `(done_count, current_file) -> None` so the apply step can pump
+    progress without re-doing all the panel rendering each call.
+    """
+    d  = os_obj.display
+    SW = api.SCREEN_W
+    SH = api.SCREEN_H
+
+    # Static frame: pink fill, gold accent, title + sub-title text.
+    d.rect(0, 0, SW, SH, theme.PRIMARY, fill=True)
+    d.rect(0, SH // 2 - 60, SW, 2, theme.GOLD, fill=True)
+    title = "UPDATING OREOOS"
+    tw    = len(title) * 16
+    d.text(title, (SW - tw) // 2, SH // 2 - 90, api.WHITE, scale=2)
+    sub   = "to %s" % (target_version or "")
+    sw    = len(sub) * 8
+    d.text(sub, (SW - sw) // 2, SH // 2 - 64, theme.GOLD)
+
+    bar_x = 30
+    bar_y = SH // 2 - 16
+    bar_w = SW - 60
+    bar_h = 10
+    d.rect(bar_x, bar_y, bar_w, bar_h, api.rgb(40, 40, 40), fill=True)
+    d.text("do not unplug", (SW - 13 * 8) // 2, bar_y + bar_h + 14,
+           theme.GOLD)
+    d.present()
+
+    def _advance(done, current_file=""):
+        # Only repaint the bar's filled portion + the file-name strip to
+        # keep this cheap (full-screen reflows during an OTA apply would
+        # add 30+ ms of GC pressure per file).
+        pct = done / float(max(1, total_files))
+        fill_w = int(bar_w * pct)
+        d.rect(bar_x, bar_y, fill_w, bar_h, theme.GOLD, fill=True)
+        # Clear + re-draw the file-name line under the bar.
+        d.rect(0, bar_y + bar_h + 26, SW, 14, theme.PRIMARY, fill=True)
+        name = (current_file or "")[:38]
+        if name:
+            d.text(name, (SW - len(name) * 8) // 2, bar_y + bar_h + 26,
+                   api.WHITE)
+        d.present()
+
+    return _advance
+
+
 def show_splash(os_obj):
     d     = os_obj.display
     start = _ms()

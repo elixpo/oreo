@@ -206,6 +206,16 @@ def run_app(os_obj, app):
             if pm:
                 pm.tick(app)
 
+            # Background OTA probe — cheap, rate-limited internally to one
+            # call every 6 hours, and only fires when WiFi is up. The call
+            # itself is bounded by T_GH_API so a slow GitHub can never
+            # stall the frame loop.
+            try:
+                from oreoOS import ota as _ota
+                _ota.background_check(os_obj)
+            except Exception:
+                pass
+
             elapsed = time.ticks_diff(time.ticks_ms(), now)
             if elapsed < FRAME_MIN_MS:
                 time.sleep_ms(FRAME_MIN_MS - elapsed)
@@ -321,43 +331,94 @@ def _wrap_text(text, max_chars):
 
 # ── boot entry point ─────────────────────────────────────────────────────────
 
-def _maybe_apply_ota():
+def _maybe_apply_ota(os_obj=None):
     """Run any staged OTA update BEFORE we import the home screen.
 
-    apply_pending() is a no-op when /_ota/manifest.json is absent — the
-    common case on every boot. When an update is pending it copies the
-    staged files into place + clears the staging area, then returns the
-    new version string so we can flash a short "Updated to vX.Y.Z"
-    splash later. The actual VERSION constant is re-read on import, so
-    the new value is live for the rest of the boot.
+    Drives a progress splash while files are copied so the user knows
+    the badge hasn't locked up. apply_pending() is a no-op when
+    /_ota/manifest.json is absent (the common case), in which case the
+    splash is never shown.
     """
     try:
         from oreoOS import ota
-        return ota.apply_pending()
+        if not ota.is_pending():
+            return None
+        # Peek at the staged manifest to learn the target version + file
+        # count for the splash. Cheap — just opens one JSON file.
+        try:
+            import json as _j
+            with open(ota.STAGE_DIR + "/" + ota.MANIFEST_NAME) as f:
+                m = _j.load(f)
+            target = m.get("version", "")
+            total  = len(m.get("files", ()))
+        except Exception:
+            target, total = "", 1
+        if os_obj is not None:
+            try:
+                from oreoOS.splash import show_updating
+                advance = show_updating(os_obj, target, total)
+            except Exception:
+                advance = None
+        else:
+            advance = None
+        # Monkey-patch a per-file progress hook into apply_pending. The
+        # OTA module does the heavy lifting; we just count files and tick
+        # the bar. (apply_pending walks the manifest, so we replicate
+        # that walk here in order to call advance() between files.)
+        if advance is None:
+            return ota.apply_pending()
+        # Custom apply loop with progress callbacks.
+        try:
+            import json as _j
+            with open(ota.STAGE_DIR + "/" + ota.MANIFEST_NAME) as f:
+                manifest = _j.load(f)
+        except Exception:
+            return ota.apply_pending()
+        files = manifest.get("files", ())
+        for i, entry in enumerate(files):
+            path = entry.get("path", "")
+            if not path:
+                continue
+            try:
+                ota._copy_file(ota.STAGE_DIR + "/" + path, path)
+            except Exception:
+                pass
+            try:
+                advance(i + 1, path)
+            except Exception:
+                pass
+        ota._rm_tree(ota.STAGE_DIR)
+        return manifest.get("version", None)
     except Exception:
         return None
 
 
 def boot():
-    # Apply any staged OTA update FIRST — before we import display drivers
-    # or anything that might reference an old version of a module. If files
-    # get swapped in here, the subsequent imports pick up the new code.
-    applied = _maybe_apply_ota()
-
     from oreoWare.os import OS
     from oreoOS.splash import show_splash
     from oreoOS.home   import Home
 
-    # gc.threshold() was set aggressively for LDO smoothing but caused
-    # frequent GC pauses that murdered fps. Leave it at the MicroPython
-    # default — manual gc.collect() runs at app exit in run_app's finally.
-
+    # Bring the hardware up first so the OTA splash has a display to draw
+    # on. The trade-off: if an OTA swaps oreoWare/display.py we'll have
+    # already imported the old version — _maybe_apply_ota does a
+    # machine.reset() after apply to guarantee the new drivers boot fresh.
     os_obj = OS()
+
+    applied = _maybe_apply_ota(os_obj)
     if applied:
-        # Persist a one-shot flag so the home screen can show a "Updated
-        # to vX.Y.Z" toast on the next render and then forget about it.
+        # Persist the version for the post-reboot "Updated to vX.Y.Z" toast.
         try:
             os_obj.settings_set("ota_just_applied", applied)
+            os_obj.settings_set("ota_status",       "applied")
+            os_obj.settings_set("ota_pending_peek_ok", False)
+        except Exception:
+            pass
+        # Clean reboot so every module imports the new code on the next
+        # boot. apply_pending already deleted /_ota so the boot path
+        # won't re-apply this round.
+        try:
+            import machine
+            machine.reset()
         except Exception:
             pass
     # Splash must NEVER kill the boot — if the big bg asset OOMs or the
