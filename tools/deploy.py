@@ -194,7 +194,16 @@ DEPLOY.append(("assets/__init__.py", "assets/__init__.py"))
 def run(cmd, check=True):
     result = subprocess.run(cmd, capture_output=True, text=True)
     if check and result.returncode != 0:
-        print("  ERROR:", result.stderr.strip()[:300])
+        # Print the FULL stderr (and any stdout) so mpremote tracebacks aren't
+        # truncated mid-line. Helps diagnose "Cannot reach device" failures
+        # where the actual cause was a Python compat error or timeout.
+        print("  ERROR  (rc=%d, cmd=%s):" % (result.returncode, " ".join(cmd)))
+        if result.stderr:
+            print("  --- stderr ---")
+            print(result.stderr.rstrip())
+        if result.stdout:
+            print("  --- stdout ---")
+            print(result.stdout.rstrip())
     return result
 
 
