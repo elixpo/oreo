@@ -203,40 +203,94 @@ class App(oreoOS.App):
             return "?"
 
     # ── OTA actions ──────────────────────────────────────────────────────
-    # `Check Update` hits GitHub via oreoOS.ota.check() and stages the
-    # download if a newer version is found. `Install Update` triggers a
-    # reboot — the boot path's apply hook then swaps files into place.
+    # Three-stage flow so the UI never blocks on a long HTTP call without
+    # the user knowing what's happening:
+    #   1. check()  — hit GitHub releases (T_GH_API timeout, ~10 s max)
+    #   2. peek()   — fetch the manifest, compute SHA diff, total bytes
+    #   3. download() — only the changed files (bounded per-file timeout)
+    #
+    # We store intermediate state on the OS settings dict so the home
+    # screen / About page can render a status pill without re-checking.
     def _check_update(self):
         try:
             from oreoOS import ota
         except Exception:
-            return
-        try:
-            rel = ota.check()
-        except Exception:
-            rel = None
+            self._set_ota_status("error"); return
+
+        rel = self._ota_safe(lambda: ota.check())
         if not rel:
-            self._os.settings_set("ota_status", "up-to-date")
+            self._set_ota_status("up-to-date")
             return
-        self._os.settings_set("ota_status", "downloading")
-        try:
-            ok = ota.download(rel)
-        except Exception:
-            ok = False
-        self._os.settings_set("ota_status",
-                              "ready" if ok else "download-failed")
-        self._os.settings_set("ota_pending_version",
-                              rel.get("version", ""))
+
+        peeked = self._ota_safe(lambda: ota.peek(rel))
+        if not peeked:
+            self._set_ota_status("peek-failed")
+            return
+
+        # Park everything we just learned so _install_update / the
+        # confirmation popup can act on it without re-fetching.
+        self._os.settings_set("ota_pending_version", rel.get("version", ""))
+        self._os.settings_set("ota_pending_bytes",   peeked["bytes"])
+        self._os.settings_set("ota_pending_major",   peeked["major"])
+        self._os.settings_set("ota_pending_changed", len(peeked["changed"]))
+        # Stash the manifest URL too in case the popup needs to re-peek
+        # on the next boot (cleared in _install_update).
+        self._os.settings_set("ota_pending_url", rel["manifest_url"])
+
+        # Small + non-major patches auto-stage in the background. Anything
+        # bigger requires user confirmation — Settings flips a flag the
+        # home screen reads to draw a confirmation popup.
+        if peeked["small"] and not peeked["major"]:
+            self._set_ota_status("downloading")
+            ok = self._ota_safe(lambda: ota.download(peeked))
+            self._set_ota_status("ready" if ok else "download-failed")
+        else:
+            # Defer to the popup. The home screen reads this flag.
+            self._set_ota_status("needs-confirm")
+            self._os.settings_set("ota_pending_peek_ok", True)
 
     def _install_update(self):
+        """Triggered after the user confirms in the popup. Downloads (if
+        not already staged) then reboots so the boot hook applies."""
         try:
             from oreoOS import ota
-            if not ota.is_pending():
-                return
         except Exception:
             return
-        # Boot path applies and clears the staging dir; just kick the chip.
+
+        if not ota.is_pending():
+            # Need to actually fetch the bytes first. Re-peek so we don't
+            # rely on transient state; this is the user-explicit path so
+            # showing "downloading" is appropriate.
+            rel = self._ota_safe(lambda: ota.check())
+            if not rel:
+                return
+            peeked = self._ota_safe(lambda: ota.peek(rel))
+            if not peeked:
+                return
+            self._set_ota_status("downloading")
+            ok = self._ota_safe(lambda: ota.download(peeked))
+            if not ok:
+                self._set_ota_status("download-failed")
+                return
+            self._set_ota_status("ready")
+        # Clear the popup flag and kick the chip.
+        self._os.settings_set("ota_pending_peek_ok", False)
         self._reboot()
+
+    def _set_ota_status(self, s):
+        try:
+            self._os.settings_set("ota_status", s)
+        except Exception:
+            pass
+
+    @staticmethod
+    def _ota_safe(callable_):
+        """Run an OTA call inside try/except so a thrown HTTP error never
+        bubbles up into the UI's button-press handler."""
+        try:
+            return callable_()
+        except Exception:
+            return None
 
     def _reboot(self):
         try:

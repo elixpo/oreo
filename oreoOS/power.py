@@ -97,74 +97,64 @@ class PowerManager:
         except Exception:
             pass
 
-        # Sleep loop — soft, polled. Earlier attempts at machine.lightsleep()
-        # + Pin.irq(wake=SLEEP) silently failed on this firmware, leaving the
-        # chip either sleeping forever or never sleeping at all. Polling at
-        # 20 Hz with the LCD backlight off draws ~20-30 mA — far less than
-        # the run loop (~80 mA) — and is GUARANTEED to wake on any input.
-        # We can revisit true light-sleep once we have a build whose Pin.irq
-        # honours the wake flag.
-        try:
-            btns = self._os.buttons
-        except Exception:
-            btns = None
+        # Soft-polled sleep. machine.lightsleep + Pin.irq(wake=) was
+        # unreliable on this MicroPython build, so we just blank the LCD
+        # and poll at 20 Hz. Pin objects are cached once outside the loop
+        # so we don't churn the pin controller every tick.
+        #
+        # Wake conditions (any one of these breaks the loop):
+        #   * a button that was UNPRESSED at sleep entry now reads PRESSED
+        #   * the TTP223 pad that was IDLE at sleep entry now reads TOUCHED
+        # We snapshot initial state on entry so a stuck press or a finger
+        # already on the pad doesn't insta-wake us.
+        btn_ids = (pins.BTN_HOME, pins.BTN_A, pins.BTN_B, pins.BTN_C,
+                   pins.BTN_UP, pins.BTN_DOWN, pins.BTN_LEFT, pins.BTN_RIGHT)
+        btn_pins = {}
+        for b in btn_ids:
+            try:
+                btn_pins[b] = machine.Pin(b, machine.Pin.IN,
+                                           machine.Pin.PULL_UP)
+            except Exception:
+                pass
 
-        # Read the TTP touch line directly so wake-on-touch doesn't depend
-        # on the buttons module knowing about it.
-        try:
-            touch_pin = machine.Pin(pins.TOUCH_OUT, machine.Pin.IN)
-        except Exception:
-            touch_pin = None
+        touch_pin = None
+        if SETTINGS["touch_wake"]:
+            try:
+                touch_pin = machine.Pin(pins.TOUCH_OUT, machine.Pin.IN)
+            except Exception:
+                touch_pin = None
 
-        # Snapshot button states so we wake only on an EDGE (press), not on
-        # a button that was already held when we entered sleep.
-        initial = {}
-        if btns is not None:
-            for b in (pins.BTN_HOME, pins.BTN_A, pins.BTN_B, pins.BTN_C,
-                      pins.BTN_UP, pins.BTN_DOWN, pins.BTN_LEFT, pins.BTN_RIGHT):
-                try:
-                    initial[b] = machine.Pin(b, machine.Pin.IN,
-                                              machine.Pin.PULL_UP).value()
-                except Exception:
-                    initial[b] = 1
+        # Initial state snapshot — buttons read HIGH when idle (active-low,
+        # pulled-up), TTP reads LOW when no finger (active-high).
+        initial_btn = {b: pin.value() for b, pin in btn_pins.items()}
+        initial_tp  = touch_pin.value() if touch_pin else 0
 
-        # 24 h ceiling so a stuck-press doesn't lock us in forever.
+        # Safety ceiling: 24 h so a wedged pin can't strand us forever.
         deadline = time.ticks_add(time.ticks_ms(), 24 * 60 * 60 * 1000)
 
         while True:
-            # Wake on a button transitioning to pressed (active-low → 0).
+            # Any button gone from idle (1) to pressed (0) → single-press wake.
             woke = False
-            for b, was in initial.items():
-                try:
-                    v = machine.Pin(b, machine.Pin.IN,
-                                     machine.Pin.PULL_UP).value()
-                except Exception:
-                    continue
-                if v == 0 and was == 1:
+            for b, pin in btn_pins.items():
+                if pin.value() == 0 and initial_btn[b] == 1:
                     woke = True
                     break
-                initial[b] = v
             if woke:
                 break
 
-            # Wake on TTP touch (active-high pulse) when enabled.
-            if SETTINGS["touch_wake"] and touch_pin is not None:
-                try:
-                    if touch_pin.value() == 1:
-                        woke = True
-                except Exception:
-                    pass
-            if woke:
-                break
+            # TTP: rising edge from idle to touch → single-tap wake.
+            if touch_pin is not None:
+                if touch_pin.value() == 1 and initial_tp == 0:
+                    break
+                # If the user lifted their finger before sleep started
+                # measuring, accept the next press: refresh the baseline.
+                if touch_pin.value() == 0:
+                    initial_tp = 0
 
             if time.ticks_diff(deadline, time.ticks_ms()) <= 0:
                 break
-
-            # 50 ms poll → 20 Hz responsiveness, plenty for a tap-to-wake.
-            # During this sleep the CPU is in WAIT mode between ticks; the
-            # display is off; the WiFi/BT stacks keep running because
-            # connecting + reconnecting takes longer than a wake cycle.
-            time.sleep_ms(50)
+            # 30 ms poll = 33 Hz, snappier than 20 Hz at trivial CPU cost.
+            time.sleep_ms(30)
 
         # Restore the screen on wake. The next frame the run-loop draws
         # will repaint everything because each app's _dirty flag is still

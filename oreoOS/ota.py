@@ -86,6 +86,18 @@ USER_AGENT     = "OreoBadge-OTA"
 # small enough not to OOM the heap when downloading a 100 KB sprite.
 CHUNK_BYTES    = 4096
 
+# Anything below this counts as a "small patch" — auto-staged without
+# pestering the user. Above it we pop a confirmation dialog because the
+# user is on metered WiFi at a hackathon and 2 MB of new icons is rude.
+SMALL_PATCH_BYTES = 80 * 1024     # 80 KB
+
+# Timeouts (seconds). Every HTTP call uses one of these — no unbounded
+# blocking is allowed because the OS run loop polls OTA from the Settings
+# app's button handler. A hung GET would freeze the whole UI.
+T_GH_API       = 10        # GitHub releases API listing
+T_MANIFEST     = 10        # manifest.json download (tiny)
+T_FILE         = 25        # individual file download
+
 
 # ── helpers ─────────────────────────────────────────────────────────────────
 
@@ -176,30 +188,43 @@ def _newer(a, b):
     return _parse_version(a) > _parse_version(b)
 
 
+def _is_major_bump(new_ver, cur_ver):
+    """True when the MAJOR component changed (v1.x.x -> v2.x.x).
+
+    Used to flag a release as a "breaking" update so the UI can warn the
+    user. We treat a minor bump (1.2 -> 1.3) the same as a patch — the
+    decision is binary because anything above patch can introduce new
+    apps or change file layout.
+    """
+    a = _parse_version(new_ver)
+    b = _parse_version(cur_ver)
+    return a[0] != b[0]
+
+
 # ── public API ──────────────────────────────────────────────────────────────
 
-def check(channel=DEFAULT_CHANNEL, timeout=15):
-    """Return a dict describing the latest release on `channel`, or None.
+def check(channel=DEFAULT_CHANNEL):
+    """Stage 1 — fast version probe. Hits GitHub's releases API and
+    returns a thin dict iff a newer release exists.
 
     Result shape:
         {
-            "version": "v1.3.0",
-            "notes":   "...",
+            "version":      "v1.3.0",
+            "notes":        "...",
             "manifest_url": "https://...",
-            "tag":     "stable/v1.3.0",
+            "tag":          "stable/v1.3.0",
+            "major":        True/False,    # major-version bump?
         }
 
-    None when:
-      - no network
-      - GitHub returned no releases
-      - none of the releases match the requested channel
-      - we are already on the latest version (no update needed)
+    Returns None on no-network / no-release / already-on-latest. Bounded
+    to T_GH_API seconds so the caller can never hang on it.
     """
     if _http is None or _json is None:
         return None
+    cur = _current_version()
     url = "https://api.github.com/repos/%s/releases" % OTA_REPO
     try:
-        r = _http.get(url, headers={"User-Agent": USER_AGENT}, timeout=timeout)
+        r = _http.get(url, headers={"User-Agent": USER_AGENT}, timeout=T_GH_API)
         data = r.json()
         r.close()
     except Exception:
@@ -213,11 +238,9 @@ def check(channel=DEFAULT_CHANNEL, timeout=15):
         tag = rel.get("tag_name", "")
         if not (tag == channel or tag.startswith(prefix)):
             continue
-        # Strip the channel prefix (if any) to get the bare version.
         ver = tag[len(prefix):] if tag.startswith(prefix) else tag
-        if not _newer(ver, _current_version()):
-            return None      # we're already on it (or newer; e.g. dev)
-        # Find the manifest.json asset on this release.
+        if not _newer(ver, cur):
+            return None
         manifest_url = None
         for a in rel.get("assets", ()):
             if a.get("name") == MANIFEST_NAME:
@@ -230,56 +253,111 @@ def check(channel=DEFAULT_CHANNEL, timeout=15):
             "notes":        rel.get("body") or "",
             "manifest_url": manifest_url,
             "tag":          tag,
+            "major":        _is_major_bump(ver, cur),
         }
     return None
 
 
-def download(release, on_progress=None):
-    """Stage `release` (from check()) into /_ota. Returns True on success.
+def peek(release):
+    """Stage 2 — fetch the manifest and compute a SHA-based diff.
 
-    on_progress is an optional callback called as
-        on_progress(file_index, total_files, file_path)
-    so the UI can render a progress bar.
+    For every file in the manifest, compare the published SHA-256 to the
+    hash of the local file at the same path. Files that match are
+    skipped during the eventual download. The function returns the diff
+    along with the total bytes the badge would need to fetch.
+
+    Result shape:
+        {
+            "manifest":   {... full manifest dict ...},
+            "changed":    [{path, url, sha256, size}, ...],
+            "unchanged":  N,
+            "bytes":      total bytes to download (size sum of `changed`),
+            "small":      True iff bytes <= SMALL_PATCH_BYTES,
+            "major":      True iff this is a major-version bump,
+        }
+
+    Returns None on any network / parse failure. Cheap to call — the
+    manifest itself is a few KB. The expensive part (file-by-file
+    download) lives in download().
     """
-    if not release:
+    if not release or _http is None or _json is None:
+        return None
+    try:
+        r = _http.get(release["manifest_url"],
+                      headers={"User-Agent": USER_AGENT}, timeout=T_MANIFEST)
+        manifest = r.json()
+        r.close()
+    except Exception:
+        return None
+    if not isinstance(manifest, dict):
+        return None
+
+    changed   = []
+    unchanged = 0
+    total_b   = 0
+    for entry in manifest.get("files", ()):
+        path = entry.get("path", "")
+        want = entry.get("sha256", "")
+        size = int(entry.get("size", 0) or 0)
+        if not path:
+            continue
+        local_sha = _sha256_file(path)   # None when file is missing
+        if want and local_sha == want:
+            unchanged += 1
+        else:
+            changed.append(entry)
+            total_b  += size
+
+    return {
+        "manifest":  manifest,
+        "changed":   changed,
+        "unchanged": unchanged,
+        "bytes":     total_b,
+        "small":     total_b <= SMALL_PATCH_BYTES,
+        "major":     release.get("major", False) or _is_major_bump(
+                        manifest.get("version", ""), _current_version()),
+    }
+
+
+def download(peeked, on_progress=None):
+    """Stage 3 — download only the changed files into /_ota.
+
+    `peeked` is the dict returned by peek(). Pre-passing it means the
+    expensive SHA scan only happens once (during peek), not again here.
+
+    on_progress(file_index, total_files, path) lets the UI render a
+    progress bar. Every HTTP call is timeout-bounded so a hung server
+    can't freeze the OS loop — the worst case is total = T_FILE * len(changed).
+    """
+    if not peeked:
         return False
-    _rm_tree(STAGE_DIR)     # wipe any previous interrupted attempt
+    _rm_tree(STAGE_DIR)
     try:
         _os.mkdir(STAGE_DIR)
     except OSError:
         pass
 
-    # Fetch and parse manifest.
-    try:
-        r = _http.get(release["manifest_url"],
-                      headers={"User-Agent": USER_AGENT}, timeout=30)
-        manifest = r.json()
-        r.close()
-    except Exception:
-        return False
-
-    files = manifest.get("files", ())
-    total = len(files)
-    for i, entry in enumerate(files):
+    changed = peeked["changed"]
+    total   = len(changed)
+    for i, entry in enumerate(changed):
         path = entry.get("path", "")
         url  = entry.get("url", "")
         want = entry.get("sha256", "")
         if not (path and url):
             return False
-        # Skip files we already have at the right hash.
-        if want and _sha256_file(path) == want:
-            if on_progress:
-                on_progress(i + 1, total, path)
-            continue
         if not _download_file(url, path, want):
             return False
         if on_progress:
-            on_progress(i + 1, total, path)
+            try:
+                on_progress(i + 1, total, path)
+            except Exception:
+                pass
 
-    # Write the manifest LAST as the "everything staged" marker.
+    # Manifest written LAST as the all-good marker. Until this file
+    # exists, apply_pending() won't promote anything from staging.
     try:
         with open(STAGE_DIR + "/" + MANIFEST_NAME, "w") as f:
-            _json.dump(manifest, f)
+            _json.dump(peeked["manifest"], f)
     except Exception:
         return False
     return True
@@ -291,7 +369,7 @@ def _download_file(url, dest_remote, expected_sha=None):
     parent = stage_path.rsplit("/", 1)[0]
     _ensure_dir(parent)
     try:
-        r = _http.get(url, headers={"User-Agent": USER_AGENT}, timeout=60)
+        r = _http.get(url, headers={"User-Agent": USER_AGENT}, timeout=T_FILE)
         h  = _hashlib.sha256() if _hashlib else None
         with open(stage_path, "wb") as f:
             # urequests doesn't always stream; the safe path is to read
