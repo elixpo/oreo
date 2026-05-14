@@ -1,18 +1,5 @@
 name: release
 
-# OreoOS releases are CUT MANUALLY. There is no auto-trigger on tag push
-# because we want a human to look at the badge running the release
-# candidate before any other badge in the world tries to pull it.
-#
-# Two ways to cut a release:
-#   1. Local:  python tools/release.py vX.Y.Z [--channel stable|beta]
-#      (uses the gh CLI — preferred for solo or workshop releases)
-#   2. Cloud:  Actions tab → "release" workflow → Run workflow
-#      (this file — useful when you don't have a dev machine handy)
-#
-# Both paths converge on tools/build_release.py + a GitHub Release with
-# manifest.json + per-file assets attached. The badge's OTA client
-# picks up whichever release matches its channel.
 
 on:
   workflow_dispatch:
@@ -27,6 +14,8 @@ on:
 
 permissions:
   contents: write    # required to create + attach release assets
+  packages: write    # required to publish the OreoOS python package
+                     # to GitHub Packages so it shows on the Packages tab
 
 jobs:
   build:
