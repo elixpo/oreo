@@ -166,12 +166,23 @@ def main():
 
     files = []
     for local, remote in _collect_paths():
-        sha = _sha256(local)
-        size = local.stat().st_size
         # Copy into ./files/<remote>
         dest = files_dir / remote
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(local, dest)
+
+        # GitHub's release-assets upload endpoint rejects zero-byte files
+        # with `HTTP 400: Bad Content-Length`. We have a lot of empty
+        # __init__.py markers in the tree, so pad them to a single newline
+        # in the COPY. The byte is semantically identical to an empty
+        # __init__.py for MicroPython's import machinery, and re-hashing
+        # the copy keeps the manifest in lockstep with what gh uploads.
+        if dest.stat().st_size == 0:
+            dest.write_bytes(b"\n")
+
+        sha  = _sha256(dest)
+        size = dest.stat().st_size
+
         # GitHub Releases assets are stored at one URL per file, named to
         # avoid path collisions. We flatten slashes to '_' for the
         # download URL while keeping the original `path` in the manifest.

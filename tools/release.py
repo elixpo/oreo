@@ -194,16 +194,25 @@ def main():
     # push), we skip the git steps and jump straight to build + publish.
     tag_on_remote = _tag_exists(tag, dry)
     release_live  = _release_exists(tag, dry)
+    # Three resume states the script knows how to handle:
+    #   resume=False         clean run: full git → build → create
+    #   resume="build"       tag pushed but no GitHub Release: git skipped,
+    #                        build runs, gh release create runs
+    #   resume="upload"      release exists with partial assets (previous
+    #                        run died mid-upload): git skipped, build re-
+    #                        runs, gh release upload --clobber backfills
     if release_live:
-        sys.exit(
-            "✗ a GitHub Release already exists for %s.\n"
-            "  Pick a new version, or delete the release first:\n"
-            "      gh release delete %s --yes" % (tag, tag)
-        )
-    resume = tag_on_remote
-    if resume:
+        resume = "upload"
+        print("ℹ Release %s already exists — RESUMING from asset upload." % tag)
+        print("  (previous run probably died mid-upload; we'll re-upload")
+        print("   everything with --clobber so partial assets get replaced.)")
+        print()
+    elif tag_on_remote:
+        resume = "build"
         print("ℹ tag %s already on origin — RESUMING from build step." % tag)
         print()
+    else:
+        resume = False
 
     # 2. Bump VERSION + commit + tag + push (skipped on resume).
     if not resume:
