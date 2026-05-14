@@ -119,6 +119,7 @@ DEPLOY = [
     ("oreoWare/wifi.py",        "oreoWare/wifi.py"),
     ("oreoWare/bt.py",          "oreoWare/bt.py"),
     ("oreoWare/imu.py",         "oreoWare/imu.py"),
+    ("oreoWare/ir.py",          "oreoWare/ir.py"),
 ]
 
 # Pixelify Sans bitmap-font modules (.py only — skip the TTF, it's build-time)

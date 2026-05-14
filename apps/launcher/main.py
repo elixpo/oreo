@@ -178,13 +178,18 @@ class App(oreoOS.App):
 
         # Pre-upscale every icon 32×32 → 64×64 ONCE; cache as bytearray for
         # fast per-frame blits AND as the source of the rotation animation.
+        # Also keep the original-size icon under _small_icons so the
+        # category-picker tiles can render a more compact 32×32 version
+        # without re-decoding the asset at draw time.
         from oreoOS import icons as _icons
-        self._icons = {}
+        self._icons       = {}
+        self._small_icons = {}
         for a in self._apps:
             res = _icons.load(a["dir"], a.get("icon"))
             if not res:
                 continue
             data, iw, ih = res
+            self._small_icons[a["dir"]] = (bytearray(data), iw, ih)
             if iw == ICON_SZ and ih == ICON_SZ:
                 self._icons[a["dir"]] = (bytearray(data), iw, ih)
             else:
@@ -350,7 +355,13 @@ class App(oreoOS.App):
             return
         d.clear(theme.BG)
         widgets.draw_header(d, "APPS")
-        widgets.draw_hint  (d, "arrows=nav  A=launch  HOME=back")
+        # Hint reflects what the user can do at this level.
+        if self._mode == "categories" and self._cat_level == 0:
+            widgets.draw_hint(d, "UP/DOWN=pick  A=open  HOME=back")
+        elif self._mode == "categories" and self._cat_level == 1:
+            widgets.draw_hint(d, "arrows=nav  A=launch  B=back  HOME=home")
+        else:
+            widgets.draw_hint(d, "arrows=nav  A=launch  HOME=back")
 
         n = len(self._apps)
         if not n:
@@ -456,84 +467,82 @@ class App(oreoOS.App):
             return    # leave _dirty = True
         self._dirty = False
 
-    # ── category view (vertical list grouped by APP_CATEGORIES) ─────────
-    CAT_HDR_H    = 22         # height of a category-header row
-    CAT_APP_H    = 44         # height of an app row (icon + label inline)
-    CAT_ICON_SZ  = 32         # uses the cached 64×64 — we just blit a smaller chunk
-    CAT_PAD_X    = 16
+    # ── category picker (level 0) — vertical tile list ──────────────────
+    CAT_TILE_H    = 36           # each tile's height
+    CAT_TILE_PAD  = 12           # horizontal page padding
+    CAT_ICON_SZ   = 28           # blitted size of the category icon
+    CAT_NAME_PADX = 14           # gap between icon and name
 
-    def _draw_categories(self, d):
-        items   = self._cat_items
-        if not items:
+    def _category_icon(self, cat_idx):
+        """Return (data, w, h) for the FIRST app's icon in the category as
+        a stand-in for the category itself. Uses the SMALL (32×32) cache
+        so it fits inside a category-picker tile without overflow."""
+        if not (0 <= cat_idx < len(self._categories)):
+            return None
+        _name, app_idxs = self._categories[cat_idx]
+        for ai in app_idxs:
+            ic = self._small_icons.get(self._apps[ai]["dir"])
+            if ic:
+                return ic
+        return None
+
+    def _draw_category_picker(self, d):
+        cats = self._categories
+        n    = len(cats)
+        if not n:
+            d.text("no categories", (SW - 13 * 16) // 2, SH // 2,
+                   theme.MUTED, scale=2)
             return
 
-        # Item-position table: y-pixel of the top of each item in the virtual
-        # canvas. Selected item drives the scroll target.
         viewport_top = PAD_TOP
         viewport_h   = SH - PAD_TOP - PAD_BOT
-        positions    = []
-        cy = 0
-        for kind, _p in items:
-            positions.append(cy)
-            cy += self.CAT_HDR_H if kind == "hdr" else self.CAT_APP_H
-        total_h = cy
+        tile_h       = self.CAT_TILE_H
+        gap          = 4
+        block_h      = n * tile_h + (n - 1) * gap
+        # Vertically centred — leaves equal padding above and below.
+        start_y      = viewport_top + max(0, (viewport_h - block_h) // 2)
 
-        # Tween scroll so the selected item stays in view, centred-ish.
-        sel_y     = positions[self._sel]
-        sel_h     = self.CAT_APP_H
-        target    = max(0, min(total_h - viewport_h,
-                               sel_y - (viewport_h // 2) + sel_h))
-        if abs(self._scroll_y - target) > 0.5:
-            self._scroll_y += (target - self._scroll_y) * SCROLL_TWEEN
-        else:
-            self._scroll_y = float(target)
-        scroll = int(self._scroll_y)
+        tile_x = self.CAT_TILE_PAD
+        tile_w = SW - 2 * self.CAT_TILE_PAD
 
-        for i, (kind, payload) in enumerate(items):
-            y = viewport_top + positions[i] - scroll
-            # cull off-screen
-            row_h = self.CAT_HDR_H if kind == "hdr" else self.CAT_APP_H
-            if y + row_h < viewport_top or y > viewport_top + viewport_h:
-                continue
+        for i, (cat_name, app_idxs) in enumerate(cats):
+            y   = start_y + i * (tile_h + gap)
+            sel = (i == self._cat_sel)
 
-            if kind == "hdr":
-                # Pink underlined category header
-                d.rect(self.CAT_PAD_X - 4, y + row_h - 4,
-                       SW - 2 * (self.CAT_PAD_X - 4), 2,
-                       theme.PRIMARY, fill=True)
-                d.text(payload, self.CAT_PAD_X, y + 4,
-                       theme.PRIMARY, scale=2)
+            # Tile body — pink stripe + dock-sel fill when active,
+            # cream card with thin border otherwise.
+            if sel:
+                d.rect(tile_x + 1, y + 1, tile_w, tile_h, theme.MUTED2, fill=True)
+                d.rect(tile_x,     y,     tile_w, tile_h, theme.DOCK_SEL, fill=True)
+                d.rect(tile_x,     y,     4,      tile_h, theme.PRIMARY, fill=True)
             else:
-                ai = payload
-                a  = self._apps[ai]
-                sel = (i == self._sel)
-                if sel:
-                    d.rect(0, y, SW, row_h, theme.DOCK_SEL, fill=True)
-                    d.rect(0, y, 4, row_h, theme.PRIMARY, fill=True)
-                # Icon — blit the cached 64×64 at native size, vertically
-                # centred. Looks heavier than the grid icons but that's fine
-                # since rows have lots of vertical room.
-                icon = self._icons.get(a["dir"])
-                if icon:
-                    idata, iw, ih = icon
-                    iy = y + (row_h - ih) // 2
-                    d.blit(idata, self.CAT_PAD_X, iy, iw, ih)
-                # App name (scale=2 pink when selected, otherwise dim text)
-                name = a["name"]
-                ny   = y + (row_h - 16) // 2
-                d.text(name, self.CAT_PAD_X + 64 + 12, ny,
-                       theme.PRIMARY if sel else theme.TEXT_BRIGHT, scale=2)
+                d.rect(tile_x, y, tile_w, tile_h, theme.CARD,  fill=True)
+                d.rect(tile_x, y, tile_w, 1,      theme.MUTED2, fill=True)
+                d.rect(tile_x, y + tile_h - 1, tile_w, 1, theme.MUTED2, fill=True)
 
-        # ── scrollbar ───────────────────────────────────────────────────
-        if total_h > viewport_h:
-            track_x = SW - 4
-            track_y = viewport_top
-            track_h = viewport_h
-            d.rect(track_x, track_y, 2, track_h, theme.MUTED2, fill=True)
-            thumb_h = max(12, track_h * viewport_h // total_h)
-            denom   = max(1, total_h - viewport_h)
-            thumb_y = track_y + (track_h - thumb_h) * scroll // denom
-            d.rect(track_x, thumb_y, 2, thumb_h, theme.PRIMARY, fill=True)
+            # Icon — vertically centred. Uses the SMALL cached version
+            # (32×32) which fits inside the 36-px tile cleanly.
+            icon  = self._category_icon(i)
+            icon_w = 0
+            if icon:
+                idata, iw, ih = icon
+                icon_w = iw
+                ix = tile_x + 12
+                iy = y + (tile_h - ih) // 2
+                d.blit(idata, ix, iy, iw, ih)
+
+            # Category name + small "(N apps)" subtitle.
+            text_x = tile_x + 12 + icon_w + self.CAT_NAME_PADX
+            d.text(cat_name, text_x, y + 6, theme.PRIMARY, scale=2)
+            sub = "%d app%s" % (len(app_idxs), "" if len(app_idxs) == 1 else "s")
+            d.text(sub, text_x, y + tile_h - 12,
+                   theme.MUTED if not sel else theme.TEXT_BRIGHT)
+
+            # Chevron to hint "press A to drill in"
+            chev = ">"
+            d.text(chev, tile_x + tile_w - 16,
+                   y + (tile_h - 16) // 2,
+                   theme.PRIMARY if sel else theme.MUTED, scale=2)
 
         # keep frame-marking dirty until the scroll tween settles
         if abs(self._scroll_y - target) > 0.5:
