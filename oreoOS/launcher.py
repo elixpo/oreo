@@ -322,14 +322,38 @@ def boot():
     except Exception:
         pass
 
-    # Start WiFi and BT after splash (non-blocking for BT, background for WiFi)
+    # Start WiFi and BT after splash. Two safety gates so a weak supply
+    # (e.g. powered from an FTDI's onboard 3V3 LDO @ ~100 mA) doesn't brown
+    # the chip out when the radio first powers up:
+    #   1. honour secrets.WIFI_AUTO_CONNECT — user can flip to False to
+    #      keep WiFi off entirely
+    #   2. skip WiFi for one boot after a brownout reset, so the device
+    #      can at least reach the home screen
+    wifi_ok_to_try = True
+    try:
+        from secrets import WIFI_AUTO_CONNECT
+        if not WIFI_AUTO_CONNECT:
+            wifi_ok_to_try = False
+    except Exception:
+        pass
+    try:
+        import machine
+        # MicroPython exposes BROWNOUT_RESET on most ports; treat unknown
+        # constants as "not a brownout" so this stays portable.
+        if hasattr(machine, "BROWNOUT_RESET"):
+            if machine.reset_cause() == machine.BROWNOUT_RESET:
+                wifi_ok_to_try = False
+    except Exception:
+        pass
+
     try:
         from oreoWare import wifi, bt
-        wifi.connect_from_config()
+        if wifi_ok_to_try:
+            wifi.connect_from_config()
         bt.init_from_config()
         # Sync the system clock from an NTP server once WiFi is up. The RTC
         # then drives the home-screen clock. ~2 s blocking, only at boot.
-        if wifi.is_connected():
+        if wifi_ok_to_try and wifi.is_connected():
             try:
                 import ntptime, machine, time as _t
                 ntptime.host = "pool.ntp.org"

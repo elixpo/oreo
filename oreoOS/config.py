@@ -26,7 +26,7 @@ _env = _load_env()
 # OS version. tools/deploy.py auto-bumps the PATCH number on every push.
 # The literal MUST stay on its own line as `VERSION = "vN.N.N"` — the
 # deploy regex relies on that exact format to rewrite in place.
-VERSION           = "v1.2.25"
+VERSION           = "v1.2.35"
 
 GITHUB_USER       = "Circuit-Overtime"
 DISPLAY_NAME      = "Ayushman Bhattacharya"
@@ -44,4 +44,4 @@ WIFI_SSID         = _env.get("WIFI_SSID", "")
 WIFI_PASSWORD     = _env.get("WIFI_PASSWORD", "")
 OWM_API_KEY       = _env.get("OWM_API_KEY", "")
 
-WIFI_AUTO_CONNECT = bool(WIFI_SSID)
+WIFI_AUTO_CONNECT = False
