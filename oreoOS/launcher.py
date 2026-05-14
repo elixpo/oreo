@@ -151,6 +151,16 @@ def run_app(os_obj, app):
             os_obj._launch_request = "__appmenu__"
             return
 
+    # Power manager — singleton on the OS object; idle timer drives deep sleep.
+    pm = getattr(os_obj, "_power", None)
+    if pm is None:
+        try:
+            from oreoOS.power import PowerManager
+            pm = PowerManager(os_obj)
+            os_obj._power = pm
+        except Exception:
+            pm = None
+
     app.on_enter(os_obj)
     last = time.ticks_ms()
     try:
@@ -162,6 +172,7 @@ def run_app(os_obj, app):
             os_obj.buttons.update()
             for b in api.BUTTONS:
                 if os_obj.buttons.just_pressed(b):
+                    if pm: pm.note_event()
                     if b == api.BTN_HOME:
                         handled = False
                         hook = getattr(app, "on_home_press", None)
@@ -187,6 +198,13 @@ def run_app(os_obj, app):
             app.update(dt)
             app.draw(os_obj.display)
             os_obj.display.present()
+
+            # Idle check AFTER the frame so the user sees the result of their
+            # last input before the chip dozes off. PowerManager calls
+            # machine.deepsleep() internally when the threshold is hit — that
+            # call never returns; next reset starts main.py fresh.
+            if pm:
+                pm.tick(app)
 
             elapsed = time.ticks_diff(time.ticks_ms(), now)
             if elapsed < FRAME_MIN_MS:

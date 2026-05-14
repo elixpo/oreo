@@ -16,12 +16,15 @@ ROW_TOP_Y    = widgets.HEADER_H + 8
 
 
 class _Row:
-    __slots__ = ("label", "kind", "getter", "setter")
-    def __init__(self, label, kind, getter=None, setter=None):
+    __slots__ = ("label", "kind", "getter", "setter", "step")
+    def __init__(self, label, kind, getter=None, setter=None, step=10):
         self.label  = label
         self.kind   = kind        # "toggle" | "info" | "action" | "slider"
         self.getter = getter
         self.setter = setter
+        # Per-row L/R adjustment step. 10 is right for percent-style sliders
+        # (brightness 0-100); minute counters use 1 so 1->30 isn't 3 jumps.
+        self.step   = step
 
 
 class App(oreoOS.App):
@@ -42,21 +45,42 @@ class App(oreoOS.App):
             self._bt   = None
 
         self._brightness = 100   # logical brightness (0..100), backlight is pure HIGH for now
+
+        # Power-manager settings live in the SETTINGS dict in oreoOS.power.
+        # Default to "on, 120 s" if the module isn't importable for any reason
+        # (e.g. running on the build host without the power.py file).
+        try:
+            from oreoOS import power as _pm
+            self._pm = _pm
+            _pm.load_settings(os)
+        except Exception:
+            self._pm = None
+
         self._rows = [
-            _Row("WiFi",       "toggle",
+            _Row("WiFi",        "toggle",
                  getter=lambda: self._wifi and self._wifi.is_connected(),
                  setter=lambda v: self._toggle_wifi(v)),
-            _Row("WiFi IP",    "info",
+            _Row("WiFi IP",     "info",
                  getter=lambda: (self._wifi.ip() if self._wifi else None) or "—"),
-            _Row("Bluetooth",  "toggle",
+            _Row("Bluetooth",   "toggle",
                  getter=lambda: self._bt and self._bt.is_active(),
                  setter=lambda v: self._bt and self._bt.set_active(v)),
-            _Row("Brightness", "slider",
+            _Row("Brightness",  "slider",
                  getter=lambda: self._brightness,
                  setter=lambda v: self._set_brightness(v)),
-            _Row("Version",    "info",
+            _Row("Auto Sleep",  "toggle",
+                 getter=self._idle_enabled,
+                 setter=self._set_idle_enabled),
+            _Row("Sleep After", "slider",
+                 getter=self._idle_minutes,
+                 setter=self._set_idle_minutes,
+                 step=1),
+            _Row("Touch Wake",  "toggle",
+                 getter=self._touch_wake,
+                 setter=self._set_touch_wake),
+            _Row("Version",     "info",
                  getter=self._os_version),
-            _Row("Reboot",     "action",
+            _Row("Reboot",      "action",
                  setter=lambda v: self._reboot()),
         ]
 
@@ -78,6 +102,39 @@ class App(oreoOS.App):
                 setter(self._brightness)
         except Exception:
             pass
+
+    # ── power-manager getters / setters ──────────────────────────────────
+    # The slider for "Sleep After" is in MINUTES (more user-friendly than
+    # seconds for a 1–30 minute range). Persist as seconds internally so
+    # the power manager's tick math stays in milliseconds without a unit
+    # conversion every frame.
+    def _idle_enabled(self):
+        if not self._pm: return True
+        return bool(self._pm.SETTINGS.get("idle_enable", True))
+
+    def _set_idle_enabled(self, v):
+        if not self._pm: return
+        self._pm.SETTINGS["idle_enable"] = bool(v)
+        self._pm.save_settings(self._os)
+
+    def _idle_minutes(self):
+        if not self._pm: return 2
+        return max(1, int(self._pm.SETTINGS.get("idle_seconds", 120) / 60))
+
+    def _set_idle_minutes(self, v):
+        if not self._pm: return
+        v = max(1, min(30, int(v)))
+        self._pm.SETTINGS["idle_seconds"] = v * 60
+        self._pm.save_settings(self._os)
+
+    def _touch_wake(self):
+        if not self._pm: return True
+        return bool(self._pm.SETTINGS.get("touch_wake", True))
+
+    def _set_touch_wake(self, v):
+        if not self._pm: return
+        self._pm.SETTINGS["touch_wake"] = bool(v)
+        self._pm.save_settings(self._os)
 
     @staticmethod
     def _os_version():
@@ -102,16 +159,17 @@ class App(oreoOS.App):
         if   btn == api.BTN_UP:    self._sel = (self._sel - 1) % n; self._dirty = True
         elif btn == api.BTN_DOWN:  self._sel = (self._sel + 1) % n; self._dirty = True
         elif btn == api.BTN_LEFT:
-            self._adjust(-10); self._dirty = True
+            self._adjust(-1); self._dirty = True
         elif btn == api.BTN_RIGHT:
-            self._adjust(+10); self._dirty = True
+            self._adjust(+1); self._dirty = True
         elif btn == api.BTN_A:
             self._activate(); self._dirty = True
 
-    def _adjust(self, delta):
+    def _adjust(self, sign):
+        """sign is +1 or -1 — multiplied by the row's own step."""
         row = self._rows[self._sel]
         if row.kind == "slider":
-            row.setter(row.getter() + delta)
+            row.setter(row.getter() + sign * row.step)
 
     def _activate(self):
         row = self._rows[self._sel]
