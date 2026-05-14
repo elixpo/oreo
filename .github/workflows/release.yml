@@ -100,3 +100,20 @@ jobs:
             See `CONTRIBUTING.md` for the release process.
           files: |
             upload/*
+
+      # ── GitHub Packages (Python registry) ──────────────────────────────
+      # Publishes oreoos-<version>.tar.gz + .whl to GitHub Packages so
+      # OreoOS appears under the repo's "Packages" sidebar. Not used by
+      # the badge (which flashes via tools/deploy.py), but gives the
+      # project a versioned, discoverable artefact trail.
+      - name: Install build tools
+        run: pip install --upgrade build twine
+      - name: Build sdist + wheel
+        run: python -m build
+      - name: Publish to GitHub Packages (PyPI registry)
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+          # GitHub-hosted PyPI: https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-pypi-registry
+          TWINE_REPOSITORY_URL: https://${{ github.repository_owner }}.pkg.github.com/${{ github.repository_owner }}/
+        run: twine upload --skip-existing dist/oreoos-*.tar.gz dist/oreoos-*.whl
