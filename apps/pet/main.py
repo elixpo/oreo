@@ -213,9 +213,12 @@ class App(oreoOS.App):
             self._dirty = True
 
     def _spawn_hearts(self, n):
+        # Hearts emit from above the pet's head — roughly the top of the
+        # 128 px sprite slot in the middle of the screen.
+        spawn_y = widgets.HEADER_H + 60
         for i in range(n):
-            vx = (i - n // 2) * 12
-            self._hearts.append(_HeartParticle(SW // 2, 100, vx))
+            vx = (i - n // 2) * 14
+            self._hearts.append(_HeartParticle(SW // 2, spawn_y, vx))
 
     def update(self, dt):
         now      = time.ticks_ms()
