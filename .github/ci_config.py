@@ -1,5 +1,5 @@
 """
-Elixpo CI Configuration — oreo-badge
+Elixpo CI Configuration — oreo
 Single source of truth for all CI workflows and scripts.
 """
 
@@ -16,7 +16,7 @@ LLM_MODEL = LLM_MODEL_CHAT
 
 # ── Repository ──────────────────────────────────────
 REPO = "elixpo/oreo"
-PROJECT_NAME = "oreo-badge"
+PROJECT_NAME = "oreo"
 PROJECT_DESCRIPTION = "OreoOS — MicroPython badge OS for the Elixpo conference badge"
 
 # ── GitHub Projects V2 ──────────────────────────────

@@ -28,7 +28,7 @@ This document is the short version. Read it once, then jump in.
 
 ```bash
 git clone https://github.com/elixpo/oreo
-cd oreo-badge
+cd oreo
 python -m venv .venv && source .venv/bin/activate
 pip install -r oreoOS/requirements.txt
 ```

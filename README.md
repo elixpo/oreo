@@ -62,7 +62,7 @@ into `apps/your_name/` and ship.
 
 ```bash
 git clone https://github.com/elixpo/oreo
-cd oreo-badge
+cd oreo
 python -m venv .venv && source .venv/bin/activate
 pip install -r oreoOS/requirements.txt
 python tools/deploy.py /dev/ttyACM0      # flash to a connected board
