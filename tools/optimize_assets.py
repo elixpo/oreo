@@ -100,6 +100,10 @@ PER_APP_SIZES = {
     # so the MicroPython parser doesn't OOM the boot heap.
     "splash_bg":    (160, 120),
 
+    # color_picker — hue × lightness rainbow. Stored quarter-res; the app
+    # upscales 4x to fill the play area. 80×49 = ~7 kB .py module.
+    "color_splash": (80, 49),
+
     # racer game — top-down kart, oncoming cars, verge trees, tiled tarmac
     "racer_player":       (32, 40),
     "racer_player_crash": (32, 40),

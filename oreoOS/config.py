@@ -73,7 +73,7 @@ BT_ADV_INTERVAL_MS = 500
 APP_CATEGORIES = (
     ("Games",     ("flappy", "snake", "racer", "pet")),
     ("GitHub",    ("badge",  "identity", "commits")),
-    ("Connected", ("weather",)),
+    ("Utils", ("weather",)),
     ("Tools",     ("gallery", "color_picker", "gamepad", "quest")),
     ("System",    ("settings", "about")),
 )
