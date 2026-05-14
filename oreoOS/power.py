@@ -97,22 +97,39 @@ class PowerManager:
         except Exception:
             pass
 
-        # Configure wake-on-pin for buttons + (optional) touch.
+        # Resolve the wake-from-sleep IRQ flag. MicroPython exposes
+        # machine.SLEEP on most ESP32 builds but a few stripped builds omit
+        # it; fall back to the documented integer value (5 = SLEEP) when
+        # the constant is missing so we still register the wake source.
+        wake_flag = getattr(machine, "SLEEP", None)
+        if wake_flag is None:
+            wake_flag = 5
+
+        # Configure wake-on-pin for buttons + (optional) touch. Each pin
+        # gets its own try/except so a single failure doesn't strand the
+        # chip in sleep with no other wake source.
         wake_pins = []
-        try:
-            for p in (pins.BTN_HOME, pins.BTN_A, pins.BTN_B, pins.BTN_C,
-                      pins.BTN_UP, pins.BTN_DOWN, pins.BTN_LEFT, pins.BTN_RIGHT):
+        for p in (pins.BTN_HOME, pins.BTN_A, pins.BTN_B, pins.BTN_C,
+                  pins.BTN_UP, pins.BTN_DOWN, pins.BTN_LEFT, pins.BTN_RIGHT):
+            try:
                 pin = machine.Pin(p, machine.Pin.IN, machine.Pin.PULL_UP)
-                pin.irq(trigger=machine.Pin.IRQ_FALLING, wake=machine.SLEEP)
+                pin.irq(trigger=machine.Pin.IRQ_FALLING, wake=wake_flag)
                 wake_pins.append(pin)
-            if SETTINGS["touch_wake"]:
+            except Exception:
+                # That single pin's wake didn't register; keep going.
+                pass
+
+        if SETTINGS["touch_wake"]:
+            try:
                 tp = machine.Pin(pins.TOUCH_OUT, machine.Pin.IN)
-                tp.irq(trigger=machine.Pin.IRQ_RISING, wake=machine.SLEEP)
+                tp.irq(trigger=machine.Pin.IRQ_RISING, wake=wake_flag)
                 wake_pins.append(tp)
-        except Exception:
-            # If wake-source setup failed (older MP build / wrong pin map)
-            # we DON'T want to enter light sleep — we'd have no way out.
-            # Bail and restore the screen instead.
+            except Exception:
+                pass
+
+        if not wake_pins:
+            # No wake source got registered — entering lightsleep here would
+            # only ever return on the chip's max timeout. Bail.
             try:
                 self._os.display.set_brightness(prev_brightness)
             except Exception:
@@ -120,10 +137,16 @@ class PowerManager:
             return
 
         # ── sleep here. Resumes when any configured pin IRQ fires. ──
+        # We pass a 24-hour ceiling so a borked wake source can't strand the
+        # chip forever — worst case it ticks back to the run loop tomorrow.
         try:
-            machine.lightsleep()
+            machine.lightsleep(24 * 60 * 60 * 1000)
         except Exception:
-            pass
+            try:
+                # Older MP builds want no argument.
+                machine.lightsleep()
+            except Exception:
+                pass
 
         # Restore the screen on wake. The next frame the run-loop draws
         # will repaint everything because each app's _dirty flag is still

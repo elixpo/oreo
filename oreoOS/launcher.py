@@ -321,7 +321,29 @@ def _wrap_text(text, max_chars):
 
 # ── boot entry point ─────────────────────────────────────────────────────────
 
+def _maybe_apply_ota():
+    """Run any staged OTA update BEFORE we import the home screen.
+
+    apply_pending() is a no-op when /_ota/manifest.json is absent — the
+    common case on every boot. When an update is pending it copies the
+    staged files into place + clears the staging area, then returns the
+    new version string so we can flash a short "Updated to vX.Y.Z"
+    splash later. The actual VERSION constant is re-read on import, so
+    the new value is live for the rest of the boot.
+    """
+    try:
+        from oreoOS import ota
+        return ota.apply_pending()
+    except Exception:
+        return None
+
+
 def boot():
+    # Apply any staged OTA update FIRST — before we import display drivers
+    # or anything that might reference an old version of a module. If files
+    # get swapped in here, the subsequent imports pick up the new code.
+    applied = _maybe_apply_ota()
+
     from oreoWare.os import OS
     from oreoOS.splash import show_splash
     from oreoOS.home   import Home
@@ -331,6 +353,13 @@ def boot():
     # default — manual gc.collect() runs at app exit in run_app's finally.
 
     os_obj = OS()
+    if applied:
+        # Persist a one-shot flag so the home screen can show a "Updated
+        # to vX.Y.Z" toast on the next render and then forget about it.
+        try:
+            os_obj.settings_set("ota_just_applied", applied)
+        except Exception:
+            pass
     # Splash must NEVER kill the boot — if the big bg asset OOMs or the
     # mascot module is missing we just want to fall through to the home
     # screen. Whatever's on the LCD stays visible (initial black frame from

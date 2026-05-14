@@ -83,9 +83,23 @@ class App(oreoOS.App):
 
     def _info_rows(self):
         secs = self._last_s
+        # OTA status comes from the Settings → Check Update flow.
+        # 'up-to-date' / 'downloading' / 'ready' / 'download-failed' / None
+        ota_status = None
+        try:
+            ota_status = self._os.settings_get("ota_status", None)
+        except Exception:
+            pass
+        ota_label = {
+            "up-to-date":       "up to date",
+            "downloading":      "downloading...",
+            "ready":            "ready to install",
+            "download-failed":  "fetch failed",
+        }.get(ota_status, "—") if ota_status else "—"
         return [
             ("OS",       "Oreo OS"),
             ("Version",  _os_version()),
+            ("Update",   ota_label),
             ("Codename", "Sweet Sandwich"),
             ("Board",    "ESP32-S3"),
             ("Memory",   _kb(gc.mem_free()) + " free"),

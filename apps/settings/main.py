@@ -105,6 +105,10 @@ class App(oreoOS.App):
                  on_label="Cat", off_label="Grid"),
             _Row("Version",     "info",
                  getter=self._os_version),
+            _Row("Check Update","action",
+                 setter=lambda v: self._check_update()),
+            _Row("Install Update","action",
+                 setter=lambda v: self._install_update()),
             _Row("Reboot",      "action",
                  setter=lambda v: self._reboot()),
         ]
@@ -197,6 +201,42 @@ class App(oreoOS.App):
             return getattr(launcher, "VERSION", "?")
         except Exception:
             return "?"
+
+    # ── OTA actions ──────────────────────────────────────────────────────
+    # `Check Update` hits GitHub via oreoOS.ota.check() and stages the
+    # download if a newer version is found. `Install Update` triggers a
+    # reboot — the boot path's apply hook then swaps files into place.
+    def _check_update(self):
+        try:
+            from oreoOS import ota
+        except Exception:
+            return
+        try:
+            rel = ota.check()
+        except Exception:
+            rel = None
+        if not rel:
+            self._os.settings_set("ota_status", "up-to-date")
+            return
+        self._os.settings_set("ota_status", "downloading")
+        try:
+            ok = ota.download(rel)
+        except Exception:
+            ok = False
+        self._os.settings_set("ota_status",
+                              "ready" if ok else "download-failed")
+        self._os.settings_set("ota_pending_version",
+                              rel.get("version", ""))
+
+    def _install_update(self):
+        try:
+            from oreoOS import ota
+            if not ota.is_pending():
+                return
+        except Exception:
+            return
+        # Boot path applies and clears the staging dir; just kick the chip.
+        self._reboot()
 
     def _reboot(self):
         try:
