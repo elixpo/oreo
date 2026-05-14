@@ -1,15 +1,5 @@
-<!-- Top wave — full rainbow sweep -->
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://capsule-render.vercel.app/api?type=waving&color=0:FF5D68,15:FF9A3C,30:FFBE1E,50:6BD968,70:00B4A5,85:5D9BFF,100:B45DFF&height=200&section=header&text=Oreo%20Badge&fontColor=FFFFFF&fontSize=52&fontAlignY=38&animation=fadeIn&desc=A%20conference%20badge%20that%27s%20also%20a%20tiny%20console&descAlignY=62&descSize=14&descAlign=50">
-  <img alt="Oreo Badge" src="https://capsule-render.vercel.app/api?type=waving&color=0:FF5D68,15:FF9A3C,30:FFBE1E,50:6BD968,70:00B4A5,85:5D9BFF,100:B45DFF&height=200&section=header&text=Oreo%20Badge&fontColor=FFFFFF&fontSize=52&fontAlignY=38&animation=fadeIn&desc=A%20conference%20badge%20that%27s%20also%20a%20tiny%20console&descAlignY=62&descSize=14&descAlign=50">
-</picture>
-
 <div align="center">
 
-<!-- Hero banner — regenerate any time with: python tools/_gen_banner.py -->
-<img src="docs/images/banner.png" alt="OreoOS — the Oreo Badge" width="100%">
-
-<br><br>
 
 <img src="assets/sprites/raw/mascot.png" alt="Oreo, the panda mascot" width="180">
 
@@ -28,6 +18,8 @@
 [![Sponsor](https://img.shields.io/badge/sponsor-%E2%9D%A4-FF5D68?style=flat-square)](https://github.com/sponsors/Circuit-Overtime)
 
 </div>
+
+<img src="docs/images/banner.png" alt="OreoOS — the Oreo Badge" width="100%">
 
 ---
 

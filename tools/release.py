@@ -188,13 +188,38 @@ def main():
     # 5. Create the GitHub Release.
     prerelease_flag = ["--prerelease"] if args.channel != "stable" else []
     notes = args.notes or ("OreoOS %s — %s channel." % (args.version, args.channel))
+
+    # Title format: "OreoOS v1.3.0 · 2026-05-15" for stable, plus a "(beta)"
+    # suffix when off-channel. The date is ISO yyyy-mm-dd in UTC so it
+    # matches what GitHub renders alongside the release.
+    import datetime as _dt
+    today = _dt.datetime.utcnow().strftime("%Y-%m-%d")
+    if args.channel == "stable":
+        title = "OreoOS %s · %s" % (args.version, today)
+    else:
+        title = "OreoOS %s · %s · %s" % (args.version, today, args.channel)
+
+    # Expand the upload-dir glob in Python — `gh release create` takes the
+    # files as positional args, but subprocess.run passes them as literal
+    # argv elements (no shell, so `*` doesn't expand). Without this `gh`
+    # would try to stat a path literally named '*'.
+    upload_files = []
+    if not dry:
+        upload_files = sorted(str(p) for p in upload_dir.iterdir() if p.is_file())
+        if not upload_files:
+            sys.exit("✗ %s is empty — build_release.py didn't produce any files" % upload_dir)
+    else:
+        # In dry-run we don't actually create _upload/, so just print a
+        # placeholder; the real command on a wet run gets a real list.
+        upload_files = ["<expanded at runtime>"]
+
     run([
         "gh", "release", "create", tag,
-        "--title", "OreoOS %s (%s)" % (args.version, args.channel),
+        "--title", title,
         "--notes", notes,
         *prerelease_flag,
         "--target", "main",
-        str(upload_dir) + "/*",
+        *upload_files,
     ], dry)
 
     print("\n✓ release %s pushed and published." % tag)
