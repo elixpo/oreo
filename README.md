@@ -1,9 +1,6 @@
 <div align="center">
 
-<!-- Hero banner — regenerate any time with: python tools/_gen_banner.py -->
-<img src="docs/images/banner.png" alt="OreoOS — the Oreo Badge" width="100%">
 
-<br><br>
 
 <img src="assets/sprites/raw/mascot.png" alt="Oreo, the panda mascot" width="180">
 
@@ -34,6 +31,9 @@ Made by [Elixpo](https://elixpo.com) · OS, mascot, and apps by [@Circuit-Overti
 > *Oreo is what happens when a conference name-tag grows up.*
 
 </div>
+
+<img src="docs/images/banner.png" alt="OreoOS — the Oreo Badge" width="100%">
+
 
 ---
 
