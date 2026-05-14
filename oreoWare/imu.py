@@ -51,12 +51,28 @@ _GYRO_LSB_PER_DPS = 131.0     # at ±250 °/s
 _BURST_FMT = ">hhhhhhh"
 
 
+def i2c_scan(freq=100_000):
+    """Probe the bus and return the list of addresses that ACKed.
+
+    Useful when 'OSError: ETIMEDOUT' shows up — calling this first tells you
+    whether the chip is reachable AT ALL, separately from any driver bug.
+    Returns [] when nothing answered (check wiring + power + pull-ups).
+    """
+    if I2C is None:
+        raise RuntimeError("machine.I2C not available (off-device)")
+    bus = I2C(0, scl=Pin(pins.I2C_SCL), sda=Pin(pins.I2C_SDA), freq=freq)
+    return bus.scan()
+
+
 class MPU6050:
     def __init__(self, i2c=None, addr=_ADDR):
         if i2c is None:
             if I2C is None:
                 raise RuntimeError("machine.I2C not available (off-device)")
-            i2c = I2C(0, scl=Pin(pins.I2C_SCL), sda=Pin(pins.I2C_SDA), freq=400_000)
+            # 100 kHz default — slow mode, forgiving of breadboard parasitic
+            # capacitance and long jumper wires. Bump to 400 kHz only once
+            # you've confirmed the bus is stable.
+            i2c = I2C(0, scl=Pin(pins.I2C_SCL), sda=Pin(pins.I2C_SDA), freq=100_000)
         self._i2c    = i2c
         self._addr   = addr
         self._buf    = bytearray(14)

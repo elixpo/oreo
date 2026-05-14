@@ -4,18 +4,17 @@ How to play:
   * Hold the badge HORIZONTAL (screen facing up, +Y of the IMU pointing
     toward the top of the screen).
   * ROLL the badge left/right -> car steers left/right.
-  * PITCH the badge forward (top edge down) -> accelerate.
+  * PITCH the badge forward (top edge down) -> accelerate AWAY from you.
   * PITCH the badge back   (top edge up)   -> brake / slow down.
 
-The user said "yaw=steer, pitch=throttle" - we approximate yaw with the
-ROLL accel reading because in a horizontal-card grip a wrist-twist looks
-identical to a roll from the accelerometer's point of view, and using
-the gyro for steering accumulates drift over a multi-minute play session.
+Visual style follows Flappy: live game world keeps animating in the
+background, with a dim scan-line overlay + shadow text on top for
+INTRO and GAME OVER states. No opaque cards.
 
 Three states:
-    INTRO   - title, blink "tilt to start"
-    PLAY    - obstacles scroll down, dodge them
-    OVER    - crash card, "press A to retry"
+    INTRO   - title, blink "Press A to start", world still scrolling behind
+    PLAY    - obstacles scroll down (toward player), dodge them
+    OVER    - crash visible, world dimmed, "Press A to retry"
 
 Assets used (drop into apps/racer/assets/raw/, run:
   python tools/optimize_assets.py --app racer):
@@ -32,9 +31,8 @@ mechanics are playable even before the asset pipeline has run.
 Hi-score persists in apps/racer/hi.txt.
 """
 
-import time
 import oreoOS
-from oreoOS import api, theme, widgets
+from oreoOS import api
 
 
 SW = api.SCREEN_W       # 320
@@ -45,29 +43,36 @@ INTRO, PLAY, OVER = 1, 2, 3
 # ── game tuning ──────────────────────────────────────────────────────────────
 ROAD_W       = 200                      # rendered road width
 ROAD_X       = (SW - ROAD_W) // 2
-PLAY_TOP     = widgets.HEADER_H
-PLAY_BOT     = SH - widgets.HINT_H
+PLAY_TOP     = 0                        # full-screen for the Flappy look
+PLAY_BOT     = SH
 PLAY_H       = PLAY_BOT - PLAY_TOP
 
 CAR_W, CAR_H = 32, 40
-PLAYER_Y     = PLAY_BOT - CAR_H - 12
+PLAYER_Y     = PLAY_BOT - CAR_H - 18
 
 ENEMY_W, ENEMY_H = 32, 40
 ENEMY_LANES  = (ROAD_X + 28, ROAD_X + ROAD_W // 2 - ENEMY_W // 2, ROAD_X + ROAD_W - ENEMY_W - 28)
 
-MAX_STEER_PX_PER_S   = 220.0    # max horizontal speed of the player car
-ROAD_SCROLL_MIN      = 30.0     # px/s — minimum forward speed
-ROAD_SCROLL_MAX      = 220.0    # px/s — flat-out, pitched forward
-ENEMY_SPAWN_SEC0     = 1.6      # first enemy interval; tightens with score
+MAX_STEER_PX_PER_S   = 220.0
+ROAD_SCROLL_MIN      = 30.0
+ROAD_SCROLL_MAX      = 220.0
+ENEMY_SPAWN_SEC0     = 1.6
 ENEMY_SPAWN_FLOOR    = 0.55
 
-# Tilt mapping. roll -> steering, pitch -> throttle.
-#  - dead-zone around 0 so the car doesn't drift on a flat hand
-#  - clamp far past the saturation point so a steep tilt = full input
 ROLL_DEADZONE_DEG    = 4.0
 ROLL_SATURATION_DEG  = 30.0
 PITCH_DEADZONE_DEG   = 5.0
 PITCH_SATURATION_DEG = 25.0
+
+# Flappy-derived palette — warm, bright, with consistent shadow colour.
+C_GRASS      = api.rgb( 40, 110,  50)
+C_ROAD       = api.rgb( 64,  64,  72)
+C_DASH       = api.WHITE
+C_TITLE      = api.rgb(255,  93, 104)   # pink
+C_HI         = api.rgb(255, 230,  80)   # gold
+C_TEXT       = api.WHITE
+C_DIM        = api.rgb(200, 180, 160)
+C_SHADOW     = api.rgb( 20,  30,  45)
 
 HI_PATH = "apps/racer/hi.txt"
 
@@ -104,7 +109,7 @@ def _clamp(v, lo, hi):
 
 
 def _norm_input(value, deadzone, saturation):
-    """Map a signed angle (deg) onto -1..+1 with a dead-zone."""
+    """Signed angle (deg) -> -1..+1 with a dead-zone + saturation curve."""
     av = value if value >= 0 else -value
     if av < deadzone:
         return 0.0
@@ -118,20 +123,14 @@ def _norm_input(value, deadzone, saturation):
 
 
 class _Enemy:
-    """Oncoming car. Spawns at the top, scrolls down with the road."""
     __slots__ = ("x", "y", "spr")
-
     def __init__(self, x, y, spr):
-        self.x = x
-        self.y = y
-        self.spr = spr
+        self.x, self.y, self.spr = x, y, spr
 
 
 class App(oreoOS.App):
     name         = "Racer"
     SHOW_LOADING = True
-    # When the racer is foregrounded we want the OS to NOT idle-sleep —
-    # the user is actively driving even though no buttons are pressed.
     BLOCK_IDLE   = True
 
     def on_enter(self, os):
@@ -142,7 +141,6 @@ class App(oreoOS.App):
         self._blink  = 0.0
         self._dirty  = True
 
-        # Sprite cache (loaded once, fall back to flat rects if missing)
         self._spr_player  = _try_sprite("racer_player")
         self._spr_crash   = _try_sprite("racer_player_crash")
         self._spr_enemy_a = _try_sprite("racer_enemy_a")
@@ -150,17 +148,34 @@ class App(oreoOS.App):
         self._spr_tree    = _try_sprite("racer_tree")
         self._spr_road    = _try_sprite("racer_road")
 
-        # IMU.  We deliberately catch ANY error so the game can still
-        # render in the simulator / on a board without the IMU wired.
         self._imu = None
         try:
             from oreoWare import imu
             self._imu = imu.MPU6050()
-            self._imu.calibrate(samples=80)   # ~0.4 s blocking on entry
+            self._imu.calibrate(samples=80)
         except Exception:
             self._imu = None
 
+        # Control mode: "IMU" (tilt) or "BTN" (D-pad). Persisted across
+        # boots via the OS settings dict; falls back to BTN when no IMU
+        # is detected so the game stays playable on a bare board.
+        saved = os.settings_get("racer_mode", None)
+        if saved in ("IMU", "BTN"):
+            self._mode = saved
+        else:
+            self._mode = "IMU" if self._imu else "BTN"
+        # Smoothed digital-input axes for BTN mode (lerp toward the held
+        # state so tap-tap doesn't snap the car instantly).
+        self._btn_steer    = 0.0
+        self._btn_throttle = 0.0
+
         self._reset_run()
+
+    def _save_mode(self):
+        try:
+            self._os.settings_set("racer_mode", self._mode)
+        except Exception:
+            pass
 
     def _reset_run(self):
         self._player_x   = ROAD_X + (ROAD_W - CAR_W) // 2
@@ -182,60 +197,85 @@ class App(oreoOS.App):
             elif self._state == OVER:
                 self._state = INTRO
             self._dirty = True
+        elif btn == api.BTN_B and self._state in (INTRO, OVER):
+            # Toggle control mode from the menus. Don't allow mid-race so the
+            # user can't switch sources of input while a car is in motion.
+            self._mode = "BTN" if self._mode == "IMU" else "IMU"
+            self._save_mode()
+            self._dirty = True
+
+    def _read_inputs(self, dt):
+        """Return (steer, throttle) each in -1..+1, per the active mode.
+
+        IMU mode reads roll for steering and pitch for throttle.
+        BTN mode lerps a digital axis toward the held button state so taps
+        feel smooth (rather than instant teleport-style).
+        """
+        if self._mode == "IMU" and self._imu:
+            try:
+                pitch, roll = self._imu.tilt_deg()
+                return (
+                    _norm_input(roll,  ROLL_DEADZONE_DEG,  ROLL_SATURATION_DEG),
+                    _norm_input(pitch, PITCH_DEADZONE_DEG, PITCH_SATURATION_DEG),
+                )
+            except Exception:
+                pass
+
+        # BTN mode (or IMU fallback when the sensor errored out).
+        b = self._os.buttons
+        try:
+            left  = b.is_pressed(api.BTN_LEFT)
+            right = b.is_pressed(api.BTN_RIGHT)
+            up    = b.is_pressed(api.BTN_UP)
+            down  = b.is_pressed(api.BTN_DOWN)
+        except Exception:
+            left = right = up = down = False
+
+        tgt_steer    = (1.0 if right else 0.0) - (1.0 if left else 0.0)
+        tgt_throttle = (1.0 if up    else 0.0) - (1.0 if down else 0.0)
+        # Lerp toward target — 8/s = roll-on in ~125 ms when held, decay
+        # back to 0 in the same time when released.
+        lerp = min(1.0, dt * 8.0)
+        self._btn_steer    += (tgt_steer    - self._btn_steer)    * lerp
+        self._btn_throttle += (tgt_throttle - self._btn_throttle) * lerp
+        return self._btn_steer, self._btn_throttle
 
     def update(self, dt):
         self._blink += dt
 
-        steer = throttle = 0.0
-        if self._imu:
-            try:
-                pitch, roll = self._imu.tilt_deg()
-                steer    = _norm_input(roll,  ROLL_DEADZONE_DEG,  ROLL_SATURATION_DEG)
-                throttle = _norm_input(pitch, PITCH_DEADZONE_DEG, PITCH_SATURATION_DEG)
-            except Exception:
-                steer = throttle = 0.0
+        steer, throttle = self._read_inputs(dt)
 
         if self._state == PLAY:
-            # ── player car ──────────────────────────────────────────────
             self._player_x += steer * MAX_STEER_PX_PER_S * dt
             self._player_x  = _clamp(self._player_x,
                                      ROAD_X + 4,
                                      ROAD_X + ROAD_W - CAR_W - 4)
 
-            # Throttle: +1 = full speed, -1 = full brake.  Brake decays to 0
-            # speed rather than going negative — no reverse.
             target = ROAD_SCROLL_MIN + (
                 ROAD_SCROLL_MAX - ROAD_SCROLL_MIN) * max(0.0, throttle)
-            # If user is braking, target the minimum
             if throttle < -0.2:
                 target = ROAD_SCROLL_MIN * 0.3
-            # Smooth approach so it doesn't feel jerky
             self._scroll_v += (target - self._scroll_v) * min(1.0, dt * 4)
 
             self._scroll_y += self._scroll_v * dt
             self._tree_t   += self._scroll_v * dt
 
-            # ── enemy spawning ──────────────────────────────────────────
             self._spawn_left -= dt
             if self._spawn_left <= 0:
-                # tighten interval as score climbs
                 self._spawn_int = max(
                     ENEMY_SPAWN_FLOOR,
                     ENEMY_SPAWN_SEC0 - self._score * 0.01)
                 self._spawn_left = self._spawn_int
-                # pick a random lane + sprite
                 lane = ENEMY_LANES[int(self._blink * 31) % 3]
                 spr  = self._spr_enemy_a if int(self._blink * 17) & 1 else self._spr_enemy_b
                 self._enemies.append(_Enemy(lane, PLAY_TOP - ENEMY_H, spr))
 
-            # ── enemy movement + collision ──────────────────────────────
             new_enemies = []
             for e in self._enemies:
                 e.y += self._scroll_v * dt
                 if e.y > PLAY_BOT:
                     self._score += 1
                     continue
-                # AABB collision
                 if (abs((e.x + ENEMY_W // 2) - (self._player_x + CAR_W // 2))
                         < (CAR_W + ENEMY_W) // 2 - 6
                     and abs((e.y + ENEMY_H // 2) - (PLAYER_Y + CAR_H // 2))
@@ -248,14 +288,15 @@ class App(oreoOS.App):
             self._dirty = True
 
         elif self._state in (INTRO, OVER):
-            # animate the trees scrolling in background so the screen
-            # isn't static while the user reads the title
-            self._tree_t += 30.0 * dt
-            self._dirty   = True
+            # Keep the world animating behind the menus — Flappy style.
+            self._scroll_v += (40.0 - self._scroll_v) * min(1.0, dt * 2)
+            self._scroll_y += self._scroll_v * dt
+            self._tree_t   += self._scroll_v * dt
+            self._dirty     = True
 
     def _on_crash(self):
         if self._score > self._hi:
-            self._hi = self._score
+            self._hi     = self._score
             self._new_hi = True
             _save_hi(self._hi)
         else:
@@ -270,32 +311,32 @@ class App(oreoOS.App):
         self._dirty = False
 
         self._draw_world(d)
+        self._draw_enemies(d)
+        self._draw_player(
+            d,
+            sprite=(self._spr_crash if self._state == OVER else self._spr_player))
 
-        if self._state == INTRO:
-            widgets.draw_header(d, "RACER")
-            widgets.draw_hint  (d, "A=start  HOME=back")
-            self._draw_player(d, sprite=self._spr_player)
-            self._draw_intro(d)
-        elif self._state == PLAY:
-            widgets.draw_hint(d, "Tilt: roll=steer  pitch=throttle")
-            self._draw_enemies(d)
-            self._draw_player(d, sprite=self._spr_player)
+        if self._state == PLAY:
             self._draw_hud(d)
-        elif self._state == OVER:
-            widgets.draw_header(d, "CRASH!")
-            widgets.draw_hint  (d, "A=continue  HOME=back")
-            self._draw_enemies(d)
-            self._draw_player(d, sprite=self._spr_crash or self._spr_player)
-            self._draw_gameover(d)
+        else:
+            self._dim_world(d)
+            if self._state == INTRO:
+                self._draw_intro(d)
+            else:
+                self._draw_over(d)
 
-    # ── render helpers ──────────────────────────────────────────────────
+    # ── world (road + trees scroll DOWN toward the player) ───────────────
     def _draw_world(self, d):
-        # Grass verges either side
-        d.clear(api.rgb(40, 110, 50))
-        # Road
+        d.clear(C_GRASS)
+
+        # Road tiles: as scroll_y grows, the tile pattern slides DOWN. The
+        # first tile starts slightly ABOVE the visible area; the modulo
+        # offset pushes it INTO view as scroll grows — creates the illusion
+        # the player is accelerating AWAY from the camera.
         if self._spr_road:
             data, rw, rh = self._spr_road
-            y = PLAY_TOP - (int(self._scroll_y) % rh)
+            y0 = PLAY_TOP + (int(self._scroll_y) % rh) - rh
+            y  = y0
             while y < PLAY_BOT:
                 x = ROAD_X
                 while x < ROAD_X + ROAD_W:
@@ -303,30 +344,30 @@ class App(oreoOS.App):
                     x += rw
                 y += rh
         else:
-            d.rect(ROAD_X, PLAY_TOP, ROAD_W, PLAY_H, api.rgb(64, 64, 72), fill=True)
-            # centre dashes
+            d.rect(ROAD_X, PLAY_TOP, ROAD_W, PLAY_H, C_ROAD, fill=True)
             dash_h = 24
             gap    = 16
             step   = dash_h + gap
-            y0     = PLAY_TOP - (int(self._scroll_y) % step)
+            y0     = PLAY_TOP + (int(self._scroll_y) % step) - step
             cx     = ROAD_X + ROAD_W // 2 - 2
             y      = y0
             while y < PLAY_BOT:
                 yy = max(PLAY_TOP, y)
-                d.rect(cx, yy, 4, min(dash_h, PLAY_BOT - yy),
-                       api.WHITE, fill=True)
+                hh = min(dash_h, PLAY_BOT - yy)
+                if hh > 0:
+                    d.rect(cx, yy, 4, hh, C_DASH, fill=True)
                 y += step
 
-        # Side trees (parallax). Skip the centre band; clusters left + right.
+        # Verge trees - same scroll math, so trees + road move together.
         if self._spr_tree:
             data, tw, th = self._spr_tree
             step = th + 24
-            base = int(self._tree_t) % step
-            y = PLAY_TOP - base
+            y0   = PLAY_TOP + (int(self._tree_t) % step) - step
+            y    = y0
             while y < PLAY_BOT:
-                if PLAY_TOP - th < y < PLAY_BOT:
-                    d.blit(data, ROAD_X - tw - 2, y, tw, th)
-                    d.blit(data, ROAD_X + ROAD_W + 2, y, tw, th)
+                if y + th > PLAY_TOP:
+                    d.blit(data, ROAD_X - tw - 2,         y, tw, th)
+                    d.blit(data, ROAD_X + ROAD_W + 2,     y, tw, th)
                 y += step
 
     def _draw_enemies(self, d):
@@ -335,60 +376,58 @@ class App(oreoOS.App):
                 data, w, h = e.spr
                 d.blit(data, int(e.x), int(e.y), w, h)
             else:
-                d.rect(int(e.x), int(e.y), ENEMY_W, ENEMY_H,
-                       theme.PRIMARY, fill=True)
+                d.rect(int(e.x), int(e.y), ENEMY_W, ENEMY_H, C_TITLE, fill=True)
 
     def _draw_player(self, d, sprite=None):
         if sprite:
             data, w, h = sprite
             d.blit(data, int(self._player_x), PLAYER_Y, w, h)
         else:
-            d.rect(int(self._player_x), PLAYER_Y, CAR_W, CAR_H,
-                   theme.GOLD, fill=True)
+            d.rect(int(self._player_x), PLAYER_Y, CAR_W, CAR_H, C_HI, fill=True)
 
     def _draw_hud(self, d):
+        # Score top-right with a 1-px shadow, no opaque box.
         s = "%d" % self._score
-        d.text(s, SW - len(s) * 16 - 6, 6, api.WHITE, scale=2)
-        # speed mini-bar bottom-left
-        bar_w   = 60
-        d.rect(8, SH - widgets.HINT_H - 10, bar_w, 4,
-               api.rgb(40, 40, 40), fill=True)
+        self._shadow_text(d, s, SW - len(s) * 16 - 6, 6, C_TEXT, scale=2)
+        # Thin speed bar bottom-left.
+        bar_w = 60
+        d.rect(8, SH - 12, bar_w, 4, C_SHADOW, fill=True)
         v_pct = (self._scroll_v - ROAD_SCROLL_MIN) / max(
             1.0, ROAD_SCROLL_MAX - ROAD_SCROLL_MIN)
-        d.rect(8, SH - widgets.HINT_H - 10, int(bar_w * v_pct), 4,
-               theme.GOLD, fill=True)
+        d.rect(8, SH - 12, int(bar_w * v_pct), 4, C_HI, fill=True)
 
+    # ── overlay helpers (scan-line dim + shadow text) ────────────────────
+    def _dim_world(self, d):
+        for y in range(PLAY_TOP, PLAY_BOT, 2):
+            d.rect(0, y, SW, 1, api.rgb(0, 0, 0), fill=True)
+
+    def _shadow_text(self, d, s, x, y, color, scale=1):
+        d.text(s, x + 1, y + 1, C_SHADOW, scale=scale)
+        d.text(s, x,     y,     color,    scale=scale)
+
+    def _center_text(self, d, s, y, color, scale=1):
+        w = len(s) * 8 * scale
+        self._shadow_text(d, s, (SW - w) // 2, y, color, scale)
+
+    # ── menus ────────────────────────────────────────────────────────────
     def _draw_intro(self, d):
-        title = "PANDA RACER"
-        d.text(title, (SW - len(title) * 24) // 2, 56, api.WHITE, scale=3)
+        self._center_text(d, "PANDA RACER", 40, C_TITLE, scale=3)
         if self._hi:
-            hi = "HIGH %d" % self._hi
-            d.text(hi, (SW - len(hi) * 16) // 2, 92, theme.GOLD, scale=2)
+            self._center_text(d, "HIGH %d" % self._hi, 90, C_HI, scale=2)
         if not self._imu:
-            warn = "no IMU - sensor offline"
-            d.text(warn, (SW - len(warn) * 8) // 2, 124, theme.PRIMARY)
+            self._center_text(d, "no IMU - sensor offline", 120, C_TITLE, scale=1)
         if int(self._blink * 2) % 2 == 0:
-            msg = "Press A to start"
-            d.text(msg, (SW - len(msg) * 16) // 2, 148, api.WHITE, scale=2)
-        hint = "Hold the badge flat. Tilt to steer."
-        d.text(hint, (SW - len(hint) * 8) // 2, PLAY_BOT - 18, theme.GOLD)
+            self._center_text(d, "Press A to start", 140, C_TEXT, scale=2)
+        self._center_text(d, "tilt to steer + throttle", 180, C_DIM, scale=1)
+        self._center_text(d, "HOME = back",              200, C_DIM, scale=1)
 
-    def _draw_gameover(self, d):
-        band_h = 110
-        band_y = (SH - band_h) // 2
-        d.rect(0, band_y, SW, band_h, api.rgb(10, 14, 28), fill=True)
-        d.rect(0, band_y, SW, 3, theme.PRIMARY, fill=True)
-        d.rect(0, band_y + band_h - 3, SW, 3, theme.PRIMARY, fill=True)
-        title = "GAME OVER"
-        d.text(title, (SW - len(title) * 24) // 2, band_y + 14,
-               api.WHITE, scale=3)
-        score_line = "Score %d" % self._score
-        d.text(score_line, (SW - len(score_line) * 16) // 2, band_y + 50,
-               api.WHITE, scale=2)
+    def _draw_over(self, d):
+        self._center_text(d, "GAME OVER", 40, C_TITLE, scale=3)
+        self._center_text(d, "Score %d" % self._score, 90, C_TEXT, scale=2)
         if self._new_hi:
-            d.text("NEW HIGH!", (SW - 9 * 16) // 2, band_y + 74,
-                   theme.GOLD, scale=2)
+            self._center_text(d, "NEW HIGH!", 120, C_HI, scale=2)
         else:
-            best = "Best %d" % self._hi
-            d.text(best, (SW - len(best) * 16) // 2, band_y + 74,
-                   theme.GOLD, scale=2)
+            self._center_text(d, "Best %d" % self._hi, 120, C_HI, scale=2)
+        if int(self._blink * 2) % 2 == 0:
+            self._center_text(d, "Press A to retry", 160, C_TEXT, scale=2)
+        self._center_text(d, "HOME = back", 200, C_DIM, scale=1)
