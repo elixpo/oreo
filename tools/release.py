@@ -1,34 +1,30 @@
 """Cut an OreoOS release from your laptop. No CI required.
 
-Usage:
-    python tools/release.py vX.Y.Z [--channel stable|beta] [--notes "..."] [--dry-run]
+Simplest path:
+    python tools/release.py
 
-What it does, in order:
+That reads the version from oreoOS/config.py, picks today's date,
+publishes to the stable channel. Done.
 
-  1. Confirms the version isn't already a tag on the remote.
-  2. Bumps oreoOS/config.py:VERSION to the requested string (no-op if
-     already correct).
-  3. Commits + tags + pushes the bump.
-  4. Runs tools/build_release.py to produce dist/<version>/.
-  5. Calls `gh release create` to publish the GitHub Release with
-     manifest.json + bundle.tar + every per-file asset attached.
+Overrides:
+    python tools/release.py v1.3.0           # explicit version
+    python tools/release.py --channel beta   # prerelease
+    python tools/release.py --dry-run        # preview every command
 
-Once `gh release create` returns, every badge in the field with WiFi
-will see the new version on its next background-check tick (within 6h
-of the release).
+The script auto-recovers from a half-failed previous run: if the tag
+is already on the remote it skips git + jumps to build + publish.
 
-Requirements:
-  * `gh` CLI installed + authenticated (`gh auth status`)
-  * `git` configured with push access to the repo
-  * a clean working tree (this script refuses to release with
-    uncommitted changes unless --force is passed)
+If the working tree is dirty when you start, the script offers to
+stage everything and commit it as "release: vX.Y.Z (auto)". Type N to
+abort.
 
 Channel convention:
   stable/vX.Y.Z   — what badges pick up by default
   beta/vX.Y.Z     — opt-in, marked as prerelease
 
-Pass --dry-run to print the gh / git commands without executing them.
-That's the safest way to preview a release.
+Requirements:
+  * `gh` CLI installed + authenticated (`gh auth status`)
+  * `git` configured with push access to the repo
 """
 
 import argparse
@@ -63,16 +59,44 @@ def run(cmd, dry, capture=False, check=True):
 
 # ── pre-flight ──────────────────────────────────────────────────────────────
 
-def _check_clean(force, dry):
+def _read_current_version():
+    """Default for the `version` arg — what's pinned in oreoOS/config.py."""
+    m = VERSION_RE.search(CONFIG.read_text())
+    if not m:
+        return None
+    return re.search(r'v\d+\.\d+\.\d+', m.group(0)).group(0)
+
+
+def _handle_dirty_tree(version, dry, force, yes):
+    """If the tree is dirty, interactively ask to auto-commit everything.
+
+    - `force`: ignore dirty tree entirely (legacy escape hatch)
+    - `yes`:   skip the prompt and auto-commit unconditionally
+    Returns True iff we created an auto-commit.
+    """
     if force:
-        return
+        return False
     status = run(["git", "status", "--porcelain"], dry, capture=True, check=False)
-    if status:
-        sys.exit(
-            "✗ working tree is not clean:\n"
-            + status
-            + "\n  Commit / stash first, or rerun with --force."
-        )
+    if not status:
+        return False
+    print("⚠ working tree is not clean:")
+    for line in status.splitlines():
+        print("    " + line)
+    if yes:
+        ans = "y"
+    else:
+        try:
+            ans = input(
+                "\nAuto-stage everything and commit as "
+                "'release: %s (auto)'? [Y/n] " % version
+            ).strip().lower() or "y"
+        except EOFError:
+            ans = "n"
+    if ans not in ("y", "yes"):
+        sys.exit("Aborted. Commit / stash manually and re-run.")
+    run(["git", "add", "-A"], dry)
+    run(["git", "commit", "-m", "release: %s (auto)" % version], dry)
+    return True
 
 
 def _check_tools(dry):
@@ -88,6 +112,17 @@ def _tag_exists(tag, dry):
     if dry:
         return False
     out = run(["git", "ls-remote", "--tags", "origin", tag], dry, capture=True)
+    return bool(out.strip())
+
+
+def _release_exists(tag, dry):
+    """True iff a GitHub Release already exists for this tag."""
+    if dry:
+        return False
+    out = run(["gh", "release", "view", tag], dry, capture=True, check=False)
+    # gh prints "release not found" to stderr (we don't capture stderr here),
+    # so the empty stdout case = no release. Defensive against gh format
+    # changes: also accept a "release tag" line if it appears.
     return bool(out.strip())
 
 
@@ -114,17 +149,30 @@ def _bump_version(target_version, dry):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("version", help="vX.Y.Z (must start with v)")
+    ap.add_argument("version", nargs="?", default=None,
+                    help="vX.Y.Z. Omit to use the version in oreoOS/config.py.")
     ap.add_argument("--channel", default="stable",
                     choices=("stable", "beta"),
                     help="release channel (default: stable)")
     ap.add_argument("--notes", default="",
-                    help="release notes body. If omitted, gh prompts you.")
+                    help="release notes body. If omitted, a sensible default is used.")
     ap.add_argument("--force", action="store_true",
-                    help="skip the clean-working-tree check (dangerous).")
+                    help="skip the clean-working-tree prompt entirely.")
+    ap.add_argument("--yes", "-y", action="store_true",
+                    help="answer 'yes' to every prompt (auto-stage, etc.).")
     ap.add_argument("--dry-run", action="store_true",
                     help="print every step without executing.")
     args = ap.parse_args()
+
+    # Default to whatever oreoOS/config.py:VERSION currently holds. This is
+    # the zero-arg invocation: `python tools/release.py` ships exactly
+    # whatever the repo is pointing at.
+    if not args.version:
+        current = _read_current_version()
+        if not current:
+            sys.exit("✗ could not read VERSION from oreoOS/config.py")
+        args.version = current
+        print("Using version from oreoOS/config.py: %s" % args.version)
 
     if not re.fullmatch(r"v\d+\.\d+\.\d+", args.version):
         sys.exit("✗ version must look like vX.Y.Z (got: %r)" % args.version)
@@ -140,18 +188,33 @@ def main():
 
     # 1. Pre-flight.
     _check_tools(dry)
-    _check_clean(args.force, dry)
-    if _tag_exists(tag, dry):
-        sys.exit("✗ tag %s already exists on origin." % tag)
 
-    # 2. Bump VERSION + commit + tag + push.
-    bumped = _bump_version(args.version, dry)
-    if bumped:
-        run(["git", "add", "oreoOS/config.py"], dry)
-        run(["git", "commit", "-m", "release: %s" % args.version], dry)
-    run(["git", "tag", tag], dry)
-    run(["git", "push"], dry)
-    run(["git", "push", "origin", tag], dry)
+    # Resume detection: if the tag is already on origin AND there's no
+    # GitHub Release for it (i.e. a previous attempt died after the tag
+    # push), we skip the git steps and jump straight to build + publish.
+    tag_on_remote = _tag_exists(tag, dry)
+    release_live  = _release_exists(tag, dry)
+    if release_live:
+        sys.exit(
+            "✗ a GitHub Release already exists for %s.\n"
+            "  Pick a new version, or delete the release first:\n"
+            "      gh release delete %s --yes" % (tag, tag)
+        )
+    resume = tag_on_remote
+    if resume:
+        print("ℹ tag %s already on origin — RESUMING from build step." % tag)
+        print()
+
+    # 2. Bump VERSION + commit + tag + push (skipped on resume).
+    if not resume:
+        _handle_dirty_tree(args.version, dry, args.force, args.yes)
+        bumped = _bump_version(args.version, dry)
+        if bumped:
+            run(["git", "add", "oreoOS/config.py"], dry)
+            run(["git", "commit", "-m", "release: %s" % args.version], dry)
+        run(["git", "tag", tag], dry)
+        run(["git", "push"], dry)
+        run(["git", "push", "origin", tag], dry)
 
     # 3. Build the release artefacts. asset_base_url points at the URL
     # gh will use once the upload step has finished.
@@ -193,7 +256,8 @@ def main():
     # suffix when off-channel. The date is ISO yyyy-mm-dd in UTC so it
     # matches what GitHub renders alongside the release.
     import datetime as _dt
-    today = _dt.datetime.utcnow().strftime("%Y-%m-%d")
+    # tz-aware now() so we don't trip Python 3.12's utcnow() deprecation.
+    today = _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%d")
     if args.channel == "stable":
         title = "OreoOS %s · %s" % (args.version, today)
     else:
