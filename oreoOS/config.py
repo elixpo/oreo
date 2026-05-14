@@ -44,4 +44,4 @@ WIFI_SSID         = _env.get("WIFI_SSID", "")
 WIFI_PASSWORD     = _env.get("WIFI_PASSWORD", "")
 OWM_API_KEY       = _env.get("OWM_API_KEY", "")
 
-WIFI_AUTO_CONNECT = False
+WIFI_AUTO_CONNECT = True
