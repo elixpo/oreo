@@ -196,14 +196,78 @@ class App(oreoOS.App):
         # Pre-wrap labels (no per-frame allocation).
         self._labels = [_wrap_label(a["name"]) for a in self._apps]
 
-        self._sel        = 0
-        self._top_row    = 0          # which grid row is at top of viewport
-        self._scroll_y   = 0.0        # tweened pixel offset (float for smooth tween)
-        self._anim_t     = ANIM_DUR
-        self._dirty      = True
+        # View mode — "grid" (4-col grid) or "categories" (vertical list
+        # grouped per oreoOS.config.APP_CATEGORIES). Settable from the
+        # Settings → "App View" row; persisted on the OS settings dict.
+        self._mode = "categories" if (
+            os.settings_get("app_view", "grid") == "categories") else "grid"
+        self._cat_items = self._build_categories() if self._mode == "categories" else []
+
+        self._sel       = 0
+        self._top_row   = 0          # grid mode: which grid row is at top
+        self._scroll_y  = 0.0        # tweened pixel offset (float for smooth tween)
+        self._anim_t    = ANIM_DUR
+        self._dirty     = True
+        if self._mode == "categories":
+            self._sel = self._first_selectable_item()
+
+    # ── category-view helpers ──────────────────────────────────────────────
+    def _build_categories(self):
+        """Return a flat list of ("hdr", name) | ("app", app_idx).
+
+        Uses oreoOS.config.APP_CATEGORIES (a tuple of (cat_name, dirs)) for
+        ordering. Anything not listed there lands under a trailing "More"
+        bucket so newly added apps still show up even without a config edit.
+        """
+        try:
+            from oreoOS.config import APP_CATEGORIES
+        except Exception:
+            APP_CATEGORIES = ()
+        cat_for = {}
+        for cat_name, dirs in APP_CATEGORIES:
+            for d in dirs:
+                cat_for[d] = cat_name
+        by_cat = {}
+        misc   = []
+        for i, a in enumerate(self._apps):
+            cat = cat_for.get(a["dir"])
+            if cat:
+                by_cat.setdefault(cat, []).append(i)
+            else:
+                misc.append(i)
+        items = []
+        for cat_name, _dirs in APP_CATEGORIES:
+            if cat_name in by_cat:
+                items.append(("hdr", cat_name))
+                for ai in by_cat[cat_name]:
+                    items.append(("app", ai))
+        if misc:
+            items.append(("hdr", "More"))
+            for ai in misc:
+                items.append(("app", ai))
+        return items
+
+    def _first_selectable_item(self):
+        for i, (kind, _p) in enumerate(self._cat_items):
+            if kind == "app":
+                return i
+        return 0
+
+    def _step_selectable(self, start, direction):
+        """Walk +/- direction over self._cat_items, skipping headers."""
+        n = len(self._cat_items)
+        if n == 0: return start
+        i = start
+        for _ in range(n):
+            i = (i + direction) % n
+            if self._cat_items[i][0] == "app":
+                return i
+        return start
 
     # ── input ────────────────────────────────────────────────────────────
     def on_button_press(self, btn):
+        if self._mode == "categories":
+            return self._on_button_press_cat(btn)
         n = len(self._apps)
         if not n: return
         prev = self._sel
@@ -235,6 +299,25 @@ class App(oreoOS.App):
             self._anim_t = 0.0
         self._dirty = True
 
+    def _on_button_press_cat(self, btn):
+        """Category view nav. UP/DOWN walk the items list skipping headers."""
+        if not self._cat_items: return
+        prev = self._sel
+        if btn in (api.BTN_UP, api.BTN_LEFT):
+            self._sel = self._step_selectable(self._sel, -1)
+        elif btn in (api.BTN_DOWN, api.BTN_RIGHT):
+            self._sel = self._step_selectable(self._sel, +1)
+        elif btn == api.BTN_A:
+            kind, payload = self._cat_items[self._sel]
+            if kind == "app":
+                self._os.launch(self._apps[payload]["dir"])
+            return
+        else:
+            return
+        if self._sel != prev:
+            self._anim_t = 0.0
+        self._dirty = True
+
     def update(self, dt):
         # Tween scroll
         target = self._top_row * CELL_H
@@ -260,6 +343,11 @@ class App(oreoOS.App):
         if not n:
             d.text("no apps found", (SW - 13 * 16) // 2, SH // 2,
                    theme.MUTED, scale=2)
+            self._dirty = False
+            return
+
+        if self._mode == "categories":
+            self._draw_categories(d)
             self._dirty = False
             return
 
@@ -352,3 +440,86 @@ class App(oreoOS.App):
             self._anim_t < ANIM_DUR):
             return    # leave _dirty = True
         self._dirty = False
+
+    # ── category view (vertical list grouped by APP_CATEGORIES) ─────────
+    CAT_HDR_H    = 22         # height of a category-header row
+    CAT_APP_H    = 44         # height of an app row (icon + label inline)
+    CAT_ICON_SZ  = 32         # uses the cached 64×64 — we just blit a smaller chunk
+    CAT_PAD_X    = 16
+
+    def _draw_categories(self, d):
+        items   = self._cat_items
+        if not items:
+            return
+
+        # Item-position table: y-pixel of the top of each item in the virtual
+        # canvas. Selected item drives the scroll target.
+        viewport_top = PAD_TOP
+        viewport_h   = SH - PAD_TOP - PAD_BOT
+        positions    = []
+        cy = 0
+        for kind, _p in items:
+            positions.append(cy)
+            cy += self.CAT_HDR_H if kind == "hdr" else self.CAT_APP_H
+        total_h = cy
+
+        # Tween scroll so the selected item stays in view, centred-ish.
+        sel_y     = positions[self._sel]
+        sel_h     = self.CAT_APP_H
+        target    = max(0, min(total_h - viewport_h,
+                               sel_y - (viewport_h // 2) + sel_h))
+        if abs(self._scroll_y - target) > 0.5:
+            self._scroll_y += (target - self._scroll_y) * SCROLL_TWEEN
+        else:
+            self._scroll_y = float(target)
+        scroll = int(self._scroll_y)
+
+        for i, (kind, payload) in enumerate(items):
+            y = viewport_top + positions[i] - scroll
+            # cull off-screen
+            row_h = self.CAT_HDR_H if kind == "hdr" else self.CAT_APP_H
+            if y + row_h < viewport_top or y > viewport_top + viewport_h:
+                continue
+
+            if kind == "hdr":
+                # Pink underlined category header
+                d.rect(self.CAT_PAD_X - 4, y + row_h - 4,
+                       SW - 2 * (self.CAT_PAD_X - 4), 2,
+                       theme.PRIMARY, fill=True)
+                d.text(payload, self.CAT_PAD_X, y + 4,
+                       theme.PRIMARY, scale=2)
+            else:
+                ai = payload
+                a  = self._apps[ai]
+                sel = (i == self._sel)
+                if sel:
+                    d.rect(0, y, SW, row_h, theme.DOCK_SEL, fill=True)
+                    d.rect(0, y, 4, row_h, theme.PRIMARY, fill=True)
+                # Icon — blit the cached 64×64 at native size, vertically
+                # centred. Looks heavier than the grid icons but that's fine
+                # since rows have lots of vertical room.
+                icon = self._icons.get(a["dir"])
+                if icon:
+                    idata, iw, ih = icon
+                    iy = y + (row_h - ih) // 2
+                    d.blit(idata, self.CAT_PAD_X, iy, iw, ih)
+                # App name (scale=2 pink when selected, otherwise dim text)
+                name = a["name"]
+                ny   = y + (row_h - 16) // 2
+                d.text(name, self.CAT_PAD_X + 64 + 12, ny,
+                       theme.PRIMARY if sel else theme.TEXT_BRIGHT, scale=2)
+
+        # ── scrollbar ───────────────────────────────────────────────────
+        if total_h > viewport_h:
+            track_x = SW - 4
+            track_y = viewport_top
+            track_h = viewport_h
+            d.rect(track_x, track_y, 2, track_h, theme.MUTED2, fill=True)
+            thumb_h = max(12, track_h * viewport_h // total_h)
+            denom   = max(1, total_h - viewport_h)
+            thumb_y = track_y + (track_h - thumb_h) * scroll // denom
+            d.rect(track_x, thumb_y, 2, thumb_h, theme.PRIMARY, fill=True)
+
+        # keep frame-marking dirty until the scroll tween settles
+        if abs(self._scroll_y - target) > 0.5:
+            self._dirty = True
