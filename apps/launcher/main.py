@@ -196,28 +196,37 @@ class App(oreoOS.App):
         # Pre-wrap labels (no per-frame allocation).
         self._labels = [_wrap_label(a["name"]) for a in self._apps]
 
-        # View mode — "grid" (4-col grid) or "categories" (vertical list
-        # grouped per oreoOS.config.APP_CATEGORIES). Settable from the
-        # Settings → "App View" row; persisted on the OS settings dict.
+        # View mode — "grid" (one big 4-col grid of all apps) or
+        # "categories" (5 vertical tiles → drill in → app grid).
+        # Persisted on the OS settings dict via the Settings app.
         self._mode = "categories" if (
             os.settings_get("app_view", "grid") == "categories") else "grid"
-        self._cat_items = self._build_categories() if self._mode == "categories" else []
+
+        # Category-mode state machine:
+        #   _cat_level 0 = picker (5 vertical tiles)
+        #   _cat_level 1 = grid of apps inside the selected category
+        self._categories = self._build_categories() if self._mode == "categories" else []
+        self._cat_level  = 0
+        self._cat_sel    = 0          # picker selection (in level 0)
+
+        # _view_apps holds the indices of self._apps that the grid will
+        # render. In grid mode this is "everything"; in category level 1
+        # it's just the apps belonging to the chosen category.
+        self._view_apps = list(range(len(self._apps)))
 
         self._sel       = 0
-        self._top_row   = 0          # grid mode: which grid row is at top
-        self._scroll_y  = 0.0        # tweened pixel offset (float for smooth tween)
+        self._top_row   = 0          # which grid row is at top of viewport
+        self._scroll_y  = 0.0        # tweened pixel offset
         self._anim_t    = ANIM_DUR
         self._dirty     = True
-        if self._mode == "categories":
-            self._sel = self._first_selectable_item()
 
     # ── category-view helpers ──────────────────────────────────────────────
     def _build_categories(self):
-        """Return a flat list of ("hdr", name) | ("app", app_idx).
+        """Return [(cat_name, [app_idx, ...]), ...] in config order.
 
-        Uses oreoOS.config.APP_CATEGORIES (a tuple of (cat_name, dirs)) for
-        ordering. Anything not listed there lands under a trailing "More"
-        bucket so newly added apps still show up even without a config edit.
+        Apps not listed in APP_CATEGORIES end up under a trailing "More"
+        bucket so newly added apps show up without a config edit. Empty
+        categories are dropped so the picker only shows real ones.
         """
         try:
             from oreoOS.config import APP_CATEGORIES
@@ -235,40 +244,41 @@ class App(oreoOS.App):
                 by_cat.setdefault(cat, []).append(i)
             else:
                 misc.append(i)
-        items = []
+        out = []
         for cat_name, _dirs in APP_CATEGORIES:
             if cat_name in by_cat:
-                items.append(("hdr", cat_name))
-                for ai in by_cat[cat_name]:
-                    items.append(("app", ai))
+                out.append((cat_name, by_cat[cat_name]))
         if misc:
-            items.append(("hdr", "More"))
-            for ai in misc:
-                items.append(("app", ai))
-        return items
+            out.append(("More", misc))
+        return out
 
-    def _first_selectable_item(self):
-        for i, (kind, _p) in enumerate(self._cat_items):
-            if kind == "app":
-                return i
-        return 0
+    def _enter_category(self, cat_idx):
+        """Drill from the picker into the apps grid for a chosen category."""
+        if not (0 <= cat_idx < len(self._categories)):
+            return
+        _name, app_idxs = self._categories[cat_idx]
+        if not app_idxs:
+            return
+        self._view_apps = list(app_idxs)
+        self._cat_level = 1
+        self._sel       = 0
+        self._top_row   = 0
+        self._scroll_y  = 0.0
+        self._anim_t    = 0.0
 
-    def _step_selectable(self, start, direction):
-        """Walk +/- direction over self._cat_items, skipping headers."""
-        n = len(self._cat_items)
-        if n == 0: return start
-        i = start
-        for _ in range(n):
-            i = (i + direction) % n
-            if self._cat_items[i][0] == "app":
-                return i
-        return start
+    def _leave_category(self):
+        """Return from the apps grid back up to the category picker."""
+        self._cat_level = 0
+        self._view_apps = list(range(len(self._apps)))
+        self._anim_t    = 0.0
 
     # ── input ────────────────────────────────────────────────────────────
     def on_button_press(self, btn):
-        if self._mode == "categories":
-            return self._on_button_press_cat(btn)
-        n = len(self._apps)
+        # Category mode, level 0: 5 vertical tile picker.
+        if self._mode == "categories" and self._cat_level == 0:
+            return self._on_button_press_picker(btn)
+
+        n = len(self._view_apps)
         if not n: return
         prev = self._sel
         if btn == api.BTN_LEFT:
@@ -280,7 +290,12 @@ class App(oreoOS.App):
         elif btn == api.BTN_DOWN:
             self._sel = (self._sel + COLS) % n
         elif btn == api.BTN_A:
-            self._os.launch(self._apps[self._sel]["dir"])
+            self._os.launch(self._apps[self._view_apps[self._sel]]["dir"])
+            return
+        elif btn == api.BTN_B and self._mode == "categories":
+            # Drill back up to the category picker.
+            self._leave_category()
+            self._dirty = True
             return
         else:
             return
@@ -299,22 +314,20 @@ class App(oreoOS.App):
             self._anim_t = 0.0
         self._dirty = True
 
-    def _on_button_press_cat(self, btn):
-        """Category view nav. UP/DOWN walk the items list skipping headers."""
-        if not self._cat_items: return
-        prev = self._sel
+    def _on_button_press_picker(self, btn):
+        """Category picker (level 0). UP/DOWN walks the 5 tiles, A drills in."""
+        n = len(self._categories)
+        if not n: return
+        prev = self._cat_sel
         if btn in (api.BTN_UP, api.BTN_LEFT):
-            self._sel = self._step_selectable(self._sel, -1)
+            self._cat_sel = (self._cat_sel - 1) % n
         elif btn in (api.BTN_DOWN, api.BTN_RIGHT):
-            self._sel = self._step_selectable(self._sel, +1)
+            self._cat_sel = (self._cat_sel + 1) % n
         elif btn == api.BTN_A:
-            kind, payload = self._cat_items[self._sel]
-            if kind == "app":
-                self._os.launch(self._apps[payload]["dir"])
-            return
+            self._enter_category(self._cat_sel)
         else:
             return
-        if self._sel != prev:
+        if self._cat_sel != prev:
             self._anim_t = 0.0
         self._dirty = True
 
@@ -346,23 +359,27 @@ class App(oreoOS.App):
             self._dirty = False
             return
 
-        if self._mode == "categories":
-            self._draw_categories(d)
+        # Category picker (level 0): show the 5 category tiles instead of
+        # the apps grid.
+        if self._mode == "categories" and self._cat_level == 0:
+            self._draw_category_picker(d)
             self._dirty = False
             return
 
-        rows_total = (n + COLS - 1) // COLS
+        # Grid rendering — iterates over self._view_apps which holds either
+        # all apps (grid mode) or just one category's apps (level 1).
+        view_n     = len(self._view_apps)
+        rows_total = (view_n + COLS - 1) // COLS
         scroll_int = int(self._scroll_y)
 
-        # Compute the slice of rows that are at least partially on-screen.
         viewport_top    = PAD_TOP
         viewport_bottom = PAD_TOP + VISIBLE_ROWS * CELL_H
 
-        for app_idx in range(n):
-            row = app_idx // COLS
-            col = app_idx %  COLS
+        for vi in range(view_n):
+            app_idx = self._view_apps[vi]
+            row = vi // COLS
+            col = vi %  COLS
             cell_y = PAD_TOP + row * CELL_H - scroll_int
-            # cull if entirely off-screen
             if cell_y + CELL_H < viewport_top or cell_y > viewport_bottom:
                 continue
 
@@ -370,14 +387,13 @@ class App(oreoOS.App):
             ix = cx - ICON_SZ // 2
             iy = cell_y + 4
 
-            sel = (app_idx == self._sel)
+            sel = (vi == self._sel)
 
             # ── icon (selected one may be horizontally compressed for the Y-axis flip) ──
             icon = self._icons.get(self._apps[app_idx]["dir"])
             if icon:
                 idata, iw, ih = icon
                 if sel and self._anim_t < ANIM_DUR:
-                    # Y-axis rotation: scale_x goes 0 → 1 over the anim
                     t = self._anim_t / ANIM_DUR
                     scale_x = math.sin(t * math.pi / 2)
                     cur_w = max(2, int(iw * scale_x))
@@ -390,7 +406,6 @@ class App(oreoOS.App):
                 else:
                     d.blit(idata, ix, iy, iw, ih)
             else:
-                # letter placeholder
                 d.text(self._apps[app_idx]["name"][0].upper(),
                        cx - 16, iy + (ICON_SZ - 32) // 2,
                        theme.PRIMARY, scale=4)
@@ -398,7 +413,7 @@ class App(oreoOS.App):
             # ── multi-line label (centred under the icon) ──
             label_top = iy + ICON_SZ + SEL_PAD + LABEL_GAP
             for li, line in enumerate(self._labels[app_idx]):
-                lx = cx - len(line) * 4         # 8-px font ⇒ /2 for centre
+                lx = cx - len(line) * 4
                 ly = label_top + li * LABEL_LINE_H
                 color = theme.PRIMARY if sel else theme.TEXT_BRIGHT
                 d.text(line, lx, ly, color)

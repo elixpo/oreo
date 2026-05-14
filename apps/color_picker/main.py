@@ -1,61 +1,73 @@
+"""Color Picker - Photoshop-style 2D spectrum + crosshair cursor.
+
+Layout:
+  Header (28 px)  : "COLOR" label + small live preview swatch + tiny readout
+                    of the current value in the active model (RGB / HSL / CMYK)
+  Spectrum field  : full 320 x 196 rainbow, upscaled 4x from a baked
+                    80 x 49 source asset (apps/color_picker/assets/optimized/
+                    color_splash.py). White at the top -> saturated band in
+                    the middle -> black at the bottom. Hue sweeps left -> right.
+  Hint bar (16 px): control summary.
+
+Controls:
+  arrows  move the crosshair (long-press accelerates ~5x after ~0.4 s held)
+  B       cycle display model RGB -> HSL -> CMYK -> RGB
+  A       save the current colour to apps/color_picker/state.txt
+  HOME    back to the apps drawer
+
+The current colour is read directly out of the upscaled spectrum buffer at
+the cursor position (so what you see is what you get; no resampling
+artefacts). The HSL / CMYK readouts are derived on the fly from RGB.
+"""
+
 import oreoOS
 from oreoOS import api, theme, widgets
 
 
-SW = api.SCREEN_W
-SH = api.SCREEN_H
-
-# Channel definitions per model. Each entry is (label, max_value).
-MODELS = {
-    "RGB":  (("R", 255), ("G", 255), ("B", 255)),
-    "HSL":  (("H", 359), ("S", 100), ("L", 100)),
-    "CMYK": (("C", 100), ("M", 100), ("Y", 100), ("K", 100)),
-}
-MODEL_ORDER = ("RGB", "HSL", "CMYK")
-
+SW = api.SCREEN_W                    # 320
+SH = api.SCREEN_H                    # 240
+PLAY_TOP  = widgets.HEADER_H
+PLAY_BOT  = SH - widgets.HINT_H
+PLAY_H    = PLAY_BOT - PLAY_TOP      # 196
+PLAY_W    = SW                       # full width
 STATE_PATH = "apps/color_picker/state.txt"
 
+# Movement tuning. Tap = 1 px nudge; hold for ACCEL_AFTER seconds and the
+# cursor steps by FAST_PX_PER_FRAME each frame for fast traversal.
+TAP_NUDGE_PX        = 2
+SLOW_PX_PER_S       = 60.0
+FAST_PX_PER_S       = 380.0
+ACCEL_AFTER_S       = 0.4
 
-# ── colour-space conversions (RGB↔HSL, RGB↔CMYK) ────────────────────────────
+# Channel labels per model (just for the header readout)
+_MODELS = ("RGB", "HSL", "CMYK")
+
+
+# ── conversions ─────────────────────────────────────────────────────────────
 
 def _rgb_to_hsl(r, g, b):
     rf, gf, bf = r / 255.0, g / 255.0, b / 255.0
-    mx, mn = max(rf, gf, bf), min(rf, gf, bf)
-    l = (mx + mn) / 2.0
+    mx = max(rf, gf, bf)
+    mn = min(rf, gf, bf)
+    l  = (mx + mn) / 2
     if mx == mn:
         return 0, 0, int(round(l * 100))
-    d = mx - mn
-    s = d / (2.0 - mx - mn) if l > 0.5 else d / (mx + mn)
+    d  = mx - mn
+    s  = d / (2 - mx - mn) if l > 0.5 else d / (mx + mn)
     if mx == rf:
         h = ((gf - bf) / d) % 6
     elif mx == gf:
-        h = ((bf - rf) / d) + 2
+        h = (bf - rf) / d + 2
     else:
-        h = ((rf - gf) / d) + 4
+        h = (rf - gf) / d + 4
     return int(round(h * 60)) % 360, int(round(s * 100)), int(round(l * 100))
-
-
-def _hsl_to_rgb(h, s, l):
-    s, l = s / 100.0, l / 100.0
-    if s == 0:
-        v = int(round(l * 255))
-        return v, v, v
-    c = (1 - abs(2 * l - 1)) * s
-    x = c * (1 - abs(((h / 60.0) % 2) - 1))
-    m = l - c / 2.0
-    seg = int(h // 60) % 6
-    rp, gp, bp = ((c, x, 0), (x, c, 0), (0, c, x),
-                  (0, x, c), (x, 0, c), (c, 0, x))[seg]
-    return (int(round((rp + m) * 255)),
-            int(round((gp + m) * 255)),
-            int(round((bp + m) * 255)))
 
 
 def _rgb_to_cmyk(r, g, b):
     if r == 0 and g == 0 and b == 0:
         return 0, 0, 0, 100
     rf, gf, bf = r / 255.0, g / 255.0, b / 255.0
-    k = 1 - max(rf, gf, bf)
+    k     = 1 - max(rf, gf, bf)
     inv_k = 1 - k if k < 1 else 1.0
     c = (1 - rf - k) / inv_k
     m = (1 - gf - k) / inv_k
@@ -64,13 +76,37 @@ def _rgb_to_cmyk(r, g, b):
             int(round(y * 100)), int(round(k * 100)))
 
 
-def _cmyk_to_rgb(c, m, y, k):
-    c, m, y, k = c / 100.0, m / 100.0, y / 100.0, k / 100.0
-    r = 255 * (1 - c) * (1 - k)
-    g = 255 * (1 - m) * (1 - k)
-    b = 255 * (1 - y) * (1 - k)
-    return int(round(r)), int(round(g)), int(round(b))
+# ── upscale 80x49 -> 320x196 (nearest-neighbour) ───────────────────────────
 
+def _upscale_4x(src, sw, sh, dw, dh):
+    """RGB565-big-endian src buffer -> dest buffer, 4x point-sampled."""
+    out = bytearray(dw * dh * 2)
+    sx_step = (sw << 16) // dw
+    sy_step = (sh << 16) // dh
+    sy = 0
+    for dy in range(dh):
+        src_row = (sy >> 16) * sw * 2
+        sx = 0
+        row_off = dy * dw * 2
+        for dx in range(dw):
+            s = src_row + (sx >> 16) * 2
+            out[row_off + dx * 2]     = src[s]
+            out[row_off + dx * 2 + 1] = src[s + 1]
+            sx += sx_step
+        sy += sy_step
+    return out
+
+
+def _try_load_spectrum():
+    try:
+        m = __import__("apps.color_picker.assets.optimized.color_splash",
+                       None, None, ["DATA", "W", "H"])
+        return bytes(m.DATA), m.W, m.H
+    except (ImportError, AttributeError):
+        return None
+
+
+# ── persistence ─────────────────────────────────────────────────────────────
 
 def _save_rgb(rgb):
     try:
@@ -88,159 +124,184 @@ def _load_rgb():
                 max(0, min(255, g)),
                 max(0, min(255, b)))
     except Exception:
-        return (255, 93, 104)   # theme.PRIMARY pink as a friendly default
+        return (255, 93, 104)
 
 
 class App(oreoOS.App):
-    name = "Color Picker"
+    name         = "Color"
+    SHOW_LOADING = True       # ~300 ms upscale at entry — hidden by the panel
 
+    # ── lifecycle ──────────────────────────────────────────────────────────
     def on_enter(self, os):
-        self._os    = os
-        self._rgb   = list(_load_rgb())   # source of truth
-        self._model = "RGB"
-        self._sel   = 0                   # which channel row is highlighted
-        self._saved_flash = 0.0           # ms timer for the "saved" toast
+        self._os = os
+        # Load the 80x49 baked rainbow and upscale to fill the play area.
+        # Cached on the instance — no per-frame work.
+        spec = _try_load_spectrum()
+        if spec:
+            src, sw, sh = spec
+            self._bg = _upscale_4x(src, sw, sh, PLAY_W, PLAY_H)
+            self._bg_w, self._bg_h = PLAY_W, PLAY_H
+        else:
+            self._bg = None
+            self._bg_w = self._bg_h = 0
+
+        # Cursor starts mid-screen (often a nice saturated colour). Stored
+        # as floats so long-press acceleration can move in sub-pixel steps.
+        self._cx, self._cy = PLAY_W / 2.0, PLAY_H / 2.0
+        self._rgb = _load_rgb()       # restored from disk
+        self._mode = "RGB"            # header readout model
+        self._saved_flash = 0.0
+        # Hold-times for direction buttons (seconds held). Reset to 0 the
+        # instant a button is released so the next tap restarts the curve.
+        self._hold_t = {api.BTN_LEFT: 0.0, api.BTN_RIGHT: 0.0,
+                        api.BTN_UP:   0.0, api.BTN_DOWN:  0.0}
+        self._sample_color()
         self._dirty = True
 
-    # ── input ────────────────────────────────────────────────────────────
+    # ── input ──────────────────────────────────────────────────────────────
     def on_button_press(self, btn):
-        chans = MODELS[self._model]
-        n     = len(chans)
-        if btn == api.BTN_LEFT:
-            self._sel = (self._sel - 1) % n
-        elif btn == api.BTN_RIGHT:
-            self._sel = (self._sel + 1) % n
-        elif btn == api.BTN_UP:
-            self._adjust(+1)
-        elif btn == api.BTN_DOWN:
-            self._adjust(-1)
+        # Single-tap nudge so a quick press always moves at least a couple
+        # of pixels (the update() loop only ramps after ACCEL_AFTER_S).
+        if   btn == api.BTN_LEFT:   self._cx -= TAP_NUDGE_PX
+        elif btn == api.BTN_RIGHT:  self._cx += TAP_NUDGE_PX
+        elif btn == api.BTN_UP:     self._cy -= TAP_NUDGE_PX
+        elif btn == api.BTN_DOWN:   self._cy += TAP_NUDGE_PX
         elif btn == api.BTN_B:
-            # Cycle model. Stay on a valid channel index for the new model.
-            idx = MODEL_ORDER.index(self._model)
-            self._model = MODEL_ORDER[(idx + 1) % len(MODEL_ORDER)]
-            self._sel   = min(self._sel, len(MODELS[self._model]) - 1)
+            i = _MODELS.index(self._mode)
+            self._mode = _MODELS[(i + 1) % len(_MODELS)]
         elif btn == api.BTN_A:
-            _save_rgb(tuple(self._rgb))
+            _save_rgb(self._rgb)
             try:
-                self._os.settings_set("color_picker_rgb", tuple(self._rgb))
+                self._os.settings_set("color_picker_rgb", self._rgb)
             except Exception:
                 pass
-            self._saved_flash = 1.2       # show "Saved!" for ~1.2 s
+            self._saved_flash = 1.2
+        self._clamp_cursor()
+        self._sample_color()
         self._dirty = True
 
-    # Step size: 1 per tap for RGB / CMYK / HSL S+L; H steps by 5 since
-    # 360 / 1 would be slow.
-    def _adjust(self, sign):
-        _, max_v = MODELS[self._model][self._sel]
-        step = 5 if (self._model == "HSL" and self._sel == 0) else 1
-        delta = sign * step
-        if self._model == "RGB":
-            self._rgb[self._sel] = max(0, min(255, self._rgb[self._sel] + delta))
-        elif self._model == "HSL":
-            h, s, l = _rgb_to_hsl(*self._rgb)
-            vals = [h, s, l]
-            vals[self._sel] = (vals[self._sel] + delta) % (max_v + 1)
-            if vals[self._sel] < 0:
-                vals[self._sel] += (max_v + 1)
-            self._rgb = list(_hsl_to_rgb(*vals))
-        elif self._model == "CMYK":
-            c, m, y, k = _rgb_to_cmyk(*self._rgb)
-            vals = [c, m, y, k]
-            vals[self._sel] = max(0, min(max_v, vals[self._sel] + delta))
-            self._rgb = list(_cmyk_to_rgb(*vals))
-
     def update(self, dt):
+        # Long-press: poll which dir buttons are held and accumulate.
+        moved = False
+        b = self._os.buttons
+        for btn, dx, dy in ((api.BTN_LEFT,  -1, 0),
+                            (api.BTN_RIGHT, +1, 0),
+                            (api.BTN_UP,     0, -1),
+                            (api.BTN_DOWN,   0, +1)):
+            try:
+                held = b.is_pressed(btn)
+            except Exception:
+                held = False
+            if held:
+                self._hold_t[btn] += dt
+                # Start slow, ramp to fast after ACCEL_AFTER_S held.
+                t = self._hold_t[btn]
+                if t > ACCEL_AFTER_S:
+                    speed = FAST_PX_PER_S
+                else:
+                    speed = SLOW_PX_PER_S
+                self._cx += dx * speed * dt
+                self._cy += dy * speed * dt
+                moved = True
+            else:
+                self._hold_t[btn] = 0.0
+
+        if moved:
+            self._clamp_cursor()
+            self._sample_color()
+            self._dirty = True
+
         if self._saved_flash > 0:
             self._saved_flash = max(0.0, self._saved_flash - dt)
             self._dirty = True
 
-    # ── render ───────────────────────────────────────────────────────────
+    def _clamp_cursor(self):
+        if self._cx < 0:           self._cx = 0
+        if self._cy < 0:           self._cy = 0
+        if self._cx > PLAY_W - 1:  self._cx = PLAY_W - 1
+        if self._cy > PLAY_H - 1:  self._cy = PLAY_H - 1
+
+    def _sample_color(self):
+        """Read the RGB565 pixel under the cursor out of the upscaled bg."""
+        if not self._bg:
+            return
+        x = int(self._cx); y = int(self._cy)
+        i = (y * self._bg_w + x) * 2
+        v = (self._bg[i] << 8) | self._bg[i + 1]
+        r = ((v >> 11) & 0x1F) << 3
+        g = ((v >>  5) & 0x3F) << 2
+        b = ( v        & 0x1F) << 3
+        # Restore lost low-order bits with a tiny smear so dark colours
+        # don't read as pure black just from RGB565 truncation.
+        self._rgb = (r | (r >> 5), g | (g >> 6), b | (b >> 5))
+
+    # ── render ────────────────────────────────────────────────────────────
     def draw(self, d):
         if not self._dirty:
             return
+        self._dirty = False
 
-        play_top    = widgets.HEADER_H
-        play_bot    = SH - widgets.HINT_H
-        swatch_rgb  = api.rgb(self._rgb[0], self._rgb[1], self._rgb[2])
+        # ── spectrum (or solid fallback) ───────────────────────────────────
+        if self._bg:
+            d.blit(self._bg, 0, PLAY_TOP, self._bg_w, self._bg_h)
+        else:
+            d.rect(0, PLAY_TOP, PLAY_W, PLAY_H,
+                   api.rgb(*self._rgb), fill=True)
 
-        # ── full-screen swatch: the whole play area IS the colour ─────────
-        d.rect(0, play_top, SW, play_bot - play_top, swatch_rgb, fill=True)
+        # ── header bar (pink, compact) ─────────────────────────────────────
+        self._draw_header(d)
+        widgets.draw_hint(d, "arrows=pick  B=mode  A=save  HOME=back")
 
-        # ── header: canonical RGB values + hex on a pink bar ──────────────
-        # Render directly (not widgets.draw_header) so we control the layout
-        # of the title + values without an extra string concat.
-        d.rect(0, 0, SW, widgets.HEADER_H, theme.PRIMARY, fill=True)
-        d.rect(0, widgets.HEADER_H - 1, SW, 1, theme.GOLD, fill=True)
-        d.text("COLOR", 8, (widgets.HEADER_H - 16) // 2, api.WHITE, scale=2)
-        rgb_str = "R%d  G%d  B%d  #%02X%02X%02X" % (
-            self._rgb[0], self._rgb[1], self._rgb[2],
-            self._rgb[0], self._rgb[1], self._rgb[2])
-        # Truncate from the left if needed (rare — fits at 320 px easily).
-        rw = len(rgb_str) * 8
-        d.text(rgb_str, SW - rw - 8, (widgets.HEADER_H - 8) // 2, api.WHITE)
+        # ── crosshair ──────────────────────────────────────────────────────
+        self._draw_cursor(d)
 
-        widgets.draw_hint(d, "UP/DN=val  L/R=row  B=model  A=save")
-
-        # ── floating overlay card with the active model's channels ────────
-        chans   = MODELS[self._model]
-        vals    = self._values_for_model()
-        row_h   = 20
-        pad_y   = 6
-        pad_x   = 10
-        card_h  = pad_y * 2 + 14 + row_h * len(chans)
-        card_w  = 200
-        card_x  = (SW - card_w) // 2
-        card_y  = play_bot - card_h - 8
-
-        # Drop shadow + cream card so it reads on any swatch colour.
-        d.rect(card_x + 2, card_y + 2, card_w, card_h, theme.MUTED2, fill=True)
-        d.rect(card_x,     card_y,     card_w, card_h, theme.CARD,   fill=True)
-        d.rect(card_x,     card_y,     card_w, 2,      theme.PRIMARY, fill=True)
-
-        # Model label (top of the card)
-        d.text("Mode: %s" % self._model,
-               card_x + pad_x, card_y + pad_y, theme.PRIMARY, scale=1)
-
-        # Channel rows
-        rows_top = card_y + pad_y + 14
-        for i, (label, max_v) in enumerate(chans):
-            row_y = rows_top + i * row_h
-            sel   = (i == self._sel)
-            if sel:
-                d.rect(card_x + 2, row_y - 2, card_w - 4, row_h - 2,
-                       theme.DOCK_SEL, fill=True)
-                d.rect(card_x + 2, row_y - 2, 3, row_h - 2,
-                       theme.PRIMARY, fill=True)
-            d.text(label, card_x + pad_x, row_y + 4,
-                   theme.TEXT_BRIGHT, scale=1)
-            # Right-aligned numeric value.
-            v   = vals[i]
-            s   = "%d" % v
-            val_w = len(s) * 8
-            val_x = card_x + card_w - pad_x - val_w
-            d.text(s, val_x, row_y + 4, theme.TEXT_BRIGHT)
-            # Bar between label and value.
-            bar_x = card_x + pad_x + 16
-            bar_w = val_x - bar_x - 8
-            if bar_w > 6:
-                d.rect(bar_x, row_y + 7, bar_w, 4, theme.MUTED2, fill=True)
-                fill_w = int(bar_w * v / max(1, max_v))
-                d.rect(bar_x, row_y + 7, fill_w, 4, theme.PRIMARY, fill=True)
-
-        # "Saved!" toast — overlay above the card.
+        # ── "Saved!" toast ────────────────────────────────────────────────
         if self._saved_flash > 0:
             msg = "Saved!"
-            mw  = len(msg) * 16
-            tx  = (SW - mw) // 2
-            ty  = card_y - 28
+            mw = len(msg) * 16
+            tx = (SW - mw) // 2
+            ty = PLAY_BOT - 32
             d.rect(tx - 8, ty - 4, mw + 16, 22, theme.GREEN, fill=True)
             d.text(msg, tx, ty, api.WHITE, scale=2)
 
-        self._dirty = False
+    # ── header pieces ─────────────────────────────────────────────────────
+    def _draw_header(self, d):
+        H = widgets.HEADER_H
+        d.rect(0, 0, SW, H, theme.PRIMARY, fill=True)
+        d.rect(0, H - 1, SW, 1, theme.GOLD, fill=True)
+        d.text("COLOR", 6, (H - 8) // 2, api.WHITE)
+        # Live preview swatch (small square, pink-bordered)
+        sw_sz = H - 8
+        sw_x  = 50
+        sw_y  = (H - sw_sz) // 2
+        d.rect(sw_x - 1, sw_y - 1, sw_sz + 2, sw_sz + 2, theme.GOLD, fill=True)
+        d.rect(sw_x,     sw_y,     sw_sz,     sw_sz,    api.rgb(*self._rgb),
+               fill=True)
+        # Tiny readout per the active model
+        readout = self._readout_str()
+        d.text(readout, sw_x + sw_sz + 8, (H - 8) // 2, api.WHITE)
 
-    def _values_for_model(self):
-        if self._model == "RGB":
-            return tuple(self._rgb)
-        if self._model == "HSL":
-            return _rgb_to_hsl(*self._rgb)
-        return _rgb_to_cmyk(*self._rgb)
+    def _readout_str(self):
+        r, g, b = self._rgb
+        if self._mode == "RGB":
+            return "RGB %d %d %d" % (r, g, b)
+        if self._mode == "HSL":
+            h, s, l = _rgb_to_hsl(r, g, b)
+            return "HSL %d %d %d" % (h, s, l)
+        c, m, y, k = _rgb_to_cmyk(r, g, b)
+        return "CMYK %d %d %d %d" % (c, m, y, k)
+
+    # ── crosshair drawing ────────────────────────────────────────────────
+    def _draw_cursor(self, d):
+        cx = int(self._cx)
+        cy = int(self._cy) + PLAY_TOP
+        # Outer dark ring + inner white ring + 1-px black dot in the middle.
+        # Two colour layers make the cursor visible on ANY background.
+        r1, r2 = 7, 5
+        d.rect(cx - r1, cy,      2 * r1 + 1, 1, api.BLACK, fill=True)
+        d.rect(cx,      cy - r1, 1, 2 * r1 + 1, api.BLACK, fill=True)
+        d.rect(cx - r2, cy,      2 * r2 + 1, 1, api.WHITE, fill=True)
+        d.rect(cx,      cy - r2, 1, 2 * r2 + 1, api.WHITE, fill=True)
+        # Small open square at the centre, dark outline + light interior
+        d.rect(cx - 2, cy - 2, 5, 5, api.BLACK, fill=False)
+        d.rect(cx - 1, cy - 1, 3, 3, api.WHITE, fill=False)
