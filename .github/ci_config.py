@@ -15,7 +15,7 @@ LLM_MODEL_SEARCH = "gemini-search"
 LLM_MODEL = LLM_MODEL_CHAT
 
 # ── Repository ──────────────────────────────────────
-REPO = "elixpo/oreo-badge"
+REPO = "elixpo/oreo"
 PROJECT_NAME = "oreo-badge"
 PROJECT_DESCRIPTION = "OreoOS — MicroPython badge OS for the Elixpo conference badge"
 

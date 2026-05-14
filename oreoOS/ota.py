@@ -76,7 +76,7 @@ except ImportError:
 
 # ── tunables ────────────────────────────────────────────────────────────────
 
-OTA_REPO       = "elixpo/oreo-badge"      # owner/repo on GitHub
+OTA_REPO       = "elixpo/oreo"      # owner/repo on GitHub
 STAGE_DIR      = "/_ota"
 MANIFEST_NAME  = "manifest.json"
 DEFAULT_CHANNEL = "stable"

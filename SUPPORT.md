@@ -4,8 +4,8 @@ A quick map of where to take what:
 
 | You want to… | Go here |
 |---|---|
-| Report a bug | [New bug report issue](https://github.com/elixpo/oreo-badge/issues/new?template=bug_report.yml) |
-| Suggest a feature / new app | [New feature request issue](https://github.com/elixpo/oreo-badge/issues/new?template=feature_request.yml) |
+| Report a bug | [New bug report issue](https://github.com/elixpo/oreo/issues/new?template=bug_report.yml) |
+| Suggest a feature / new app | [New feature request issue](https://github.com/elixpo/oreo/issues/new?template=feature_request.yml) |
 | Read the docs | [README](README.md) → [HARDWARE.md](docs/HARDWARE.md) → [CONTRIBUTING.md](CONTRIBUTING.md) |
 | Disclose a security issue | [Security policy](SECURITY.md) |
 | Ask a general question | Email **hello@elixpo.com** |

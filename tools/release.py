@@ -155,7 +155,7 @@ def main():
 
     # 3. Build the release artefacts. asset_base_url points at the URL
     # gh will use once the upload step has finished.
-    asset_base = "https://github.com/elixpo/oreo-badge/releases/download/%s/" % tag
+    asset_base = "https://github.com/elixpo/oreo/releases/download/%s/" % tag
     run([
         sys.executable, "tools/build_release.py",
         "--version", args.version,

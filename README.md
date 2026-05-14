@@ -1,7 +1,7 @@
-<!-- Top wave -->
+<!-- Top wave — full rainbow sweep -->
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://capsule-render.vercel.app/api?type=waving&color=0:FF5D68,50:FFBE1E,100:00B4A5&height=180&section=header&text=Oreo%20Badge&fontColor=FFFFFF&fontSize=48&animation=fadeIn">
-  <img alt="Oreo Badge" src="https://capsule-render.vercel.app/api?type=waving&color=0:FF5D68,50:FFBE1E,100:00B4A5&height=180&section=header&text=Oreo%20Badge&fontColor=FFFFFF&fontSize=48&animation=fadeIn">
+  <source media="(prefers-color-scheme: dark)" srcset="https://capsule-render.vercel.app/api?type=waving&color=0:FF5D68,15:FF9A3C,30:FFBE1E,50:6BD968,70:00B4A5,85:5D9BFF,100:B45DFF&height=200&section=header&text=Oreo%20Badge&fontColor=FFFFFF&fontSize=52&fontAlignY=38&animation=fadeIn&desc=A%20conference%20badge%20that%27s%20also%20a%20tiny%20console&descAlignY=62&descSize=14&descAlign=50">
+  <img alt="Oreo Badge" src="https://capsule-render.vercel.app/api?type=waving&color=0:FF5D68,15:FF9A3C,30:FFBE1E,50:6BD968,70:00B4A5,85:5D9BFF,100:B45DFF&height=200&section=header&text=Oreo%20Badge&fontColor=FFFFFF&fontSize=52&fontAlignY=38&animation=fadeIn&desc=A%20conference%20badge%20that%27s%20also%20a%20tiny%20console&descAlignY=62&descSize=14&descAlign=50">
 </picture>
 
 <div align="center">
@@ -16,11 +16,11 @@
 [![License: Oreo-PCL](https://img.shields.io/badge/license-Oreo--PCL-FF5D68?style=for-the-badge)](LICENSE)
 [![MicroPython 1.28](https://img.shields.io/badge/MicroPython-1.28-00B4A5?style=for-the-badge&logo=python&logoColor=white)](https://micropython.org)
 [![ESP32-S3](https://img.shields.io/badge/ESP32--S3-N16R8-2E2E2E?style=for-the-badge&logo=espressif&logoColor=white)](https://www.espressif.com/en/products/socs/esp32-s3)
-[![OTA Updates](https://img.shields.io/badge/OTA-yes-FFBE1E?style=for-the-badge)](#updates)
+[![OTA Updates](https://img.shields.io/badge/OTA-yes-FFBE1E?style=for-the-badge)](#-updates)
 
 [![Made by Elixpo](https://img.shields.io/badge/made_by-Elixpo-FF5D68?style=flat-square)](https://elixpo.com)
-[![Issues welcome](https://img.shields.io/badge/issues-welcome-00B4A5?style=flat-square)](https://github.com/elixpo/oreo-badge/issues)
-[![Stars](https://img.shields.io/github/stars/elixpo/oreo-badge?style=flat-square&color=FFBE1E)](https://github.com/elixpo/oreo-badge/stargazers)
+[![Issues welcome](https://img.shields.io/badge/issues-welcome-00B4A5?style=flat-square)](https://github.com/elixpo/oreo/issues)
+[![Stars](https://img.shields.io/github/stars/elixpo/oreo?style=flat-square&color=FFBE1E)](https://github.com/elixpo/oreo/stargazers)
 [![Sponsor](https://img.shields.io/badge/sponsor-%E2%9D%A4-FF5D68?style=flat-square)](https://github.com/sponsors/Circuit-Overtime)
 
 </div>
@@ -36,71 +36,63 @@ updates, and a panda mascot.
 Hang it on your lanyard. Hand it to a stranger. Swap quests over IR.
 Watch your GitHub commit graph scroll across its tiny screen.
 
-<br>
+---
+
+## 🎮 Apps
+
+Every tile in the drawer is its own folder under [`apps/`](apps/),
+written as a small `class App(oreoOS.App)` with three lifecycle methods.
 
 <div align="center">
 
-| | | |
-|:-:|:-:|:-:|
-| <img src="docs/images/app_home.png" width="160"><br>**Home** | <img src="docs/images/app_apps.png" width="160"><br>**Apps** | <img src="docs/images/app_racer.png" width="160"><br>**Racer** |
-| <img src="docs/images/app_commits.png" width="160"><br>**Commits** | <img src="docs/images/app_pet.png" width="160"><br>**Pet** | <img src="docs/images/app_color.png" width="160"><br>**Color Picker** |
-
-<sub>(Drop real screenshots into <code>docs/images/</code> — they show up here automatically.)</sub>
+| | | | | |
+|:-:|:-:|:-:|:-:|:-:|
+| <img src="assets/icons/raw/apps_icon.png" width="64"><br>**Apps** | <img src="assets/icons/raw/badge_icon.png" width="64"><br>**Badge** | <img src="assets/icons/raw/identity_icon.png" width="64"><br>**Identity** | <img src="assets/icons/raw/commits_icon.png" width="64"><br>**Commits** | <img src="assets/icons/raw/wifi_icon.png" width="64"><br>**Weather** |
+| <img src="assets/icons/raw/elixpo_pet_icon.png" width="64"><br>**Pet** | <img src="assets/icons/raw/racer_icon.png" width="64"><br>**Racer** | <img src="assets/icons/raw/flappy_icon.png" width="64"><br>**Flappy** | <img src="assets/icons/raw/snake_icon.png" width="64"><br>**Snake** | <img src="assets/icons/raw/gamepad_icon.png" width="64"><br>**Gamepad** |
+| <img src="assets/icons/raw/gallery_icon.png" width="64"><br>**Gallery** | <img src="assets/icons/raw/color_icon.png" width="64"><br>**Color** | <img src="assets/icons/raw/IR_Quest_icon.png" width="64"><br>**IR Quest** | <img src="assets/icons/raw/settings_icon.png" width="64"><br>**Settings** | <img src="assets/icons/raw/about_icon.png" width="64"><br>**About** |
 
 </div>
+
+Want to add yours? Copy [`templates/example_app/`](templates/example_app/)
+into `apps/your_name/` and ship.
 
 ---
 
 ## 🚀 Get going
 
 ```bash
-git clone https://github.com/elixpo/oreo-badge
+git clone https://github.com/elixpo/oreo
 cd oreo-badge
 python -m venv .venv && source .venv/bin/activate
 pip install -r oreoOS/requirements.txt
 python tools/deploy.py /dev/ttyACM0      # flash to a connected board
 ```
 
-Want to write your own app? Copy
-[`templates/example_app/`](templates/example_app/) into `apps/your_name/`
-and edit — see [`CONTRIBUTING.md`](CONTRIBUTING.md) for the full walk-through.
+For step-by-step app-writing + OS internals, see
+[`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ---
 
 ## 🛠 Hardware
 
-ESP32-S3 + 320×240 IPS LCD + 8 buttons + touch pad + IMU + IR.
+ESP32-S3 + 320×240 IPS LCD + 8 buttons + capacitive touch pad + IMU + IR.
 
-The full pinout, schematic, BOM, soldering tips, and breadboard photos
-live in **[`docs/HARDWARE.md`](docs/HARDWARE.md)**.
-
-The single source of truth for GPIO assignments is
+Full pinout, schematic, BOM, soldering tips, and breadboard photos
+live in **[`docs/HARDWARE.md`](docs/HARDWARE.md)**. The single source
+of truth for GPIO assignments is
 [`oreoWare/pins.py`](oreoWare/pins.py) — one file, one line per pin.
 
 ---
 
 ## 🔄 Updates
 
-The badge pulls itself forward. It does a fast SHA-vs-version check
-against its own GitHub release channel, auto-stages small patches, and
-asks before downloading big ones. Files are validated by SHA-256 and
-atomically swapped on the next boot.
+The badge pulls itself forward. A fast SHA-vs-version check runs in
+the background against the project's GitHub release channel, auto-stages
+small patches, and asks before downloading big ones. Files are validated
+by SHA-256 and atomically swapped on the next boot.
 
-Full design + release flow: see [`CONTRIBUTING.md → Releasing`](CONTRIBUTING.md#releasing).
-
----
-
-## 📂 Repo layout
-
-```
-oreoOS/      the Python OS — boot, splash, theme, OTA, power, app base
-oreoWare/    hardware drivers — display, buttons, wifi, BT, IMU, IR
-apps/        the user-facing apps (each in its own folder)
-assets/      icons, sprites, fonts (raw + optimized RGB565 modules)
-tools/       deploy, asset pipeline, release builder
-docs/        HARDWARE.md + design notes + images
-templates/   starting point for new apps
-```
+Releases are cut manually with `python tools/release.py vX.Y.Z` —
+details in [`CONTRIBUTING.md → Releasing`](CONTRIBUTING.md#releasing).
 
 ---
 
@@ -108,7 +100,7 @@ templates/   starting point for new apps
 
 We love new contributors. The bar is low; the welcome is warm.
 
-- 🐛 Bugs / ideas: open an [issue](https://github.com/elixpo/oreo-badge/issues/new/choose)
+- 🐛 Bugs / ideas: open an [issue](https://github.com/elixpo/oreo/issues/new/choose)
 - 🔧 Code: read [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - 🧑‍🤝‍🧑 Community: read the [`Code of Conduct`](CODE_OF_CONDUCT.md)
 - 🔐 Security disclosures: read [`SECURITY.md`](SECURITY.md)
@@ -117,11 +109,11 @@ We love new contributors. The bar is low; the welcome is warm.
 
 ## ⭐ Star history
 
-<a href="https://www.star-history.com/#elixpo/oreo-badge&Date">
+<a href="https://www.star-history.com/#elixpo/oreo&Date">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=elixpo/oreo-badge&type=Date&theme=dark" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=elixpo/oreo-badge&type=Date" />
-    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=elixpo/oreo-badge&type=Date" width="640" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=elixpo/oreo&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=elixpo/oreo&type=Date" />
+    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=elixpo/oreo&type=Date" width="640" />
   </picture>
 </a>
 
@@ -129,9 +121,10 @@ We love new contributors. The bar is low; the welcome is warm.
 
 ## 📫 Made by
 
-The Oreo Badge is a project from the [**Elixpo**](https://elixpo.com) team.
-Mascot, OS, and most of the apps by
-[@Circuit-Overtime](https://github.com/Circuit-Overtime).
+OreoOS, the mascot, the apps, and pretty much everything in this repo is
+the work of [**@Circuit-Overtime**](https://github.com/Circuit-Overtime).
+The Oreo Badge ships as a project under the
+[**Elixpo**](https://elixpo.com) umbrella.
 
 Want to help, ship an app, sponsor a build, or just say hi?
 
@@ -141,8 +134,8 @@ Want to help, ship an app, sponsor a build, or just say hi?
 
 </div>
 
-<!-- Bottom wave -->
+<!-- Bottom wave — same rainbow, mirrored -->
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://capsule-render.vercel.app/api?type=waving&color=0:00B4A5,50:FFBE1E,100:FF5D68&height=120&section=footer">
-  <img alt="" src="https://capsule-render.vercel.app/api?type=waving&color=0:00B4A5,50:FFBE1E,100:FF5D68&height=120&section=footer">
+  <source media="(prefers-color-scheme: dark)" srcset="https://capsule-render.vercel.app/api?type=waving&color=0:B45DFF,15:5D9BFF,30:00B4A5,50:6BD968,70:FFBE1E,85:FF9A3C,100:FF5D68&height=140&section=footer">
+  <img alt="" src="https://capsule-render.vercel.app/api?type=waving&color=0:B45DFF,15:5D9BFF,30:00B4A5,50:6BD968,70:FFBE1E,85:FF9A3C,100:FF5D68&height=140&section=footer">
 </picture>

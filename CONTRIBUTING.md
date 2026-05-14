@@ -27,7 +27,7 @@ This document is the short version. Read it once, then jump in.
 ## Setup
 
 ```bash
-git clone https://github.com/elixpo/oreo-badge
+git clone https://github.com/elixpo/oreo
 cd oreo-badge
 python -m venv .venv && source .venv/bin/activate
 pip install -r oreoOS/requirements.txt
@@ -145,28 +145,41 @@ notification probably got lost in conference-season chaos.
 
 Maintainers only — feel free to skip this section.
 
+Releases are **manual on purpose**. We want a human to look at a badge
+running the release candidate before the wider fleet pulls it in. The
+one-liner:
+
 ```bash
-# 1. Bump the version (deploy.py does this automatically, but a manual
-#    push needs the literal in oreoOS/config.py).
-sed -i 's/VERSION.*= ".*"/VERSION           = "v1.4.0"/' oreoOS/config.py
+# Dry-run first so you can read every command the script will execute.
+python tools/release.py v1.4.0 --channel stable --dry-run
 
-# 2. Commit, push.
-git commit -am "release: v1.4.0 — fly mode, new pet sprites"
-git push
-
-# 3. Tag the release. The CI workflow at .github/workflows/release.yml
-#    will build manifest.json + bundle.tar + every individual asset
-#    and create the GitHub Release.
-git tag stable/v1.4.0
-git push --tags
+# Looks good? Drop --dry-run and ship.
+python tools/release.py v1.4.0 --channel stable --notes "Fly mode + new pet sprites"
 ```
 
-A few minutes later the release is live. Every badge in the field that
-has WiFi up will see the SHA-based check find a new version within 6 h,
-and the next time the user opens Settings they'll see the update dot.
+Under the hood the script:
 
-For **beta** channels, tag as `beta/v1.4.0-rc1` instead. Badges only
-pick up the channel they're configured for (`stable` by default).
+1. Verifies `git` + `gh` are installed and you're authenticated.
+2. Refuses to release if the working tree is dirty (override with `--force`).
+3. Bumps `oreoOS/config.py:VERSION` to `v1.4.0` if it isn't already.
+4. Commits the bump and pushes `main` + the new tag (`stable/v1.4.0`).
+5. Runs `tools/build_release.py` to produce
+   `dist/v1.4.0/{manifest.json, bundle.tar, files/...}`.
+6. Calls `gh release create` to publish, uploading every file as a
+   per-asset attachment so the manifest's per-file URLs resolve.
+
+A few minutes later every badge in the field with WiFi will see the
+SHA-based check find the new version within 6 h, and **Settings →
+Check Update** will pull it down on demand.
+
+For a **beta** channel: `python tools/release.py v1.4.0-rc1 --channel beta`.
+Badges only pick up the channel they're configured for (`stable` by
+default).
+
+If you don't have a dev machine handy: the GitHub Actions
+[`release` workflow](.github/workflows/release.yml) does the same thing
+when you click **Run workflow** in the Actions tab — same script under
+the hood, no auto-trigger on tag push.
 
 ---
 
@@ -184,7 +197,7 @@ pick up the channel they're configured for (`stable` by default).
 ## Contact
 
 - **Email:** hello@elixpo.com
-- **GitHub:** https://github.com/elixpo/oreo-badge
+- **GitHub:** https://github.com/elixpo/oreo
 - **Maintainer:** [@Circuit-Overtime](https://github.com/Circuit-Overtime)
 
 Thanks for being here. 🐼

@@ -21,7 +21,7 @@ Please **don't** open a public issue for security problems.
 Use one of:
 
 1. **GitHub Security Advisory** (preferred):
-   <https://github.com/elixpo/oreo-badge/security/advisories/new>
+   <https://github.com/elixpo/oreo/security/advisories/new>
 2. **Email:** `hello@elixpo.com`
 
 You can expect:
