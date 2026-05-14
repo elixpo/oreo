@@ -26,7 +26,7 @@ _env = _load_env()
 # OS version. tools/deploy.py auto-bumps the PATCH number on every push.
 # The literal MUST stay on its own line as `VERSION = "vN.N.N"` — the
 # deploy regex relies on that exact format to rewrite in place.
-VERSION           = "v1.2.48"
+VERSION           = "v1.2.49"
 
 GITHUB_USER       = "Circuit-Overtime"
 DISPLAY_NAME      = "Ayushman Bhattacharya"
@@ -67,13 +67,15 @@ WIFI_POWERSAVE    = True
 BT_ADV_INTERVAL_MS = 500
 
 # ── Apps drawer view ───────────────────────────────────────────────────────
-# Group apps in the "Category" view of the launcher. Keys are folder names
-# under apps/. Apps absent from this map go into a "More" bucket. The
+# Group apps in the "Category" view of the launcher. Each entry is
+#   (display_name, icon_stem, (app_dir, app_dir, ...))
+# where icon_stem looks up assets/icons/optimized/<stem>.py. Apps absent
+# from this map go into a "More" bucket that re-uses its first app's icon.
 # Settings → "App View" toggle picks Grid (flat) or Category (grouped).
 APP_CATEGORIES = (
-    ("Games",     ("flappy", "snake", "racer", "pet")),
-    ("GitHub",    ("badge",  "identity", "commits")),
-    ("Utils", ("weather",)),
-    ("Tools",     ("gallery", "color_picker", "gamepad", "quest")),
-    ("System",    ("settings", "about")),
+    ("Games",  "cat_games",  ("flappy", "snake", "racer", "pet")),
+    ("GitHub", "cat_github", ("badge",  "identity", "commits")),
+    ("Utils",  "cat_utils",  ("weather",)),
+    ("Tools",  "cat_tools",  ("gallery", "color_picker", "gamepad", "quest")),
+    ("System", "cat_system", ("settings", "about")),
 )

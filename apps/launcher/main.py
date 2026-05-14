@@ -227,20 +227,31 @@ class App(oreoOS.App):
 
     # ── category-view helpers ──────────────────────────────────────────────
     def _build_categories(self):
-        """Return [(cat_name, [app_idx, ...]), ...] in config order.
+        """Return [(cat_name, icon_stem_or_None, [app_idx, ...]), ...].
 
-        Apps not listed in APP_CATEGORIES end up under a trailing "More"
-        bucket so newly added apps show up without a config edit. Empty
-        categories are dropped so the picker only shows real ones.
+        Reads oreoOS.config.APP_CATEGORIES, which is either:
+            ("Name", ("dir", ...))                 — legacy 2-tuple
+            ("Name", "icon_stem", ("dir", ...))    — new 3-tuple
+        Both shapes work so a stale config still loads. Apps not listed
+        end up in a trailing "More" bucket; the "More" tile re-uses its
+        first app's icon.
         """
         try:
             from oreoOS.config import APP_CATEGORIES
         except Exception:
             APP_CATEGORIES = ()
+
+        def _unpack(entry):
+            # entry is either (name, dirs) or (name, icon_stem, dirs)
+            if len(entry) == 2:
+                return entry[0], None, entry[1]
+            return entry[0], entry[1], entry[2]
+
         cat_for = {}
-        for cat_name, dirs in APP_CATEGORIES:
+        for entry in APP_CATEGORIES:
+            name, _icon, dirs = _unpack(entry)
             for d in dirs:
-                cat_for[d] = cat_name
+                cat_for[d] = name
         by_cat = {}
         misc   = []
         for i, a in enumerate(self._apps):
@@ -250,18 +261,19 @@ class App(oreoOS.App):
             else:
                 misc.append(i)
         out = []
-        for cat_name, _dirs in APP_CATEGORIES:
-            if cat_name in by_cat:
-                out.append((cat_name, by_cat[cat_name]))
+        for entry in APP_CATEGORIES:
+            name, icon, _dirs = _unpack(entry)
+            if name in by_cat:
+                out.append((name, icon, by_cat[name]))
         if misc:
-            out.append(("More", misc))
+            out.append(("More", None, misc))
         return out
 
     def _enter_category(self, cat_idx):
         """Drill from the picker into the apps grid for a chosen category."""
         if not (0 <= cat_idx < len(self._categories)):
             return
-        _name, app_idxs = self._categories[cat_idx]
+        _name, _icon, app_idxs = self._categories[cat_idx]
         if not app_idxs:
             return
         self._view_apps = list(app_idxs)
@@ -544,6 +556,6 @@ class App(oreoOS.App):
                    y + (tile_h - 16) // 2,
                    theme.PRIMARY if sel else theme.MUTED, scale=2)
 
-        # keep frame-marking dirty until the scroll tween settles
-        if abs(self._scroll_y - target) > 0.5:
-            self._dirty = True
+        # The picker has no scroll target — 5 tiles fit on one screen.
+        # Leftover line from the old vertical-list category view that
+        # *did* tween a scroll; deliberately a no-op here.
