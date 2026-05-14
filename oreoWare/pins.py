@@ -48,3 +48,20 @@ IR_RX = 18    # TSOP38238 OUT pin
 
 # ----- Analog inputs -----
 ADC_VBAT = 1  # ADC1_CH0, fed by the 100kΩ/100kΩ divider stub
+
+# ----- I2C bus (shared by MPU6050; future expanders) -----
+# Picked from the unused pool: 42, 47 are general-purpose, non-strapping,
+# not on PSRAM lines for N16R8, and not USB-OTG pads.
+I2C_SDA   = 42
+I2C_SCL   = 47
+
+# ----- MPU6050 -----
+# +Y axis of the IMU is wired to "up" on the screen (the way the user holds
+# the badge horizontally during the racer game). Mount in-plane with the
+# board so pitch = front/back tilt, roll = side-to-side tilt, yaw = twist.
+IMU_INT   = 3      # RTC_GPIO3 — wakes from deep sleep on a motion interrupt
+
+# ----- TTP223 -----
+# Module jumper set to active-HIGH, momentary (no toggle), so OUT pulses
+# while finger is on the pad. RTC_GPIO21 → ext1 wake-from-deep-sleep source.
+TOUCH_OUT = 21

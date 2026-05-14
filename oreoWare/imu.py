@@ -1,0 +1,184 @@
+"""MPU6050 accelerometer + gyroscope driver.
+
+Wiring (see oreoWare/pins.py):
+    SDA → I2C_SDA  (GPIO 42)
+    SCL → I2C_SCL  (GPIO 47)
+    VCC → 3V3
+    GND → GND
+    AD0 → GND      (address 0x68)
+    INT → IMU_INT  (GPIO 3, optional, for motion-wake)
+
+Usage:
+    from oreoWare import imu
+    sensor = imu.MPU6050()
+    ax, ay, az = sensor.read_accel_g()       # g (gravity = 1.0)
+    gx, gy, gz = sensor.read_gyro_dps()      # degrees per second
+    pitch, roll = sensor.tilt_deg()          # convenience for game apps
+
+The driver caches I2C, reuses one read buffer per call, and exposes a
+sleep() / wake() pair so the power manager can drop the chip to 5 µA when
+no game is using it.
+"""
+
+try:
+    from machine import I2C, Pin
+except ImportError:  # build-host fallback so apps import cleanly off-device
+    I2C = None
+    Pin = None
+
+import struct
+from oreoWare import pins
+
+
+# ── register map (subset we actually use) ────────────────────────────────────
+_ADDR        = 0x68
+_PWR_MGMT_1  = 0x6B
+_PWR_MGMT_2  = 0x6C
+_SMPLRT_DIV  = 0x19
+_CONFIG      = 0x1A
+_GYRO_CFG    = 0x1B
+_ACCEL_CFG   = 0x1C
+_ACCEL_OUT_H = 0x3B   # accel x_h, x_l, y_h, y_l, z_h, z_l (then temp + gyro)
+_WHO_AM_I    = 0x75
+
+# Full-scale ranges we configure.
+_ACCEL_FS_2G   = 0x00         # ±2 g
+_GYRO_FS_250   = 0x00         # ±250 °/s
+_ACCEL_LSB_PER_G  = 16384.0   # at ±2 g full-scale
+_GYRO_LSB_PER_DPS = 131.0     # at ±250 °/s
+
+# 14-byte read covering accel(6) + temp(2) + gyro(6) starting at 0x3B.
+_BURST_FMT = ">hhhhhhh"
+
+
+class MPU6050:
+    def __init__(self, i2c=None, addr=_ADDR):
+        if i2c is None:
+            if I2C is None:
+                raise RuntimeError("machine.I2C not available (off-device)")
+            i2c = I2C(0, scl=Pin(pins.I2C_SCL), sda=Pin(pins.I2C_SDA), freq=400_000)
+        self._i2c    = i2c
+        self._addr   = addr
+        self._buf    = bytearray(14)
+        # Persistent biases — set by calibrate(); zero until then.
+        self._a_bias = (0.0, 0.0, 0.0)
+        self._g_bias = (0.0, 0.0, 0.0)
+        self._init_chip()
+
+    # ── lifecycle ────────────────────────────────────────────────────────
+    def _w(self, reg, val):
+        self._i2c.writeto_mem(self._addr, reg, bytes((val,)))
+
+    def _init_chip(self):
+        # Wake from default sleep, use the PLL with X gyro reference (more
+        # stable than the internal oscillator).
+        self._w(_PWR_MGMT_1, 0x01)
+        # 1 kHz sample rate, DLPF ≈ 44 Hz on accel, 42 Hz on gyro
+        self._w(_SMPLRT_DIV, 0x00)
+        self._w(_CONFIG,     0x03)
+        self._w(_GYRO_CFG,   _GYRO_FS_250)
+        self._w(_ACCEL_CFG,  _ACCEL_FS_2G)
+
+    def whoami(self):
+        return self._i2c.readfrom_mem(self._addr, _WHO_AM_I, 1)[0]
+
+    def sleep(self):
+        """Put the IMU into low-power sleep (~5 µA)."""
+        self._w(_PWR_MGMT_1, 0x40)
+
+    def wake(self):
+        self._init_chip()
+
+    # ── reads ────────────────────────────────────────────────────────────
+    def _burst(self):
+        """Single 14-byte read → 7 signed-16 ints: ax, ay, az, temp, gx, gy, gz."""
+        self._i2c.readfrom_mem_into(self._addr, _ACCEL_OUT_H, self._buf)
+        return struct.unpack(_BURST_FMT, self._buf)
+
+    def read_raw(self):
+        return self._burst()
+
+    def read_accel_g(self):
+        ax, ay, az, _t, _gx, _gy, _gz = self._burst()
+        bx, by, bz = self._a_bias
+        return (ax / _ACCEL_LSB_PER_G - bx,
+                ay / _ACCEL_LSB_PER_G - by,
+                az / _ACCEL_LSB_PER_G - bz)
+
+    def read_gyro_dps(self):
+        _ax, _ay, _az, _t, gx, gy, gz = self._burst()
+        bx, by, bz = self._g_bias
+        return (gx / _GYRO_LSB_PER_DPS - bx,
+                gy / _GYRO_LSB_PER_DPS - by,
+                gz / _GYRO_LSB_PER_DPS - bz)
+
+    def read_all(self):
+        """Return (ax, ay, az, gx, gy, gz, temp_C) in physical units."""
+        ax, ay, az, t, gx, gy, gz = self._burst()
+        bax, bay, baz = self._a_bias
+        bgx, bgy, bgz = self._g_bias
+        # Datasheet: T_C = TEMP_OUT / 340 + 36.53
+        return (ax / _ACCEL_LSB_PER_G - bax,
+                ay / _ACCEL_LSB_PER_G - bay,
+                az / _ACCEL_LSB_PER_G - baz,
+                gx / _GYRO_LSB_PER_DPS - bgx,
+                gy / _GYRO_LSB_PER_DPS - bgy,
+                gz / _GYRO_LSB_PER_DPS - bgz,
+                t / 340.0 + 36.53)
+
+    # ── derived ──────────────────────────────────────────────────────────
+    def tilt_deg(self):
+        """Return (pitch, roll) in degrees from the accel vector.
+
+        Assumes the badge is held HORIZONTAL (screen up). Pitch is rotation
+        around the X axis (front/back tilt) and roll is around the Y axis
+        (side-to-side tilt). Drives the racer game's throttle + steer.
+        """
+        import math
+        ax, ay, az = self.read_accel_g()
+        # atan2 with mag of the orthogonal pair keeps small-angle behaviour
+        # smooth even near the gimbal-lock edges.
+        pitch = math.degrees(math.atan2(ay, math.sqrt(ax * ax + az * az)))
+        roll  = math.degrees(math.atan2(ax, math.sqrt(ay * ay + az * az)))
+        return pitch, roll
+
+    # ── calibration ──────────────────────────────────────────────────────
+    def calibrate(self, samples=200, settle_ms=2):
+        """Sit still on a flat surface and average N samples to learn biases.
+
+        Captures the resting gyro drift AND any accel offset away from
+        (0, 0, +1g). After this, read_accel_g/read_gyro_dps return values
+        with the resting bias subtracted out.
+
+        Called once at racer game start; takes ~0.5 s with the defaults.
+        """
+        import time
+        ax = ay = az = 0.0
+        gx = gy = gz = 0.0
+        for _ in range(samples):
+            rax, ray, raz, _t, rgx, rgy, rgz = self._burst()
+            ax += rax / _ACCEL_LSB_PER_G
+            ay += ray / _ACCEL_LSB_PER_G
+            az += raz / _ACCEL_LSB_PER_G
+            gx += rgx / _GYRO_LSB_PER_DPS
+            gy += rgy / _GYRO_LSB_PER_DPS
+            gz += rgz / _GYRO_LSB_PER_DPS
+            time.sleep_ms(settle_ms)
+        n = float(samples)
+        # Accel bias = mean offset from (0, 0, +1g). Z keeps the gravity 1g
+        # so subsequent reads still see Z ≈ 1 at rest.
+        self._a_bias = (ax / n, ay / n, (az / n) - 1.0)
+        self._g_bias = (gx / n, gy / n, gz / n)
+        return self._a_bias, self._g_bias
+
+    # ── motion interrupt (used by the power manager for wake-on-motion) ──
+    def enable_motion_int(self, thresh_mg=128, duration_ms=1):
+        """Configure the chip to raise INT when |accel| jerks above thresh."""
+        # Registers per the MPU6050 RM (Motion Detection Mode).
+        self._w(0x37, 0x60)                            # INT pin latched, push-pull
+        self._w(0x38, 0x40)                            # int enable: motion only
+        self._w(0x1F, max(1, int(thresh_mg / 2)))      # thresh, 2 mg/LSB
+        self._w(0x20, max(1, int(duration_ms)))        # duration, ms
+
+    def clear_int(self):
+        self._i2c.readfrom_mem(self._addr, 0x3A, 1)    # INT_STATUS read clears it
