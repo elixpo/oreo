@@ -26,10 +26,30 @@ def is_active():
 
 def set_active(on):
     try:
-        _get_ble().active(on)
+        ble = _get_ble()
+        ble.active(on)
+        if on:
+            _apply_power_cap(ble)
         return True
     except Exception:
         return False
+
+
+def _apply_power_cap(ble):
+    """Start advertising at the secrets-baked interval so BT's average RF
+    duty (and therefore its average current draw) is capped.
+
+    BLE peak TX current is tiny compared to WiFi (~7-15 mA), but during
+    discovery the radio TXes every advertising interval. A 500 ms interval
+    keeps discovery snappy while reducing average current ~5x vs the
+    default ~100 ms. Only fires when BT was just brought up.
+    """
+    try:
+        from secrets import BT_ADV_INTERVAL_MS
+        # MicroPython gap_advertise takes microseconds.
+        ble.gap_advertise(int(BT_ADV_INTERVAL_MS) * 1000)
+    except Exception:
+        pass
 
 
 def toggle():

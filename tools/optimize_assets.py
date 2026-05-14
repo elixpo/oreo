@@ -57,6 +57,9 @@ PER_APP_OPAQUE = {
     "flappy":   {"background"},
     "weather":  {"background"},
     "snake":    {"arena"},
+    # Road tarmac fully covers its tile; cars + trees need chroma-key
+    # transparency so they composite over the road and grass.
+    "racer":    {"racer_road"},
 }
 
 # Per-app asset target sizes (W, H) by file stem.
@@ -96,6 +99,14 @@ PER_APP_SIZES = {
     # to 320×240 at boot. Storing 4× smaller keeps the .py module under 200 KB
     # so the MicroPython parser doesn't OOM the boot heap.
     "splash_bg":    (160, 120),
+
+    # racer game — top-down kart, oncoming cars, verge trees, tiled tarmac
+    "racer_player":       (32, 40),
+    "racer_player_crash": (32, 40),
+    "racer_enemy_a":      (32, 40),
+    "racer_enemy_b":      (32, 40),
+    "racer_tree":         (24, 32),
+    "racer_road":         (80, 80),
 }
 
 

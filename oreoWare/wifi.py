@@ -22,9 +22,36 @@ def _get_wlan():
     return _wlan
 
 
+def _apply_power_cap(wlan):
+    """Apply the secrets-baked TX-power dBm cap + power-save mode.
+
+    Done as a best-effort: every `wlan.config(...)` call is wrapped in
+    try/except so older / minimal MicroPython builds without one of these
+    keys don't kill WiFi entirely.
+    """
+    try:
+        from secrets import WIFI_TX_DBM
+        try:
+            wlan.config(txpower=int(WIFI_TX_DBM))
+        except Exception:
+            pass
+    except Exception:
+        pass
+    try:
+        from secrets import WIFI_POWERSAVE
+        if WIFI_POWERSAVE:
+            try:
+                wlan.config(pm=wlan.PM_POWERSAVE)
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+
 def connect(ssid, password, timeout_ms=12000):
     wlan = _get_wlan()
     wlan.active(True)
+    _apply_power_cap(wlan)
     if wlan.isconnected() and wlan.config("essid") == ssid:
         return True
     wlan.connect(ssid, password)
@@ -33,6 +60,9 @@ def connect(ssid, password, timeout_ms=12000):
         if time.ticks_diff(time.ticks_ms(), start) > timeout_ms:
             return False
         time.sleep_ms(200)
+    # Re-apply power-save AFTER association — some IDF versions reset PM
+    # state on connect and need it set again to actually take effect.
+    _apply_power_cap(wlan)
     return True
 
 
