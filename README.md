@@ -198,8 +198,3 @@ Want to help, ship an app, sponsor a build, or just say hi?
 
 </div>
 
-<!-- Bottom wave — same rainbow, mirrored -->
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://capsule-render.vercel.app/api?type=waving&color=0:B45DFF,15:5D9BFF,30:00B4A5,50:6BD968,70:FFBE1E,85:FF9A3C,100:FF5D68&height=140&section=footer">
-  <img alt="" src="https://capsule-render.vercel.app/api?type=waving&color=0:B45DFF,15:5D9BFF,30:00B4A5,50:6BD968,70:FFBE1E,85:FF9A3C,100:FF5D68&height=140&section=footer">
-</picture>
