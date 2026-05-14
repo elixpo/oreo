@@ -487,11 +487,22 @@ class App(oreoOS.App):
 
     def _category_icon(self, cat_idx):
         """Return (data, w, h) for the FIRST app's icon in the category as
-        a stand-in for the category itself. Uses the SMALL (32×32) cache
-        so it fits inside a category-picker tile without overflow."""
+        a stand-in for the category itself. Prefers the explicit icon_stem
+        baked under assets/icons/optimized/<stem>.py — falls back to the
+        first app's icon if the category icon hasn't been generated yet
+        so the picker is always populated."""
         if not (0 <= cat_idx < len(self._categories)):
             return None
-        _name, app_idxs = self._categories[cat_idx]
+        _name, icon_stem, app_idxs = self._categories[cat_idx]
+        # 1) try the explicit category icon
+        if icon_stem:
+            try:
+                m = __import__("assets.icons.optimized." + icon_stem,
+                               None, None, ["DATA", "W", "H"])
+                return (bytearray(m.DATA), m.W, m.H)
+            except (ImportError, AttributeError):
+                pass
+        # 2) fall back to the first app's small icon
         for ai in app_idxs:
             ic = self._small_icons.get(self._apps[ai]["dir"])
             if ic:
@@ -517,7 +528,7 @@ class App(oreoOS.App):
         tile_x = self.CAT_TILE_PAD
         tile_w = SW - 2 * self.CAT_TILE_PAD
 
-        for i, (cat_name, app_idxs) in enumerate(cats):
+        for i, (cat_name, _icon, app_idxs) in enumerate(cats):
             y   = start_y + i * (tile_h + gap)
             sel = (i == self._cat_sel)
 
