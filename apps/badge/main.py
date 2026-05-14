@@ -94,6 +94,12 @@ class App(oreoOS.App):
     name         = "Badge"
     SHOW_LOADING = True
 
+    # Cache the GitHub profile to flash for one hour. On entry we render
+    # the cached profile instantly (no spinner) then attempt a background
+    # refresh — if it succeeds we swap in the fresh data + re-save.
+    CACHE_PATH = "apps/badge/cache.txt"
+    CACHE_TTL  = 3600        # seconds (1 hour)
+
     def on_enter(self, os):
         self._os = os
         try:
@@ -101,16 +107,61 @@ class App(oreoOS.App):
             self._user = GITHUB_USER
         except Exception:
             self._user = "octocat"
-        self._avatar  = _try_avatar()
-        self._profile = _fetch_profile(self._user)
-        self._dirty   = True
+        self._avatar = _try_avatar()
+
+        # 1) Load whatever's on disk so the card renders immediately.
+        cached, age = self._load_cache()
+        self._profile  = cached
+        self._fresh_ts = age          # age (sec) of what we're showing; None = miss
+
+        # 2) Hit the network ONLY if the cache is missing or stale.
+        if cached is None or (age is not None and age > self.CACHE_TTL):
+            fresh = _fetch_profile(self._user)
+            if fresh:
+                self._profile  = fresh
+                self._fresh_ts = 0
+                self._save_cache(fresh)
+        self._dirty = True
 
     def on_button_press(self, btn):
         if btn == api.BTN_A:
+            # Manual refresh: bypass TTL, always hit GitHub.
             new = _fetch_profile(self._user)
             if new:
-                self._profile = new
+                self._profile  = new
+                self._fresh_ts = 0
+                self._save_cache(new)
             self._dirty = True
+
+    # ── cache helpers (use oreoOS.cache for TTL-bookkeeping) ────────────
+    def _load_cache(self):
+        try:
+            from oreoOS import cache
+            payload, age = cache.load(self.CACHE_PATH)
+        except Exception:
+            return None, None
+        if not payload:
+            return None, None
+        # Coerce types — cache stores everything as strings.
+        try:
+            return {
+                "name":      payload.get("name", ""),
+                "login":     payload.get("login", self._user),
+                "bio":       payload.get("bio", ""),
+                "location":  payload.get("location", ""),
+                "followers": int(payload.get("followers", 0)),
+                "following": int(payload.get("following", 0)),
+                "repos":     int(payload.get("repos", 0)),
+            }, age
+        except Exception:
+            return None, None
+
+    def _save_cache(self, profile):
+        try:
+            from oreoOS import cache
+            cache.save(self.CACHE_PATH, profile)
+        except Exception:
+            pass
 
     def update(self, dt):
         pass
