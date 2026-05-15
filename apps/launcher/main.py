@@ -33,9 +33,12 @@ MAX_LBL_CHARS = 9        # chars per label line (8-px font @ ~72 px cell width)
 
 PAD_X        = 14
 PAD_TOP      = widgets.HEADER_H + 4
-# Generous bottom gap so the second row of icons doesn't crash into the
-# hint bar — the per-cell label runs two lines so we need real room.
-PAD_BOT      = widgets.HINT_H   + 52
+# Bottom gap needs to clear the hint bar AND leave room for two label
+# lines under the second-row icons. With ICON_SZ=64 + SEL_PAD*2 +
+# LABEL_GAP + 2*LABEL_LINE_H ≈ 92 of vertical content per cell, the
+# previous PAD_BOT=HINT_H+52 squeezed cells to 71 px and the labels
+# disappeared off the bottom. Trim the slack so cells get ~94 px.
+PAD_BOT      = widgets.HINT_H   + 4
 
 CELL_W       = (SW - 2 * PAD_X) // COLS
 CELL_H       = (SH - PAD_TOP - PAD_BOT) // VISIBLE_ROWS
@@ -235,7 +238,11 @@ class App(oreoOS.App):
     def on_enter(self, os):
         self._os = os
         from oreoOS.launcher import list_apps
-        self._apps = [a for a in list_apps() if a["dir"] != "launcher"]
+        # bt + wifi are surfaced through Settings rather than as their
+        # own drawer tiles — Settings has dedicated rows that launch
+        # those screens, so a separate tile would just be duplication.
+        DRAWER_HIDDEN = ("launcher", "bt", "wifi")
+        self._apps = [a for a in list_apps() if a["dir"] not in DRAWER_HIDDEN]
 
         # Pre-upscale every icon 32×32 → 64×64 ONCE; cache as bytearray for
         # fast per-frame blits AND as the source of the rotation animation.

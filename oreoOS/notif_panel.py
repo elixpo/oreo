@@ -8,18 +8,22 @@ panel rather than the running app.
 Layout (slides down from the top, full width):
 
   pink header strip  ── bell + "NOTIFICATIONS"
-  quick-settings row ── three chunky pills:  WiFi  •  BT  •  Bright
+  quick-toggle row   ── three chunky pills:  WiFi  •  BT  •  Settings
+  brightness row     ── wide range slider with live %
   notif card list    ── one per push, newest first
   hint band          ── A=open  B=clear  C/HOME=close
 
 Focus model:
-  _focus == "quick"   LEFT/RIGHT cycles pills, A toggles/cycles
-  _focus == "list"    UP/DOWN walks cards,  A opens target, B clears all
-  UP at top of list → focus = "quick"
-  DOWN from quick   → focus = "list" (if list is non-empty)
+  _focus == "quick"   LEFT/RIGHT cycles pills, A activates,
+                      DOWN drops to "bright"
+  _focus == "bright"  LEFT/RIGHT adjusts ±10 %, UP back to "quick",
+                      DOWN drops to "list" (if non-empty)
+  _focus == "list"    UP/DOWN walks cards, A opens target, B clears all,
+                      UP at top → "bright"
 
 Quick settings are wired directly into oreoWare modules — `bt.set_active`,
 `wifi.connect_from_config`/`wifi.disconnect`, `display.set_brightness`.
+The Settings pill closes the panel and launches the Settings app.
 The panel never blocks for I/O; toggles fire and the panel re-renders
 the new state next frame.
 """
@@ -39,12 +43,16 @@ _PILL_H   = 38
 _PILL_PAD = 12
 _PILL_Y   = 26
 
+_BRIGHT_Y    = _PILL_Y + _PILL_H + 8
+_BRIGHT_H    = 22
+_BRIGHT_PAD  = 12
+_BRIGHT_STEP = 10               # ± per LEFT/RIGHT tap on the slider
+_BRIGHT_MIN  = 10               # don't let users blank the screen accidentally
+_BRIGHT_MAX  = 100
+
 _CARD_H   = 34
 _CARD_GAP = 4
-_LIST_Y   = _PILL_Y + _PILL_H + 10
-
-# Brightness preset cycle — A on the Brightness pill steps through these.
-_BRIGHT_STEPS = (25, 50, 75, 100)
+_LIST_Y   = _BRIGHT_Y + _BRIGHT_H + 10
 
 
 def _draw_bell(d, x, y, color):
@@ -56,6 +64,34 @@ def _draw_bell(d, x, y, color):
     d.rect(x + 2, y + 4, 8, 1, color, fill=True)
     d.rect(x + 1, y + 5, 10, 1, color, fill=True)
     d.rect(x + 5, y + 7, 2, 2, color, fill=True)
+
+
+def _draw_gear(d, x, y, color):
+    """12×12 gear glyph for the Settings quick-action pill."""
+    # outer teeth — four nubs at N/S/E/W
+    d.rect(x + 5, y,      2, 2, color, fill=True)
+    d.rect(x + 5, y + 10, 2, 2, color, fill=True)
+    d.rect(x,     y + 5,  2, 2, color, fill=True)
+    d.rect(x + 10, y + 5, 2, 2, color, fill=True)
+    # body
+    d.rect(x + 3, y + 2, 6, 8, color, fill=True)
+    d.rect(x + 2, y + 3, 8, 6, color, fill=True)
+    # hub punch-out (background)
+    d.rect(x + 5, y + 5, 2, 2, theme.CARD, fill=True)
+
+
+def _draw_sun(d, x, y, color):
+    """12×12 sun glyph for the brightness slider label."""
+    d.rect(x + 5, y,      2, 2, color, fill=True)
+    d.rect(x + 5, y + 10, 2, 2, color, fill=True)
+    d.rect(x,     y + 5,  2, 2, color, fill=True)
+    d.rect(x + 10, y + 5, 2, 2, color, fill=True)
+    d.rect(x + 1, y + 1, 2, 2, color, fill=True)
+    d.rect(x + 9, y + 1, 2, 2, color, fill=True)
+    d.rect(x + 1, y + 9, 2, 2, color, fill=True)
+    d.rect(x + 9, y + 9, 2, 2, color, fill=True)
+    d.rect(x + 4, y + 3, 4, 6, color, fill=True)
+    d.rect(x + 3, y + 4, 6, 4, color, fill=True)
 
 
 def _draw_kind_glyph(d, x, y, kind, ink):
@@ -155,6 +191,8 @@ class NotifPanel:
         items = self._items()
         if self._focus == "quick":
             return self._handle_quick(btn, items)
+        if self._focus == "bright":
+            return self._handle_bright(btn, items)
         return self._handle_list(btn, items)
 
     def _handle_quick(self, btn, items):
@@ -163,25 +201,36 @@ class NotifPanel:
         elif btn == api.BTN_RIGHT:
             self._quick_sel = (self._quick_sel + 1) % 3
         elif btn == api.BTN_DOWN:
-            if items:
-                self._focus = "list"
-                self._list_sel = 0
+            self._focus = "bright"
         elif btn == api.BTN_A:
             if self._quick_sel == 0:
                 self._toggle_wifi()
             elif self._quick_sel == 1:
                 self._toggle_bt()
             else:
-                self._cycle_brightness()
+                self._open_settings()
         else:
-            return True   # swallow everything else while panel is open
+            return True
+        return True
+
+    def _handle_bright(self, btn, items):
+        if btn == api.BTN_LEFT:
+            self._adjust_brightness(-_BRIGHT_STEP)
+        elif btn == api.BTN_RIGHT:
+            self._adjust_brightness(+_BRIGHT_STEP)
+        elif btn == api.BTN_UP:
+            self._focus = "quick"
+        elif btn == api.BTN_DOWN:
+            if items:
+                self._focus = "list"
+                self._list_sel = 0
         return True
 
     def _handle_list(self, btn, items):
         n = len(items)
         if btn == api.BTN_UP:
             if self._list_sel == 0:
-                self._focus = "quick"
+                self._focus = "bright"
             else:
                 self._list_sel -= 1
         elif btn == api.BTN_DOWN:
@@ -226,16 +275,26 @@ class NotifPanel:
         except Exception:
             pass
 
-    def _cycle_brightness(self):
+    def _adjust_brightness(self, delta):
         cur = getattr(self._os, "_last_brightness", 100)
-        try:
-            i = _BRIGHT_STEPS.index(cur)
-            nxt = _BRIGHT_STEPS[(i + 1) % len(_BRIGHT_STEPS)]
-        except ValueError:
-            nxt = _BRIGHT_STEPS[0]
+        nxt = max(_BRIGHT_MIN, min(_BRIGHT_MAX, cur + delta))
+        if nxt == cur:
+            return
         try:
             self._os.display.set_brightness(nxt)
             self._os._last_brightness = nxt
+        except Exception:
+            pass
+
+    def _open_settings(self):
+        # Close the panel synchronously and hand control to Settings —
+        # one-tap shortcut so users can dive deeper without leaving the
+        # current app, scrolling for the Settings tile, then coming back.
+        self.open = False
+        self._t   = 0.0
+        self._dir = 0
+        try:
+            self._os.launch("settings")
         except Exception:
             pass
 
@@ -269,12 +328,13 @@ class NotifPanel:
         _draw_bell(d, title_x - 16, panel_y + 4, theme.BG)
 
         self._draw_quick_row(d, panel_y)
+        self._draw_brightness(d, panel_y)
         self._draw_list(d, panel_y, items, full_h)
         self._draw_hint(d, panel_y, full_h)
 
     def _draw_quick_row(self, d, panel_y):
-        # Three pills: WiFi / BT / Brightness.
-        labels = ("WiFi", "BT", "Bright")
+        # Three pills: WiFi / BT / Settings (shortcut, never "on").
+        labels = ("WiFi", "BT", "Settings")
         states = self._quick_states()
         for i in range(3):
             x = _PILL_PAD + i * (_PILL_W + _PILL_PAD)
@@ -284,24 +344,32 @@ class NotifPanel:
             fill = theme.PRIMARY if on else theme.CARD
             d.rect(x, y, _PILL_W, _PILL_H, fill, fill=True)
             if sel:
-                # Selection ring (one-pixel border in pink).
                 d.rect(x,         y,             _PILL_W, 1,        theme.SEL_BORDER, fill=True)
                 d.rect(x,         y + _PILL_H-1, _PILL_W, 1,        theme.SEL_BORDER, fill=True)
                 d.rect(x,         y,             1,       _PILL_H,  theme.SEL_BORDER, fill=True)
                 d.rect(x+_PILL_W-1, y,           1,       _PILL_H,  theme.SEL_BORDER, fill=True)
             txt_color = theme.BG if on else theme.TEXT_BRIGHT
             label = labels[i]
-            d.text(label, x + (_PILL_W - len(label) * 8) // 2,
-                   y + 6, txt_color, scale=1)
-            sub = states[i]["sub"]
-            d.text(sub, x + (_PILL_W - len(sub) * 8) // 2,
-                   y + 22, txt_color, scale=1)
+
+            if i == 2:
+                # Settings pill — gear glyph + "Settings" + "open ›" sub
+                _draw_gear(d, x + 8, y + 6, txt_color)
+                d.text(label, x + 22, y + 6, txt_color, scale=1)
+                sub = "open ›"
+                d.text(sub, x + (_PILL_W - len(sub) * 8) // 2,
+                       y + 22, txt_color, scale=1)
+            else:
+                d.text(label, x + (_PILL_W - len(label) * 8) // 2,
+                       y + 6, txt_color, scale=1)
+                sub = states[i]["sub"]
+                d.text(sub, x + (_PILL_W - len(sub) * 8) // 2,
+                       y + 22, txt_color, scale=1)
 
     def _quick_states(self):
         out = [
             {"on": False, "sub": "off"},
             {"on": False, "sub": "off"},
-            {"on": False, "sub": "100"},
+            {"on": False, "sub": ""},      # Settings shortcut — stateless
         ]
         try:
             from oreoWare import wifi
@@ -317,10 +385,48 @@ class NotifPanel:
             out[1]["sub"] = "on" if active else "off"
         except Exception:
             pass
-        bright = getattr(self._os, "_last_brightness", 100)
-        out[2]["on"]  = bright >= 50
-        out[2]["sub"] = "%d%%" % bright
         return out
+
+    def _draw_brightness(self, d, panel_y):
+        """Wide horizontal range slider showing current backlight level."""
+        x = _BRIGHT_PAD
+        y = panel_y + _BRIGHT_Y
+        w = SW - 2 * _BRIGHT_PAD
+        h = _BRIGHT_H
+
+        sel = (self._focus == "bright")
+        d.rect(x, y, w, h, theme.CARD, fill=True)
+        if sel:
+            d.rect(x,         y,         w, 1, theme.SEL_BORDER, fill=True)
+            d.rect(x,         y + h - 1, w, 1, theme.SEL_BORDER, fill=True)
+            d.rect(x,         y,         1, h, theme.SEL_BORDER, fill=True)
+            d.rect(x + w - 1, y,         1, h, theme.SEL_BORDER, fill=True)
+
+        _draw_sun(d, x + 6, y + (h - 12) // 2, theme.PRIMARY)
+
+        bright = getattr(self._os, "_last_brightness", 100)
+        bright = max(_BRIGHT_MIN, min(_BRIGHT_MAX, int(bright)))
+
+        # Slider track + fill — track is the full inner width, fill
+        # proportional to the brightness value. Track sits centre-vertical
+        # of the pill so the sun + value sit beside it.
+        track_x = x + 24
+        track_w = w - 24 - 44
+        track_y = y + (h - 4) // 2
+        d.rect(track_x, track_y, track_w, 4, theme.MUTED2, fill=True)
+
+        fill_w = max(2, (track_w * bright) // _BRIGHT_MAX)
+        d.rect(track_x, track_y, fill_w, 4, theme.PRIMARY, fill=True)
+
+        # Handle dot — small square at the fill end so it's obvious which
+        # direction LEFT/RIGHT moves the value.
+        handle_x = track_x + fill_w - 3
+        d.rect(handle_x, track_y - 3, 6, 10, theme.PRIMARY, fill=True)
+
+        # Value tag on the right edge.
+        val = "%d%%" % bright
+        d.text(val, x + w - len(val) * 8 - 8,
+               y + (h - 8) // 2, theme.TEXT_BRIGHT, scale=1)
 
     def _draw_list(self, d, panel_y, items, full_h):
         list_top = panel_y + _LIST_Y
@@ -360,6 +466,8 @@ class NotifPanel:
     def _draw_hint(self, d, panel_y, full_h):
         if self._focus == "quick":
             hint = "L/R=switch  A=toggle  C=close"
+        elif self._focus == "bright":
+            hint = "L/R=adjust  UP=back  C=close"
         else:
             hint = "A=open  B=clear  C=close"
         d.text(hint, (SW - len(hint) * 8) // 2,

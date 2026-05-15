@@ -41,6 +41,44 @@ _HEADING_H = {1: 24, 2: 20, 3: 16}
 _HEADING_SCALE = {1: 2, 2: 2, 3: 1}
 
 
+# ── "how to add" splash content ─────────────────────────────────────────
+# Mirrors the gallery's ADD-tile pattern: a scrollable card describing
+# both the on-device (BT) and developer (flash) flows for getting .md /
+# .txt files onto the badge. Edits here propagate to the in-app help.
+_HELP = [
+    ("h",    "Send over Bluetooth"),
+    ("b",    "From a paired laptop:"),
+    ("code", "python tools/bt_send.py"),
+    ("code", "         notes.md"),
+    ("b",    ".md files arrive as markdown,"),
+    ("b",    ".txt files as plain text. Both"),
+    ("b",    "land in documents/ on the badge"),
+    ("b",    "and show up here automatically."),
+    ("b",    "The picker polls at 5 Hz, so the"),
+    ("b",    "new file appears without restart."),
+
+    ("h",    "Flash from source"),
+    ("b",    "Drop a .md or .txt into"),
+    ("code", "apps/reader/assets/"),
+    ("b",    "from the repo root, then run:"),
+    ("code", "python tools/deploy.py"),
+    ("b",    "Bundled files appear with a"),
+    ("b",    "leading '*' so you can tell them"),
+    ("b",    "apart from BT-arrived inbox items."),
+
+    ("h",    "Markdown support"),
+    ("b",    "Headings: # / ## / ###"),
+    ("b",    "Inline: **bold** *italic* `code`"),
+    ("b",    "Bullets: - or *  (two-space indent)"),
+    ("b",    "Numbered: 1. 2. 3."),
+    ("b",    "Fenced blocks: ``` ... ```"),
+    ("b",    "Horizontal rule: ---"),
+    ("b",    "No nested constructs / no links —"),
+    ("b",    "small enough to ship to flash."),
+]
+_HELP_ROW_LABEL = "+ How to add"
+
+
 # ── picker ──────────────────────────────────────────────────────────────
 
 def _list_docs():
@@ -350,6 +388,10 @@ class App(oreoOS.App):
         self._blocks  = []
         self._scroll  = 0          # in pixels
         self._total_h = 0
+        # help-mode scroll (row index into _HELP, NOT pixels — matches
+        # gallery's add-tile scroll model so the rendering math stays
+        # straightforward).
+        self._help_scroll = 0
         # 5 Hz auto-refresh of the picker — picks up files that land in
         # documents/ while the user is sitting on the list (e.g. a BT
         # transfer completing). Off entirely in view mode.
@@ -380,27 +422,55 @@ class App(oreoOS.App):
     def on_button_press(self, btn):
         if self._mode == "picker":
             return self._on_btn_picker(btn)
+        if self._mode == "help":
+            return self._on_btn_help(btn)
         return self._on_btn_view(btn)
 
     # ── picker input ────────────────────────────────────────────────────
     def _on_btn_picker(self, btn):
+        # The picker always shows a trailing "+ How to add" row, so the
+        # total selectable count is len(files) + 1. Selecting the help
+        # row + A opens the splash; selecting a real row + A opens the
+        # document. UP/DOWN wraps over the whole list including help.
         n = len(self._files)
+        total = n + 1
         if btn == api.BTN_HOME:
             self._os.quit()
             return
         if btn == api.BTN_A:
-            if n:
+            if self._sel == n:
+                self._open_help()
+            else:
                 self._open(self._files[self._sel])
             return
-        if not n:
-            return
         if btn == api.BTN_UP:
-            self._sel = (self._sel - 1) % n
+            self._sel = (self._sel - 1) % total
         elif btn == api.BTN_DOWN:
-            self._sel = (self._sel + 1) % n
+            self._sel = (self._sel + 1) % total
         else:
             return
         self._dirty = True
+
+    # ── help input ──────────────────────────────────────────────────────
+    def _on_btn_help(self, btn):
+        if btn == api.BTN_B or btn == api.BTN_HOME:
+            self._mode  = "picker"
+            self._files = _list_docs()
+            self._dirty = True
+            return
+        if btn == api.BTN_UP:
+            self._help_scroll = max(0, self._help_scroll - 1)
+        elif btn == api.BTN_DOWN:
+            self._help_scroll = min(max(0, len(_HELP) - 1),
+                                    self._help_scroll + 1)
+        else:
+            return
+        self._dirty = True
+
+    def _open_help(self):
+        self._mode        = "help"
+        self._help_scroll = 0
+        self._dirty       = True
 
     # ── view input ──────────────────────────────────────────────────────
     def _on_btn_view(self, btn):

@@ -224,9 +224,21 @@ def run_app(os_obj, app):
                         if not panel.is_active():
                             app.on_button_release(b)
 
+            # Tick the panel BEFORE the app draws so we can detect the
+            # exact frame the close animation finishes and force the app
+            # to redraw the area the panel just vacated. Without this the
+            # last frame of the panel lingers as visible artifacts because
+            # the app's _dirty flag is False and panel.draw bails on _t==0.
+            panel_was_active = panel.is_active()
+            panel.tick(dt)
+            if panel_was_active and not panel.is_active():
+                try:
+                    app._dirty = True
+                except Exception:
+                    pass
+
             app.update(dt)
             app.draw(os_obj.display)
-            panel.tick(dt)
             panel.draw(os_obj.display)
             os_obj.display.present()
 
