@@ -375,7 +375,7 @@ jobs:
           $CHANGES
 
           ## 🧪 How to verify
-          - Pull the branch and run \\\`npm run build\\\` / biome check.
+          - Pull the branch and \\\`python -m py_compile\\\` any edited modules; deploy with \\\`python tools/deploy.py\\\` to a connected badge.
           - Review the diff against the issue's expected behavior.
 
           ---
