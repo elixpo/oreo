@@ -59,7 +59,8 @@ Current assignments:
 | ADC_VBAT (100 k/100 k divider) | 1 | ADC1_CH0 |
 | I²C SDA / SCL | 42 / 47 | 100 kHz default; shared bus |
 | IMU_INT (MPU-6050 → wake) | 3 | RTC GPIO |
-| TOUCH_OUT (TTP223) | 21 | RTC GPIO, active-high — _reserved for v2_ |
+| TOUCH_OUT_1 (TTP223 #1) | 21 | RTC GPIO, active-high — primary pad, wake-capable; _reserved for v2_ |
+| TOUCH_OUT_2 (TTP223 #2) | 33 | non-RTC, active-high — secondary pad, edge-poll only; _reserved for v2_ |
 
 Display SPI runs at **40 MHz**, the practical ceiling for GPIO-matrix-
 routed pins on the ESP32-S3 — going higher loses bits at the matrix.
