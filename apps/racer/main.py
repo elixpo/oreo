@@ -38,7 +38,7 @@ from oreoOS import api
 SW = api.SCREEN_W       # 320
 SH = api.SCREEN_H       # 240
 
-INTRO, PLAY, OVER = 1, 2, 3
+INTRO, PLAY, OVER, PAUSE = 1, 2, 3, 4
 
 # ── game tuning ──────────────────────────────────────────────────────────────
 ROAD_W       = 200                      # rendered road width
@@ -155,13 +155,31 @@ class App(oreoOS.App):
         self._spr_tree    = _try_sprite("racer_tree")
         self._spr_road    = _try_sprite("racer_road")
 
-        self._imu = None
-        try:
-            from oreoWare import imu
-            self._imu = imu.MPU6050()
-            self._imu.calibrate(samples=80)
-        except Exception:
-            self._imu = None
+        # IMU detection is delegated to oreoWare.imu.detect() so we get
+        # 0x68/0x69 address fallback + a 3× retry loop "for free". The
+        # working instance is cached on the OS so a transient I2C glitch
+        # at one launch doesn't permanently disable tilt mode — the next
+        # racer launch re-detects fresh. We still calibrate per-launch
+        # because the user might be holding the badge differently.
+        self._imu = getattr(os, "_imu", None)
+        if self._imu is None:
+            try:
+                from oreoWare import imu as _imu_mod
+                self._imu = _imu_mod.detect()
+            except Exception:
+                self._imu = None
+            if self._imu is not None:
+                try:
+                    os._imu = self._imu
+                except Exception:
+                    pass
+        if self._imu is not None:
+            try:
+                self._imu.calibrate(samples=80)
+            except Exception:
+                # A failed calibrate doesn't disable IMU mode — we just
+                # play with zero biases. Better degraded than disabled.
+                pass
 
         # Control mode: "IMU" (tilt) or "BTN" (D-pad). Persisted across
         # boots via the OS settings dict; falls back to BTN when no IMU
@@ -203,13 +221,28 @@ class App(oreoOS.App):
                 self._reset_run()
             elif self._state == OVER:
                 self._state = INTRO
+            elif self._state == PAUSE:
+                # A on the pause overlay = resume. Matches "A advances
+                # the game" from INTRO so the muscle memory is one
+                # button across all paused-ish states.
+                self._state = PLAY
             self._dirty = True
-        elif btn == api.BTN_B and self._state in (INTRO, OVER):
-            # Toggle control mode from the menus. Don't allow mid-race so the
-            # user can't switch sources of input while a car is in motion.
-            self._mode = "BTN" if self._mode == "IMU" else "IMU"
-            self._save_mode()
-            self._dirty = True
+        elif btn == api.BTN_B:
+            if self._state == PLAY:
+                # Pause overlay — freezes the world, draws a card, lets
+                # the user step away without a forced crash on return.
+                self._state = PAUSE
+                self._dirty = True
+            elif self._state == PAUSE:
+                self._state = PLAY
+                self._dirty = True
+            elif self._state in (INTRO, OVER):
+                # Toggle control mode from the menus. Don't allow
+                # mid-race or mid-pause so the user can't switch sources
+                # of input while a car is in motion (or about to be).
+                self._mode = "BTN" if self._mode == "IMU" else "IMU"
+                self._save_mode()
+                self._dirty = True
 
     def _read_inputs(self, dt):
         """Return (steer, throttle) each in -1..+1, per the active mode.
@@ -382,6 +415,8 @@ class App(oreoOS.App):
             self._dim_world(d)
             if self._state == INTRO:
                 self._draw_intro(d)
+            elif self._state == PAUSE:
+                self._draw_pause(d)
             else:
                 self._draw_over(d)
 
@@ -496,6 +531,17 @@ class App(oreoOS.App):
             self._center_text(d, "Press A to start", 132, C_TEXT, scale=2)
         self._center_text(d, self._mode_hint(), 180, C_DIM, scale=1)
         self._center_text(d, "HOME = back",     200, C_DIM, scale=1)
+
+    def _draw_pause(self, d):
+        # Centered "PAUSED" card on the dimmed world. We keep the score
+        # visible so the user knows what they're returning to, and blink
+        # the "A to resume" line so it stays obvious which button comes
+        # next (matches the A-to-advance rhythm of INTRO/OVER).
+        self._center_text(d, "PAUSED",            44, C_TITLE, scale=3)
+        self._center_text(d, "Score %d" % self._score, 84,  C_TEXT, scale=2)
+        if int(self._blink * 2) % 2 == 0:
+            self._center_text(d, "A or B to resume", 124, C_TEXT, scale=2)
+        self._center_text(d, "HOME = quit", 168, C_DIM, scale=1)
 
     def _draw_over(self, d):
         self._center_text(d, "GAME OVER", 36, C_TITLE, scale=3)

@@ -51,6 +51,59 @@ _GYRO_LSB_PER_DPS = 131.0     # at ±250 °/s
 _BURST_FMT = ">hhhhhhh"
 
 
+# Both addresses the MPU6050 module can answer on. AD0 → GND = 0x68
+# (datasheet default + most GY-521 breakouts), AD0 → 3V3 = 0x69. Some
+# boards leave AD0 floating, which is why detection has to try both.
+_ALT_ADDR = 0x69
+
+
+def detect(i2c=None, retries=3):
+    """Probe the I2C bus for an MPU6050 and return a configured driver.
+
+    Tries the default 0x68 first, then 0x69, up to `retries` rounds.
+    Returns the live MPU6050 instance, or None if neither address ACKs
+    cleanly across the retries.
+
+    Used by the racer game so a momentary I2C glitch at boot doesn't
+    permanently disable IMU mode — the next call (e.g. next game launch)
+    re-detects from scratch. Keeps callers out of the address-fallback
+    + retry pattern that every app would otherwise reinvent.
+    """
+    if I2C is None:
+        return None
+    if i2c is None:
+        try:
+            i2c = I2C(0, scl=Pin(pins.I2C_SCL), sda=Pin(pins.I2C_SDA),
+                      freq=100_000)
+        except Exception:
+            return None
+
+    # Quick pre-scan — only attempt addresses the bus actually saw, so
+    # we don't waste retries on a chip that isn't even on the bus.
+    try:
+        present = set(i2c.scan())
+    except Exception:
+        present = None
+
+    for addr in (_ADDR, _ALT_ADDR):
+        if present is not None and addr not in present:
+            continue
+        for _ in range(retries):
+            try:
+                return MPU6050(i2c=i2c, addr=addr)
+            except Exception:
+                # Bus might recover on the next try (e.g. clock stretch
+                # timing out during a fresh power-on); brief settle then
+                # retry. import locally so the module stays cheap at
+                # import-time on the build host.
+                try:
+                    import time
+                    time.sleep_ms(5)
+                except Exception:
+                    pass
+    return None
+
+
 def i2c_scan(freq=100_000):
     """Probe the bus and return the list of addresses that ACKed.
 

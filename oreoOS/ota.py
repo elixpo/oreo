@@ -92,11 +92,21 @@ CHUNK_BYTES    = 4096
 SMALL_PATCH_BYTES = 80 * 1024     # 80 KB
 
 # Timeouts (seconds). Every HTTP call uses one of these — no unbounded
-# blocking is allowed because the OS run loop polls OTA from the Settings
-# app's button handler. A hung GET would freeze the whole UI.
-T_GH_API       = 10        # GitHub releases API listing
-T_MANIFEST     = 10        # manifest.json download (tiny)
-T_FILE         = 25        # individual file download
+# blocking is allowed because the OS run loop polls OTA from the
+# background_check tail of every frame. A hung GET freezes the whole UI
+# (input events queue up but no transitions happen) so the API probe is
+# kept short. Tuned down from 10s -> 4s after on-device reports of
+# "press A, OS stuck" — every frame was potentially eating a 10 s GET
+# while GitHub's edge throttled the badge's IP.
+T_GH_API       = 4         # GitHub releases API listing
+T_MANIFEST     = 4         # manifest.json download (tiny)
+T_FILE         = 25        # individual file download (user-triggered)
+
+# Don't auto-probe in the first minute of boot — gives the UI time to
+# settle, lets the user open the home screen / press a button without
+# eating a synchronous HTTP round-trip. Manual "Check Update" from
+# Settings is unaffected: it calls check() directly.
+_OTA_BOOT_GRACE_S = 60
 
 
 # ── helpers ─────────────────────────────────────────────────────────────────
@@ -463,20 +473,32 @@ def background_check(os_obj, min_interval_s=6 * 3600):
     """Cheap periodic version probe — runs in the OS run-loop tail.
 
     Behaviour:
+      * Disabled by default (see DISABLE flag below). The MicroPython
+        urequests build on this firmware does NOT honour `timeout=` for
+        the response body read — only the connect. When GitHub's edge
+        keeps the socket open but never returns data, r.json() hangs
+        FOREVER, freezing the OS run loop. Until we replace urequests
+        with a raw-socket implementation that wraps settimeout() around
+        every recv(), background probing is opt-in only via the
+        `ota_bg_check` setting.
+      * The manual "Check Update" row in Settings calls check() directly
+        and remains available regardless of this flag.
       * Skips if WiFi isn't up.
+      * Skips inside the boot grace window (_OTA_BOOT_GRACE_S).
       * Skips if a check ran in the last `min_interval_s` (6 h default).
-      * Calls check() (single GitHub-API hit, hard-bounded by T_GH_API).
-      * On result, stashes flags on the OS settings dict:
-            ota_status            -> "needs-confirm" / "up-to-date" / "error"
-            ota_pending_version   -> "vX.Y.Z" of the new release
-            ota_pending_major     -> bool
-            ota_pending_warn_seen -> reset to False so the popup fires once
-      * Does NOT download anything. The user (or the Check Update action)
-        decides whether to fetch.
+      * On result, stashes flags on the OS settings dict.
 
     Returns True iff a new release was discovered this call.
     """
     if _http is None:
+        return False
+
+    # Hard-off until we have a non-hangable HTTP client. The Settings
+    # row can flip this true once the user opts in to background checks.
+    try:
+        if not os_obj.settings_get("ota_bg_check", False):
+            return False
+    except Exception:
         return False
     last = 0
     try:
@@ -487,6 +509,19 @@ def background_check(os_obj, min_interval_s=6 * 3600):
         now = int(time.time())
     except Exception:
         return False
+
+    # Boot-grace: never probe in the first _OTA_BOOT_GRACE_S of uptime,
+    # even if the persisted timestamp is missing or zero. Without this,
+    # the very first frame after boot fires a synchronous HTTP GET and
+    # the user sees "press A, stuck for 4 s" because the exiting frame
+    # has to finish background_check before the next app loads.
+    try:
+        boot_ts = getattr(os_obj, "_boot_ts_s", None)
+        if boot_ts is not None and (now - boot_ts) < _OTA_BOOT_GRACE_S:
+            return False
+    except Exception:
+        pass
+
     if now - last < min_interval_s:
         return False
 
