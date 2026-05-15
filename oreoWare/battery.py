@@ -1,17 +1,10 @@
-"""Battery monitor — read VBAT via the 100k/100k divider on ADC_VBAT.
+"""Battery monitor — VBAT via the 100k/100k divider on ADC_VBAT.
 
-The divider halves the cell voltage; ESP32-S3 ADC1 with 11 dB attenuation
-reads up to ~3.1 V. A full 4.2 V Li-Po reads as ~2.10 V at the pin, an
-empty 3.30 V cell reads ~1.65 V. We linearise to a percentage via a small
-piecewise table (loosely modelling the Li-Po discharge curve).
+A full 4.2 V Li-Po reads ~2.10 V at the pin (divider halves cell V);
+empty 3.30 V reads ~1.65 V. Mapped to a percentage via a small
+piecewise table modelling the Li-Po discharge curve.
 
-When the ADC isn't available (e.g. CPython on the build host), `read_percent()`
-returns a fixed 85 so callers always get a usable value.
-
-Usage:
-    from oreoWare import battery
-    pct  = battery.read_percent()   # 0–100, clamped
-    volt = battery.read_voltage()   # cell V (float)
+If the ADC is unavailable, `read_percent()` returns a fixed 85.
 """
 
 from oreoWare import pins

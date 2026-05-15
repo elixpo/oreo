@@ -22,7 +22,7 @@ no game is using it.
 
 try:
     from machine import I2C, Pin
-except ImportError:  # build-host fallback so apps import cleanly off-device
+except ImportError:
     I2C = None
     Pin = None
 
@@ -92,10 +92,8 @@ def detect(i2c=None, retries=3):
             try:
                 return MPU6050(i2c=i2c, addr=addr)
             except Exception:
-                # Bus might recover on the next try (e.g. clock stretch
-                # timing out during a fresh power-on); brief settle then
-                # retry. import locally so the module stays cheap at
-                # import-time on the build host.
+                # Brief settle before retry — bus can recover from a
+                # clock-stretch timeout on a fresh power-on.
                 try:
                     import time
                     time.sleep_ms(5)
@@ -112,7 +110,7 @@ def i2c_scan(freq=100_000):
     Returns [] when nothing answered (check wiring + power + pull-ups).
     """
     if I2C is None:
-        raise RuntimeError("machine.I2C not available (off-device)")
+        raise RuntimeError("machine.I2C not available")
     bus = I2C(0, scl=Pin(pins.I2C_SCL), sda=Pin(pins.I2C_SDA), freq=freq)
     return bus.scan()
 
@@ -121,7 +119,7 @@ class MPU6050:
     def __init__(self, i2c=None, addr=_ADDR):
         if i2c is None:
             if I2C is None:
-                raise RuntimeError("machine.I2C not available (off-device)")
+                raise RuntimeError("machine.I2C not available")
             # 100 kHz default — slow mode, forgiving of breadboard parasitic
             # capacitance and long jumper wires. Bump to 400 kHz only once
             # you've confirmed the bus is stable.

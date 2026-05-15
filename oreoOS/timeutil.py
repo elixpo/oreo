@@ -1,4 +1,4 @@
-"""Cross-platform time helper (CPython + MicroPython)."""
+"""Time + NTP helpers shared by the home clock, Settings, and notif panel."""
 
 _DAYS  = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 _MONTHS = ("", "Jan", "Feb", "Mar", "Apr", "May", "Jun",

@@ -1,13 +1,11 @@
 """Icon loading for app launcher tiles.
 
 Priority:
-  1. assets/icons/raw/{icon_filename}   — PNG via PIL (sim only)
-  2. assets/icons/optimized/{stem}.py   — pre-baked RGB565 module (hw + sim)
+  1. assets/icons/raw/{icon_filename}   — PNG decoded via PIL
+  2. assets/icons/optimized/{stem}.py   — pre-baked RGB565 module
   3. None                               — caller draws letter fallback
 
-Generate .py modules with:
-  python tools/generate_assets.py [name]
-  python tools/optimize_assets.py [name]
+Generate .py modules with `python tools/optimize_assets.py [name]`.
 """
 
 import struct

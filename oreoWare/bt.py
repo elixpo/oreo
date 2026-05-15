@@ -759,13 +759,11 @@ def _finish(st):
 
 def _post_notification(kind_label, size_bytes, target,
                        title=None, body=None, kind="file"):
-    """Best-effort push into the OS notification ring. oreoWare doesn't
-    depend on oreoOS, so this is wrapped in try/except so the BT module
-    stays importable on hosts where oreoOS isn't available.
+    """Push a transfer event into the OS notification ring.
 
-    Successful-transfer callers pass the bytes count and rely on the
-    default file kind. Rejection callers supply an explicit title / body
-    / kind="reject" so the panel can colour the entry distinctly.
+    Successful transfers default to kind="file" with a "N bytes via BT"
+    body. Rejections (bad type, oversize) pass an explicit title +
+    body + kind="reject" so the panel can colour the entry distinctly.
     """
     try:
         from oreoOS import notifications
