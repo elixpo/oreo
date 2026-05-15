@@ -107,3 +107,113 @@ def rssi():
         return _get_wlan().status("rssi")
     except Exception:
         return None
+
+
+def ssid():
+    """Currently-associated SSID, or None if not connected."""
+    try:
+        wlan = _get_wlan()
+        if wlan.isconnected():
+            return wlan.config("essid")
+    except Exception:
+        pass
+    return None
+
+
+def info():
+    """One-shot snapshot for the WiFi detail screen.
+
+    Returns a dict with `connected`, `ssid`, `ip`, `subnet`, `gateway`,
+    `dns`, and `rssi`. Missing fields are None — the UI fills with '—'.
+    """
+    out = {"connected": False, "ssid": None,    "ip": None,
+           "subnet":   None,  "gateway": None, "dns": None,
+           "rssi":     None}
+    try:
+        wlan = _get_wlan()
+        out["connected"] = bool(wlan.isconnected())
+        if out["connected"]:
+            cfg = wlan.ifconfig()    # (ip, subnet, gateway, dns)
+            out["ip"]      = cfg[0]
+            out["subnet"]  = cfg[1]
+            out["gateway"] = cfg[2]
+            out["dns"]     = cfg[3]
+            try:
+                out["ssid"] = wlan.config("essid")
+            except Exception:
+                pass
+            try:
+                out["rssi"] = wlan.status("rssi")
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return out
+
+
+# ── power-mode preset cycling ────────────────────────────────────────────
+# A single dial that covers TX dBm + power-save mode together so the user
+# doesn't reason about both. Persisted on the OS settings dict so the
+# choice survives a reboot.
+
+POWER_MODES = ("off", "eco", "balanced", "max")
+
+_MODE_TX_DBM = {"eco": 5, "balanced": 11, "max": 19}
+
+
+def set_power_mode(mode):
+    """Apply a coherent (tx_dbm, pm) preset to the live radio.
+
+    'off'      → radio down
+    'eco'      → 5 dBm, PM_POWERSAVE
+    'balanced' → 11 dBm, PM_POWERSAVE (matches existing default)
+    'max'      → 19 dBm, PM_NONE
+    """
+    if mode not in POWER_MODES:
+        return False
+    wlan = _get_wlan()
+    if mode == "off":
+        try:
+            wlan.disconnect()
+        except Exception:
+            pass
+        try:
+            wlan.active(False)
+        except Exception:
+            pass
+        return True
+
+    try:
+        wlan.active(True)
+    except Exception:
+        return False
+    try:
+        wlan.config(txpower=_MODE_TX_DBM[mode])
+    except Exception:
+        pass
+    try:
+        wlan.config(pm=(wlan.PM_NONE if mode == "max" else wlan.PM_POWERSAVE))
+    except Exception:
+        pass
+    return True
+
+
+def get_power_mode():
+    """Best-effort introspection — returns the current preset name based
+    on the active TX-power level and PM mode. Falls back to 'balanced'
+    when MicroPython doesn't expose enough config to be sure."""
+    try:
+        wlan = _get_wlan()
+        if not wlan.active():
+            return "off"
+        try:
+            tx = int(wlan.config("txpower"))
+        except Exception:
+            return "balanced"
+        if tx <= 6:
+            return "eco"
+        if tx >= 17:
+            return "max"
+        return "balanced"
+    except Exception:
+        return "balanced"

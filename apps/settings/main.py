@@ -78,11 +78,9 @@ class App(oreoOS.App):
             self._pm = None
 
         self._rows = [
-            _Row("WiFi",        "toggle",
-                 getter=lambda: self._wifi and self._wifi.is_connected(),
-                 setter=lambda v: self._toggle_wifi(v)),
-            _Row("WiFi IP",     "info",
-                 getter=lambda: (self._wifi.ip() if self._wifi else None) or "—"),
+            _Row("WiFi",        "action",
+                 getter=lambda: self._wifi_summary(),
+                 setter=lambda v: self._open_wifi()),
             _Row("Bluetooth",   "toggle",
                  getter=lambda: self._bt and self._bt.is_active(),
                  setter=lambda v: self._bt and self._bt.set_active(v)),
@@ -298,6 +296,23 @@ class App(oreoOS.App):
         except Exception:
             pass
 
+    def _open_wifi(self):
+        try:
+            self._os.launch("wifi")
+        except Exception:
+            pass
+
+    def _wifi_summary(self):
+        if not self._wifi:
+            return "—"
+        try:
+            if self._wifi.is_connected():
+                ip = self._wifi.ip() or ""
+                return ip or "on"
+            return "off"
+        except Exception:
+            return "—"
+
     # ── input ────────────────────────────────────────────────────────────
     def on_button_press(self, btn):
         n = len(self._rows)
@@ -385,4 +400,18 @@ class App(oreoOS.App):
             s = str(row.getter() or "—")[:14]
             d.text(s, right_x - len(s) * 8, y + 7, theme.MUTED)
         elif row.kind == "action":
-            d.text(">", right_x - 8, y + 6, theme.PRIMARY, scale=2)
+            # Phone-style: action rows can carry a preview string via
+            # their getter ("WiFi  HomeNet >"). Empty / missing falls
+            # back to bare chevron.
+            chev_w = 16
+            preview = ""
+            if row.getter is not None:
+                try:
+                    preview = str(row.getter() or "")[:14]
+                except Exception:
+                    preview = ""
+            if preview:
+                d.text(preview,
+                       right_x - chev_w - len(preview) * 8,
+                       y + 7, theme.MUTED, scale=1)
+            d.text(">", right_x - chev_w + 4, y + 6, theme.PRIMARY, scale=2)
