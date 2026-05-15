@@ -103,7 +103,14 @@ def _wrap_help(text, max_chars):
 
 
 class App(oreoOS.App):
-    name = "Gallery"
+    name         = "Gallery"
+    author       = "Circuit-Overtime"
+    # _list_photos() + first-photo decode walks assets/optimized/ and
+    # imports each baked RGB565 module. Cold-launch on a populated
+    # gallery is in the 400-800 ms range — without the splash, the user
+    # stares at the previous app's frame until the first photo lands.
+    # Matches the pattern already used by Storage / Reader / Settings.
+    SHOW_LOADING = True
 
     def on_enter(self, os):
         self._os    = os
