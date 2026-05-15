@@ -26,9 +26,7 @@ BOND_FILE  = "bonds.json"
 BOND_CAP   = 3
 
 
-# Cached copy of the on-flash store. Loaded lazily on first access so
-# the module is importable on the build host (no /bonds.json) without
-# blowing up.
+# Cached copy of the on-flash store. Loaded lazily on first access.
 _state = None
 
 

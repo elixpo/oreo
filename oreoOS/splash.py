@@ -49,9 +49,9 @@ def _get_mascot():
     transparent variant so the splash bg shows through around the mascot.
 
     Resolution order:
-      1. assets/sprites/optimized/mascot_transparent.py   (chroma-key, *preferred*)
+      1. assets/sprites/optimized/mascot_transparent.py   (chroma-key, preferred)
       2. assets/sprites/optimized/mascot.py               (cream-bg fallback)
-      3. PIL bake at runtime (build-host only; never on device)
+      3. PIL bake at runtime                              (asset rebuild path)
     """
     global _mascot
     if _mascot is not None:
