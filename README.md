@@ -200,10 +200,11 @@ power capping on top.
   applies `wlan.config(txpower=…)` and `pm=PM_POWERSAVE` from
   `oreoOS/config.py` so a sealed badge doesn't melt its LDO.
 - **Bluetooth** — [`bluetooth`](https://docs.micropython.org/en/latest/library/bluetooth.html).
-  BLE advertising is gated by `BT_ADV_INTERVAL_MS` (proxy for TX power).
-  File-transfer over BT is **work-in-progress** — the GATT service is
-  advertised but chunked-payload reassembly still has a known bug we'll
-  fix in a follow-up release.
+  The badge advertises as **Oreo** and exposes a tiny GATT "transfer"
+  service so a paired device can push **one image (max 250 KB)** or
+  **one text document (deflate-compressed)** at a time. Images land in
+  `apps/gallery/assets/raw/`, text in `documents/`. BLE adv interval is
+  capped by `BT_ADV_INTERVAL_MS` to keep average current draw down.
 
 ```python
 # WiFi via the OreoOS wrapper — auto-applies power caps from config
@@ -225,6 +226,21 @@ ble = bluetooth.BLE()
 ble.active(True)
 ble.gap_advertise(500_000, b"\x02\x01\x06\x05\x09Oreo")
 ```
+
+**Pushing files to the badge.** Connect to "Oreo", then write to the
+RX characteristic in chunks. Frame format:
+
+```
++------+-------------------+-----------+-------------+
+| type | length (4B BE)    | payload   | crc32 (4B)  |
++------+-------------------+-----------+-------------+
+  'I'  =  image, raw bytes, length ≤ 250 KB
+  'T'  =  text,  deflate-compressed UTF-8
+```
+
+The TX characteristic notifies a single-byte status (`0x02` = done,
+`0xE1` = too large, `0xE2` = bad CRC, …). See [`oreoWare/bt.py`](oreoWare/bt.py)
+for the full UUID + status table.
 
 ### Built-in modules
 
