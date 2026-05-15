@@ -26,8 +26,7 @@ AUTOCON_GAP  = 8          # extra breathing room above the Auto-connect row
                           # so it reads as a separate group from the live
                           # link-info rows above it
 
-# Power-mode helpers — bound at on_enter so the build host (no wifi
-# module) doesn't crash module import.
+# Power-mode helpers — bound at on_enter when oreoWare.wifi is in hand.
 
 POWER_LABELS = {
     "off":      "Off",

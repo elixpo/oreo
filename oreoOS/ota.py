@@ -59,7 +59,7 @@ try:
     import urequests as _http
 except ImportError:
     try:
-        import requests as _http   # CPython fallback for tests
+        import requests as _http
     except ImportError:
         _http = None
 

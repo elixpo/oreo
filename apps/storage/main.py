@@ -100,7 +100,7 @@ class App(oreoOS.App):
 
         stats  = self._snap["stats"]
         bks    = self._snap["buckets"]
-        total  = stats["total"] or 1     # avoid /0 on the build-host fallback
+        total  = stats["total"] or 1     # avoid /0 when statvfs returns zero
         used   = stats["used"]
         free   = stats["free"]
 

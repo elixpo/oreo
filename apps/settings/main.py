@@ -68,8 +68,7 @@ class App(oreoOS.App):
         self._brightness = 100   # logical brightness (0..100), backlight is pure HIGH for now
 
         # Power-manager settings live in the SETTINGS dict in oreoOS.power.
-        # Default to "on, 120 s" if the module isn't importable for any reason
-        # (e.g. running on the build host without the power.py file).
+        # Default to "on, 120 s" if the module isn't importable for any reason.
         try:
             from oreoOS import power as _pm
             self._pm = _pm

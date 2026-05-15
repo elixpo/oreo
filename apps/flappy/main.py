@@ -159,12 +159,9 @@ def _upscale_to_bytearray(data, w, h, scale_x, scale_y):
 
 
 # ── _bluedim kernel ──────────────────────────────────────────────────────────
-# On MicroPython the kernel is compiled with @micropython.viper for near-C
-# speed (76,800 pixels in ~30-50 ms vs ~700 ms in pure Python). On CPython we
-# fall back to a regular function — perf doesn't matter on the build host.
-#
-# The viper source lives in a string so CPython never has to parse the `ptr8`
-# annotation (which only exists inside Viper's namespace).
+# Compiled with @micropython.viper for near-C speed (76,800 pixels in
+# ~30-50 ms vs ~700 ms in pure Python). The viper source lives in a
+# string so `ptr8` doesn't have to resolve outside Viper's namespace.
 
 _BLUEDIM_VIPER_SRC = """
 @micropython.viper
@@ -186,7 +183,7 @@ def _bluedim_kernel(src: ptr8, dst: ptr8, n: int):
 """
 
 def _bluedim_kernel(src, dst, n):
-    """Pure-Python fallback for the build host. Replaced by Viper on hardware."""
+    """Pure-Python fallback — replaced by the viper-compiled version above."""
     for i in range(n):
         off = i << 1
         v = (src[off] << 8) | src[off + 1]
