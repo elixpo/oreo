@@ -79,6 +79,37 @@ _HELP = [
 _HELP_ROW_LABEL = "+ How to add"
 
 
+def _wrap_help(text, max_chars):
+    """Greedy word-wrap for the help splash.
+
+    Splits `text` into a list of lines, each no longer than `max_chars`
+    characters. Breaks on whitespace; if a single word is longer than
+    `max_chars`, hard-truncates that word across multiple lines (rare —
+    only happens on URLs etc., and our _HELP corpus avoids them).
+    """
+    if max_chars <= 0:
+        return [text]
+    out  = []
+    rest = text.split()
+    cur  = ""
+    while rest:
+        w    = rest[0]
+        cand = (cur + " " + w) if cur else w
+        if len(cand) <= max_chars:
+            cur = cand
+            rest.pop(0)
+            continue
+        if cur:
+            out.append(cur)
+            cur = ""
+            continue
+        out.append(w[:max_chars])
+        rest[0] = w[max_chars:]
+    if cur:
+        out.append(cur)
+    return out or [""]
+
+
 # ── picker ──────────────────────────────────────────────────────────────
 
 def _list_docs():
@@ -569,42 +600,77 @@ class App(oreoOS.App):
         d.rect(card_x,     card_y,     card_w, 3,      theme.PRIMARY, fill=True)
 
         # Pink "+" badge + heading.
-        bx, by, bsz = card_x + 12, card_y + 12, 36
+        bx, by, bsz = card_x + 10, card_y + 10, 32
         d.rect(bx, by, bsz, bsz, theme.PRIMARY, fill=True)
-        d.rect(bx + bsz // 2 - 2, by + 6,            4, bsz - 12, api.WHITE, fill=True)
-        d.rect(bx + 6,            by + bsz // 2 - 2, bsz - 12, 4, api.WHITE, fill=True)
-        d.text("Add a doc",    bx + bsz + 12, by + 4,  theme.PRIMARY, scale=2)
-        d.text("BT or flash",  bx + bsz + 12, by + 24, theme.MUTED)
+        d.rect(bx + bsz // 2 - 2, by + 5,            4, bsz - 10, api.WHITE, fill=True)
+        d.rect(bx + 5,            by + bsz // 2 - 2, bsz - 10, 4, api.WHITE, fill=True)
+        d.text("Add a doc",   bx + bsz + 10, by + 2,  theme.PRIMARY, scale=2)
+        d.text("BT or flash", bx + bsz + 10, by + 22, theme.MUTED)
 
-        # Scrollable instruction rows.
-        list_y    = card_y + 12 + bsz + 16
-        list_bot  = card_y + card_h - 8
-        line_h_h  = 18
-        line_h_b  = 12
-        text_x    = card_x + 16
-        max_chars = (card_w - 24) // 8
+        # Scrollable instruction rows. Bumped to scale=2 for bullets +
+        # headings so the text is readable from arm's length, with
+        # word-wrap so long lines like "Send over Bluetooth" wrap inside
+        # the card instead of bleeding off the right edge. Code stays at
+        # scale=1 because commands can be long (eg. python tools/...).
+        text_x   = card_x + 12
+        inner_w  = card_w - 24
+        list_y   = card_y + 10 + bsz + 14
+        list_bot = card_y + card_h - 8
+
+        H_LINE  = 18    # heading line height (scale=2, 16px glyph + 2px gap)
+        B_LINE  = 18    # bullet line height (same; consistent vertical rhythm)
+        C_LINE  = 14    # code line height (scale=1, 8px glyph + 6px gap)
+        ROW_GAP = 6     # extra space between sibling list rows
+
+        # Reserve a 14-px gutter on the left of bullets for the dot.
+        max_h_chars = inner_w // 16
+        max_b_chars = (inner_w - 14) // 16
+        max_c_chars = (inner_w - 12) // 8
 
         rows = _HELP[self._help_scroll:]
         cur_y = list_y
         rendered = 0
         for kind, payload in rows:
-            row_h = line_h_h if kind == "h" else line_h_b
-            if cur_y + row_h > list_bot:
-                break
             if kind == "h":
-                d.text(payload, text_x, cur_y, theme.PRIMARY, scale=2)
-                d.rect(text_x, cur_y + 17, len(payload) * 16, 1, theme.GOLD, fill=True)
+                lines = _wrap_help(payload, max_h_chars)
+                block_h = len(lines) * H_LINE + 4
+                if cur_y + block_h > list_bot:
+                    break
+                # Extra top padding before each heading, except the
+                # very first one in the visible window.
+                if rendered > 0:
+                    cur_y += ROW_GAP
+                for line in lines:
+                    d.text(line, text_x, cur_y, theme.PRIMARY, scale=2)
+                    cur_y += H_LINE
+                # Gold underline below the LAST wrapped line, matching its width.
+                last_w = len(lines[-1]) * 16
+                d.rect(text_x, cur_y - 1, last_w, 1, theme.GOLD, fill=True)
+                cur_y += 4
             elif kind == "b":
-                d.rect(text_x, cur_y + 4, 3, 3, theme.PRIMARY, fill=True)
-                d.text(payload[:max_chars - 1], text_x + 10, cur_y,
-                       theme.TEXT_BRIGHT)
+                lines = _wrap_help(payload, max_b_chars)
+                block_h = len(lines) * B_LINE + 2
+                if cur_y + block_h > list_bot:
+                    break
+                # Pink dot on the first line; wrapped lines indent flush
+                # with the first line's text (no double-bullet).
+                d.rect(text_x + 2, cur_y + 6, 4, 4, theme.PRIMARY, fill=True)
+                for line in lines:
+                    d.text(line, text_x + 14, cur_y, theme.TEXT_BRIGHT, scale=2)
+                    cur_y += B_LINE
+                cur_y += 2
             elif kind == "code":
-                strip_h = 12
-                d.rect(text_x + 8, cur_y - 1, card_w - 32, strip_h,
+                # Single-line tinted strip — commands shouldn't wrap, but
+                # we still truncate as a safety net so a runaway entry
+                # can't bleed past the card.
+                truncated = payload[:max_c_chars]
+                if cur_y + C_LINE > list_bot:
+                    break
+                d.rect(text_x + 6, cur_y - 1, inner_w - 12, C_LINE,
                        theme.DOCK_SEL, fill=True)
-                d.text(payload[:max_chars - 2], text_x + 12, cur_y,
-                       theme.TEAL)
-            cur_y += row_h
+                d.text(truncated, text_x + 10, cur_y + 2,
+                       theme.TEAL, scale=1)
+                cur_y += C_LINE + 2
             rendered += 1
 
         # Scroll arrows on the right edge.
