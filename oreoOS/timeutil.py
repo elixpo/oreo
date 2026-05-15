@@ -1,4 +1,4 @@
-"""Cross-platform time helper (CPython + MicroPython)."""
+"""Time + NTP helpers shared by the home clock, Settings, and notif panel."""
 
 _DAYS  = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 _MONTHS = ("", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -57,8 +57,6 @@ def sync_from_ntp(timezone_offset_h=None):
             _last_sync_status = "no-wifi"
             return False, "no wifi"
     except Exception:
-        # No wifi module on the build host — fall through and let the
-        # ntptime import error surface as "failed".
         pass
 
     try:

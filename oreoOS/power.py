@@ -164,7 +164,7 @@ class PowerManager:
         starts main.py from scratch; reset_cause() == DEEPSLEEP_RESET lets
         boot() decide to skip the splash for a faster wake.
         """
-        if machine is None:                # build-host fallback
+        if machine is None:
             return
         try:
             self._os.display.set_brightness(0)
