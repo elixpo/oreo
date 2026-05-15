@@ -504,22 +504,11 @@ def boot():
         bt.init_from_config()
         # Sync the system clock from an NTP server once WiFi is up. The RTC
         # then drives the home-screen clock. ~2 s blocking, only at boot.
+        # Manual re-sync is available from the notif panel and Settings.
         if wifi_ok_to_try and wifi.is_connected():
             try:
-                import ntptime, machine, time as _t
-                ntptime.host = "pool.ntp.org"
-                ntptime.settime()
-                # ntptime always sets the RTC to UTC. Shift by the user's
-                # TIMEZONE_OFFSET (hours) so localtime() reads correctly.
-                try:
-                    from secrets import TIMEZONE_OFFSET as _TZ
-                    if _TZ:
-                        shifted = _t.localtime(_t.time() + int(_TZ * 3600))
-                        machine.RTC().datetime(
-                            (shifted[0], shifted[1], shifted[2], shifted[6] + 1,
-                             shifted[3], shifted[4], shifted[5], 0))
-                except Exception:
-                    pass
+                from oreoOS import timeutil
+                timeutil.sync_from_ntp()
             except Exception:
                 pass
     except Exception:

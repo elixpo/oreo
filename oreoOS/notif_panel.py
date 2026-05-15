@@ -50,9 +50,13 @@ _BRIGHT_STEP = 10               # ± per LEFT/RIGHT tap on the slider
 _BRIGHT_MIN  = 10               # don't let users blank the screen accidentally
 _BRIGHT_MAX  = 100
 
+_TIME_Y      = _BRIGHT_Y + _BRIGHT_H + 6
+_TIME_H      = 20
+_TIME_PAD    = 12
+
 _CARD_H   = 34
 _CARD_GAP = 4
-_LIST_Y   = _BRIGHT_Y + _BRIGHT_H + 10
+_LIST_Y   = _TIME_Y + _TIME_H + 8
 
 
 def _draw_bell(d, x, y, color):
@@ -78,6 +82,21 @@ def _draw_gear(d, x, y, color):
     d.rect(x + 2, y + 3, 8, 6, color, fill=True)
     # hub punch-out (background)
     d.rect(x + 5, y + 5, 2, 2, theme.CARD, fill=True)
+
+
+def _draw_clock(d, x, y, color):
+    """12×12 clock-face glyph for the time-sync row."""
+    d.rect(x + 2, y,     8, 1, color, fill=True)
+    d.rect(x + 2, y + 11, 8, 1, color, fill=True)
+    d.rect(x,     y + 2, 1, 8, color, fill=True)
+    d.rect(x + 11, y + 2, 1, 8, color, fill=True)
+    d.rect(x + 1, y + 1, 1, 1, color, fill=True)
+    d.rect(x + 10, y + 1, 1, 1, color, fill=True)
+    d.rect(x + 1, y + 10, 1, 1, color, fill=True)
+    d.rect(x + 10, y + 10, 1, 1, color, fill=True)
+    # hands (12 + 3 o'clock)
+    d.rect(x + 5, y + 3, 2, 4, color, fill=True)
+    d.rect(x + 6, y + 5, 4, 2, color, fill=True)
 
 
 def _draw_sun(d, x, y, color):
