@@ -53,13 +53,13 @@ PLAYER_Y     = PLAY_BOT - CAR_H - 18
 ENEMY_W, ENEMY_H = 32, 40
 ENEMY_LANES  = (ROAD_X + 28, ROAD_X + ROAD_W // 2 - ENEMY_W // 2, ROAD_X + ROAD_W - ENEMY_W - 28)
 
-MAX_STEER_PX_PER_S   = 260.0   # was 220 — keeps lane changes ahead of the
-                                # faster scroll so the game stays playable.
-ROAD_SCROLL_MIN      = 40.0
-ROAD_SCROLL_MAX      = 280.0   # was 220 — flat-out scroll baseline.
-ENEMY_SPAWN_SEC0     = 1.6
-ENEMY_SPAWN_FLOOR    = 0.40    # was 0.55 — tighter cap so high scores keep
-                                # tightening the cadence.
+MAX_STEER_PX_PER_S   = 260.0   # keeps lane changes ahead of the faster
+                                # scroll so the game stays playable.
+ROAD_SCROLL_MIN      = 60.0    # bumped — even a coasting car feels alive.
+ROAD_SCROLL_MAX      = 320.0   # bumped — flat-out scroll baseline.
+ENEMY_SPAWN_SEC0     = 1.3     # tighter start; was 1.6.
+ENEMY_SPAWN_FLOOR    = 0.28    # tighter cap; was 0.40. At score ~100 you
+                                # see a new car roughly every 0.3 s.
 
 # Collision tightness — how many pixels we deduct from each axis of the
 # overlap test. Higher = more forgiving (smaller effective hitbox). 14 leaves
@@ -258,11 +258,10 @@ class App(oreoOS.App):
                                      ROAD_X + 4,
                                      ROAD_X + ROAD_W - CAR_W - 4)
 
-            # Top speed climbs with score. +1.2 % per point — much steeper
-            # than before, so the game actually feels harder around score 20.
-            # Capped at 2.2x so it stays playable; the spawn-spacing rule
-            # below keeps the field navigable even at full speed.
-            speed_mult = min(2.2, 1.0 + 0.012 * self._score)
+            # Top speed climbs with score. +1.6 % per point + a higher cap
+            # (2.6×). At score 40 you're at full speed already; after that
+            # the spawn cadence keeps escalating instead.
+            speed_mult = min(2.6, 1.0 + 0.016 * self._score)
             effective_max = ROAD_SCROLL_MAX * speed_mult
             target = ROAD_SCROLL_MIN + (
                 effective_max - ROAD_SCROLL_MIN) * max(0.0, throttle)
@@ -293,7 +292,10 @@ class App(oreoOS.App):
                 speed_frac   = (self._scroll_v - ROAD_SCROLL_MIN) / max(
                     1.0, ROAD_SCROLL_MAX * 2.2 - ROAD_SCROLL_MIN)
                 speed_frac   = max(0.0, min(1.0, speed_frac))
-                MIN_VGAP     = ENEMY_H * (1.5 + 0.9 * speed_frac)
+                # Tighter than before — 1.2× car-height at low speed and
+                # only 2.0× at flat-out (was 1.5 / 2.4). Less breathing
+                # room between approaching enemies, more difficulty.
+                MIN_VGAP     = ENEMY_H * (1.2 + 0.8 * speed_frac)
                 too_close = False
                 for e in self._enemies:
                     if e.y < PLAY_TOP + MIN_VGAP:
@@ -307,7 +309,10 @@ class App(oreoOS.App):
                     # Lane choice: avoid lanes that still have an enemy in
                     # the upper REACTION_PX band (gives the player room to
                     # leave that lane before this new car arrives).
-                    REACTION_PX = ENEMY_H + 90
+                    REACTION_PX = ENEMY_H + 60   # was +90 — adjacent-lane
+                                                 # blocks lift sooner so an
+                                                 # enemy can appear in the
+                                                 # same lane you just left.
                     blocked = set()
                     for e in self._enemies:
                         if e.y < PLAY_TOP + REACTION_PX:

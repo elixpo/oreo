@@ -117,6 +117,118 @@ For step-by-step app-writing + OS internals, see [`CONTRIBUTING.md`](CONTRIBUTIN
 
 ---
 
+## 🧰 Built-in libraries
+
+OreoOS ships a small batteries-included SDK that every app imports
+from `oreoOS`. Three of those are worth a quick tour:
+
+### Drawing — `d.rect`, `d.pixel`, `d.text`, `d.blit`, `d.clear`
+
+```python
+from oreoOS import api, theme
+
+def draw(self, d):
+    d.clear(theme.BG)                            # fill cream background
+    d.rect(10, 10, 100, 40, theme.PRIMARY, fill=True)
+    d.rect(10, 10, 100, 40, theme.GOLD)          # outline (fill=False default)
+    d.pixel(60, 30, api.WHITE)                   # single pixel
+    d.text("hello!", 14, 20, api.WHITE, scale=2) # framebuf 8×8, scaled
+    d.text(api.rgb(160, 50, 220), 14, 60, ...)   # arbitrary RGB
+```
+
+The framebuffer is RGB565 big-endian. Build colours with `api.rgb(r, g, b)`
+instead of constructing the integer by hand. Theme colours
+(`theme.PRIMARY` / `theme.GOLD` / `theme.TEAL` / `theme.MUTED` / …)
+exist for visual consistency across apps.
+
+### Sprites + images — `d.blit`
+
+```python
+def _try_sprite(name):
+    try:
+        m = __import__("apps.my_app.assets.optimized." + name, None, None,
+                       ["DATA", "W", "H"])
+        return (bytearray(m.DATA), m.W, m.H)
+    except (ImportError, AttributeError):
+        return None
+
+def draw(self, d):
+    if (s := self._sprite):
+        data, w, h = s
+        d.blit(data, x, y, w, h)
+```
+
+Sprites are produced by `tools/optimize_assets.py` from raw PNG / JPG
+files under `apps/my_app/assets/raw/`. Pixels equal to chroma-key
+magenta (`0xF81F` RGB565) are skipped by `blit()` — that's how the
+panda mascot ends up with a transparent backdrop on the splash.
+
+### Higher-level text — `oreoOS.pixelfont`
+
+```python
+from oreoOS import pixelfont
+font = pixelfont.load("pixelify_16")  # also pixelify_8, _12, _24
+font.text(d, "Score: 42", 8, 6, theme.PRIMARY)
+w = font.measure("Score: 42")          # for centring
+```
+
+The framebuf's 8×8 font is fine for HUDs; the Pixelify Sans bitmaps
+look better for titles and menus.
+
+### Caching network data — `oreoOS.cache`
+
+```python
+from oreoOS import cache
+profile, age = cache.load("apps/my_app/cache.txt", ttl_s=3600)
+if not profile or age > 3600:
+    profile = my_fetch_function()
+    cache.save("apps/my_app/cache.txt", profile)
+```
+
+Used by Badge + Commits to render instantly from disk and refresh in
+the background. Auto-includes a `__ts=<epoch>` header so callers know
+the cache age.
+
+### Touch gestures — `oreoOS.touch`
+
+```python
+from oreoOS import touch
+def update(self, dt):
+    ev = touch.poll(self._os)
+    if   ev == touch.TAP:        self._open_help()
+    elif ev == touch.DOUBLE_TAP: self._favourite()
+    elif ev == touch.LONG_HOLD:  self._screenshot()
+```
+
+The TTP223 pad is a single binary line; this module converts edges
+into named gestures so every app doesn't reimplement debounce.
+
+---
+
+## 🖼 Gallery — flashing your own photos
+
+The Gallery app cycles through pictures you ship with the badge.
+Workflow:
+
+```bash
+# 1. Drop pictures into apps/gallery/assets/raw/
+cp ~/Pictures/team-offsite.jpg apps/gallery/assets/raw/
+
+# 2. Bake them to RGB565 (preserves aspect ratio, fits 320×196 play area)
+python tools/optimize_assets.py --app gallery
+
+# 3. Push to the badge — the deploy step also prunes any stale photos
+#    the user deleted from raw/ so the device stays in sync.
+python tools/deploy.py /dev/ttyACM0
+```
+
+The optimizer accepts `.png`, `.jpg`, and `.jpeg`. Photos are
+aspect-preserved (no forced square crop). On the badge, **L/R cycles
+photos**, and the last tile is a **+ help screen** that walks any
+user through this exact workflow.
+
+---
+
 ## 🛠 Hardware
 
 | | |

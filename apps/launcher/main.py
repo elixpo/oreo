@@ -310,7 +310,14 @@ class App(oreoOS.App):
         elif btn == api.BTN_DOWN:
             self._sel = (self._sel + COLS) % n
         elif btn == api.BTN_A:
-            self._os.launch(self._apps[self._view_apps[self._sel]]["dir"])
+            target = self._apps[self._view_apps[self._sel]]["dir"]
+            # Stamp the recent-app slot so a TTP double-tap from the
+            # drawer can round-trip the user back to it next time.
+            try:
+                self._os.settings_set("recent_app", target)
+            except Exception:
+                pass
+            self._os.launch(target)
             return
         elif btn == api.BTN_B and self._mode == "categories":
             # Drill back up to the category picker.
@@ -363,6 +370,20 @@ class App(oreoOS.App):
         if self._anim_t < ANIM_DUR:
             self._anim_t = min(ANIM_DUR, self._anim_t + dt)
             self._dirty = True
+
+        # TTP-touch gestures. Double-tap from the drawer launches the
+        # most-recently-used app (stored on the OS settings dict by the
+        # run-loop when an app exits). Lets users round-trip to their
+        # last app without scrolling through the grid.
+        try:
+            from oreoOS import touch
+            ev = touch.poll(self._os)
+            if ev == touch.DOUBLE_TAP:
+                last = self._os.settings_get("recent_app", None)
+                if last and last != "launcher":
+                    self._os.launch(last)
+        except Exception:
+            pass
 
     # ── render ───────────────────────────────────────────────────────────
     def draw(self, d):
