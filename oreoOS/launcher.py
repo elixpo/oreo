@@ -459,16 +459,34 @@ def _maybe_apply_ota(os_obj=None):
         return None
 
 
+def _bc(tag):
+    """Boot breadcrumb — print to USB serial with monotonic timestamp.
+
+    Used to live-diagnose boot freezes over the USB-CDC REPL (host runs
+    `mpremote connect /dev/ttyACM0`). Each phase prints a short tag so
+    we can tell whether a freeze is in WiFi, NTP, OTA-stage-copy, etc.
+    Cheap enough to leave in for v1 — one print per boot phase, nothing
+    in the run-loop hot path.
+    """
+    try:
+        print("[boot %d] %s" % (time.ticks_ms(), tag))
+    except Exception:
+        pass
+
+
 def boot():
+    _bc("entered boot()")
     from oreoWare.os import OS
     from oreoOS.splash import show_splash
     from oreoOS.home   import Home
+    _bc("imports done")
 
     # Bring the hardware up first so the OTA splash has a display to draw
     # on. The trade-off: if an OTA swaps oreoWare/display.py we'll have
     # already imported the old version — _maybe_apply_ota does a
     # machine.reset() after apply to guarantee the new drivers boot fresh.
     os_obj = OS()
+    _bc("OS() constructed")
 
     # Stamp the boot timestamp on the OS object so OTA can refuse to
     # probe inside the first minute of uptime — without this the very
@@ -479,7 +497,9 @@ def boot():
     except Exception:
         os_obj._boot_ts_s = 0
 
+    _bc("checking pending OTA")
     applied = _maybe_apply_ota(os_obj)
+    _bc("OTA check done (applied=%s)" % bool(applied))
     if applied:
         # Persist the version for the post-reboot "Updated to vX.Y.Z" toast.
         try:
@@ -500,10 +520,12 @@ def boot():
     # mascot module is missing we just want to fall through to the home
     # screen. Whatever's on the LCD stays visible (initial black frame from
     # Display.__init__, or partial splash) until Home draws its first frame.
+    _bc("show_splash")
     try:
         show_splash(os_obj)
-    except Exception:
-        pass
+    except Exception as e:
+        _bc("show_splash FAILED: %s" % e)
+    _bc("splash done")
 
     # Start WiFi and BT after splash. Two safety gates so a weak supply
     # (e.g. powered from an FTDI's onboard 3V3 LDO @ ~100 mA) doesn't brown
@@ -532,19 +554,25 @@ def boot():
     try:
         from oreoWare import wifi, bt
         if wifi_ok_to_try:
+            _bc("wifi.connect_from_config begin")
             wifi.connect_from_config()
+            _bc("wifi.connect_from_config done")
+        else:
+            _bc("wifi skipped")
+        _bc("bt.init_from_config begin")
         bt.init_from_config()
-        # Sync the system clock from an NTP server once WiFi is up. The RTC
-        # then drives the home-screen clock. ~2 s blocking, only at boot.
-        # Manual re-sync is available from the notif panel and Settings.
+        _bc("bt.init_from_config done")
         if wifi_ok_to_try and wifi.is_connected():
+            _bc("ntp sync begin")
             try:
                 from oreoOS import timeutil
                 timeutil.sync_from_ntp()
-            except Exception:
-                pass
-    except Exception:
-        pass
+            except Exception as e:
+                _bc("ntp sync FAILED: %s" % e)
+            _bc("ntp sync done")
+    except Exception as e:
+        _bc("wifi/bt block FAILED: %s" % e)
+    _bc("entering main loop")
 
     while True:
         apps = list_apps()

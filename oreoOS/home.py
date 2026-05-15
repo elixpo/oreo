@@ -127,6 +127,12 @@ def _get_scaled_bg():
     if not bg:
         _scaled_bg_cache = False
         return None
+    try:
+        import time as _t
+        _bg_start_ms = _t.ticks_ms()
+        print("[home] scaled_bg precompute begin")
+    except Exception:
+        _bg_start_ms = None
 
     import struct
     data, bw, bh = bg
@@ -168,6 +174,12 @@ def _get_scaled_bg():
             out[s:s + sw * 2] = row
 
     _scaled_bg_cache = (out, sw, sh)
+    try:
+        if _bg_start_ms is not None:
+            print("[home] scaled_bg precompute done in %d ms"
+                  % _t.ticks_diff(_t.ticks_ms(), _bg_start_ms))
+    except Exception:
+        pass
     return _scaled_bg_cache
 
 
@@ -316,6 +328,12 @@ class Home(oreoOS.App):
         h, m, s, wd, day, mon, yr = timeutil.now()
 
         if full:
+            try:
+                import time as _t
+                _draw_start = _t.ticks_ms()
+                print("[home] full draw begin")
+            except Exception:
+                _draw_start = None
             # ── background (uses cached pre-scaled buffer) ──────────────
             sbg = _get_scaled_bg()
             if sbg:
@@ -330,6 +348,12 @@ class Home(oreoOS.App):
             self._dirty = False
             self._clock_dirty = False
             self._status_dirty = False
+            try:
+                if _draw_start is not None:
+                    print("[home] full draw done in %d ms"
+                          % _t.ticks_diff(_t.ticks_ms(), _draw_start))
+            except Exception:
+                pass
             return
 
         if clock_only:
