@@ -8,8 +8,6 @@
 
 **A handheld panda-themed conference badge that runs a real operating system.**
 
-Made by [Elixpo](https://elixpo.com) · OS, mascot, and apps by [@Circuit-Overtime](https://github.com/Circuit-Overtime)
-
 [![License: Oreo-PCL](https://img.shields.io/badge/license-Oreo--PCL-FF5D68?style=for-the-badge)](LICENSE)
 [![MicroPython 1.28](https://img.shields.io/badge/MicroPython-1.28-00B4A5?style=for-the-badge&logo=python&logoColor=white)](https://micropython.org)
 [![ESP32-S3](https://img.shields.io/badge/ESP32--S3-N16R8-2E2E2E?style=for-the-badge&logo=espressif&logoColor=white)](https://www.espressif.com/en/products/socs/esp32-s3)
@@ -63,8 +61,8 @@ Weather, GitHub commits, OTA updates — all live. WiFi power-capped at 11 dBm s
 <tr>
 <td valign="top">
 
-### 🎮 12 apps shipped
-Games, GitHub tools, IR quests, a colour picker, a panda you take care of across days. All open-source under one warm cream theme.
+### 🎮 16 apps shipped
+Games, GitHub tools, IR quests, a colour picker, a markdown reader, storage breakdown, and a panda you take care of across days. All open-source under one warm cream theme.
 
 </td>
 <td valign="top">
