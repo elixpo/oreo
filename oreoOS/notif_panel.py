@@ -114,7 +114,24 @@ def _draw_sun(d, x, y, color):
 
 
 def _draw_kind_glyph(d, x, y, kind, ink):
-    """12×12 per-kind notification glyph (file / ota / other)."""
+    """12×12 per-kind notification glyph (file / ota / reject / other)."""
+    if kind == "reject":
+        # Crossed-circle "no" symbol — diagonal slash inside a hollow O.
+        # Used for BT-rejected transfers (wrong file type, oversize image)
+        # so the user can tell at a glance the notif is bad-news, not
+        # a fresh delivery.
+        d.rect(x + 3, y,     6, 1, ink, fill=True)
+        d.rect(x + 3, y + 11, 6, 1, ink, fill=True)
+        d.rect(x,     y + 3, 1, 6, ink, fill=True)
+        d.rect(x + 11, y + 3, 1, 6, ink, fill=True)
+        d.rect(x + 1, y + 1, 2, 2, ink, fill=True)
+        d.rect(x + 9, y + 1, 2, 2, ink, fill=True)
+        d.rect(x + 1, y + 9, 2, 2, ink, fill=True)
+        d.rect(x + 9, y + 9, 2, 2, ink, fill=True)
+        # diagonal slash
+        for i in range(8):
+            d.rect(x + 2 + i, y + 9 - i, 1, 1, ink, fill=True)
+        return
     if kind == "file":
         d.rect(x + 1, y,     8, 12, ink, fill=False)
         d.rect(x + 1, y,     8, 1,  ink, fill=True)
@@ -504,6 +521,7 @@ class NotifPanel:
             kind = it.get("kind", "")
             ink  = (theme.GOLD if kind == "file"
                     else theme.PRIMARY if kind == "ota"
+                    else theme.PRIMARY if kind == "reject"
                     else theme.TEAL)
             _draw_kind_glyph(d, 14, y + 9, kind, ink)
             title = it.get("title", "")[:24]
