@@ -57,8 +57,6 @@ def sync_from_ntp(timezone_offset_h=None):
             _last_sync_status = "no-wifi"
             return False, "no wifi"
     except Exception:
-        # No wifi module on the build host — fall through and let the
-        # ntptime import error surface as "failed".
         pass
 
     try:
