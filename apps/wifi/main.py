@@ -22,6 +22,9 @@ ROW_H        = 22
 ROW_PAD_X    = 12
 ROW_TOP_Y    = widgets.HEADER_H + 6
 VALUE_X      = 138        # left edge of the right-aligned value column
+AUTOCON_GAP  = 8          # extra breathing room above the Auto-connect row
+                          # so it reads as a separate group from the live
+                          # link-info rows above it
 
 # Power-mode helpers — bound at on_enter so the build host (no wifi
 # module) doesn't crash module import.
@@ -191,17 +194,26 @@ class App(oreoOS.App):
                              theme.TEXT_BRIGHT),
         ]
         for i, (label, value, color) in enumerate(rows):
+            # Auto-connect sits in its own group below the live link-info
+            # rows; nudge it down so the visual break matches its logical
+            # role as a persistent preference rather than a live readout.
             y = ROW_TOP_Y + i * ROW_H
+            if i == self.ROW_AUTOCONNECT:
+                y += AUTOCON_GAP
             sel = (i == self._sel)
             if sel:
                 d.rect(4, y - 2, SW - 8, ROW_H - 1,
                        theme.DOCK_SEL, fill=True)
-                # 1-px selection border
                 d.rect(4, y - 2, SW - 8, 1, theme.SEL_BORDER, fill=True)
                 d.rect(4, y + ROW_H - 4, SW - 8, 1,
                        theme.SEL_BORDER, fill=True)
             d.text(label, ROW_PAD_X, y + 4, theme.TEXT_BRIGHT, scale=1)
             d.text(str(value)[:20], VALUE_X, y + 4, color, scale=1)
+
+        # Thin divider in the gap above Auto-connect to make the group
+        # break read as deliberate, not as a bug.
+        sep_y = ROW_TOP_Y + self.ROW_AUTOCONNECT * ROW_H + AUTOCON_GAP // 2 - 1
+        d.rect(ROW_PAD_X, sep_y, SW - 2 * ROW_PAD_X, 1, theme.MUTED2, fill=True)
 
         # Mode sub-line — small caption under the Power row.
         mode = self._power_mode()

@@ -41,6 +41,44 @@ _HEADING_H = {1: 24, 2: 20, 3: 16}
 _HEADING_SCALE = {1: 2, 2: 2, 3: 1}
 
 
+# ── "how to add" splash content ─────────────────────────────────────────
+# Mirrors the gallery's ADD-tile pattern: a scrollable card describing
+# both the on-device (BT) and developer (flash) flows for getting .md /
+# .txt files onto the badge. Edits here propagate to the in-app help.
+_HELP = [
+    ("h",    "Send over Bluetooth"),
+    ("b",    "From a paired laptop:"),
+    ("code", "python tools/bt_send.py"),
+    ("code", "         notes.md"),
+    ("b",    ".md files arrive as markdown,"),
+    ("b",    ".txt files as plain text. Both"),
+    ("b",    "land in documents/ on the badge"),
+    ("b",    "and show up here automatically."),
+    ("b",    "The picker polls at 5 Hz, so the"),
+    ("b",    "new file appears without restart."),
+
+    ("h",    "Flash from source"),
+    ("b",    "Drop a .md or .txt into"),
+    ("code", "apps/reader/assets/"),
+    ("b",    "from the repo root, then run:"),
+    ("code", "python tools/deploy.py"),
+    ("b",    "Bundled files appear with a"),
+    ("b",    "leading '*' so you can tell them"),
+    ("b",    "apart from BT-arrived inbox items."),
+
+    ("h",    "Markdown support"),
+    ("b",    "Headings: # / ## / ###"),
+    ("b",    "Inline: **bold** *italic* `code`"),
+    ("b",    "Bullets: - or *  (two-space indent)"),
+    ("b",    "Numbered: 1. 2. 3."),
+    ("b",    "Fenced blocks: ``` ... ```"),
+    ("b",    "Horizontal rule: ---"),
+    ("b",    "No nested constructs / no links —"),
+    ("b",    "small enough to ship to flash."),
+]
+_HELP_ROW_LABEL = "+ How to add"
+
+
 # ── picker ──────────────────────────────────────────────────────────────
 
 def _list_docs():
@@ -350,6 +388,10 @@ class App(oreoOS.App):
         self._blocks  = []
         self._scroll  = 0          # in pixels
         self._total_h = 0
+        # help-mode scroll (row index into _HELP, NOT pixels — matches
+        # gallery's add-tile scroll model so the rendering math stays
+        # straightforward).
+        self._help_scroll = 0
         # 5 Hz auto-refresh of the picker — picks up files that land in
         # documents/ while the user is sitting on the list (e.g. a BT
         # transfer completing). Off entirely in view mode.
@@ -380,27 +422,55 @@ class App(oreoOS.App):
     def on_button_press(self, btn):
         if self._mode == "picker":
             return self._on_btn_picker(btn)
+        if self._mode == "help":
+            return self._on_btn_help(btn)
         return self._on_btn_view(btn)
 
     # ── picker input ────────────────────────────────────────────────────
     def _on_btn_picker(self, btn):
+        # The picker always shows a trailing "+ How to add" row, so the
+        # total selectable count is len(files) + 1. Selecting the help
+        # row + A opens the splash; selecting a real row + A opens the
+        # document. UP/DOWN wraps over the whole list including help.
         n = len(self._files)
+        total = n + 1
         if btn == api.BTN_HOME:
             self._os.quit()
             return
         if btn == api.BTN_A:
-            if n:
+            if self._sel == n:
+                self._open_help()
+            else:
                 self._open(self._files[self._sel])
             return
-        if not n:
-            return
         if btn == api.BTN_UP:
-            self._sel = (self._sel - 1) % n
+            self._sel = (self._sel - 1) % total
         elif btn == api.BTN_DOWN:
-            self._sel = (self._sel + 1) % n
+            self._sel = (self._sel + 1) % total
         else:
             return
         self._dirty = True
+
+    # ── help input ──────────────────────────────────────────────────────
+    def _on_btn_help(self, btn):
+        if btn == api.BTN_B or btn == api.BTN_HOME:
+            self._mode  = "picker"
+            self._files = _list_docs()
+            self._dirty = True
+            return
+        if btn == api.BTN_UP:
+            self._help_scroll = max(0, self._help_scroll - 1)
+        elif btn == api.BTN_DOWN:
+            self._help_scroll = min(max(0, len(_HELP) - 1),
+                                    self._help_scroll + 1)
+        else:
+            return
+        self._dirty = True
+
+    def _open_help(self):
+        self._mode        = "help"
+        self._help_scroll = 0
+        self._dirty       = True
 
     # ── view input ──────────────────────────────────────────────────────
     def _on_btn_view(self, btn):
@@ -437,6 +507,8 @@ class App(oreoOS.App):
         d.clear(theme.BG)
         if self._mode == "picker":
             self._draw_picker(d)
+        elif self._mode == "help":
+            self._draw_help(d)
         else:
             self._draw_view(d)
 
@@ -444,16 +516,10 @@ class App(oreoOS.App):
         widgets.draw_header(d, "READER")
         widgets.draw_hint(d, "A=open  HOME=back")
 
-        if not self._files:
-            msg = "no documents yet"
-            d.text(msg, (SW - len(msg) * 8) // 2,
-                   SH // 2 - 8, theme.MUTED, scale=1)
-            d.text("send .md / .txt over BT",
-                   (SW - 23 * 8) // 2, SH // 2 + 6, theme.MUTED2, scale=1)
-            return
-
         row_h = 20
         top_y = widgets.HEADER_H + 6
+
+        # Real document rows.
         for i, (name, _) in enumerate(self._files):
             y = top_y + i * row_h
             if y + row_h > SH - widgets.HINT_H:
@@ -464,6 +530,89 @@ class App(oreoOS.App):
                        theme.DOCK_SEL, fill=True)
             color = theme.TEXT_BRIGHT if sel else theme.TEXT_DIM
             d.text(name[:34], 12, y + 6, color, scale=1)
+
+        # Trailing "+ How to add" row — always rendered, always
+        # selectable, so the user discovers the splash even when the
+        # documents/ directory has real files in it.
+        help_idx = len(self._files)
+        y = top_y + help_idx * row_h
+        if y + row_h <= SH - widgets.HINT_H:
+            sel = (self._sel == help_idx)
+            if sel:
+                d.rect(6, y, SW - 12, row_h - 2,
+                       theme.DOCK_SEL, fill=True)
+            color = theme.PRIMARY if sel else theme.GOLD
+            d.text(_HELP_ROW_LABEL, 12, y + 6, color, scale=1)
+
+        # When the directory is empty point the user at the help row so
+        # the next step is obvious — "no documents" alone was a dead end.
+        if not self._files:
+            msg = "no documents yet"
+            d.text(msg, (SW - len(msg) * 8) // 2,
+                   SH // 2 - 4, theme.MUTED, scale=1)
+            d.text("press A on '+ How to add'",
+                   (SW - 24 * 8) // 2, SH // 2 + 10, theme.MUTED2, scale=1)
+
+    # ── help splash ─────────────────────────────────────────────────────
+    def _draw_help(self, d):
+        widgets.draw_header(d, "ADD A DOC")
+        widgets.draw_hint(d, "UP/DOWN=scroll  B=back")
+
+        # Cream card filling the play area — matches the gallery splash
+        # so the two how-to screens feel like one family.
+        card_x = 10
+        card_y = widgets.HEADER_H + 4
+        card_w = SW - 20
+        card_h = SH - widgets.HEADER_H - widgets.HINT_H - 8
+        d.rect(card_x + 2, card_y + 2, card_w, card_h, theme.MUTED2, fill=True)
+        d.rect(card_x,     card_y,     card_w, card_h, theme.CARD,   fill=True)
+        d.rect(card_x,     card_y,     card_w, 3,      theme.PRIMARY, fill=True)
+
+        # Pink "+" badge + heading.
+        bx, by, bsz = card_x + 12, card_y + 12, 36
+        d.rect(bx, by, bsz, bsz, theme.PRIMARY, fill=True)
+        d.rect(bx + bsz // 2 - 2, by + 6,            4, bsz - 12, api.WHITE, fill=True)
+        d.rect(bx + 6,            by + bsz // 2 - 2, bsz - 12, 4, api.WHITE, fill=True)
+        d.text("Add a doc",    bx + bsz + 12, by + 4,  theme.PRIMARY, scale=2)
+        d.text("BT or flash",  bx + bsz + 12, by + 24, theme.MUTED)
+
+        # Scrollable instruction rows.
+        list_y    = card_y + 12 + bsz + 16
+        list_bot  = card_y + card_h - 8
+        line_h_h  = 18
+        line_h_b  = 12
+        text_x    = card_x + 16
+        max_chars = (card_w - 24) // 8
+
+        rows = _HELP[self._help_scroll:]
+        cur_y = list_y
+        rendered = 0
+        for kind, payload in rows:
+            row_h = line_h_h if kind == "h" else line_h_b
+            if cur_y + row_h > list_bot:
+                break
+            if kind == "h":
+                d.text(payload, text_x, cur_y, theme.PRIMARY, scale=2)
+                d.rect(text_x, cur_y + 17, len(payload) * 16, 1, theme.GOLD, fill=True)
+            elif kind == "b":
+                d.rect(text_x, cur_y + 4, 3, 3, theme.PRIMARY, fill=True)
+                d.text(payload[:max_chars - 1], text_x + 10, cur_y,
+                       theme.TEXT_BRIGHT)
+            elif kind == "code":
+                strip_h = 12
+                d.rect(text_x + 8, cur_y - 1, card_w - 32, strip_h,
+                       theme.DOCK_SEL, fill=True)
+                d.text(payload[:max_chars - 2], text_x + 12, cur_y,
+                       theme.TEAL)
+            cur_y += row_h
+            rendered += 1
+
+        # Scroll arrows on the right edge.
+        sx = card_x + card_w - 14
+        if self._help_scroll > 0:
+            d.text("^", sx, list_y - 12, theme.PRIMARY, scale=2)
+        if self._help_scroll + rendered < len(_HELP):
+            d.text("v", sx, list_bot - 12, theme.PRIMARY, scale=2)
 
     def _draw_view(self, d):
         widgets.draw_header(d, self._title[:18])

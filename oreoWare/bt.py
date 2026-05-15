@@ -244,6 +244,144 @@ def scan_results():
     return out
 
 
+# ── pair flow ───────────────────────────────────────────────────────────
+
+def pair_state():
+    """Tuple of (state, message, target_dict_or_None). UI polls this to
+    drive the on-screen popup; state moves IDLE → CONNECTING →
+    ENCRYPTING → DONE | FAILED on its own."""
+    return _pair_state, _pair_message, _pair_target
+
+
+def _set_pair_state(state, msg=""):
+    global _pair_state, _pair_message
+    _pair_state   = state
+    _pair_message = msg
+
+
+def pair_reset():
+    """Clear DONE / FAILED state once the UI has read it."""
+    global _pair_target
+    _set_pair_state(PAIR_IDLE, "")
+    _pair_target = None
+
+
+def _addr_from_mac(mac_str):
+    """'AA:BB:CC:DD:EE:FF' → bytes(6). Returns None on bad input."""
+    try:
+        parts = mac_str.split(":")
+        if len(parts) != 6:
+            return None
+        return bytes(int(p, 16) for p in parts)
+    except Exception:
+        return None
+
+
+def _apply_security_config(ble):
+    """Enable bonding + LE Secure Connections with JustWorks IO caps.
+
+    Best-effort: older MicroPython builds may not support every kwarg,
+    so each is wrapped individually so the radio still works in a
+    degraded mode (no bonding) if a build is missing one."""
+    for kw in (
+        {"bond":      True},
+        {"mitm":      False},
+        {"le_secure": True},
+        {"io":        _IO_NO_INPUT_NO_OUTPUT},
+    ):
+        try:
+            ble.config(**kw)
+        except Exception:
+            pass
+
+
+def start_pair(target):
+    """Kick off an outbound pair attempt.
+
+      target = {"mac": str, "name": str, "kind": str,
+                "addr_type": int, "addr": bytes_or_None}
+
+    Returns True if the request was dispatched, False if BLE isn't
+    available or pair flow is already in progress."""
+    global _pair_target, _pair_state
+    if _pair_state in (PAIR_CONNECTING, PAIR_ENCRYPTING):
+        return False
+
+    addr_type = target.get("addr_type", 0)
+    addr      = target.get("addr")
+    if addr is None:
+        addr = _addr_from_mac(target.get("mac", ""))
+    if addr is None:
+        _set_pair_state(PAIR_FAILED, "bad mac")
+        return False
+
+    try:
+        ble = _get_ble()
+        if not ble.active():
+            ble.active(True)
+        _register_service(ble)
+        _apply_security_config(ble)
+    except Exception:
+        _set_pair_state(PAIR_FAILED, "ble init failed")
+        return False
+
+    # Stop scanning before we initiate — many ESP32-S3 builds reject
+    # gap_connect while a scan is running.
+    try:
+        scan_stop()
+    except Exception:
+        pass
+
+    _pair_target = {
+        "mac":       target.get("mac", "").upper(),
+        "name":      target.get("name", ""),
+        "kind":      target.get("kind", "other"),
+        "addr_type": addr_type,
+        "addr":      bytes(addr),
+        "conn":      None,
+    }
+    _set_pair_state(PAIR_CONNECTING, "connecting...")
+    try:
+        ble.gap_connect(addr_type, bytes(addr))
+        return True
+    except Exception as e:
+        _set_pair_state(PAIR_FAILED, "connect call failed")
+        return False
+
+
+def cancel_pair():
+    """Abort an in-progress pair. Disconnects if we got far enough to
+    have a conn handle."""
+    global _pair_target
+    if _pair_target and _pair_target.get("conn") is not None:
+        try:
+            _get_ble().gap_disconnect(_pair_target["conn"])
+        except Exception:
+            pass
+    _pair_target = None
+    _set_pair_state(PAIR_IDLE, "")
+
+
+# ── bonded-device list (read-through to oreoOS.bonds) ───────────────────
+
+def paired_devices():
+    """Pulled from the on-flash bond store. Wrapped here so callers in
+    apps/bt don't have to know about oreoOS.bonds."""
+    try:
+        from oreoOS import bonds
+        return list(bonds.list_bonds())
+    except Exception:
+        return []
+
+
+def forget(mac):
+    try:
+        from oreoOS import bonds
+        return bonds.remove(mac)
+    except Exception:
+        return False
+
+
 def _get_ble():
     global _ble
     if _ble is None:
@@ -350,11 +488,36 @@ def _start_advertising(ble):
 
 # ─── IRQ dispatch + reassembly ───────────────────────────────────────────
 
-_IRQ_CENTRAL_CONNECT    = 1
-_IRQ_CENTRAL_DISCONNECT = 2
-_IRQ_GATTS_WRITE        = 3
-_IRQ_SCAN_RESULT        = 5
-_IRQ_SCAN_DONE          = 6
+_IRQ_CENTRAL_CONNECT     = 1
+_IRQ_CENTRAL_DISCONNECT  = 2
+_IRQ_GATTS_WRITE         = 3
+_IRQ_SCAN_RESULT         = 5
+_IRQ_SCAN_DONE           = 6
+_IRQ_PERIPHERAL_CONNECT     = 7
+_IRQ_PERIPHERAL_DISCONNECT  = 8
+_IRQ_ENCRYPTION_UPDATE   = 28
+_IRQ_GET_SECRET          = 29
+_IRQ_SET_SECRET          = 30
+
+
+# ── pair-flow state machine ─────────────────────────────────────────────
+# Lives at module scope so the IRQ handlers can update it without an
+# explicit dispatch object. Consumed by apps/bt to drive the popup state.
+
+PAIR_IDLE        = "idle"
+PAIR_CONNECTING  = "connecting"
+PAIR_ENCRYPTING  = "encrypting"
+PAIR_DONE        = "done"
+PAIR_FAILED      = "failed"
+
+_pair_state   = PAIR_IDLE
+_pair_target  = None     # {"mac", "name", "kind", "addr_type", "addr", "conn"}
+_pair_message = ""
+
+# Security config — JustWorks pairing (no passkey UI). The on-badge "do
+# you want to pair with X?" confirmation popup is the consent step; once
+# the user accepts on the badge, the BLE handshake completes silently.
+_IO_NO_INPUT_NO_OUTPUT = 3
 
 
 class _RxState:
@@ -417,6 +580,72 @@ def _irq(event, data):
     elif event == _IRQ_SCAN_DONE:
         global _scan_active
         _scan_active = False
+
+    # ── outbound pair / bonding events ─────────────────────────────────
+    elif event == _IRQ_PERIPHERAL_CONNECT:
+        conn_handle, _addr_type, _addr = data
+        if _pair_target is not None and _pair_state == PAIR_CONNECTING:
+            _pair_target["conn"] = conn_handle
+            _set_pair_state(PAIR_ENCRYPTING, "pairing...")
+            # Kick the security handshake. On builds without gap_pair this
+            # silently no-ops and we rely on the peer to drive encryption.
+            try:
+                _get_ble().gap_pair(conn_handle)
+            except Exception:
+                pass
+    elif event == _IRQ_PERIPHERAL_DISCONNECT:
+        conn_handle, _addr_type, _addr = data
+        if _pair_target is not None and _pair_target.get("conn") == conn_handle:
+            # If we got disconnected BEFORE encryption completed it's a
+            # failure; AFTER it's the normal post-bond teardown.
+            if _pair_state == PAIR_ENCRYPTING:
+                _set_pair_state(PAIR_FAILED, "peer dropped link")
+            # leave DONE / FAILED alone so the UI can read it
+    elif event == _IRQ_ENCRYPTION_UPDATE:
+        # data = (conn_handle, encrypted, authenticated, bonded, key_size)
+        try:
+            conn_handle, encrypted, _auth, bonded, _ks = data
+        except (ValueError, TypeError):
+            return
+        if _pair_target is None:
+            return
+        if encrypted:
+            # Persist the bond record (separate from BLE secrets, which
+            # arrive via _IRQ_SET_SECRET as their own events).
+            try:
+                from oreoOS import bonds
+                bonds.add(_pair_target["mac"],
+                          _pair_target.get("name", ""),
+                          _pair_target.get("kind", "other"))
+            except Exception:
+                pass
+            _set_pair_state(PAIR_DONE,
+                            "paired" + (" + bonded" if bonded else ""))
+            # Politely disconnect now that bonding's stashed — the user
+            # doesn't need an active link sitting open.
+            try:
+                _get_ble().gap_disconnect(conn_handle)
+            except Exception:
+                pass
+        else:
+            _set_pair_state(PAIR_FAILED, "encryption rejected")
+    elif event == _IRQ_SET_SECRET:
+        sec_type, key, value = data
+        try:
+            from oreoOS import bonds
+            bonds.set_secret(sec_type, bytes(key) if key else None,
+                             bytes(value) if value else None)
+        except Exception:
+            return False
+        return True
+    elif event == _IRQ_GET_SECRET:
+        sec_type, index, key = data
+        try:
+            from oreoOS import bonds
+            return bonds.get_secret(sec_type, index,
+                                    bytes(key) if key else None)
+        except Exception:
+            return None
 
 
 def _notify(status_byte):
