@@ -56,7 +56,15 @@ def _color(name):
 
 
 class App(oreoOS.App):
-    name = "Storage"
+    name         = "Storage"
+    author       = "Circuit-Overtime"
+    # storage.usage() does a full os.listdir+stat walk of the flash —
+    # ~hundreds of ms on a populated 16 MB filesystem. Without the
+    # loading splash the user stares at a frozen previous-app frame
+    # until the walk returns. Same applies on every A-refresh, but
+    # the splash only covers the initial on_enter; refresh is fast
+    # enough on a re-walk that the brief stutter is acceptable.
+    SHOW_LOADING = True
 
     def on_enter(self, os):
         super().on_enter(os)
