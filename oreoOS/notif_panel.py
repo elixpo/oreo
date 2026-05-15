@@ -151,9 +151,14 @@ class NotifPanel:
         self.open   = False        # logical state (independent of anim)
         self._t     = 0.0          # animation progress 0..1
         self._dir   = 0            # +1 opening, -1 closing
-        self._focus = "quick"      # "quick" | "list"
+        self._focus = "quick"      # "quick" | "bright" | "time" | "list"
         self._quick_sel = 0
         self._list_sel  = 0
+        # Transient toast shown in the time-sync row while a manual sync
+        # is in flight, then for ~1.5 s after it finishes. None = display
+        # the live clock instead. (start_ms, text, color_key)
+        self._time_toast = None
+        self._toast_ms   = 1500
 
     # ── visibility ──────────────────────────────────────────────────────
     def is_active(self):
@@ -212,6 +217,8 @@ class NotifPanel:
             return self._handle_quick(btn, items)
         if self._focus == "bright":
             return self._handle_bright(btn, items)
+        if self._focus == "time":
+            return self._handle_time(btn, items)
         return self._handle_list(btn, items)
 
     def _handle_quick(self, btn, items):
