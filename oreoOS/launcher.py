@@ -174,6 +174,17 @@ def run_app(os_obj, app):
     frame_errs = 0
     FRAME_ERR_LIMIT = 8
 
+    # Long-press auto-repeat for navigation buttons. Held UP/DOWN/LEFT/
+    # RIGHT will fire on_button_press repeatedly at REPEAT_MS cadence
+    # after HOLD_MS of continuous hold. Action buttons (A/B/C/HOME) are
+    # NOT included — those are commit-style and one fire per press is
+    # the right semantic. Apps inherit this behaviour for free: any
+    # scrollable list already handles UP/DOWN, no per-app changes.
+    HOLD_MS   = 350
+    REPEAT_MS = 80
+    AUTOREPEAT_BUTTONS = (api.BTN_UP, api.BTN_DOWN, api.BTN_LEFT, api.BTN_RIGHT)
+    next_repeat_ms = {b: 0 for b in AUTOREPEAT_BUTTONS}
+
     app.on_enter(os_obj)
     last = time.ticks_ms()
     try:
@@ -230,6 +241,41 @@ def run_app(os_obj, app):
                     if os_obj.buttons.just_released(b):
                         if not panel.is_active():
                             app.on_button_release(b)
+
+                # ── auto-repeat synthesis for held nav buttons ────────
+                # After the initial just_pressed dispatch above, a held
+                # UP/DOWN/LEFT/RIGHT keeps firing on_button_press every
+                # REPEAT_MS so the user can drag-scroll a list without
+                # tapping repeatedly. Routed identically to the initial
+                # press so the panel-open / app dispatch / HOME-redirect
+                # paths all stay consistent.
+                tick_ms = time.ticks_ms()
+                for b in AUTOREPEAT_BUTTONS:
+                    held = os_obj.buttons.pressed_for_ms(b)
+                    if held <= HOLD_MS:
+                        next_repeat_ms[b] = 0
+                        continue
+                    if next_repeat_ms[b] == 0:
+                        # First repeat fires HOLD_MS after press.
+                        next_repeat_ms[b] = tick_ms + REPEAT_MS
+                        fire = True
+                    elif time.ticks_diff(tick_ms, next_repeat_ms[b]) >= 0:
+                        next_repeat_ms[b] = tick_ms + REPEAT_MS
+                        fire = True
+                    else:
+                        fire = False
+                    if not fire:
+                        continue
+                    if pm: pm.note_event()
+                    if b == api.BTN_C:
+                        # Defensive — BTN_C isn't in AUTOREPEAT_BUTTONS,
+                        # but keep the guard so a future edit can't make
+                        # the panel re-toggle on every repeat tick.
+                        continue
+                    if panel.is_active():
+                        panel.handle_button(b)
+                    else:
+                        app.on_button_press(b)
 
             # Tick the panel BEFORE the app draws so we can detect the
             # exact frame the close animation finishes and force the app
