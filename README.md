@@ -8,8 +8,6 @@
 
 **A handheld panda-themed conference badge that runs a real operating system.**
 
-Made by [Elixpo](https://elixpo.com) · OS, mascot, and apps by [@Circuit-Overtime](https://github.com/Circuit-Overtime)
-
 [![License: Oreo-PCL](https://img.shields.io/badge/license-Oreo--PCL-FF5D68?style=for-the-badge)](LICENSE)
 [![MicroPython 1.28](https://img.shields.io/badge/MicroPython-1.28-00B4A5?style=for-the-badge&logo=python&logoColor=white)](https://micropython.org)
 [![ESP32-S3](https://img.shields.io/badge/ESP32--S3-N16R8-2E2E2E?style=for-the-badge&logo=espressif&logoColor=white)](https://www.espressif.com/en/products/socs/esp32-s3)
@@ -63,8 +61,8 @@ Weather, GitHub commits, OTA updates — all live. WiFi power-capped at 11 dBm s
 <tr>
 <td valign="top">
 
-### 🎮 12 apps shipped
-Games, GitHub tools, IR quests, a colour picker, a panda you take care of across days. All open-source under one warm cream theme.
+### 🎮 16 apps shipped
+Games, GitHub tools, IR quests, a colour picker, a markdown reader, storage breakdown, and a panda you take care of across days. All open-source under one warm cream theme.
 
 </td>
 <td valign="top">
@@ -91,13 +89,16 @@ written as a small `class App(oreoOS.App)` with three lifecycle methods.
 
 <div align="center">
 
-| | | | | |
-|:-:|:-:|:-:|:-:|:-:|
-| <img src="assets/icons/raw/apps_icon.png" width="64"><br>**Apps** | <img src="assets/icons/raw/badge_icon.png" width="64"><br>**Badge** | <img src="assets/icons/raw/identity_icon.png" width="64"><br>**Identity** | <img src="assets/icons/raw/commits_icon.png" width="64"><br>**Commits** | <img src="assets/icons/raw/wifi_icon.png" width="64"><br>**Weather** |
-| <img src="assets/icons/raw/elixpo_pet_icon.png" width="64"><br>**Pet** | <img src="assets/icons/raw/racer_icon.png" width="64"><br>**Racer** | <img src="assets/icons/raw/flappy_icon.png" width="64"><br>**Flappy** | <img src="assets/icons/raw/snake_icon.png" width="64"><br>**Snake** | <img src="assets/icons/raw/gamepad_icon.png" width="64"><br>**Gamepad** |
-| <img src="assets/icons/raw/gallery_icon.png" width="64"><br>**Gallery** | <img src="assets/icons/raw/color_icon.png" width="64"><br>**Color** | <img src="assets/icons/raw/IR_Quest_icon.png" width="64"><br>**IR Quest** | <img src="assets/icons/raw/settings_icon.png" width="64"><br>**Settings** | <img src="assets/icons/raw/about_icon.png" width="64"><br>**About** |
+| | | | |
+|:-:|:-:|:-:|:-:|
+| <img src="assets/icons/raw/badge_icon.png" width="64"><br>**Badge** | <img src="assets/icons/raw/identity_icon.png" width="64"><br>**Identity** | <img src="assets/icons/raw/commits_icon.png" width="64"><br>**Commits** | <img src="assets/icons/raw/wallpaper_icon.png" width="64"><br>**Weather** |
+| <img src="assets/icons/raw/elixpo_pet_icon.png" width="64"><br>**Pet** | <img src="assets/icons/raw/racer_icon.png" width="64"><br>**Racer** | <img src="assets/icons/raw/flappy_icon.png" width="64"><br>**Flappy** | <img src="assets/icons/raw/snake_icon.png" width="64"><br>**Snake** |
+| <img src="assets/icons/raw/gamepad_icon.png" width="64"><br>**Gamepad** | <img src="assets/icons/raw/gallery_icon.png" width="64"><br>**Gallery** | <img src="assets/icons/raw/color_icon.png" width="64"><br>**Color** | <img src="assets/icons/raw/IR_Quest_icon.png" width="64"><br>**IR Quest** |
+| <img src="assets/icons/raw/reader_icon.png" width="64"><br>**Reader** | <img src="assets/icons/raw/storage_icon.png" width="64"><br>**Storage** | <img src="assets/icons/raw/settings_icon.png" width="64"><br>**Settings** | <img src="assets/icons/raw/about_icon.png" width="64"><br>**About** |
 
 </div>
+
+Bluetooth and WiFi don't get their own drawer tiles — they live inside **Settings**, alongside brightness, sleep, and OTA. The notification panel (press **C** from anywhere) puts both radios + a brightness slider + manual time-sync one tap away.
 
 Want to add yours? Copy [`templates/example_app/`](templates/example_app/) into `apps/your_name/` and ship.
 
@@ -114,6 +115,21 @@ python tools/deploy.py /dev/ttyACM0      # flash to a connected board
 ```
 
 For step-by-step app-writing + OS internals, see [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
+---
+
+## 🔔 The notification panel
+
+Press **C** from any app. A pink panel slides down with everything you'd otherwise dig through menus for:
+
+| Row | What it does |
+|---|---|
+| WiFi · BT · Settings | three pills — A toggles the radio, or jumps straight to the Settings app |
+| Brightness slider | LEFT / RIGHT nudges the LCD backlight by 10 %, no preset cycling |
+| Sync time | A re-runs the NTP sync — useful when WiFi just came up or you crossed a timezone |
+| Notification cards | newest-first list of OTA / BT / file events; A opens, B clears all |
+
+Press **C** (or **HOME**) again to dismiss — the underlying app keeps its state and resumes mid-frame.
 
 ---
 
@@ -188,6 +204,45 @@ if not profile or age > 3600:
 Used by Badge + Commits to render instantly from disk and refresh in
 the background. Auto-includes a `__ts=<epoch>` header so callers know
 the cache age.
+
+### Time + NTP sync — `oreoOS.timeutil`
+
+```python
+from oreoOS import timeutil
+hour, minute, sec, weekday, day, month, year = timeutil.now()
+
+ok, msg = timeutil.sync_from_ntp()        # ~2 s blocking, gated on WiFi
+print(timeutil.last_sync_status())        # "ok" | "no-wifi" | "failed" | "never"
+```
+
+Same call drives the boot-time auto-sync, the **Sync Time** row in
+Settings, and the **C-panel** time-sync action — all three surfaces
+agree on the last result via the shared `last_sync_status()`.
+
+### Storage breakdown — `oreoOS.storage`
+
+```python
+from oreoOS import storage
+snap = storage.usage()
+# {'stats': {'total': …, 'used': …, 'free': …},
+#  'buckets': {'system': {...}, 'apps': {...}, 'gallery': {...},
+#              'documents': {...}, 'misc': {...}}}
+```
+
+A full `os.listdir + os.stat` walk takes a few hundred ms on a
+populated 16 MB flash, so the Storage app declares
+`SHOW_LOADING = True` to mask the blocking call behind the slide
+splash. Use it from any app that wants a "how full am I?" readout.
+
+### Markdown rendering — the Reader app
+
+The Reader app (`apps/reader/`) renders **`.md`** and **`.txt`** files
+landed in `documents/` (BT inbox) or `apps/reader/assets/` (flashed).
+Supports `# / ## / ###` headings, `**bold**`, `*italic*`, `` `code` ``,
+bullets, numbered lists, fenced ``` ``` ``` blocks, and `---` rules —
+small enough to ship to flash, big enough for README-style notes
+someone sideloaded over BT. New files appear in the picker within
+200 ms (5 Hz poll) — no restart.
 
 ### Wireless networking and Bluetooth
 
@@ -292,11 +347,12 @@ user through this exact workflow.
 |---|---|
 | **MCU** | ESP32-S3-DevKitC-1-N16R8 (16 MB flash, 8 MB PSRAM) |
 | **Display** | ST7789 IPS, 2.0", 320×240, 4-wire SPI @ 40 MHz |
-| **Input** | 8 tactile buttons (TTP223 capacitive pads planned for v2) |
+| **Input** | 8 tactile buttons — also the wake-from-sleep source (TTP223 capacitive pads planned for v2) |
 | **Sensors** | MPU-6050 (6-DoF IMU), TSOP38238 (IR RX) |
 | **Output** | 4 corner LEDs, WS2812 status NeoPixel, IR LED (940 nm) + 2N2222 driver |
 | **Comms** | WiFi 802.11 b/g/n, BLE 5.0, IR, USB-C |
 | **Power** | 18650 cell + MAX17048 fuel gauge, USB-C charging, AMS1117-3.3 LDO |
+| **Clock** | RTC backed by NTP — boot sync + manual re-sync from Settings / C-panel |
 
 📄 **Full electrical / mechanical specs:** see [`docs/DATASHEET.md`](docs/DATASHEET.md)
 🔧 **Build guide + pinout + soldering tips:** see [`docs/HARDWARE.md`](docs/HARDWARE.md)
@@ -309,6 +365,8 @@ The single source of truth for every GPIO assignment is
 ## 🔄 Updates
 
 The badge pulls itself forward. A fast SHA-vs-version check runs in the background against the project's GitHub release channel. **Small patches** (≤ 80 KB) install themselves; **big updates** wait for your explicit yes. Files are validated by SHA-256 and atomically swapped on the next boot — if anything goes wrong mid-download, the badge keeps running its old version.
+
+Wall-clock time follows the same pattern: NTP runs once at boot when WiFi is up, and the **Sync Time** action (Settings or the C-panel) lets you re-pull if you crossed a timezone or the clock drifted.
 
 Cutting a release takes one command: `python tools/release.py`. Details in [`CONTRIBUTING.md → Releasing`](CONTRIBUTING.md#releasing).
 

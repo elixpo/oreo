@@ -1,43 +1,14 @@
-<!--
-Thanks for sending a PR to OreoOS! 🐼
-Fill out the sections that apply; delete the rest.
--->
+## Changes Made:- 
 
-## What's changing
+## Checklists 
 
-<!-- 1-2 sentences. The README of this PR. -->
+- [ ] 
 
-## Why
+## Further Explanation (optional)
 
-<!-- The motivation. Linked issue? User-reported bug? Design tweak? -->
 
-Fixes: #
-Related: #
+> 
 
-## Type of change
-
-- [ ] 🐛 Bug fix
-- [ ] ✨ New app
-- [ ] 🔧 OS / driver change
-- [ ] 🎨 UI / theme polish
-- [ ] 📦 Build / tooling
-- [ ] 📚 Docs
-- [ ] 🔐 Security
-- [ ] 🧪 Test / CI
-
-## How was it tested
-
-<!-- Did you flash a real badge? Run any of the apps? Confirm wake-from-sleep? -->
-
-- [ ] `python tools/deploy.py /dev/ttyACM0` passed
-- [ ] Booted to home screen on hardware
-- [ ] App(s) touched still open + render
-- [ ] Wake-from-sleep still works (if power-management touched)
-- [ ] OTA staging not broken (if `oreoOS/ota.py` or release pipeline touched)
-
-## Screenshots / photos
-
-<!-- Phone snaps of the badge running the change are very welcome. -->
 
 ## Checklist before merging
 
