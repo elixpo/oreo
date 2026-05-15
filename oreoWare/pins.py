@@ -62,8 +62,23 @@ I2C_SCL   = 47
 IMU_INT   = 3      # RTC_GPIO3 — wakes from deep sleep on a motion interrupt
 
 # ----- TTP223 (planned v2 — NOT wired in v1 firmware) -----
-# v2 hardware reserves TWO pads (front-panda + secondary) for capacitive
-# touch. v1 firmware doesn't read these; button-only wake covers v1. Pin
-# kept here so v2 work doesn't have to re-pick an RTC GPIO.
+# v2 hardware exposes TWO capacitive pads so apps + accessories can wire
+# in independent touch interfaces (e.g. front-panda chest + back-cover
+# secondary, or a paired-badge handshake). v1 firmware doesn't read
+# either; button-only wake covers v1. Pins reserved here so v2 work
+# doesn't have to re-pick GPIOs.
+#
 # Module jumper set to active-HIGH, momentary (no toggle).
-TOUCH_OUT = 21
+#
+# Pin selection:
+#   TOUCH_OUT_1 = 21  RTC GPIO → wake-from-deep-sleep capable. Use this
+#                     pad as the primary wake source on v2.
+#   TOUCH_OUT_2 = 33  Non-RTC. Edge-poll only in firmware (no deep-sleep
+#                     wake). Non-strapping, not on PSRAM lines for the
+#                     N16R8 module, not a USB-OTG pad. Free in our map.
+#
+# Back-compat: `TOUCH_OUT` aliases TOUCH_OUT_1 so existing references in
+# documentation / external sketches keep resolving.
+TOUCH_OUT_1 = 21
+TOUCH_OUT_2 = 33
+TOUCH_OUT   = TOUCH_OUT_1
