@@ -92,11 +92,21 @@ CHUNK_BYTES    = 4096
 SMALL_PATCH_BYTES = 80 * 1024     # 80 KB
 
 # Timeouts (seconds). Every HTTP call uses one of these — no unbounded
-# blocking is allowed because the OS run loop polls OTA from the Settings
-# app's button handler. A hung GET would freeze the whole UI.
-T_GH_API       = 10        # GitHub releases API listing
-T_MANIFEST     = 10        # manifest.json download (tiny)
-T_FILE         = 25        # individual file download
+# blocking is allowed because the OS run loop polls OTA from the
+# background_check tail of every frame. A hung GET freezes the whole UI
+# (input events queue up but no transitions happen) so the API probe is
+# kept short. Tuned down from 10s -> 4s after on-device reports of
+# "press A, OS stuck" — every frame was potentially eating a 10 s GET
+# while GitHub's edge throttled the badge's IP.
+T_GH_API       = 4         # GitHub releases API listing
+T_MANIFEST     = 4         # manifest.json download (tiny)
+T_FILE         = 25        # individual file download (user-triggered)
+
+# Don't auto-probe in the first minute of boot — gives the UI time to
+# settle, lets the user open the home screen / press a button without
+# eating a synchronous HTTP round-trip. Manual "Check Update" from
+# Settings is unaffected: it calls check() directly.
+_OTA_BOOT_GRACE_S = 60
 
 
 # ── helpers ─────────────────────────────────────────────────────────────────
@@ -487,6 +497,19 @@ def background_check(os_obj, min_interval_s=6 * 3600):
         now = int(time.time())
     except Exception:
         return False
+
+    # Boot-grace: never probe in the first _OTA_BOOT_GRACE_S of uptime,
+    # even if the persisted timestamp is missing or zero. Without this,
+    # the very first frame after boot fires a synchronous HTTP GET and
+    # the user sees "press A, stuck for 4 s" because the exiting frame
+    # has to finish background_check before the next app loads.
+    try:
+        boot_ts = getattr(os_obj, "_boot_ts_s", None)
+        if boot_ts is not None and (now - boot_ts) < _OTA_BOOT_GRACE_S:
+            return False
+    except Exception:
+        pass
+
     if now - last < min_interval_s:
         return False
 

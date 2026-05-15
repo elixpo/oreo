@@ -470,6 +470,15 @@ def boot():
     # machine.reset() after apply to guarantee the new drivers boot fresh.
     os_obj = OS()
 
+    # Stamp the boot timestamp on the OS object so OTA can refuse to
+    # probe inside the first minute of uptime — without this the very
+    # first run-loop frame fires a synchronous GitHub API GET, freezing
+    # whichever transition the user triggers (e.g. "press A on home").
+    try:
+        os_obj._boot_ts_s = int(time.time())
+    except Exception:
+        os_obj._boot_ts_s = 0
+
     applied = _maybe_apply_ota(os_obj)
     if applied:
         # Persist the version for the post-reboot "Updated to vX.Y.Z" toast.
