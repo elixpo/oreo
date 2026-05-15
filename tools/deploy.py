@@ -124,6 +124,7 @@ DEPLOY = [
     ("oreoOS/ota.py",           "oreoOS/ota.py"),
     ("oreoOS/storage.py",       "oreoOS/storage.py"),
     ("oreoOS/notifications.py", "oreoOS/notifications.py"),
+    ("oreoOS/notif_panel.py",   "oreoOS/notif_panel.py"),
 
     # Hardware drivers
     ("oreoWare/__init__.py",    "oreoWare/__init__.py"),
@@ -162,6 +163,22 @@ for app_dir in sorted(APPS_DIR.iterdir()):
             ("%s/main.py" % rel,          "%s/main.py" % rel),
             ("%s/manifest.json" % rel,    "%s/manifest.json" % rel),
         ]
+        # Reader bundles plain .md / .txt files under assets/ (no optimize
+        # step — they're already device-readable). README.md is a host-only
+        # workflow doc and is excluded from the push.
+        if app_dir.name == "reader":
+            r_assets = app_dir / "assets"
+            if r_assets.exists():
+                for p in sorted(r_assets.iterdir()):
+                    if not p.is_file():
+                        continue
+                    if p.name == "README.md":
+                        continue
+                    if p.suffix.lower() not in (".md", ".txt"):
+                        continue
+                    DEPLOY.append((str(p),
+                                   "%s/assets/%s" % (rel, p.name)))
+
         # Per-app assets (only optimized .py modules, not raw images).
         # Gallery is special: filter the optimized list to ONLY the stems
         # that still have a corresponding raw image — old photos that the

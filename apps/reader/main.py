@@ -27,7 +27,10 @@ from oreoOS import api, theme, widgets
 SW = api.SCREEN_W
 SH = api.SCREEN_H
 
-DOCS_DIR = "documents"
+DOCS_DIRS = (
+    "documents",                # ← BT inbox (writable, .md/.txt land here)
+    "apps/reader/assets",       # ← bundled / sideloaded via deploy.py
+)
 
 PAD_X      = 10
 LINE_GAP   = 2
@@ -41,16 +44,27 @@ _HEADING_SCALE = {1: 2, 2: 2, 3: 1}
 # ── picker ──────────────────────────────────────────────────────────────
 
 def _list_docs():
-    """Return sorted (basename, full_path) for every .md/.txt under
-    documents/. Returns [] if the dir doesn't exist yet."""
-    out = []
-    try:
-        for name in os.listdir(DOCS_DIR):
+    """Return sorted (display_name, full_path) for every .md / .txt under
+    any of DOCS_DIRS. Files bundled in apps/reader/assets are tagged with
+    a leading '* ' so the user can tell them apart from BT-arrived inbox
+    items. Returns [] when no readable directory exists yet."""
+    out  = []
+    seen = set()
+    for base in DOCS_DIRS:
+        try:
+            entries = os.listdir(base)
+        except OSError:
+            continue
+        for name in entries:
             low = name.lower()
-            if low.endswith(".md") or low.endswith(".txt"):
-                out.append((name, DOCS_DIR + "/" + name))
-    except OSError:
-        return []
+            if not (low.endswith(".md") or low.endswith(".txt")):
+                continue
+            full = base + "/" + name
+            if full in seen:
+                continue
+            seen.add(full)
+            label = name if base == "documents" else ("* " + name)
+            out.append((label, full))
     out.sort()
     return out
 

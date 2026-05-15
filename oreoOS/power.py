@@ -126,6 +126,29 @@ class PowerManager:
                 break
             time.sleep_ms(30)
 
+        # Wait for the wake-button to be RELEASED before we return. Without
+        # this the next frame's `buttons.update()` sees the button still
+        # held, fires `just_pressed` against the pre-sleep frame's released
+        # state, and the app receives a spurious tap of whatever woke us.
+        # 200 ms safety ceiling so a stuck button doesn't strand us here.
+        release_deadline = time.ticks_add(time.ticks_ms(), 200)
+        while time.ticks_diff(release_deadline, time.ticks_ms()) > 0:
+            any_held = False
+            for pin in btn_pins.values():
+                if pin.value() == 0:
+                    any_held = True
+                    break
+            if not any_held:
+                break
+            time.sleep_ms(10)
+        # Flag the run loop so it skips one input-dispatch frame and
+        # re-syncs the buttons module's edge detector against the now-
+        # released state.
+        try:
+            self._os._just_woke = True
+        except Exception:
+            pass
+
         # Restore the screen on wake. The next frame the run-loop draws
         # will repaint everything because each app's _dirty flag is still
         # whatever it was before — but we force a redraw just in case.

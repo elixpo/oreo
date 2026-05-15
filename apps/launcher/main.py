@@ -286,13 +286,9 @@ class App(oreoOS.App):
         self._anim_t    = ANIM_DUR
         self._dirty     = True
 
-        # Notification panel state — pulls down from the top on C. Lives
-        # in the launcher (not a separate app) so the apps grid stays
-        # visible behind the sliding overlay.
-        self._panel_open  = False
-        self._panel_t     = 0.0        # 0 = hidden, 1 = fully down
-        self._panel_dir   = 0          # +1 opening, -1 closing
-        self._panel_sel   = 0
+        # Notification panel is now OS-level (see oreoOS/notif_panel.py)
+        # — the run loop intercepts BTN_C globally and overlays the panel
+        # on whatever app is on screen, so no launcher-local state needed.
 
     # ── category-view helpers ──────────────────────────────────────────────
     def _build_categories(self):
@@ -360,14 +356,8 @@ class App(oreoOS.App):
 
     # ── input ────────────────────────────────────────────────────────────
     def on_button_press(self, btn):
-        # Notification panel takes input precedence whenever it's open OR
-        # currently animating in — pressing C twice quickly shouldn't get
-        # eaten by the launcher.
-        if self._panel_open:
-            return self._on_button_press_panel(btn)
-        if btn == api.BTN_C:
-            self._open_panel()
-            return
+        # BTN_C is consumed by the OS-level notification panel before it
+        # ever reaches an app, so we don't handle it here.
 
         # Category mode, level 0: 5 vertical tile picker.
         if self._mode == "categories" and self._cat_level == 0:
@@ -446,76 +436,6 @@ class App(oreoOS.App):
             self._anim_t = min(ANIM_DUR, self._anim_t + dt)
             self._dirty = True
 
-        # Notification-panel slide animation. Independent of the grid
-        # animation so closing the panel while the grid scrolls works.
-        if self._panel_dir != 0:
-            self._panel_t += self._panel_dir * (dt / 0.18)
-            if self._panel_t >= 1.0:
-                self._panel_t   = 1.0
-                self._panel_dir = 0
-            elif self._panel_t <= 0.0:
-                self._panel_t    = 0.0
-                self._panel_dir  = 0
-                self._panel_open = False
-            self._dirty = True
-
-    # ── notification panel ──────────────────────────────────────────────
-    def _open_panel(self):
-        self._panel_open = True
-        self._panel_dir  = 1
-        self._panel_sel  = 0
-        try:
-            from oreoOS import notifications
-            notifications.mark_read()
-        except Exception:
-            pass
-        self._dirty = True
-
-    def _close_panel(self):
-        self._panel_dir  = -1
-        self._dirty = True
-
-    def _on_button_press_panel(self, btn):
-        try:
-            from oreoOS import notifications
-            items = notifications.items()
-        except Exception:
-            items = []
-        n = len(items)
-
-        if btn == api.BTN_C or btn == api.BTN_HOME:
-            self._close_panel()
-            return
-        if n == 0:
-            return
-        if btn == api.BTN_UP:
-            self._panel_sel = (self._panel_sel - 1) % n
-            self._dirty = True
-        elif btn == api.BTN_DOWN:
-            self._panel_sel = (self._panel_sel + 1) % n
-            self._dirty = True
-        elif btn == api.BTN_A:
-            target = items[self._panel_sel].get("target")
-            try:
-                notifications.remove_at(self._panel_sel)
-            except Exception:
-                pass
-            self._panel_sel = 0
-            self._panel_open = False
-            self._panel_t    = 0.0
-            self._panel_dir  = 0
-            if target:
-                self._os.launch(target)
-            else:
-                self._dirty = True
-        elif btn == api.BTN_B:
-            try:
-                notifications.clear()
-            except Exception:
-                pass
-            self._panel_sel = 0
-            self._dirty = True
-
     # ── render ───────────────────────────────────────────────────────────
     def draw(self, d):
         if not self._dirty:
@@ -524,11 +444,11 @@ class App(oreoOS.App):
         widgets.draw_header(d, "APPS")
         # Hint reflects what the user can do at this level.
         if self._mode == "categories" and self._cat_level == 0:
-            widgets.draw_hint(d, "A=open  C=notif  HOME=back")
+            widgets.draw_hint(d, "A=open  HOME=back  C=notif")
         elif self._mode == "categories" and self._cat_level == 1:
             widgets.draw_hint(d, "A=launch  B=back  C=notif")
         else:
-            widgets.draw_hint(d, "A=launch  C=notif  HOME=back")
+            widgets.draw_hint(d, "A=launch  HOME=back  C=notif")
 
         n = len(self._apps)
         if not n:
@@ -647,89 +567,11 @@ class App(oreoOS.App):
                                  // max(1, rows_total - VISIBLE_ROWS)
             d.rect(track_x, thumb_y, 2, thumb_h, theme.PRIMARY, fill=True)
 
-        # Notification panel overlays everything else when open / animating.
-        if self._panel_open or self._panel_t > 0:
-            self._draw_panel(d)
-
         # keep dirty while scrolling / animating
         if (abs(self._scroll_y - self._top_row * CELL_H) > 0.5 or
-            self._anim_t < ANIM_DUR or
-            self._panel_dir != 0):
+            self._anim_t < ANIM_DUR):
             return    # leave _dirty = True
         self._dirty = False
-
-    # ── notification panel — slides down from the top on C ─────────────
-    def _draw_panel(self, d):
-        try:
-            from oreoOS import notifications
-            items = notifications.items()
-        except Exception:
-            items = []
-
-        # Panel takes the top ~75 % of the screen — leaves the launcher's
-        # hint bar visible so the user always knows how to dismiss.
-        full_h    = SH - widgets.HINT_H
-        # Eased slide: shift the whole panel down by full_h*(1-t).
-        offset    = int(full_h * (1.0 - self._panel_t))
-        panel_y   = -offset
-
-        # Backdrop (slightly translucent feel via the cream dock color).
-        d.rect(0, panel_y, SW, full_h, theme.DOCK_BG, fill=True)
-        # Accent strip at the bottom edge for separation.
-        d.rect(0, panel_y + full_h - 2, SW, 2, theme.PRIMARY, fill=True)
-
-        # Header band — pink strip with a small bell glyph beside the title.
-        title = "NOTIFICATIONS"
-        d.rect(0, panel_y, SW, 22, theme.PRIMARY, fill=True)
-        title_w  = len(title) * 8
-        title_x  = (SW - title_w) // 2
-        d.text(title, title_x, panel_y + 7, theme.BG, scale=1)
-        _draw_bell(d, title_x - 16, panel_y + 4, theme.BG)
-
-        # Empty state.
-        if not items:
-            msg = "no notifications"
-            d.text(msg, (SW - len(msg) * 8) // 2,
-                   panel_y + full_h // 2 - 12,
-                   theme.MUTED, scale=1)
-            hint = "C/HOME=close"
-            d.text(hint, (SW - len(hint) * 8) // 2,
-                   panel_y + full_h - 18, theme.MUTED2, scale=1)
-            return
-
-        # Card list. Each card: kind dot + title + body. Selection draws
-        # a pink border around the row.
-        list_y    = panel_y + 28
-        card_pad  = 6
-        card_h    = 34
-        max_cards = (full_h - 28 - 20) // (card_h + 4)
-        top       = max(0, self._panel_sel - max_cards + 1)
-        for i in range(top, min(len(items), top + max_cards)):
-            it = items[i]
-            y  = list_y + (i - top) * (card_h + 4)
-            sel = (i == self._panel_sel)
-            bg  = theme.DOCK_SEL if sel else theme.CARD
-            d.rect(8, y, SW - 16, card_h, bg, fill=True)
-            if sel:
-                _rounded_outline(d, 8, y, SW - 16, card_h,
-                                 theme.SEL_BORDER, r=3)
-            # Per-kind 12×12 glyph baked from rect calls. No asset load
-            # so the panel stays cheap to draw mid-animation.
-            kind  = it.get("kind", "")
-            ink   = (theme.GOLD if kind == "file"
-                     else theme.PRIMARY if kind == "ota"
-                     else theme.TEAL)
-            _draw_kind_glyph(d, 14, y + card_pad + 3, kind, ink)
-            title = it.get("title", "")[:24]
-            body  = it.get("body",  "")[:28]
-            d.text(title, 34, y + card_pad, theme.TEXT_BRIGHT, scale=1)
-            if body:
-                d.text(body, 34, y + card_pad + 12, theme.TEXT_DIM, scale=1)
-
-        # Hint band at the bottom of the panel.
-        hint = "A=open  B=clear  C/HOME=close"
-        d.text(hint, (SW - len(hint) * 8) // 2,
-               panel_y + full_h - 14, theme.TEXT_DIM, scale=1)
 
     # ── category picker (level 0) — vertical tile list ──────────────────
     CAT_TILE_H    = 36           # each tile's height

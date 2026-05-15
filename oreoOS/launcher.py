@@ -161,6 +161,12 @@ def run_app(os_obj, app):
         except Exception:
             pm = None
 
+    # Notification panel singleton — global C-button hotkey, OS-level
+    # overlay. Same instance survives app switches so notifications you
+    # push from inside an app are visible the moment the user opens it.
+    from oreoOS import notif_panel as _np_mod
+    panel = _np_mod.get(os_obj)
+
     app.on_enter(os_obj)
     last = time.ticks_ms()
     try:
@@ -170,33 +176,58 @@ def run_app(os_obj, app):
             last = now
 
             os_obj.buttons.update()
-            for b in api.BUTTONS:
-                if os_obj.buttons.just_pressed(b):
-                    if pm: pm.note_event()
-                    if b == api.BTN_HOME:
-                        handled = False
-                        hook = getattr(app, "on_home_press", None)
-                        if hook is not None:
-                            try:
-                                handled = bool(hook())
-                            except Exception:
-                                handled = False
-                        if not handled:
-                            # Default: HOME → apps drawer (not the clock screen).
-                            # Skip the redirect when we ARE in a drawer/home — quit
-                            # then so boot()'s outer loop reaches the home screen.
-                            app_name = getattr(app, "name", "")
-                            if app_name in ("Apps", "home"):
-                                os_obj.quit()
-                            else:
-                                os_obj.launch("__appmenu__")
-                    else:
-                        app.on_button_press(b)
-                if os_obj.buttons.just_released(b):
-                    app.on_button_release(b)
+
+            # Wake-button swallow. PowerManager sets this when light sleep
+            # exits — without it, the press that woke us would also fire
+            # as a fresh just_pressed against the pre-sleep frame and the
+            # current app would handle it (e.g. HOME → go-home).
+            if getattr(os_obj, "_just_woke", False):
+                os_obj._just_woke = False
+            else:
+                for b in api.BUTTONS:
+                    if os_obj.buttons.just_pressed(b):
+                        if pm: pm.note_event()
+
+                        # Global C hotkey → toggle the notification panel
+                        # before anything else gets a look. Works from any
+                        # app, including ones that would otherwise consume C.
+                        if b == api.BTN_C:
+                            panel.toggle()
+                            continue
+
+                        # Panel-open input is routed to the panel and the
+                        # underlying app sees nothing.
+                        if panel.is_active():
+                            panel.handle_button(b)
+                            continue
+
+                        if b == api.BTN_HOME:
+                            handled = False
+                            hook = getattr(app, "on_home_press", None)
+                            if hook is not None:
+                                try:
+                                    handled = bool(hook())
+                                except Exception:
+                                    handled = False
+                            if not handled:
+                                # Default: HOME → apps drawer (not the clock screen).
+                                # Skip the redirect when we ARE in a drawer/home — quit
+                                # then so boot()'s outer loop reaches the home screen.
+                                app_name = getattr(app, "name", "")
+                                if app_name in ("Apps", "home"):
+                                    os_obj.quit()
+                                else:
+                                    os_obj.launch("__appmenu__")
+                        else:
+                            app.on_button_press(b)
+                    if os_obj.buttons.just_released(b):
+                        if not panel.is_active():
+                            app.on_button_release(b)
 
             app.update(dt)
             app.draw(os_obj.display)
+            panel.tick(dt)
+            panel.draw(os_obj.display)
             os_obj.display.present()
 
             # Idle check AFTER the frame so the user sees the result of their
