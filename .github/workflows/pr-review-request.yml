@@ -277,7 +277,7 @@ jobs:
             echo "   - 1-3 file surgical edits → Read + Edit/MultiEdit."
             echo "   - Bulk find/replace across several spots → python .github/scripts/apply_refactor.py with a JSON plan on stdin (one call, deterministic)."
             echo "   - You are ALREADY on the PR's head branch — commit + push there directly, do NOT open a new PR."
-            echo "   - Do NOT run ./biome.sh — the CI biome workflow checks the PR separately."
+            echo "   - This is a MicroPython repo — no biome / npm steps. A quick \`python -m py_compile <file>\` on edited modules is enough; flashing + on-device verification is the author's job."
             echo "   - End with ONE 'gh pr comment' summarising the fix (what you changed, which files). Stop."
             echo ""
             echo "3. **DECLINE (too big / architectural)** — large feature work, cross-module refactor, security-sensitive logic, DB migration-heavy, anything you can't confidently ship in <3 min."
@@ -398,7 +398,7 @@ jobs:
           $CHANGES
 
           ## 🧪 How to verify
-          - Pull the branch and run \\\`npm run build\\\` / biome check.
+          - Pull the branch and \\\`python -m py_compile\\\` any edited modules; deploy with \\\`python tools/deploy.py\\\` to a connected badge.
           - Review the diff against the issue's expected behavior.
 
           ---

@@ -42,11 +42,10 @@ Rules:
 - Use EXACTLY these sections in this order:
   1. `## Changes Made` — 3-7 bullets. Each bullet references a file in backticks and says what changed and why. Skip lockfiles, generated files, formatting-only noise.
   2. `## Checklist` — only include items that actually apply to this diff:
-     - `- [ ] \\`export const runtime = 'edge'\\` on any new API route` (only if new route.ts added)
-     - `- [ ] No Node built-ins imported (crypto, fs, path, stream, Buffer)` (only if src/ changed)
-     - `- [ ] New DB columns/tables have a migration in \\`src/workers/migrations/\\`` (only if D1 schema changed)
-     - `- [ ] Rate-limit middleware on new public auth endpoints` (only if new app/api/auth/** route added)
-     - `- [ ] \\`./biome.sh ci\\` clean` (always)
+     - `- [ ] MicroPython compat: no f-strings with `=`, no pathlib, no walrus in modules that ship to flash` (only if oreoOS/ or oreoWare/ or apps/ changed)
+     - `- [ ] App ships through \\`tools/deploy.py\\` DEPLOY list / \\`tools/build_release.py\\` SHIP_PATTERNS` (only if a new file under oreoOS/ or oreoWare/ or apps/ was added)
+     - `- [ ] No secrets committed (.env, secrets.py)` (always, but only flag if any .env*, secrets.py, or credentials.json appears in the diff)
+     - `- [ ] Flashed + smoke-tested on hardware` (always, leave a prompt for the author)
      - `- [ ] Tested locally: <how>` (always, leave the "how" as a prompt for the author)
   3. If the author left blockquotes (lines starting with `>`) in the original body, preserve them verbatim below Checklist. Skip the `@elixpoo fill` trigger line.
 - No marketing language. No "seamlessly", "leverages", "robust". Bullets, not paragraphs. Under 400 words total.
