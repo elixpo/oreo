@@ -93,9 +93,6 @@ class App(oreoOS.App):
                  getter=self._idle_minutes,
                  setter=self._set_idle_minutes,
                  step=1, max_val=10),
-            _Row("Touch Wake",  "toggle",
-                 getter=self._touch_wake,
-                 setter=self._set_touch_wake),
             _Row("Categorical", "toggle",
                  getter=self._app_view_categorical,
                  setter=self._set_app_view_categorical),
@@ -156,15 +153,6 @@ class App(oreoOS.App):
         # 10 = top cap so the slider doesn't run off into hours.
         v = max(0, min(10, int(v)))
         self._pm.SETTINGS["idle_seconds"] = v * 60
-        self._pm.save_settings(self._os)
-
-    def _touch_wake(self):
-        if not self._pm: return True
-        return bool(self._pm.SETTINGS.get("touch_wake", True))
-
-    def _set_touch_wake(self, v):
-        if not self._pm: return
-        self._pm.SETTINGS["touch_wake"] = bool(v)
         self._pm.save_settings(self._os)
 
     # ── apps drawer view ────────────────────────────────────────────────

@@ -189,19 +189,59 @@ Used by Badge + Commits to render instantly from disk and refresh in
 the background. Auto-includes a `__ts=<epoch>` header so callers know
 the cache age.
 
-### Touch gestures — `oreoOS.touch`
+### Wireless networking and Bluetooth
+
+OreoOS leans on MicroPython's stock networking stack; the OreoOS
+wrappers (`oreoWare.wifi`, `oreoWare.bt`) add config handling and
+power capping on top.
+
+- **WiFi** — [`network.WLAN`](https://docs.micropython.org/en/latest/library/network.WLAN.html).
+  Credentials come from `.env` (`WIFI_SSID`, `WIFI_PASSWORD`); the OS
+  applies `wlan.config(txpower=…)` and `pm=PM_POWERSAVE` from
+  `oreoOS/config.py` so a sealed badge doesn't melt its LDO.
+- **Bluetooth** — [`bluetooth`](https://docs.micropython.org/en/latest/library/bluetooth.html).
+  BLE advertising is gated by `BT_ADV_INTERVAL_MS` (proxy for TX power).
+  File-transfer over BT is **work-in-progress** — the GATT service is
+  advertised but chunked-payload reassembly still has a known bug we'll
+  fix in a follow-up release.
 
 ```python
-from oreoOS import touch
-def update(self, dt):
-    ev = touch.poll(self._os)
-    if   ev == touch.TAP:        self._open_help()
-    elif ev == touch.DOUBLE_TAP: self._favourite()
-    elif ev == touch.LONG_HOLD:  self._screenshot()
+# WiFi via the OreoOS wrapper — auto-applies power caps from config
+from oreoWare import wifi
+wifi.connect_from_config()
+print(wifi.ip())
+
+# Or drop straight to stock MicroPython:
+import network
+wlan = network.WLAN(network.STA_IF)
+wlan.active(True)
+wlan.connect("SSID", "password")
 ```
 
-The TTP223 pad is a single binary line; this module converts edges
-into named gestures so every app doesn't reimplement debounce.
+```python
+# BLE advertise (raw stdlib path)
+import bluetooth
+ble = bluetooth.BLE()
+ble.active(True)
+ble.gap_advertise(500_000, b"\x02\x01\x06\x05\x09Oreo")
+```
+
+### Built-in modules
+
+Every stock MicroPython module is available to apps — no extra install
+step. The ones you'll actually reach for on badge work:
+
+`array`, `binascii`, `builtins`, `cmath`, `collections`, `errno`, `gc`,
+`hashlib`, `heapq`, `io`, `json`, `machine`, `math`, `micropython`,
+`network`, `os`, `platform`, `random`, `re`, `select`, `socket`, `ssl`,
+`struct`, `sys`, `time`, `uctypes`, `bluetooth`, `cryptolib`, `deflate`,
+`framebuf`, `vfs`, `ntptime`, `requests`, `urequests`, `asyncio`,
+`aioble`, `websocket`, `umqtt`, `webrepl`.
+
+On top of those, OreoOS ships its own helper packages: `oreoOS.*`
+(font, sprite, cache, theme, widgets, ota, power…) and `oreoWare.*`
+(display, buttons, wifi, bt, imu, ir, battery, pins). Import them from
+any app — they're on the device boot path.
 
 ---
 
@@ -235,7 +275,7 @@ user through this exact workflow.
 |---|---|
 | **MCU** | ESP32-S3-DevKitC-1-N16R8 (16 MB flash, 8 MB PSRAM) |
 | **Display** | ST7789 IPS, 2.0", 320×240, 4-wire SPI @ 40 MHz |
-| **Input** | 8 tactile buttons + TTP223 capacitive touch pad |
+| **Input** | 8 tactile buttons (TTP223 capacitive pads planned for v2) |
 | **Sensors** | MPU-6050 (6-DoF IMU), TSOP38238 (IR RX) |
 | **Output** | 4 corner LEDs, WS2812 status NeoPixel, IR LED (940 nm) + 2N2222 driver |
 | **Comms** | WiFi 802.11 b/g/n, BLE 5.0, IR, USB-C |

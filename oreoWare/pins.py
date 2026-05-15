@@ -61,7 +61,9 @@ I2C_SCL   = 47
 # board so pitch = front/back tilt, roll = side-to-side tilt, yaw = twist.
 IMU_INT   = 3      # RTC_GPIO3 — wakes from deep sleep on a motion interrupt
 
-# ----- TTP223 -----
-# Module jumper set to active-HIGH, momentary (no toggle), so OUT pulses
-# while finger is on the pad. RTC_GPIO21 → ext1 wake-from-deep-sleep source.
+# ----- TTP223 (planned v2 — NOT wired in v1 firmware) -----
+# v2 hardware reserves TWO pads (front-panda + secondary) for capacitive
+# touch. v1 firmware doesn't read these; button-only wake covers v1. Pin
+# kept here so v2 work doesn't have to re-pick an RTC GPIO.
+# Module jumper set to active-HIGH, momentary (no toggle).
 TOUCH_OUT = 21

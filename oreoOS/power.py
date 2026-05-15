@@ -15,7 +15,6 @@ DEFAULT_IDLE_SECONDS = 120    # 2 min default — short enough to save battery
 SETTINGS = {
     "idle_enable":  True,
     "idle_seconds": DEFAULT_IDLE_SECONDS,
-    "touch_wake":   True,
 }
 
 
@@ -68,20 +67,14 @@ class PowerManager:
 
     # ── transitions ──────────────────────────────────────────────────────
     def enter_light_sleep(self):
-        """Pause CPU, blank LCD, wait for any button or TTP touch to wake.
+        """Pause CPU, blank LCD, wait for any button press to wake.
 
         Light sleep keeps RAM, framebuffer state, and peripherals alive —
-        when machine.lightsleep() returns the OS resumes EXACTLY at the
-        line below, no boot, no app reset. This is the right model for
-        "screen off but keep running" since the user's expectation is to
-        return to the same screen on tap-to-wake.
+        the OS resumes EXACTLY at the line below, no boot, no app reset.
+        This is the right model for "screen off but keep running" since
+        the user's expectation is to return to the same screen on wake.
 
-        Wake sources:
-          * every matrix button (active-low → IRQ_FALLING)
-          * TOUCH_OUT from the TTP223 (active-high → IRQ_RISING)
-        Both pins MUST be RTC GPIOs to wake the chip from light sleep;
-        we verified they are when picking the pin map (HOME/A/B/C/UP/DOWN/
-        LEFT/RIGHT in 4-21 range, TOUCH_OUT at 21).
+        Wake source: every matrix button (active-low → reads 0 on press).
         """
         if machine is None:
             return
@@ -99,14 +92,12 @@ class PowerManager:
 
         # Soft-polled sleep. machine.lightsleep + Pin.irq(wake=) was
         # unreliable on this MicroPython build, so we just blank the LCD
-        # and poll at 20 Hz. Pin objects are cached once outside the loop
+        # and poll at 33 Hz. Pin objects are cached once outside the loop
         # so we don't churn the pin controller every tick.
         #
-        # Wake conditions (any one of these breaks the loop):
-        #   * a button that was UNPRESSED at sleep entry now reads PRESSED
-        #   * the TTP223 pad that was IDLE at sleep entry now reads TOUCHED
-        # We snapshot initial state on entry so a stuck press or a finger
-        # already on the pad doesn't insta-wake us.
+        # Wake condition: a button that was UNPRESSED at sleep entry now
+        # reads PRESSED. Snapshot of initial state prevents a stuck press
+        # from insta-waking us.
         btn_ids = (pins.BTN_HOME, pins.BTN_A, pins.BTN_B, pins.BTN_C,
                    pins.BTN_UP, pins.BTN_DOWN, pins.BTN_LEFT, pins.BTN_RIGHT)
         btn_pins = {}
@@ -117,23 +108,12 @@ class PowerManager:
             except Exception:
                 pass
 
-        touch_pin = None
-        if SETTINGS["touch_wake"]:
-            try:
-                touch_pin = machine.Pin(pins.TOUCH_OUT, machine.Pin.IN)
-            except Exception:
-                touch_pin = None
-
-        # Initial state snapshot — buttons read HIGH when idle (active-low,
-        # pulled-up), TTP reads LOW when no finger (active-high).
         initial_btn = {b: pin.value() for b, pin in btn_pins.items()}
-        initial_tp  = touch_pin.value() if touch_pin else 0
 
         # Safety ceiling: 24 h so a wedged pin can't strand us forever.
         deadline = time.ticks_add(time.ticks_ms(), 24 * 60 * 60 * 1000)
 
         while True:
-            # Any button gone from idle (1) to pressed (0) → single-press wake.
             woke = False
             for b, pin in btn_pins.items():
                 if pin.value() == 0 and initial_btn[b] == 1:
@@ -142,18 +122,8 @@ class PowerManager:
             if woke:
                 break
 
-            # TTP: rising edge from idle to touch → single-tap wake.
-            if touch_pin is not None:
-                if touch_pin.value() == 1 and initial_tp == 0:
-                    break
-                # If the user lifted their finger before sleep started
-                # measuring, accept the next press: refresh the baseline.
-                if touch_pin.value() == 0:
-                    initial_tp = 0
-
             if time.ticks_diff(deadline, time.ticks_ms()) <= 0:
                 break
-            # 30 ms poll = 33 Hz, snappier than 20 Hz at trivial CPU cost.
             time.sleep_ms(30)
 
         # Restore the screen on wake. The next frame the run-loop draws
@@ -177,27 +147,15 @@ class PowerManager:
             self._os.display.set_brightness(0)
         except Exception:
             pass
-        # Wake mask: every matrix button + (optionally) the touch pad.
+        # Wake mask: every matrix button. Active-low → wake on any going LOW.
         wake_pins = [
             pins.BTN_HOME, pins.BTN_A, pins.BTN_B, pins.BTN_C,
             pins.BTN_UP, pins.BTN_DOWN, pins.BTN_LEFT, pins.BTN_RIGHT,
         ]
-        # Matrix buttons are active-low (pulled up). They wake on FALLING edge.
-        # TTP223 OUT is active-high → wakes on RISING edge. We configure both
-        # via esp32.wake_on_ext1 with the right level mask.
         try:
             import esp32
-            # First: buttons - any one going LOW (esp32.WAKEUP_ALL_LOW)
-            button_mask = 0
-            for p in wake_pins:
-                button_mask |= (1 << p)
             esp32.wake_on_ext1(pins=[machine.Pin(p) for p in wake_pins],
                                level=esp32.WAKEUP_ALL_LOW)
-            # Touch wake uses ext0 (single pin, edge-sensitive).  Only set
-            # up when enabled in settings.
-            if SETTINGS["touch_wake"]:
-                esp32.wake_on_ext0(pin=machine.Pin(pins.TOUCH_OUT),
-                                   level=esp32.WAKEUP_ANY_HIGH)
         except Exception:
             pass
         machine.deepsleep()

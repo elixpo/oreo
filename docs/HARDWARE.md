@@ -18,7 +18,7 @@ single-layer PCB that fits a standard lanyard slot.
 | ESP32-S3-DevKitC-1-N16R8 | 1 | brain, WiFi 802.11 b/g/n, BLE 5.0 | 16 MB flash, 8 MB PSRAM |
 | ST7789 IPS LCD, 2.0", 320×240 | 1 | display | 4-wire SPI, PWM backlight |
 | 12×12 mm tactile switch | 8 | HOME, A, B, C, dpad | through-hole, click-feel |
-| TTP223 capacitive touch module | 1 | wake from sleep | jumper for toggle/momentary |
+| TTP223 capacitive touch module | 2 | _planned v2 — not wired in v1_ | front-panda + secondary pads |
 | MPU-6050 (GY-521) | 1 | tilt input for games | I²C, 0x68 |
 | TSOP38238 IR receiver | 1 | quest beacon detection | active-low data |
 | IR LED (940 nm) + 2N2222 NPN | 1 each | IR transmitter | NEC protocol |
@@ -59,7 +59,7 @@ Current assignments:
 | ADC_VBAT (100 k/100 k divider) | 1 | ADC1_CH0 |
 | I²C SDA / SCL | 42 / 47 | 100 kHz default; shared bus |
 | IMU_INT (MPU-6050 → wake) | 3 | RTC GPIO |
-| TOUCH_OUT (TTP223 → wake) | 21 | RTC GPIO, active-high |
+| TOUCH_OUT (TTP223) | 21 | RTC GPIO, active-high — _reserved for v2_ |
 
 Display SPI runs at **40 MHz**, the practical ceiling for GPIO-matrix-
 routed pins on the ESP32-S3 — going higher loses bits at the matrix.
@@ -104,8 +104,10 @@ min). During sleep the LCD backlight is off and the CPU polls inputs at
 ~33 Hz. Wake sources, in priority order:
 
 - Any of the 8 matrix buttons transitioning from idle → pressed
-- The TTP223 touch pad transitioning from idle → touched
 - A 24-hour safety ceiling (so a stuck pin can't strand the chip)
+
+(v2 will add TTP223 capacitive pads as an additional wake source; v1
+firmware is button-only.)
 
 We polled rather than calling `machine.lightsleep()` + `Pin.irq(wake=)`
 because the current MicroPython 1.28 build on the S3 silently ignored

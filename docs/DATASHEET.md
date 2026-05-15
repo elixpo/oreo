@@ -114,15 +114,19 @@ collapses the rail below the 2.7 V brownout threshold.
 | INT pin | GPIO 3 (RTC GPIO, wakes deep sleep on motion) |
 | Driver | [`oreoWare/imu.py`](../oreoWare/imu.py) |
 
-### 5.2 TTP223 (capacitive touch pad)
+### 5.2 TTP223 (capacitive touch pad) — _planned v2_
+
+v2 hardware reserves **two** TTP223 pads (front-panda + secondary). v1
+firmware does NOT read them; the pin is held only so v2 work doesn't
+re-pick an RTC GPIO. Wake on v1 is button-only.
 
 | Parameter | Value |
 |---|---|
 | Output | Active-HIGH momentary (jumper AHLB open, TOG open) |
 | Idle current | < 5 µA |
 | Active current | ~10 µA |
-| OUT line | GPIO 21 (RTC GPIO, wakes light/deep sleep on tap) |
-| Driver | inline in [`oreoOS/power.py`](../oreoOS/power.py) |
+| OUT line | GPIO 21 (RTC GPIO) — _reserved for v2_ |
+| Driver | _none in v1_ |
 
 ### 5.3 TSOP38238 (IR receiver)
 
@@ -181,7 +185,7 @@ Authoritative table — derived from [`oreoWare/pins.py`](../oreoWare/pins.py).
 | 18 | IR_RX | IN | TSOP38238 OUT line, active LOW |
 | 19 | USB_DM | — | native USB; leave for the controller |
 | 20 | USB_DP | — | native USB; leave for the controller |
-| 21 | TOUCH_OUT | IN | RTC GPIO; TTP223 OUT, active HIGH |
+| 21 | TOUCH_OUT | IN | RTC GPIO; TTP223 OUT, active HIGH — _reserved for v2, not read by v1 firmware_ |
 | 35–37 | (PSRAM) | — | reserved by the ESP32-S3-N16R8 PSRAM |
 | 38 | LED_TL | OUT, PWM | corner LED via 470 Ω |
 | 39 | LED_TR | OUT, PWM | corner LED via 470 Ω |
@@ -207,7 +211,7 @@ manual.
 | U4 | TP4056 | SOP-8 | [NanJing Top Power](https://dlnmh9ip83nhy.cloudfront.net/datasheets/Prototyping/TP4056.pdf) |
 | U5 | MAX17048 | DFN-8 | [Maxim](https://www.analog.com/media/en/technical-documentation/data-sheets/MAX17048-MAX17049.pdf) |
 | U6 | MPU-6050 (GY-521) | breakout, 21 × 16 mm | [InvenSense](https://invensense.tdk.com/wp-content/uploads/2015/02/MPU-6000-Datasheet1.pdf) |
-| U7 | TTP223 | breakout, 11 × 16 mm | [Tontek](https://www.dianyuan.com/upload/community/2017/06/12/1497224944-37090.pdf) |
+| U7 | TTP223 ×2 _(v2 only)_ | breakout, 11 × 16 mm | [Tontek](https://www.dianyuan.com/upload/community/2017/06/12/1497224944-37090.pdf) |
 | U8 | TSOP38238 | three-leg, 6.95 × 5.0 mm | [Vishay](https://www.vishay.com/docs/82489/tsop382.pdf) |
 | LCD1 | ST7789P3 module | 51 × 35 mm | [Sitronix](http://www.smt.eonas.cn/datasheet/ST7789P3.pdf) |
 | D1 | 940 nm IR LED | 5 mm through-hole | generic |

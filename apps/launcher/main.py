@@ -371,20 +371,6 @@ class App(oreoOS.App):
             self._anim_t = min(ANIM_DUR, self._anim_t + dt)
             self._dirty = True
 
-        # TTP-touch gestures. Double-tap from the drawer launches the
-        # most-recently-used app (stored on the OS settings dict by the
-        # run-loop when an app exits). Lets users round-trip to their
-        # last app without scrolling through the grid.
-        try:
-            from oreoOS import touch
-            ev = touch.poll(self._os)
-            if ev == touch.DOUBLE_TAP:
-                last = self._os.settings_get("recent_app", None)
-                if last and last != "launcher":
-                    self._os.launch(last)
-        except Exception:
-            pass
-
     # ── render ───────────────────────────────────────────────────────────
     def draw(self, d):
         if not self._dirty:
