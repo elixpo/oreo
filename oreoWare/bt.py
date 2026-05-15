@@ -64,6 +64,186 @@ _HEADER_LEN = 5       # type (1) + length (4)
 _CRC_LEN    = 4
 
 
+# ── discovery state (BLE central-role scan) ─────────────────────────────
+# scan_results is mac_str → entry with {name, mac, rssi, appearance,
+# services, type, last_seen_ms}. Updated from the _IRQ_SCAN_RESULT handler
+# below; consumed by apps/bt for the Nearby list.
+
+_scan_results = {}
+_scan_active  = False
+
+# Appearance ranges we DROP from the Nearby list. Bluetooth appearance is
+# a 16-bit field laid out as 10-bit category + 6-bit subtype, so each
+# 0x40-wide window is one category.
+_FILTERED_APPEARANCES = (
+    (0x0840, 0x087F),   # Audio Sink (speakers, soundbars)
+    (0x0880, 0x08BF),   # Audio Source
+    (0x0940, 0x097F),   # Wearable Audio (earbuds, headphones)
+    (0x0980, 0x09BF),   # Hearing aid
+    (0x09C0, 0x09FF),   # Microphone subcategory
+)
+
+# Service-UUID blocklist (16-bit profiles) — secondary filter for devices
+# that don't advertise an appearance.
+_AUDIO_SERVICE_UUIDS = (
+    0x110A, 0x110B, 0x110C, 0x110D, 0x110E,   # A2DP / AVRCP
+    0x1108, 0x111E, 0x1112,                    # Headset / HFP
+    0x184E, 0x184F, 0x1850, 0x1851, 0x1852,   # LE Audio profiles
+)
+
+
+def _is_audio_appearance(app):
+    if app is None:
+        return False
+    for lo, hi in _FILTERED_APPEARANCES:
+        if lo <= app <= hi:
+            return True
+    return False
+
+
+def _has_audio_service(services):
+    for s in services:
+        if s in _AUDIO_SERVICE_UUIDS:
+            return True
+    return False
+
+
+def _classify_appearance(app):
+    """Return a short tag for the type column. Unknown → 'other'."""
+    if app is None:
+        return "other"
+    if 0x0040 <= app <= 0x007F: return "phone"
+    if 0x0080 <= app <= 0x00BF: return "computer"
+    if 0x00C0 <= app <= 0x00FF: return "watch"
+    if 0x0140 <= app <= 0x017F: return "display"   # incl. tablet
+    return "other"
+
+
+# AD record types (BT Core Spec 5.x Vol 3 Part C 18.x)
+_AD_FLAGS              = 0x01
+_AD_INCOMPLETE_UUID16  = 0x02
+_AD_COMPLETE_UUID16    = 0x03
+_AD_SHORT_NAME         = 0x08
+_AD_COMPLETE_NAME      = 0x09
+_AD_APPEARANCE         = 0x19
+
+
+def _parse_adv(adv_data):
+    """Walk AD structures. Returns (name_or_None, appearance_or_None,
+    [uuid16, ...]). Tolerates malformed payloads — we never trust a peer
+    advertiser to be conformant."""
+    name       = None
+    appearance = None
+    services   = []
+    if not adv_data:
+        return name, appearance, services
+    i = 0
+    n = len(adv_data)
+    while i < n:
+        try:
+            ln = adv_data[i]
+        except IndexError:
+            break
+        if ln == 0:
+            break
+        if i + ln >= n:
+            break
+        ad_type = adv_data[i + 1]
+        payload = adv_data[i + 2 : i + 1 + ln]
+        if ad_type in (_AD_COMPLETE_NAME, _AD_SHORT_NAME):
+            try:
+                name = bytes(payload).decode("utf-8")
+            except Exception:
+                name = None
+        elif ad_type == _AD_APPEARANCE and len(payload) >= 2:
+            appearance = payload[0] | (payload[1] << 8)
+        elif ad_type in (_AD_INCOMPLETE_UUID16, _AD_COMPLETE_UUID16):
+            for j in range(0, len(payload), 2):
+                if j + 1 < len(payload):
+                    services.append(payload[j] | (payload[j + 1] << 8))
+        i += 1 + ln
+    return name, appearance, services
+
+
+def _mac_str(addr_bytes):
+    try:
+        return ":".join("%02X" % b for b in bytes(addr_bytes))
+    except Exception:
+        return "??:??:??:??:??:??"
+
+
+# ── discovery API used by apps/bt ───────────────────────────────────────
+
+def own_name():
+    """Return the GAP Complete Local Name the badge advertises as."""
+    try:
+        return _get_ble().config("gap_name")
+    except Exception:
+        return DEVICE_NAME
+
+
+def own_mac():
+    """Public BLE MAC as 'AA:BB:CC:DD:EE:FF'."""
+    try:
+        addr = _get_ble().config("mac")
+        # config('mac') returns either (type, bytes) or just bytes
+        # depending on the MicroPython build. Handle both.
+        if isinstance(addr, tuple) and len(addr) == 2:
+            return _mac_str(addr[1])
+        return _mac_str(addr)
+    except Exception:
+        return "—"
+
+
+def scan_start(duration_ms=8000):
+    """Begin a BLE central-role scan. Use scan_results() any time to read
+    the cumulative list; scan_is_active() reports done/in-progress."""
+    global _scan_active, _scan_results
+    try:
+        ble = _get_ble()
+        if not ble.active():
+            ble.active(True)
+        _register_service(ble)
+    except Exception:
+        return False
+    _scan_results = {}
+    try:
+        # active scan (last arg True) so we get scan-response data,
+        # which more often carries the complete local name.
+        ble.gap_scan(duration_ms, 30000, 30000, True)
+        _scan_active = True
+        return True
+    except Exception:
+        _scan_active = False
+        return False
+
+
+def scan_stop():
+    global _scan_active
+    try:
+        _get_ble().gap_scan(None)
+    except Exception:
+        pass
+    _scan_active = False
+
+
+def scan_is_active():
+    return _scan_active
+
+
+def scan_results():
+    """Filtered, RSSI-sorted snapshot of discovered devices."""
+    out = []
+    for v in _scan_results.values():
+        if _is_audio_appearance(v.get("appearance")):
+            continue
+        if _has_audio_service(v.get("services", [])):
+            continue
+        out.append(v)
+    out.sort(key=lambda d: d.get("rssi", -999), reverse=True)
+    return out
+
+
 def _get_ble():
     global _ble
     if _ble is None:
@@ -173,6 +353,8 @@ def _start_advertising(ble):
 _IRQ_CENTRAL_CONNECT    = 1
 _IRQ_CENTRAL_DISCONNECT = 2
 _IRQ_GATTS_WRITE        = 3
+_IRQ_SCAN_RESULT        = 5
+_IRQ_SCAN_DONE          = 6
 
 
 class _RxState:
@@ -206,6 +388,35 @@ def _irq(event, data):
         chunk = _get_ble().gatts_read(_rx_handle)
         if chunk:
             _feed(chunk)
+    elif event == _IRQ_SCAN_RESULT:
+        addr_type, addr, adv_type, rssi, adv_data = data
+        # Each result fires many times per device per scan window; we
+        # merge into the dict so the most recent RSSI + any newly
+        # discovered name wins. bytes(addr) copies out of the IRQ-scoped
+        # buffer so we can keep the dict entry around.
+        mac  = _mac_str(bytes(addr))
+        name, appearance, services = _parse_adv(bytes(adv_data))
+        cur = _scan_results.get(mac)
+        if cur is None:
+            cur = {"mac":         mac,
+                   "name":        name or "(unknown)",
+                   "rssi":        rssi,
+                   "appearance":  appearance,
+                   "services":    services,
+                   "type":        _classify_appearance(appearance)}
+            _scan_results[mac] = cur
+        else:
+            cur["rssi"] = rssi
+            if name and (cur["name"] == "(unknown)" or len(name) > len(cur["name"])):
+                cur["name"] = name
+            if appearance and not cur["appearance"]:
+                cur["appearance"] = appearance
+                cur["type"]       = _classify_appearance(appearance)
+            if services:
+                cur["services"] = services
+    elif event == _IRQ_SCAN_DONE:
+        global _scan_active
+        _scan_active = False
 
 
 def _notify(status_byte):

@@ -81,9 +81,9 @@ class App(oreoOS.App):
             _Row("WiFi",        "action",
                  getter=lambda: self._wifi_summary(),
                  setter=lambda v: self._open_wifi()),
-            _Row("Bluetooth",   "toggle",
-                 getter=lambda: self._bt and self._bt.is_active(),
-                 setter=lambda v: self._bt and self._bt.set_active(v)),
+            _Row("Bluetooth",   "action",
+                 getter=lambda: self._bt_summary(),
+                 setter=lambda v: self._open_bt()),
             _Row("Brightness",  "slider",
                  getter=lambda: self._brightness,
                  setter=lambda v: self._set_brightness(v)),
@@ -310,6 +310,20 @@ class App(oreoOS.App):
                 ip = self._wifi.ip() or ""
                 return ip or "on"
             return "off"
+        except Exception:
+            return "—"
+
+    def _open_bt(self):
+        try:
+            self._os.launch("bt")
+        except Exception:
+            pass
+
+    def _bt_summary(self):
+        if not self._bt:
+            return "—"
+        try:
+            return "on" if self._bt.is_active() else "off"
         except Exception:
             return "—"
 
