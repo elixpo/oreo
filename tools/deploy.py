@@ -123,6 +123,7 @@ DEPLOY = [
     ("oreoOS/cache.py",         "oreoOS/cache.py"),
     ("oreoOS/ota.py",           "oreoOS/ota.py"),
     ("oreoOS/storage.py",       "oreoOS/storage.py"),
+    ("oreoOS/notifications.py", "oreoOS/notifications.py"),
 
     # Hardware drivers
     ("oreoWare/__init__.py",    "oreoWare/__init__.py"),

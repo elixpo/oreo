@@ -51,6 +51,7 @@ SHIP_PATTERNS = [
     "oreoOS/launcher.py",
     "oreoOS/ota.py",
     "oreoOS/storage.py",
+    "oreoOS/notifications.py",
     "oreoOS/pixelfont.py",
     "oreoOS/power.py",
     "oreoOS/splash.py",

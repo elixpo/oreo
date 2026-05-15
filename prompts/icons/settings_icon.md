@@ -1,4 +1,4 @@
-# settings_icon — Settings app icon
+# settings_icon — Settings app icon (revamped, v1.3.x+)
 
 **Asset name:** `settings_icon`  
 **Output size:** 200×200 → optimized to 32×32  
@@ -7,4 +7,4 @@
 
 ## Prompt
 
-pixel art cartoon icon: cute panda character with big eyes, black and white panda with pink cheeks, wearing a red badge with letter E on chest, holding a large chunky golden gear cog in one hand and a bright wifi signal bar in the other, small bluetooth symbol floating nearby, happy tinkering expression, warm cream white background, vibrant celebration colours, pixel art cartoon style, thick dark outline, cute kawaii style, square crop, no text, no watermark
+pixel art cartoon icon: cute panda character with big eyes, black and white panda with pink cheeks, wearing a red badge with letter E on chest, holding one large chunky golden gear cog centered in front of the chest, gentle satisfied tinkerer expression, NO wifi bars, NO bluetooth glyphs, NO antennas, ONLY the single gear and the panda, warm cream white background, vibrant celebration colours, pixel art cartoon style, thick dark outline, cute kawaii style, square crop, generous padding, no text, no watermark
