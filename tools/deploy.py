@@ -26,6 +26,19 @@ NOSKIP = CLEAN or FORCE
 
 HASH_CACHE_PATH = Path(".deploy_hashes.json")
 
+# Refuse to push if the device would be left with less than this many
+# bytes of free flash post-deploy. Sized for OTA staging headroom
+# (~500 KB peak) + a 250 KB image transfer + cache growth. Override on
+# the CLI with `--free-floor=N` (bytes) when you really need it.
+FREE_FLOOR_BYTES = 1 * 1024 * 1024     # 1 MB
+for _arg in sys.argv[1:]:
+    if _arg.startswith("--free-floor="):
+        try:
+            FREE_FLOOR_BYTES = int(_arg.split("=", 1)[1])
+        except ValueError:
+            pass
+SKIP_FREE_GUARD = "--no-free-guard" in sys.argv
+
 
 def _hash_file(path):
     h = hashlib.sha1()
@@ -109,6 +122,7 @@ DEPLOY = [
     ("oreoOS/widgets.py",       "oreoOS/widgets.py"),
     ("oreoOS/cache.py",         "oreoOS/cache.py"),
     ("oreoOS/ota.py",           "oreoOS/ota.py"),
+    ("oreoOS/storage.py",       "oreoOS/storage.py"),
 
     # Hardware drivers
     ("oreoWare/__init__.py",    "oreoWare/__init__.py"),
@@ -214,6 +228,24 @@ def run(cmd, check=True):
 
 def mpremote(*args):
     return run(["python", "-m", "mpremote", "connect", PORT] + list(args))
+
+
+def _device_free_bytes():
+    """Query the device's free flash via statvfs. Returns bytes, or None
+    on failure (no device / unexpected output)."""
+    r = run(["python", "-m", "mpremote", "connect", PORT, "exec",
+             "import os\n"
+             "s=os.statvfs('/')\n"
+             "print('FREE=%d' % (s[1]*s[4]))"], check=False)
+    if r.returncode != 0:
+        return None
+    for line in (r.stdout or "").splitlines():
+        if line.startswith("FREE="):
+            try:
+                return int(line[5:].strip())
+            except ValueError:
+                return None
+    return None
 
 
 def _human_size(n):
@@ -488,6 +520,43 @@ def main():
           % (cache_state, len(files) + 1, skipped_pre))
     if skipped_pre and len(cache) == 0:
         print("  (cache was empty — first run after a hash-cache reset will push everything)")
+
+    # ── free-space guard ────────────────────────────────────────────────
+    # Sum the bytes we're about to push (only files that aren't hash-cache
+    # hits) and refuse the deploy if the device would be left below the
+    # floor afterwards. The device-side measurement uses statvfs so it
+    # accounts for FS overhead the local file size misses.
+    if not SKIP_FREE_GUARD and files:
+        projected_bytes = 0
+        for local, _ in files:
+            try:
+                projected_bytes += Path(local).stat().st_size
+            except OSError:
+                pass
+        try:
+            projected_bytes += secrets_tmp.stat().st_size
+        except OSError:
+            pass
+        free_bytes = _device_free_bytes()
+        if free_bytes is None:
+            print("  free-space guard: could not read device statvfs — skipping check")
+        else:
+            projected_free = free_bytes - projected_bytes
+            print("  free-space guard: device free=%s, push=%s, post-deploy=%s, floor=%s"
+                  % (_human_size(free_bytes), _human_size(projected_bytes),
+                     _human_size(projected_free), _human_size(FREE_FLOOR_BYTES)))
+            if projected_free < FREE_FLOOR_BYTES:
+                deficit = FREE_FLOOR_BYTES - projected_free
+                print()
+                print("  ABORTING: this deploy would leave only %s free "
+                      "(floor is %s, short by %s)."
+                      % (_human_size(max(0, projected_free)),
+                         _human_size(FREE_FLOOR_BYTES),
+                         _human_size(deficit)))
+                print("  Free up space (delete photos / documents / caches) "
+                      "or rerun with --no-free-guard to override.")
+                secrets_tmp.unlink(missing_ok=True)
+                sys.exit(2)
     print()
 
     push_t0 = _t.time()

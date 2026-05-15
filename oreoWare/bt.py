@@ -15,12 +15,14 @@ Wire format on RX (concatenated across one or many writes):
   +------+----+----+----+----+----------------+--------+
    1B    └──────── 4 bytes ────────┘   payload (length B)
 
-  type=b'I'  image (raw bytes, written as-is — must be < IMAGE_MAX bytes)
-  type=b'T'  text  (deflate-compressed UTF-8 — decompressed on landing)
+  type=b'I'  image    (raw bytes, written as-is — must be < IMAGE_MAX bytes)
+  type=b'T'  text     (deflate-compressed UTF-8 — decompressed on landing)
+  type=b'M'  markdown (deflate-compressed UTF-8 — rendered by the reader app)
 
 Routing (per the v1 decision):
-  images → apps/gallery/assets/raw/bt_<ts>.<ext>
-  text   → documents/bt_<ts>.txt
+  images   → apps/gallery/assets/raw/bt_<ts>.<ext>
+  text     → documents/bt_<ts>.txt
+  markdown → documents/bt_<ts>.md
 
 Status codes notified back over TX (single byte):
   0x01 START_OK          header accepted, sending payload
@@ -236,7 +238,7 @@ def _feed(chunk):
                      | (st.buf[3] << 8)  |  st.buf[4]
         st.buf = bytearray()
         # Validate before consuming any payload.
-        if st.type_byte not in (b"I", b"T"):
+        if st.type_byte not in (b"I", b"T", b"M"):
             _notify(_STATUS_BAD_TYPE)
             _rx_state = _RxState()
             return
@@ -277,8 +279,10 @@ def _finish(st):
 
     if st.type_byte == b"I":
         ok = _write_image(bytes(st.buf))
+    elif st.type_byte == b"M":
+        ok = _write_text(bytes(st.buf), ext="md")
     else:
-        ok = _write_text(bytes(st.buf))
+        ok = _write_text(bytes(st.buf), ext="txt")
     _notify(_STATUS_DONE if ok else _STATUS_WRITE_FAIL)
 
 
@@ -327,8 +331,11 @@ def _write_image(buf):
         return False
 
 
-def _write_text(buf):
-    """Decompress (deflate / zlib) and write to documents/."""
+def _write_text(buf, ext="txt"):
+    """Decompress (deflate / zlib) and write to documents/.
+
+    `ext` controls the landing extension — "txt" for plain text and "md"
+    for markdown payloads. Both share the same wire compression."""
     try:
         import deflate
         import io
@@ -344,7 +351,7 @@ def _write_text(buf):
             return False
     try:
         _ensure_dir(DOCUMENTS_DIR)
-        path = DOCUMENTS_DIR + "/bt_" + _ts() + ".txt"
+        path = DOCUMENTS_DIR + "/bt_" + _ts() + "." + ext
         with open(path, "wb") as f:
             f.write(plain)
         return True

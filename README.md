@@ -234,8 +234,9 @@ RX characteristic in chunks. Frame format:
 +------+-------------------+-----------+-------------+
 | type | length (4B BE)    | payload   | crc32 (4B)  |
 +------+-------------------+-----------+-------------+
-  'I'  =  image, raw bytes, length ≤ 250 KB
-  'T'  =  text,  deflate-compressed UTF-8
+  'I'  =  image,    raw bytes, length ≤ 250 KB
+  'T'  =  text,     deflate-compressed UTF-8 → documents/*.txt
+  'M'  =  markdown, deflate-compressed UTF-8 → documents/*.md
 ```
 
 The TX characteristic notifies a single-byte status (`0x02` = done,

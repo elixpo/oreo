@@ -100,6 +100,8 @@ class App(oreoOS.App):
                  getter=self._app_view_is_categories,
                  setter=self._set_app_view_categories,
                  on_label="Cat", off_label="Grid"),
+            _Row("Storage",     "action",
+                 setter=lambda v: self._open_storage()),
             _Row("Version",     "info",
                  getter=self._os_version),
             _Row("Check Update","action",
@@ -286,6 +288,12 @@ class App(oreoOS.App):
             machine.reset()
         except Exception:
             self._os.quit()
+
+    def _open_storage(self):
+        try:
+            self._os.launch("storage")
+        except Exception:
+            pass
 
     # ── input ────────────────────────────────────────────────────────────
     def on_button_press(self, btn):
