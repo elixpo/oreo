@@ -473,20 +473,32 @@ def background_check(os_obj, min_interval_s=6 * 3600):
     """Cheap periodic version probe — runs in the OS run-loop tail.
 
     Behaviour:
+      * Disabled by default (see DISABLE flag below). The MicroPython
+        urequests build on this firmware does NOT honour `timeout=` for
+        the response body read — only the connect. When GitHub's edge
+        keeps the socket open but never returns data, r.json() hangs
+        FOREVER, freezing the OS run loop. Until we replace urequests
+        with a raw-socket implementation that wraps settimeout() around
+        every recv(), background probing is opt-in only via the
+        `ota_bg_check` setting.
+      * The manual "Check Update" row in Settings calls check() directly
+        and remains available regardless of this flag.
       * Skips if WiFi isn't up.
+      * Skips inside the boot grace window (_OTA_BOOT_GRACE_S).
       * Skips if a check ran in the last `min_interval_s` (6 h default).
-      * Calls check() (single GitHub-API hit, hard-bounded by T_GH_API).
-      * On result, stashes flags on the OS settings dict:
-            ota_status            -> "needs-confirm" / "up-to-date" / "error"
-            ota_pending_version   -> "vX.Y.Z" of the new release
-            ota_pending_major     -> bool
-            ota_pending_warn_seen -> reset to False so the popup fires once
-      * Does NOT download anything. The user (or the Check Update action)
-        decides whether to fetch.
+      * On result, stashes flags on the OS settings dict.
 
     Returns True iff a new release was discovered this call.
     """
     if _http is None:
+        return False
+
+    # Hard-off until we have a non-hangable HTTP client. The Settings
+    # row can flip this true once the user opts in to background checks.
+    try:
+        if not os_obj.settings_get("ota_bg_check", False):
+            return False
+    except Exception:
         return False
     last = 0
     try:
