@@ -72,6 +72,11 @@ class App(oreoOS.App):
         self._scan_t    = 0.0
         self._scan_left = 0           # ms remaining in current scan
 
+        # Pair-flow overlay state: None (no overlay) or a dict tracking
+        # which device the user picked + what the overlay is currently
+        # showing ("confirm" | "running" | "done" | "failed").
+        self._overlay = None
+
         try:
             from oreoWare import bt
             self._bt = bt
