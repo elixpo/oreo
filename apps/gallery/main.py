@@ -69,6 +69,39 @@ _HELP = [
 ]
 
 
+def _wrap_help(text, max_chars):
+    """Greedy word-wrap for the ADD-tile help splash.
+
+    Splits `text` into a list of lines, each no longer than `max_chars`
+    characters. Breaks on whitespace; if a single word is longer than
+    `max_chars`, hard-truncates that word across multiple lines (rare —
+    only happens on URLs etc., and our _HELP corpus avoids them).
+    Mirrors apps/reader/main.py's _wrap_help; the two splashes are
+    intentionally a family so the same word-wrap behaviour applies.
+    """
+    if max_chars <= 0:
+        return [text]
+    out  = []
+    rest = text.split()
+    cur  = ""
+    while rest:
+        w    = rest[0]
+        cand = (cur + " " + w) if cur else w
+        if len(cand) <= max_chars:
+            cur = cand
+            rest.pop(0)
+            continue
+        if cur:
+            out.append(cur)
+            cur = ""
+            continue
+        out.append(w[:max_chars])
+        rest[0] = w[max_chars:]
+    if cur:
+        out.append(cur)
+    return out or [""]
+
+
 class App(oreoOS.App):
     name = "Gallery"
 
@@ -172,56 +205,72 @@ class App(oreoOS.App):
         d.rect(card_x,     card_y,     card_w, card_h, theme.CARD,   fill=True)
         d.rect(card_x,     card_y,     card_w, 3,      theme.PRIMARY, fill=True)
 
-        # Big pink "+" badge on the left
-        bx, by, bsz = card_x + 12, card_y + 12, 36
+        # Pink "+" badge + heading. Slightly smaller (32 vs 36) so it
+        # leaves more room for the instruction body below.
+        bx, by, bsz = card_x + 10, card_y + 10, 32
         d.rect(bx, by, bsz, bsz, theme.PRIMARY, fill=True)
-        d.rect(bx + bsz // 2 - 2, by + 6,         4, bsz - 12, api.WHITE, fill=True)
-        d.rect(bx + 6,            by + bsz // 2 - 2, bsz - 12, 4, api.WHITE, fill=True)
+        d.rect(bx + bsz // 2 - 2, by + 5,            4, bsz - 10, api.WHITE, fill=True)
+        d.rect(bx + 5,            by + bsz // 2 - 2, bsz - 10, 4, api.WHITE, fill=True)
+        d.text("Add a photo",     bx + bsz + 10, by + 2,  theme.PRIMARY, scale=2)
+        d.text("scroll UP / DOWN", bx + bsz + 10, by + 22, theme.MUTED)
 
-        # Heading next to the badge.
-        d.text("Add a photo", bx + bsz + 12, by + 4, theme.PRIMARY, scale=2)
-        d.text("scroll UP / DOWN", bx + bsz + 12, by + 24, theme.MUTED)
+        # Scrollable instructions. Uniform scale=1 across headings,
+        # bullets and code so all three feel like one body of text;
+        # visual hierarchy comes from colour + a gold underline on
+        # headings + tinted background on code, not from font size.
+        text_x   = card_x + 12
+        inner_w  = card_w - 24
+        list_y   = card_y + 10 + bsz + 12
+        list_bot = card_y + card_h - 8
 
-        # Scrollable instructions list — only render the rows that fit in
-        # the panel area below the heading.
-        list_y     = card_y + 12 + bsz + 16
-        list_bot   = card_y + card_h - 8
-        line_h_h   = 18      # heading row height
-        line_h_b   = 12      # bullet / code row height
-        text_x     = card_x + 16
-        max_chars  = (card_w - 24) // 8
+        LINE_H  = 12
+        ROW_GAP = 6
+
+        max_h_chars = inner_w // 8
+        max_b_chars = (inner_w - 12) // 8
+        max_c_chars = (inner_w - 12) // 8
 
         rows = _HELP[self._scroll:]
         cur_y = list_y
+        rendered = 0
         for kind, payload in rows:
-            row_h = line_h_h if kind == "h" else line_h_b
-            if cur_y + row_h > list_bot:
-                break
             if kind == "h":
-                # Pink heading with a gold underline.
-                d.text(payload, text_x, cur_y, theme.PRIMARY, scale=2)
-                d.rect(text_x, cur_y + 17, len(payload) * 16, 1, theme.GOLD, fill=True)
+                lines = _wrap_help(payload, max_h_chars)
+                block_h = len(lines) * LINE_H + 4
+                if cur_y + block_h > list_bot:
+                    break
+                if rendered > 0:
+                    cur_y += ROW_GAP
+                for line in lines:
+                    d.text(line, text_x, cur_y, theme.PRIMARY, scale=1)
+                    cur_y += LINE_H
+                last_w = len(lines[-1]) * 8
+                d.rect(text_x, cur_y - 2, last_w, 1, theme.GOLD, fill=True)
             elif kind == "b":
-                # Standard bullet — pink dot + dim text.
-                d.rect(text_x, cur_y + 4, 3, 3, theme.PRIMARY, fill=True)
-                d.text(payload[:max_chars - 1], text_x + 10, cur_y,
-                       theme.TEXT_BRIGHT)
+                lines = _wrap_help(payload, max_b_chars)
+                block_h = len(lines) * LINE_H + 2
+                if cur_y + block_h > list_bot:
+                    break
+                d.rect(text_x + 2, cur_y + 3, 3, 3, theme.PRIMARY, fill=True)
+                for line in lines:
+                    d.text(line, text_x + 10, cur_y,
+                           theme.TEXT_BRIGHT, scale=1)
+                    cur_y += LINE_H
             elif kind == "code":
-                # Monospaced command on a tinted strip.
-                strip_h = 12
-                d.rect(text_x + 8, cur_y - 1, card_w - 32, strip_h,
+                truncated = payload[:max_c_chars]
+                if cur_y + LINE_H > list_bot:
+                    break
+                d.rect(text_x + 4, cur_y - 1, inner_w - 8, LINE_H,
                        theme.DOCK_SEL, fill=True)
-                d.text(payload[:max_chars - 2], text_x + 12, cur_y,
-                       theme.TEAL)
-            cur_y += row_h
+                d.text(truncated, text_x + 8, cur_y + 1,
+                       theme.TEAL, scale=1)
+                cur_y += LINE_H + 1
+            rendered += 1
 
         # Scroll indicators — small arrows on the right edge when more
         # content exists above / below the visible window.
         sx = card_x + card_w - 14
         if self._scroll > 0:
             d.text("^", sx, list_y - 12, theme.PRIMARY, scale=2)
-        last_rendered = self._scroll + sum(
-            1 for _ in range(min(len(_HELP) - self._scroll,
-                                  (list_bot - list_y) // line_h_b)))
-        if self._scroll + last_rendered < len(_HELP):
+        if self._scroll + rendered < len(_HELP):
             d.text("v", sx, list_bot - 12, theme.PRIMARY, scale=2)

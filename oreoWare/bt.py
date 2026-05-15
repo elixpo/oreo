@@ -677,13 +677,36 @@ def _feed(chunk):
         st.length    = (st.buf[1] << 24) | (st.buf[2] << 16) \
                      | (st.buf[3] << 8)  |  st.buf[4]
         st.buf = bytearray()
-        # Validate before consuming any payload.
+        # Validate before consuming any payload. Accepted types are
+        # exactly I (image), T (text) and M (markdown) — anything else
+        # (a phone trying to push a .pdf / .docx / random binary) gets
+        # an immediate BAD_TYPE wire ack AND a user-visible notification
+        # so the badge surfaces the rejection on its own screen, not
+        # just the sender's UI.
         if st.type_byte not in (b"I", b"T", b"M"):
             _notify(_STATUS_BAD_TYPE)
+            try:
+                _post_notification("rejected",
+                                   None,
+                                   None,
+                                   title="Unsupported file",
+                                   body="Only .md and .txt are accepted",
+                                   kind="reject")
+            except Exception:
+                pass
             _rx_state = _RxState()
             return
         if st.type_byte == b"I" and st.length > IMAGE_MAX:
             _notify(_STATUS_TOO_LARGE)
+            try:
+                _post_notification("rejected",
+                                   None,
+                                   None,
+                                   title="Image too large",
+                                   body="Max %d KB per transfer" % (IMAGE_MAX // 1024),
+                                   kind="reject")
+            except Exception:
+                pass
             _rx_state = _RxState()
             return
         _notify(_STATUS_START_OK)
@@ -734,16 +757,26 @@ def _finish(st):
         _post_notification(kind_label, len(st.buf), notif_target)
 
 
-def _post_notification(kind_label, size_bytes, target):
+def _post_notification(kind_label, size_bytes, target,
+                       title=None, body=None, kind="file"):
     """Best-effort push into the OS notification ring. oreoWare doesn't
     depend on oreoOS, so this is wrapped in try/except so the BT module
-    stays importable on hosts where oreoOS isn't available."""
+    stays importable on hosts where oreoOS isn't available.
+
+    Successful-transfer callers pass the bytes count and rely on the
+    default file kind. Rejection callers supply an explicit title / body
+    / kind="reject" so the panel can colour the entry distinctly.
+    """
     try:
         from oreoOS import notifications
+        if title is None:
+            title = "New %s" % kind_label
+        if body is None:
+            body = "%d bytes via BT" % (size_bytes or 0)
         notifications.push(
-            "file",
-            "New %s" % kind_label,
-            "%d bytes via BT" % size_bytes,
+            kind,
+            title,
+            body,
             target=target,
         )
     except Exception:
