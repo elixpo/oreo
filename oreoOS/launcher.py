@@ -167,6 +167,13 @@ def run_app(os_obj, app):
     from oreoOS import notif_panel as _np_mod
     panel = _np_mod.get(os_obj)
 
+    # Consecutive-frame error counter. A single bad frame (transient
+    # I2C glitch, momentary divide-by-zero) shouldn't kill the whole
+    # OS — we count, log, and only escalate to a crash screen if the
+    # error is sticky. Reset on every successful frame.
+    frame_errs = 0
+    FRAME_ERR_LIMIT = 8
+
     app.on_enter(os_obj)
     last = time.ticks_ms()
     try:
@@ -237,10 +244,26 @@ def run_app(os_obj, app):
                 except Exception:
                     pass
 
-            app.update(dt)
-            app.draw(os_obj.display)
-            panel.draw(os_obj.display)
-            os_obj.display.present()
+            try:
+                app.update(dt)
+                app.draw(os_obj.display)
+                panel.draw(os_obj.display)
+                os_obj.display.present()
+                frame_errs = 0
+            except Exception as e:
+                # Per-frame exception swallow + counter. Logging via
+                # print keeps a breadcrumb on the USB serial console for
+                # post-mortem; we don't draw anything because the
+                # framebuf state mid-failure is unknown. After
+                # FRAME_ERR_LIMIT consecutive bad frames we give up and
+                # let the outer handler crash-screen this app.
+                try:
+                    print("frame error in", getattr(app, "name", "?"), ":", e)
+                except Exception:
+                    pass
+                frame_errs += 1
+                if frame_errs >= FRAME_ERR_LIMIT:
+                    raise
 
             # Idle check AFTER the frame so the user sees the result of their
             # last input before the chip dozes off. PowerManager calls
@@ -517,7 +540,16 @@ def boot():
     while True:
         apps = list_apps()
         home = Home(apps)
-        run_app(os_obj, home)
+        # Home is wrapped just like app launches below — a crash in the
+        # home screen used to take the whole OS down silently (the LCD
+        # froze on whatever was last drawn, no button polling, requiring
+        # a hardware reset). Now we paint a crash screen and loop back
+        # so the next iteration rebuilds Home from scratch.
+        try:
+            run_app(os_obj, home)
+        except Exception as e:
+            show_crash(os_obj, "home", e)
+            continue
 
         target = os_obj._launch_request
 
