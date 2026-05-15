@@ -228,6 +228,14 @@ class App(oreoOS.App):
         self._anim_t    = ANIM_DUR
         self._dirty     = True
 
+        # Notification panel state — pulls down from the top on C. Lives
+        # in the launcher (not a separate app) so the apps grid stays
+        # visible behind the sliding overlay.
+        self._panel_open  = False
+        self._panel_t     = 0.0        # 0 = hidden, 1 = fully down
+        self._panel_dir   = 0          # +1 opening, -1 closing
+        self._panel_sel   = 0
+
     # ── category-view helpers ──────────────────────────────────────────────
     def _build_categories(self):
         """Return [(cat_name, icon_stem_or_None, [app_idx, ...]), ...].
@@ -294,6 +302,15 @@ class App(oreoOS.App):
 
     # ── input ────────────────────────────────────────────────────────────
     def on_button_press(self, btn):
+        # Notification panel takes input precedence whenever it's open OR
+        # currently animating in — pressing C twice quickly shouldn't get
+        # eaten by the launcher.
+        if self._panel_open:
+            return self._on_button_press_panel(btn)
+        if btn == api.BTN_C:
+            self._open_panel()
+            return
+
         # Category mode, level 0: 5 vertical tile picker.
         if self._mode == "categories" and self._cat_level == 0:
             return self._on_button_press_picker(btn)

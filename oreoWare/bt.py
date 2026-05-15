@@ -279,11 +279,35 @@ def _finish(st):
 
     if st.type_byte == b"I":
         ok = _write_image(bytes(st.buf))
+        kind_label = "image"
+        notif_target = "gallery"
     elif st.type_byte == b"M":
         ok = _write_text(bytes(st.buf), ext="md")
+        kind_label = "markdown"
+        notif_target = "reader"
     else:
         ok = _write_text(bytes(st.buf), ext="txt")
+        kind_label = "text"
+        notif_target = "reader"
     _notify(_STATUS_DONE if ok else _STATUS_WRITE_FAIL)
+    if ok:
+        _post_notification(kind_label, len(st.buf), notif_target)
+
+
+def _post_notification(kind_label, size_bytes, target):
+    """Best-effort push into the OS notification ring. oreoWare doesn't
+    depend on oreoOS, so this is wrapped in try/except so the BT module
+    stays importable on hosts where oreoOS isn't available."""
+    try:
+        from oreoOS import notifications
+        notifications.push(
+            "file",
+            "New %s" % kind_label,
+            "%d bytes via BT" % size_bytes,
+            target=target,
+        )
+    except Exception:
+        pass
 
 
 # ─── disk landing ────────────────────────────────────────────────────────

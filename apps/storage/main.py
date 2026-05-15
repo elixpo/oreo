@@ -103,7 +103,7 @@ class App(oreoOS.App):
                PAD_X, y + 18, theme.TEXT_DIM, scale=1)
         free_txt = "%s free" % _human(free)
         # Right-align the free counter so it sits opposite "used".
-        tw = len(free_txt) * 6   # framebuf 8x8, scale=1 ⇒ char width ~6 px
+        tw = len(free_txt) * 8   # framebuf 8x8 at scale=1
         d.text(free_txt, SW - PAD_X - tw, y + 18, theme.TEAL, scale=1)
 
         # ── stacked usage bar (one segment per non-empty bucket) ────────
@@ -140,7 +140,7 @@ class App(oreoOS.App):
                    sw_x + sw_w + 8, row_y + 4, theme.TEXT_BRIGHT, scale=1)
             # Size (right-aligned)
             sz_txt = _human(entry["bytes"])
-            tw = len(sz_txt) * 6
+            tw = len(sz_txt) * 8
             d.text(sz_txt, SW - PAD_X - tw, row_y + 4,
                    theme.TEXT_DIM, scale=1)
             row_y += ROW_H

@@ -528,6 +528,17 @@ def background_check(os_obj, min_interval_s=6 * 3600):
             os_obj.settings_set("ota_pending_warn_seen", False)
     except Exception:
         pass
+    # Surface in the notification ring too. De-duped by version so the
+    # background_check loop doesn't add a fresh entry every probe.
+    try:
+        from oreoOS import notifications
+        ver = rel.get("version", "")
+        already = any(n["kind"] == "ota" and n["body"] == ver
+                      for n in notifications.items())
+        if not already:
+            notifications.push("ota", "Update available", ver, target="settings")
+    except Exception:
+        pass
     return True
 
 
