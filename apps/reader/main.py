@@ -152,32 +152,134 @@ def _inline_spans(line):
     return spans
 
 
-# ── pre-layout: lex once at open-time, drive scrolling off line offsets ─
+# ── word-wrap that preserves (text, style) spans ───────────────────────
+
+def _wrap_spans(spans, max_chars):
+    """Greedy char-column wrap that keeps style boundaries intact.
+
+    Returns a list of visual lines, each a list of (text, style) spans
+    in render order. Honours word boundaries; falls back to a hard
+    break when a single token is longer than max_chars.
+    """
+    if max_chars < 1:
+        max_chars = 1
+    flat = []
+    for text, style in spans:
+        for ch in text:
+            flat.append((ch, style))
+    if not flat:
+        return [[]]
+
+    out      = []
+    cur      = []   # (char, style) on the current visual line
+    word     = []   # (char, style) for the in-progress word
+
+    def _regroup(line_chars):
+        """Collapse runs of equal style back into spans for rendering."""
+        if not line_chars:
+            return []
+        spans_ = []
+        run_text  = [line_chars[0][0]]
+        run_style = line_chars[0][1]
+        for ch, st in line_chars[1:]:
+            if st == run_style:
+                run_text.append(ch)
+            else:
+                spans_.append(("".join(run_text), run_style))
+                run_text, run_style = [ch], st
+        spans_.append(("".join(run_text), run_style))
+        return spans_
+
+    def _push():
+        out.append(_regroup(cur))
+
+    for ch, style in flat:
+        if ch == " ":
+            # Try to commit the pending word + this space.
+            if len(cur) + len(word) + 1 > max_chars:
+                # Word doesn't fit: flush the line, the word becomes the
+                # new line, and we drop the leading space.
+                if cur:
+                    _push()
+                cur = list(word)
+                word = []
+                # If the word alone overflows, hard-break it later — for
+                # now leave cur as-is so subsequent chars keep wrapping.
+            else:
+                cur.extend(word)
+                cur.append((ch, style))
+                word = []
+            continue
+
+        word.append((ch, style))
+        # Hard break a single token that overflows the line by itself.
+        if len(word) >= max_chars and not cur:
+            cur = word[:max_chars]
+            _push()
+            cur = []
+            word = word[max_chars:]
+
+    # Flush trailing word.
+    if cur and (len(cur) + len(word) > max_chars):
+        _push()
+        cur = []
+    cur.extend(word)
+    if cur:
+        _push()
+    return out if out else [[]]
+
+
+# ── pre-layout: lex + wrap once at open-time ───────────────────────────
+# Each entry in the produced list is a single VISUAL line ready to draw:
+#   (kind, payload, height_px)
+# where kind ∈
+#   heading_1/2/3   payload = text
+#   code            payload = raw_line
+#   bullet          payload = (spans, show_glyph)   # glyph only on first
+#   hr / blank      payload = None
+#   para            payload = spans
 
 def _layout(lines):
-    """Walk lines once, produce a list of block descriptors with
-    per-block (kind, payload, height_px). Heights are summed at render
-    time to figure scroll bounds."""
-    out = []
+    out     = []
     in_code = False
+
+    # Effective character widths at the available column width.
+    body_cols    = (SW - 2 * PAD_X) // 8           # plain text @ scale 1
+    bullet_cols  = (SW - 2 * PAD_X - 10) // 8      # leaves room for glyph
+    code_cols    = (SW - 2 * PAD_X) // 8
+
     for raw in lines:
         kind, payload = _classify_block(raw, in_code)
         if kind == "code_fence":
             in_code = not in_code
             continue
+
         if kind in ("heading_1", "heading_2", "heading_3"):
             lvl = int(kind[-1])
-            out.append((kind, payload, _HEADING_H[lvl]))
+            # Headings wrap too, but at their scaled column count.
+            scale     = _HEADING_SCALE[lvl]
+            cols      = (SW - 2 * PAD_X) // (8 * scale)
+            text      = payload
+            while text:
+                out.append((kind, text[:cols], _HEADING_H[lvl]))
+                text = text[cols:]
         elif kind == "code":
-            out.append((kind, payload, BODY_LINE_H + 2))
+            # Code lines don't wrap — overlong is clipped to the column
+            # count so the bg rect stays tidy.
+            out.append(("code", payload[:code_cols], BODY_LINE_H + 2))
         elif kind == "bullet":
-            out.append((kind, payload, BODY_LINE_H + 2))
+            depth, text = payload
+            wrapped = _wrap_spans(_inline_spans(text), bullet_cols)
+            for i, spans_ in enumerate(wrapped):
+                out.append(("bullet", (spans_, i == 0), BODY_LINE_H + 2))
         elif kind == "hr":
-            out.append((kind, payload, 12))
+            out.append(("hr", None, 12))
         elif kind == "blank":
-            out.append((kind, payload, 6))
+            out.append(("blank", None, 6))
         else:
-            out.append((kind, payload, BODY_LINE_H + 2))
+            wrapped = _wrap_spans(_inline_spans(payload), body_cols)
+            for spans_ in wrapped:
+                out.append(("para", spans_, BODY_LINE_H + 2))
     return out
 
 
@@ -201,19 +303,16 @@ def _style_color(style):
 
 
 def _draw_spans(d, spans, x, y, scale=1, code_bg=False):
-    """Draw a list of (text, style) spans left-to-right. Wraps simply by
-    truncating with an ellipsis when the line overflows the play area."""
+    """Draw pre-wrapped (text, style) spans left-to-right. Spans here
+    have already been fit to the available width by `_wrap_spans` —
+    this routine just paints, no overflow logic."""
     cw = 8 * scale
-    max_x = SW - PAD_X
     cx = x
     for text, style in spans:
         if not text:
             continue
         color = _style_color(style)
         for ch in text:
-            if cx + cw > max_x:
-                d.text("…", cx, y, theme.MUTED, scale=scale)
-                return
             if style == "code" and code_bg:
                 d.rect(cx, y - 1, cw, 8 * scale + 2, theme.CARD, fill=True)
             d.text(ch, cx, y, color, scale=scale)
@@ -227,19 +326,42 @@ class App(oreoOS.App):
 
     def on_enter(self, os_):
         super().on_enter(os_)
-        self._os     = os_
-        self._dirty  = True
-        self._mode   = "picker"
-        self._files  = _list_docs()
-        self._sel    = 0
+        self._os      = os_
+        self._dirty   = True
+        self._mode    = "picker"
+        self._files   = _list_docs()
+        self._sel     = 0
         # view-mode state
-        self._title  = ""
-        self._blocks = []
-        self._scroll = 0          # in pixels
+        self._title   = ""
+        self._blocks  = []
+        self._scroll  = 0          # in pixels
         self._total_h = 0
+        # 5 Hz auto-refresh of the picker — picks up files that land in
+        # documents/ while the user is sitting on the list (e.g. a BT
+        # transfer completing). Off entirely in view mode.
+        self._poll_t  = 0.0
+        self._poll_dt = 0.2        # 5 Hz
 
     def update(self, dt):
-        pass
+        if self._mode != "picker":
+            return
+        self._poll_t += dt
+        if self._poll_t < self._poll_dt:
+            return
+        self._poll_t = 0.0
+        fresh = _list_docs()
+        if fresh != self._files:
+            # Keep the cursor pointing at the same logical entry when
+            # possible — otherwise clamp to the new list bounds.
+            prev_path = self._files[self._sel][1] if self._files else None
+            self._files = fresh
+            new_sel = 0
+            for i, (_, path) in enumerate(fresh):
+                if path == prev_path:
+                    new_sel = i
+                    break
+            self._sel = min(new_sel, max(0, len(fresh) - 1))
+            self._dirty = True
 
     def on_button_press(self, btn):
         if self._mode == "picker":
@@ -356,22 +478,20 @@ class App(oreoOS.App):
                 lvl = int(kind[-1])
                 scale = _HEADING_SCALE[lvl]
                 color = theme.PRIMARY if lvl == 1 else theme.TEXT_BRIGHT
-                d.text(payload[: (SW - 2 * PAD_X) // (8 * scale)],
-                       PAD_X, top + 2, color, scale=scale)
+                d.text(payload, PAD_X, top + 2, color, scale=scale)
             elif kind == "code":
-                # Whole-line code in a fenced block.
                 d.rect(PAD_X - 2, top, SW - 2 * PAD_X + 4, h,
                        theme.CARD, fill=True)
-                d.text(payload[: (SW - 2 * PAD_X) // 8],
-                       PAD_X, top + 1, theme.TEAL, scale=1)
+                d.text(payload, PAD_X, top + 1, theme.TEAL, scale=1)
             elif kind == "bullet":
-                depth, text = payload
-                bx = PAD_X + depth * 8
-                d.text("\xb7", bx, top + 1, theme.PRIMARY, scale=1)
-                _draw_spans(d, _inline_spans(text), bx + 10, top + 1,
+                spans_, show_glyph = payload
+                bx = PAD_X
+                if show_glyph:
+                    d.text("\xb7", bx, top + 1, theme.PRIMARY, scale=1)
+                _draw_spans(d, spans_, bx + 10, top + 1,
                             scale=1, code_bg=True)
             else:    # para
-                _draw_spans(d, _inline_spans(payload), PAD_X, top + 1,
+                _draw_spans(d, payload, PAD_X, top + 1,
                             scale=1, code_bg=True)
 
             y_cursor += h

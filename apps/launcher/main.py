@@ -146,6 +146,65 @@ def _compress_x(data, sw, sh, dst_w):
     return (out, dst_w, sh)
 
 
+# ── procedural notification glyphs ──────────────────────────────────────
+# Hand-drawn at 12×12 using rect calls so the panel doesn't load asset
+# modules mid-animation. Once `notifications_icon.png` is baked through
+# generate_assets → optimize_assets we can swap to a real sprite blit.
+
+def _draw_bell(d, x, y, color):
+    """Tiny 12×8 hand-bell. Dome + clapper, sits next to the panel title."""
+    # dome (rounded trapezoid)
+    d.rect(x + 4, y,     4, 1, color, fill=True)
+    d.rect(x + 3, y + 1, 6, 1, color, fill=True)
+    d.rect(x + 2, y + 2, 8, 1, color, fill=True)
+    d.rect(x + 2, y + 3, 8, 1, color, fill=True)
+    d.rect(x + 2, y + 4, 8, 1, color, fill=True)
+    # base rim
+    d.rect(x + 1, y + 5, 10, 1, color, fill=True)
+    # clapper
+    d.rect(x + 5, y + 7, 2, 2, color, fill=True)
+
+
+def _draw_kind_glyph(d, x, y, kind, ink):
+    """12×12 per-kind notification glyph.
+
+      file    page with corner fold (BT-arrived image / document)
+      ota     down-pointing arrow into a tray (incoming update)
+      other   small spark / pulse
+    """
+    if kind == "file":
+        # page outline + corner fold
+        d.rect(x + 1, y,     8, 12, ink, fill=False)
+        d.rect(x + 1, y,     8, 1,  ink, fill=True)
+        d.rect(x + 1, y + 11, 8, 1, ink, fill=True)
+        d.rect(x + 1, y, 1, 12, ink, fill=True)
+        d.rect(x + 8, y, 1, 12, ink, fill=True)
+        # fold triangle
+        d.rect(x + 6, y,     3, 1, ink, fill=True)
+        d.rect(x + 7, y + 1, 2, 1, ink, fill=True)
+        d.rect(x + 8, y + 2, 1, 1, ink, fill=True)
+        # two text lines
+        d.rect(x + 3, y + 4, 4, 1, ink, fill=True)
+        d.rect(x + 3, y + 7, 4, 1, ink, fill=True)
+    elif kind == "ota":
+        # down arrow shaft
+        d.rect(x + 4, y,     2, 7, ink, fill=True)
+        # arrowhead
+        d.rect(x + 2, y + 6, 6, 1, ink, fill=True)
+        d.rect(x + 3, y + 7, 4, 1, ink, fill=True)
+        d.rect(x + 4, y + 8, 2, 1, ink, fill=True)
+        # tray underneath (||___||)
+        d.rect(x + 1, y + 10, 1, 2, ink, fill=True)
+        d.rect(x + 8, y + 10, 1, 2, ink, fill=True)
+        d.rect(x + 1, y + 11, 8, 1, ink, fill=True)
+    else:
+        # generic: sparkle / pulse
+        d.rect(x + 4, y + 1, 2, 2, ink, fill=True)
+        d.rect(x + 1, y + 4, 8, 2, ink, fill=True)
+        d.rect(x + 4, y + 7, 2, 2, ink, fill=True)
+        d.rect(x + 3, y + 9, 4, 1, ink, fill=True)
+
+
 def _rounded_outline(d, x, y, w, h, color, r=CORNER_R):
     """Outline-only rounded rect with a small chamfered corner."""
     if w < r * 2 or h < r * 2:
@@ -620,11 +679,13 @@ class App(oreoOS.App):
         # Accent strip at the bottom edge for separation.
         d.rect(0, panel_y + full_h - 2, SW, 2, theme.PRIMARY, fill=True)
 
-        # Header band
+        # Header band — pink strip with a small bell glyph beside the title.
         title = "NOTIFICATIONS"
         d.rect(0, panel_y, SW, 22, theme.PRIMARY, fill=True)
-        d.text(title, (SW - len(title) * 8) // 2,
-               panel_y + 7, theme.BG, scale=1)
+        title_w  = len(title) * 8
+        title_x  = (SW - title_w) // 2
+        d.text(title, title_x, panel_y + 7, theme.BG, scale=1)
+        _draw_bell(d, title_x - 16, panel_y + 4, theme.BG)
 
         # Empty state.
         if not items:
@@ -653,17 +714,18 @@ class App(oreoOS.App):
             if sel:
                 _rounded_outline(d, 8, y, SW - 16, card_h,
                                  theme.SEL_BORDER, r=3)
-            # Kind dot — pink for OTA, gold for files, muted for other.
-            kind = it.get("kind", "")
-            dot = (theme.GOLD if kind == "file"
-                   else theme.PRIMARY if kind == "ota"
-                   else theme.TEAL)
-            d.rect(16, y + card_pad, 8, 8, dot, fill=True)
-            title = it.get("title", "")[:28]
-            body  = it.get("body",  "")[:32]
-            d.text(title, 30, y + card_pad, theme.TEXT_BRIGHT, scale=1)
+            # Per-kind 12×12 glyph baked from rect calls. No asset load
+            # so the panel stays cheap to draw mid-animation.
+            kind  = it.get("kind", "")
+            ink   = (theme.GOLD if kind == "file"
+                     else theme.PRIMARY if kind == "ota"
+                     else theme.TEAL)
+            _draw_kind_glyph(d, 14, y + card_pad + 3, kind, ink)
+            title = it.get("title", "")[:24]
+            body  = it.get("body",  "")[:28]
+            d.text(title, 34, y + card_pad, theme.TEXT_BRIGHT, scale=1)
             if body:
-                d.text(body, 30, y + card_pad + 12, theme.TEXT_DIM, scale=1)
+                d.text(body, 34, y + card_pad + 12, theme.TEXT_DIM, scale=1)
 
         # Hint band at the bottom of the panel.
         hint = "A=open  B=clear  C/HOME=close"
