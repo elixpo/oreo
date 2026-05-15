@@ -117,6 +117,10 @@ jobs:
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
+          # Use the elixpoo PAT so the release card on GitHub shows
+          # "elixpoo released..." rather than "github-actions[bot]".
+          # The PAT must have `contents:write` for the repo.
+          token: ${{ secrets.CI_AGENT_TOKEN }}
           tag_name: ${{ steps.meta.outputs.tag }}
           name: "OreoOS ${{ steps.meta.outputs.version }} (${{ steps.meta.outputs.channel }})"
           prerelease: ${{ steps.meta.outputs.channel != 'stable' }}
@@ -139,6 +143,8 @@ jobs:
       - name: Publish to GitHub Packages (PyPI registry)
         env:
           TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+          # Attribute the package upload to elixpoo too. The PAT needs
+          # `write:packages` (and `read:packages` for re-uploads).
+          TWINE_PASSWORD: ${{ secrets.CI_AGENT_TOKEN }}
           TWINE_REPOSITORY_URL: https://${{ github.repository_owner }}.pkg.github.com/${{ github.repository_owner }}/
         run: twine upload --skip-existing dist/oreoos-*.tar.gz dist/oreoos-*.whl
