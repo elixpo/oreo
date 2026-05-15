@@ -411,9 +411,16 @@ class App(oreoOS.App):
         super().on_enter(os_)
         self._os      = os_
         self._dirty   = True
-        self._mode    = "picker"
         self._files   = _list_docs()
         self._sel     = 0
+        # First-run UX: with no documents, the picker would be a blank
+        # placeholder + "+ How to add" row that requires an extra A
+        # press to do anything useful. Skip straight into the help
+        # splash so the user sees the BT / flash instructions
+        # immediately. B/HOME from the splash drops back to the picker
+        # (which by then may have files if a BT transfer landed during
+        # the read), so the affordance still exists.
+        self._mode    = "help" if not self._files else "picker"
         # view-mode state
         self._title   = ""
         self._blocks  = []
@@ -607,24 +614,22 @@ class App(oreoOS.App):
         d.text("Add a doc",   bx + bsz + 10, by + 2,  theme.PRIMARY, scale=2)
         d.text("BT or flash", bx + bsz + 10, by + 22, theme.MUTED)
 
-        # Scrollable instruction rows. Bumped to scale=2 for bullets +
-        # headings so the text is readable from arm's length, with
-        # word-wrap so long lines like "Send over Bluetooth" wrap inside
-        # the card instead of bleeding off the right edge. Code stays at
-        # scale=1 because commands can be long (eg. python tools/...).
+        # Scrollable instruction rows. Uniform scale=1 across headings,
+        # bullets and code so all three feel like one body of text;
+        # visual hierarchy comes from colour + a gold underline on
+        # headings + tinted background on code, not from font size.
+        # Word-wrap is kept as a safety net for future long entries.
         text_x   = card_x + 12
         inner_w  = card_w - 24
-        list_y   = card_y + 10 + bsz + 14
+        list_y   = card_y + 10 + bsz + 12
         list_bot = card_y + card_h - 8
 
-        H_LINE  = 18    # heading line height (scale=2, 16px glyph + 2px gap)
-        B_LINE  = 18    # bullet line height (same; consistent vertical rhythm)
-        C_LINE  = 14    # code line height (scale=1, 8px glyph + 6px gap)
-        ROW_GAP = 6     # extra space between sibling list rows
+        LINE_H  = 12   # uniform line height (8 px glyph + 4 px gap)
+        ROW_GAP = 6    # extra space BETWEEN sibling rows of any kind
 
-        # Reserve a 14-px gutter on the left of bullets for the dot.
-        max_h_chars = inner_w // 16
-        max_b_chars = (inner_w - 14) // 16
+        # 12 px gutter on the bullet line for the dot.
+        max_h_chars = inner_w // 8
+        max_b_chars = (inner_w - 12) // 8
         max_c_chars = (inner_w - 12) // 8
 
         rows = _HELP[self._help_scroll:]
@@ -633,44 +638,40 @@ class App(oreoOS.App):
         for kind, payload in rows:
             if kind == "h":
                 lines = _wrap_help(payload, max_h_chars)
-                block_h = len(lines) * H_LINE + 4
+                block_h = len(lines) * LINE_H + 4
                 if cur_y + block_h > list_bot:
                     break
-                # Extra top padding before each heading, except the
-                # very first one in the visible window.
                 if rendered > 0:
                     cur_y += ROW_GAP
                 for line in lines:
-                    d.text(line, text_x, cur_y, theme.PRIMARY, scale=2)
-                    cur_y += H_LINE
-                # Gold underline below the LAST wrapped line, matching its width.
-                last_w = len(lines[-1]) * 16
-                d.rect(text_x, cur_y - 1, last_w, 1, theme.GOLD, fill=True)
-                cur_y += 4
+                    d.text(line, text_x, cur_y, theme.PRIMARY, scale=1)
+                    cur_y += LINE_H
+                # Gold underline beneath the last wrapped line, matching
+                # its width — the heading's only "visual heft" at this
+                # uniform size.
+                last_w = len(lines[-1]) * 8
+                d.rect(text_x, cur_y - 2, last_w, 1, theme.GOLD, fill=True)
             elif kind == "b":
                 lines = _wrap_help(payload, max_b_chars)
-                block_h = len(lines) * B_LINE + 2
+                block_h = len(lines) * LINE_H + 2
                 if cur_y + block_h > list_bot:
                     break
                 # Pink dot on the first line; wrapped lines indent flush
-                # with the first line's text (no double-bullet).
-                d.rect(text_x + 2, cur_y + 6, 4, 4, theme.PRIMARY, fill=True)
+                # with the first line's text.
+                d.rect(text_x + 2, cur_y + 3, 3, 3, theme.PRIMARY, fill=True)
                 for line in lines:
-                    d.text(line, text_x + 14, cur_y, theme.TEXT_BRIGHT, scale=2)
-                    cur_y += B_LINE
-                cur_y += 2
+                    d.text(line, text_x + 10, cur_y,
+                           theme.TEXT_BRIGHT, scale=1)
+                    cur_y += LINE_H
             elif kind == "code":
-                # Single-line tinted strip — commands shouldn't wrap, but
-                # we still truncate as a safety net so a runaway entry
-                # can't bleed past the card.
                 truncated = payload[:max_c_chars]
-                if cur_y + C_LINE > list_bot:
+                if cur_y + LINE_H > list_bot:
                     break
-                d.rect(text_x + 6, cur_y - 1, inner_w - 12, C_LINE,
+                d.rect(text_x + 4, cur_y - 1, inner_w - 8, LINE_H,
                        theme.DOCK_SEL, fill=True)
-                d.text(truncated, text_x + 10, cur_y + 2,
+                d.text(truncated, text_x + 8, cur_y + 1,
                        theme.TEAL, scale=1)
-                cur_y += C_LINE + 2
+                cur_y += LINE_H + 1
             rendered += 1
 
         # Scroll arrows on the right edge.

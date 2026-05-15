@@ -214,23 +214,20 @@ class App(oreoOS.App):
         d.text("Add a photo",     bx + bsz + 10, by + 2,  theme.PRIMARY, scale=2)
         d.text("scroll UP / DOWN", bx + bsz + 10, by + 22, theme.MUTED)
 
-        # Scrollable instructions. Bumped to scale=2 for bullets +
-        # headings so the text is readable from arm's length, with
-        # word-wrap so long headings like "Flash the badge" never bleed
-        # off the right edge. Code stays at scale=1 because commands
-        # can be long (eg. python tools/optimize_assets.py).
+        # Scrollable instructions. Uniform scale=1 across headings,
+        # bullets and code so all three feel like one body of text;
+        # visual hierarchy comes from colour + a gold underline on
+        # headings + tinted background on code, not from font size.
         text_x   = card_x + 12
         inner_w  = card_w - 24
-        list_y   = card_y + 10 + bsz + 14
+        list_y   = card_y + 10 + bsz + 12
         list_bot = card_y + card_h - 8
 
-        H_LINE  = 18
-        B_LINE  = 18
-        C_LINE  = 14
+        LINE_H  = 12
         ROW_GAP = 6
 
-        max_h_chars = inner_w // 16
-        max_b_chars = (inner_w - 14) // 16
+        max_h_chars = inner_w // 8
+        max_b_chars = (inner_w - 12) // 8
         max_c_chars = (inner_w - 12) // 8
 
         rows = _HELP[self._scroll:]
@@ -239,36 +236,35 @@ class App(oreoOS.App):
         for kind, payload in rows:
             if kind == "h":
                 lines = _wrap_help(payload, max_h_chars)
-                block_h = len(lines) * H_LINE + 4
+                block_h = len(lines) * LINE_H + 4
                 if cur_y + block_h > list_bot:
                     break
                 if rendered > 0:
                     cur_y += ROW_GAP
                 for line in lines:
-                    d.text(line, text_x, cur_y, theme.PRIMARY, scale=2)
-                    cur_y += H_LINE
-                last_w = len(lines[-1]) * 16
-                d.rect(text_x, cur_y - 1, last_w, 1, theme.GOLD, fill=True)
-                cur_y += 4
+                    d.text(line, text_x, cur_y, theme.PRIMARY, scale=1)
+                    cur_y += LINE_H
+                last_w = len(lines[-1]) * 8
+                d.rect(text_x, cur_y - 2, last_w, 1, theme.GOLD, fill=True)
             elif kind == "b":
                 lines = _wrap_help(payload, max_b_chars)
-                block_h = len(lines) * B_LINE + 2
+                block_h = len(lines) * LINE_H + 2
                 if cur_y + block_h > list_bot:
                     break
-                d.rect(text_x + 2, cur_y + 6, 4, 4, theme.PRIMARY, fill=True)
+                d.rect(text_x + 2, cur_y + 3, 3, 3, theme.PRIMARY, fill=True)
                 for line in lines:
-                    d.text(line, text_x + 14, cur_y, theme.TEXT_BRIGHT, scale=2)
-                    cur_y += B_LINE
-                cur_y += 2
+                    d.text(line, text_x + 10, cur_y,
+                           theme.TEXT_BRIGHT, scale=1)
+                    cur_y += LINE_H
             elif kind == "code":
                 truncated = payload[:max_c_chars]
-                if cur_y + C_LINE > list_bot:
+                if cur_y + LINE_H > list_bot:
                     break
-                d.rect(text_x + 6, cur_y - 1, inner_w - 12, C_LINE,
+                d.rect(text_x + 4, cur_y - 1, inner_w - 8, LINE_H,
                        theme.DOCK_SEL, fill=True)
-                d.text(truncated, text_x + 10, cur_y + 2,
+                d.text(truncated, text_x + 8, cur_y + 1,
                        theme.TEAL, scale=1)
-                cur_y += C_LINE + 2
+                cur_y += LINE_H + 1
             rendered += 1
 
         # Scroll indicators — small arrows on the right edge when more
