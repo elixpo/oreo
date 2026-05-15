@@ -247,6 +247,15 @@ class NotifPanel:
         elif btn == api.BTN_UP:
             self._focus = "quick"
         elif btn == api.BTN_DOWN:
+            self._focus = "time"
+        return True
+
+    def _handle_time(self, btn, items):
+        if btn == api.BTN_A:
+            self._sync_time()
+        elif btn == api.BTN_UP:
+            self._focus = "bright"
+        elif btn == api.BTN_DOWN:
             if items:
                 self._focus = "list"
                 self._list_sel = 0
@@ -256,7 +265,7 @@ class NotifPanel:
         n = len(items)
         if btn == api.BTN_UP:
             if self._list_sel == 0:
-                self._focus = "bright"
+                self._focus = "time"
             else:
                 self._list_sel -= 1
         elif btn == api.BTN_DOWN:
@@ -312,6 +321,19 @@ class NotifPanel:
         except Exception:
             pass
 
+    def _sync_time(self):
+        # ~2 s blocking call. We post a "syncing…" toast first so the
+        # next frame can paint it before we vanish into the network
+        # round-trip; the result toast appears on the frame after.
+        self._time_toast = (time.ticks_ms(), "syncing…", "muted")
+        try:
+            from oreoOS import timeutil
+            ok, msg = timeutil.sync_from_ntp()
+        except Exception:
+            ok, msg = False, "failed"
+        key = "ok" if ok else "err"
+        self._time_toast = (time.ticks_ms(), msg, key)
+
     def _open_settings(self):
         # Close the panel synchronously and hand control to Settings —
         # one-tap shortcut so users can dive deeper without leaving the
@@ -355,6 +377,7 @@ class NotifPanel:
 
         self._draw_quick_row(d, panel_y)
         self._draw_brightness(d, panel_y)
+        self._draw_time_row(d, panel_y)
         self._draw_list(d, panel_y, items, full_h)
         self._draw_hint(d, panel_y, full_h)
 
@@ -489,11 +512,63 @@ class NotifPanel:
             if body:
                 d.text(body, 34, y + 18, theme.TEXT_DIM, scale=1)
 
+    def _draw_time_row(self, d, panel_y):
+        """Time-sync row beneath the brightness slider. Shows the current
+        wall-clock time and (when focused) a "Sync now" affordance. A
+        recent sync result temporarily replaces the clock with a toast."""
+        x = _TIME_PAD
+        y = panel_y + _TIME_Y
+        w = SW - 2 * _TIME_PAD
+        h = _TIME_H
+
+        sel = (self._focus == "time")
+        d.rect(x, y, w, h, theme.CARD, fill=True)
+        if sel:
+            d.rect(x,         y,         w, 1, theme.SEL_BORDER, fill=True)
+            d.rect(x,         y + h - 1, w, 1, theme.SEL_BORDER, fill=True)
+            d.rect(x,         y,         1, h, theme.SEL_BORDER, fill=True)
+            d.rect(x + w - 1, y,         1, h, theme.SEL_BORDER, fill=True)
+
+        _draw_clock(d, x + 6, y + (h - 12) // 2, theme.PRIMARY)
+
+        toast = self._time_toast
+        if toast is not None:
+            start_ms, msg, key = toast
+            if time.ticks_diff(time.ticks_ms(), start_ms) > self._toast_ms \
+                    and msg != "syncing…":
+                self._time_toast = None
+                toast = None
+
+        if toast is not None:
+            _, msg, key = toast
+            color = (theme.PRIMARY if key == "ok"
+                     else theme.GOLD if key == "err"
+                     else theme.MUTED)
+            d.text(msg[:28], x + 24, y + (h - 8) // 2, color, scale=1)
+        else:
+            # Live clock readout — HH:MM in the local timezone, plus a
+            # right-aligned action hint when focused so the user knows A
+            # triggers a manual sync.
+            try:
+                from oreoOS import timeutil as _tu
+                hour, minute, _s, _wd, _d, _m, _y = _tu.now()
+                clock = "%02d:%02d" % (hour, minute)
+            except Exception:
+                clock = "--:--"
+            d.text(clock, x + 24, y + (h - 8) // 2,
+                   theme.TEXT_BRIGHT, scale=1)
+            action = "A=sync ↻" if sel else "Sync time"
+            d.text(action, x + w - len(action) * 8 - 8,
+                   y + (h - 8) // 2,
+                   theme.PRIMARY if sel else theme.MUTED, scale=1)
+
     def _draw_hint(self, d, panel_y, full_h):
         if self._focus == "quick":
             hint = "L/R=switch  A=toggle  C=close"
         elif self._focus == "bright":
             hint = "L/R=adjust  UP=back  C=close"
+        elif self._focus == "time":
+            hint = "A=sync  UP/DOWN=move  C=close"
         else:
             hint = "A=open  B=clear  C=close"
         d.text(hint, (SW - len(hint) * 8) // 2,

@@ -103,6 +103,9 @@ class App(oreoOS.App):
                  on_label="Cat", off_label="Grid"),
             _Row("Storage",     "action",
                  setter=lambda v: self._open_storage()),
+            _Row("Sync Time",   "action",
+                 getter=lambda: self._sync_time_summary(),
+                 setter=lambda v: self._sync_time()),
             _Row("Version",     "info",
                  getter=self._os_version),
             _Row("Check Update","action",
@@ -295,6 +298,31 @@ class App(oreoOS.App):
             self._os.launch("storage")
         except Exception:
             pass
+
+    # ── time sync ───────────────────────────────────────────────────────
+    # Manual NTP re-sync. The boot path runs this once when WiFi comes up;
+    # this row lets the user kick it again after they fix a bad clock or
+    # land in a new timezone without rebooting. Result is mirrored to the
+    # notif panel via timeutil's module-level last_sync_status.
+    def _sync_time(self):
+        try:
+            from oreoOS import timeutil
+            timeutil.sync_from_ntp()
+        except Exception:
+            pass
+
+    def _sync_time_summary(self):
+        try:
+            from oreoOS import timeutil
+            status = timeutil.last_sync_status()
+        except Exception:
+            return ""
+        return {
+            "ok":      "synced",
+            "no-wifi": "no wifi",
+            "failed":  "failed",
+            "never":   "tap A",
+        }.get(status, "tap A")
 
     def _open_wifi(self):
         try:
