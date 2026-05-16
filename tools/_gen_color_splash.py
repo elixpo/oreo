@@ -17,7 +17,7 @@ from pathlib import Path
 
 from PIL import Image
 
-OUT_PATH = Path("apps/color_picker/assets/raw/color_splash.png")
+OUT_PATH = Path("apps_market/color_picker/assets/raw/color_splash.png")
 W, H     = 320, 196          # we render at full screen size so the optimizer
                              # can downsample cleanly to its target 80x49.
 
