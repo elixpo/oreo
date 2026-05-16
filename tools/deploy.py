@@ -123,6 +123,7 @@ DEPLOY = [
     ("oreoOS/cache.py",         "oreoOS/cache.py"),
     ("oreoOS/ota.py",           "oreoOS/ota.py"),
     ("oreoOS/storage.py",       "oreoOS/storage.py"),
+    ("oreoOS/store.py",         "oreoOS/store.py"),
     ("oreoOS/notifications.py", "oreoOS/notifications.py"),
     ("oreoOS/notif_panel.py",   "oreoOS/notif_panel.py"),
     ("oreoOS/gestures.py",      "oreoOS/gestures.py"),
@@ -542,6 +543,42 @@ def main():
         ) % keep
         print("  pruning stale gallery photos on device (keep=%d)" % len(keep))
         mpremote("exec", cleanup)
+
+    # apps/ sync: remove device-side app directories that no longer
+    # exist in the repo's apps/ tree. Catches the apps_market move case
+    # (color_picker + pet moved out of apps/ → device still had stale
+    # copies and the drawer kept rendering them). The Store app's
+    # runtime install path repopulates these on demand.
+    repo_apps = sorted({
+        p.name for p in Path("apps").iterdir()
+        if p.is_dir() and (p / "main.py").exists()
+            and (p / "manifest.json").exists()
+            and not p.name.startswith("_")
+    })
+    apps_prune = (
+        "import os\n"
+        "keep = set(%r)\n"
+        "def _rm(p):\n"
+        "    try:\n"
+        "        for f in os.listdir(p): _rm(p + '/' + f)\n"
+        "        os.rmdir(p)\n"
+        "    except OSError:\n"
+        "        try: os.remove(p)\n"
+        "        except: pass\n"
+        "try:\n"
+        "    for d in os.listdir('apps'):\n"
+        "        if d in keep or d.startswith('_') or d == '__init__.py':\n"
+        "            continue\n"
+        "        try:\n"
+        "            os.stat('apps/' + d + '/manifest.json')\n"
+        "        except OSError:\n"
+        "            continue\n"
+        "        print('  prune apps/' + d)\n"
+        "        _rm('apps/' + d)\n"
+        "except OSError: pass\n"
+    ) % repo_apps
+    print("  pruning stale apps on device (keep=%d)" % len(repo_apps))
+    mpremote("exec", apps_prune)
 
     cache_state = "miss" if not cache else "hit (%d entries)" % len(cache)
     print("  hash cache: %s   |   to push: %d   skipped: %d"
