@@ -61,8 +61,8 @@ Weather, GitHub commits, OTA updates — all live. WiFi power-capped at 11 dBm s
 <tr>
 <td valign="top">
 
-### 🎮 16 apps shipped
-Games, GitHub tools, IR quests, a colour picker, a markdown reader, storage breakdown, and a panda you take care of across days. All open-source under one warm cream theme.
+### 🎮 14 default apps + an App Market
+Games, GitHub tools, IR quests, a markdown reader, storage breakdown, gesture controls. More optional apps (colour picker, the Elixpo Pet panda) install on-device from the App Market tile.
 
 </td>
 <td valign="top">
@@ -86,21 +86,42 @@ IR beacons, BLE advertise + scan, a quest system. Hand someone your badge — th
 
 Every tile in the drawer is its own folder under [`apps/`](apps/),
 written as a small `class App(oreoOS.App)` with three lifecycle methods.
+Two trees ship to the badge: [`apps/`](apps/) is what's pre-installed,
+[`apps_market/`](apps_market/) is the catalogue of opt-in extras the
+user can install on-device from the **App Market** tile.
 
 <div align="center">
 
 | | | | |
 |:-:|:-:|:-:|:-:|
 | <img src="assets/icons/raw/badge_icon.png" width="64"><br>**Badge** | <img src="assets/icons/raw/identity_icon.png" width="64"><br>**Identity** | <img src="assets/icons/raw/commits_icon.png" width="64"><br>**Commits** | <img src="assets/icons/raw/wallpaper_icon.png" width="64"><br>**Weather** |
-| <img src="assets/icons/raw/elixpo_pet_icon.png" width="64"><br>**Pet** | <img src="assets/icons/raw/racer_icon.png" width="64"><br>**Racer** | <img src="assets/icons/raw/flappy_icon.png" width="64"><br>**Flappy** | <img src="assets/icons/raw/snake_icon.png" width="64"><br>**Snake** |
-| <img src="assets/icons/raw/gamepad_icon.png" width="64"><br>**Gamepad** | <img src="assets/icons/raw/gallery_icon.png" width="64"><br>**Gallery** | <img src="assets/icons/raw/color_icon.png" width="64"><br>**Color** | <img src="assets/icons/raw/IR_Quest_icon.png" width="64"><br>**IR Quest** |
-| <img src="assets/icons/raw/reader_icon.png" width="64"><br>**Reader** | <img src="assets/icons/raw/storage_icon.png" width="64"><br>**Storage** | <img src="assets/icons/raw/settings_icon.png" width="64"><br>**Settings** | <img src="assets/icons/raw/about_icon.png" width="64"><br>**About** |
+| <img src="assets/icons/raw/racer_icon.png" width="64"><br>**Racer** | <img src="assets/icons/raw/flappy_icon.png" width="64"><br>**Flappy** | <img src="assets/icons/raw/snake_icon.png" width="64"><br>**Snake** | <img src="assets/icons/raw/gamepad_icon.png" width="64"><br>**Gamepad** |
+| <img src="assets/icons/raw/gallery_icon.png" width="64"><br>**Gallery** | <img src="assets/icons/raw/IR_Quest_icon.png" width="64"><br>**IR Quest** | <img src="assets/icons/raw/reader_icon.png" width="64"><br>**Reader** | <img src="assets/icons/raw/storage_icon.png" width="64"><br>**Storage** |
+| <img src="assets/icons/raw/apps_icon.png" width="64"><br>**Market** | <img src="assets/icons/raw/settings_icon.png" width="64"><br>**Settings** | <img src="assets/icons/raw/about_icon.png" width="64"><br>**About** | |
 
 </div>
 
-Bluetooth and WiFi don't get their own drawer tiles — they live inside **Settings**, alongside brightness, sleep, and OTA. The notification panel (press **C** from anywhere) puts both radios + a brightness slider + manual time-sync one tap away.
+Bluetooth and WiFi don't get their own drawer tiles — they live inside **Settings**, alongside brightness, sleep, gestures and OTA. The notification panel (press **C** from anywhere) puts both radios + a brightness slider + manual time-sync one tap away.
 
-Want to add yours? Copy [`templates/example_app/`](templates/example_app/) into `apps/your_name/` and ship.
+### 📦 App Market — install / uninstall extras on-device
+
+Apps that ship under [`apps_market/`](apps_market/) are **optional**. They aren't in the launcher drawer until you install them. The default catalogue today: **Color Picker** and **Elixpo Pet** — both are good demos but don't pull their weight as always-on tiles.
+
+Open the **App Market** tile, scroll to the app you want, press **A**:
+- **INSTALL** → copies the tree from `/apps_market/<name>/` to `/apps/<name>/`. Next time you open the drawer the tile is there.
+- **INSTALLED** → press **A** again to uninstall. The catalogue copy stays put so re-install is one tap.
+
+```python
+# Programmatic API (handy from REPL or another app):
+from oreoOS import store
+store.list_market()      # [{name, dir, icon, author, installed}, …]
+store.install("pet")     # → bool
+store.uninstall("pet")
+```
+
+The Market is the right home for: games, themed sketches, hardware demos, hackathon entries. **Contribute one** by dropping a folder into `apps_market/<your_app>/` with the usual `main.py + manifest.json + __init__.py + assets/` shape; the deploy script picks it up automatically and the market tile lists it on next boot. Anything in `apps_market/` is **opt-in by default** — that's how you keep flash + drawer real estate tight for everyone else.
+
+Want yours to be **always-installed**? Drop it in `apps/` instead. Copy [`templates/example_app/`](templates/example_app/) as a starting point.
 
 ---
 
