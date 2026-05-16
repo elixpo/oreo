@@ -328,6 +328,25 @@ def run_app(os_obj, app):
             except Exception:
                 pass
 
+            # Gesture engine — early-exits when all toggles are off, so
+            # the cost on the disabled path is one dict lookup per frame.
+            # When events fire we dispatch them globally: HARD_SHAKE
+            # paints a mascot splash, FLIP_UP runs the user's chosen
+            # quick action, TAP / DOUBLE_TAP route to the current app's
+            # `on_gesture` hook if it has one.
+            try:
+                from oreoOS import gestures as _g
+                gs = _g.get(os_obj)
+                if gs:
+                    gs.tick()
+                    while True:
+                        ev = gs.pop_event()
+                        if not ev:
+                            break
+                        _dispatch_gesture(os_obj, app, ev)
+            except Exception:
+                pass
+
             elapsed = time.ticks_diff(time.ticks_ms(), now)
             if elapsed < FRAME_MIN_MS:
                 time.sleep_ms(FRAME_MIN_MS - elapsed)
