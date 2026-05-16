@@ -1,24 +1,17 @@
 """Store — fetch installable apps from the OreoOS GitHub repo.
 
 Catalogue source: github.com/elixpo/oreo `apps_market/`. Each subdir
-of that path that ships a manifest.json + main.py is a candidate.
-Listing is cached on flash (/store_cache.json) so the page is usable
-offline; press A on a card to install / uninstall, press A on the
-top header row (or just open the app cold) to force a refresh.
+of that path with a manifest.json + main.py is a candidate. Listing
+is cached on flash (/store_cache.json) so the page is usable offline.
 
-State machine (drives the page header pill):
-    LOADING     refreshing from GitHub right now
-    OK          cached listing, fresh-ish
-    STALE       cached listing, last refresh > 12h ago
-    OFFLINE     cache exists but WiFi is down
-    EMPTY       no cache and no network — first install needs WiFi
-    ERROR       refresh threw something unexpected
+Two modes:
+  list     — catalogue overview. UP/DOWN walks rows; A on the header
+             refreshes from GitHub; A on a card opens its details page.
+  details  — single-app page. Manifest + file list fetched lazily so
+             the listing API call isn't N+1. Install / Uninstall
+             button lives here.
 
-Controls:
-  UP / DOWN  walk the list (top row = "Refresh from GitHub")
-  A          refresh, install, or uninstall depending on focus
-  HOME       back to the launcher
-"""
+HOME pops one mode level (details → list → quit-to-launcher)."""
 
 import oreoOS
 from oreoOS import api, theme, widgets
@@ -48,63 +41,101 @@ class App(oreoOS.App):
     def on_enter(self, os_):
         super().on_enter(os_)
         self._os    = os_
+        # ── list mode state
         self._sel   = 0     # 0 = refresh header, 1+ = catalogue cards
         self._top   = 0     # first visible CARD index (0..len(items))
-        self._busy  = None  # dir name currently mid-install/uninstall
         self._state = "LOADING"
         self._msg   = ""
         self._items = []
-        self._dirty = True
-        # Surface whatever's in the disk cache immediately so the user
-        # has something on screen during the GitHub round-trip.
+        # ── details mode state
+        self._mode      = "list"   # "list" | "details"
+        self._detail    = None     # cached details dict for the open app
+        self._detail_for = None    # name_dir the details belong to
+        self._busy      = None     # mid install/uninstall flag
+        self._dirty     = True
+        # Surface disk cache immediately so the user has something on
+        # screen during the GitHub round-trip.
         self._items = store.list_market()
         self._refresh(initial=True)
 
     # ── input ──────────────────────────────────────────────────────────
     def on_button_press(self, btn):
+        if self._mode == "details":
+            return self._on_btn_details(btn)
+        return self._on_btn_list(btn)
+
+    def _on_btn_list(self, btn):
         if btn == api.BTN_HOME:
             self._os.quit()
             return
-        # Row count = header + every catalogue entry.
         total = 1 + len(self._items)
         if btn == api.BTN_UP:
             self._sel = (self._sel - 1) % total
         elif btn == api.BTN_DOWN:
             self._sel = (self._sel + 1) % total
         elif btn == api.BTN_A:
-            self._activate()
+            if self._sel == 0:
+                self._refresh(initial=False)
+            else:
+                idx = self._sel - 1
+                if 0 <= idx < len(self._items):
+                    self._open_details(self._items[idx]["dir"])
         else:
             return
         self._scroll_to_sel()
         self._dirty = True
 
-    def _activate(self):
-        if self._sel == 0:
-            self._refresh(initial=False)
+    def _on_btn_details(self, btn):
+        if btn == api.BTN_HOME:
+            self._mode  = "list"
+            self._msg   = ""
+            self._busy  = None
+            # Re-snapshot the installed flag in case install completed.
+            for e in self._items:
+                e["installed"] = store.is_installed(e["dir"])
+            self._dirty = True
             return
-        idx = self._sel - 1
-        if not (0 <= idx < len(self._items)):
-            return
-        item = self._items[idx]
-        name = item["dir"]
-        self._busy = name
+        if btn == api.BTN_A and self._detail and self._detail.get("ok"):
+            self._toggle_install(self._detail_for)
+
+    def _open_details(self, name_dir):
+        """Switch to details mode + lazily fetch this app's manifest +
+        file tree. Paint a 'loading details...' frame first so the
+        synchronous GitHub round-trip doesn't look like a freeze."""
+        self._mode       = "details"
+        self._detail_for = name_dir
+        self._detail     = None
+        self._msg        = "loading details..."
+        self._dirty      = True
+        try:
+            self.draw(self._os.display); self._os.display.present()
+        except Exception:
+            pass
+        self._detail = store.get_details(name_dir)
+        if not self._detail.get("ok"):
+            self._msg = store.last_error() or "couldn't load details"
+        else:
+            self._msg = ""
+        self._dirty = True
+
+    def _toggle_install(self, name_dir):
+        """Install or uninstall the app in focus on the details page."""
+        installed = store.is_installed(name_dir)
+        self._busy = name_dir
         self._msg  = ""
         self._dirty = True
         try:
             self.draw(self._os.display); self._os.display.present()
         except Exception:
             pass
-        if item["installed"]:
-            ok = store.uninstall(name)
+        if installed:
+            ok = store.uninstall(name_dir)
             self._msg = "Uninstalled" if ok else "Uninstall failed"
         else:
-            ok = store.install(name)
+            ok = store.install(name_dir)
             self._msg = "Installed" if ok else "Install failed"
-        # Re-tag installed flags on the in-memory list so the chip
-        # flips immediately without another full refresh.
-        for e in self._items:
-            e["installed"] = store.is_installed(e["dir"])
         self._busy = None
+        self._dirty = True
 
     def _scroll_to_sel(self):
         """Keep the focused row inside the visible window."""
@@ -185,13 +216,19 @@ class App(oreoOS.App):
         self._dirty = False
         d.clear(theme.BG)
         widgets.draw_header(d, "STORE")
-        widgets.draw_hint(d, "A=refresh/install  HOME=back")
+        if self._mode == "details":
+            widgets.draw_hint(d, "A=install/uninstall  HOME=back")
+        else:
+            widgets.draw_hint(d, "A=open  HOME=back")
 
-        self._draw_header_card(d)
-        self._draw_catalogue(d)
-        self._draw_state_chip(d)
+        if self._mode == "details":
+            self._draw_details_page(d)
+        else:
+            self._draw_header_card(d)
+            self._draw_catalogue(d)
+            self._draw_state_chip(d)
         if self._msg:
-            d.text(self._msg, ROW_PAD_X, SH - widgets.HINT_H - 12,
+            d.text(self._msg[:36], ROW_PAD_X, SH - widgets.HINT_H - 12,
                    theme.PRIMARY, scale=1)
 
     def _draw_header_card(self, d):
@@ -278,26 +315,26 @@ class App(oreoOS.App):
         if author:
             d.text(("by " + author)[:24], tx, y + 26, theme.MUTED, scale=1)
 
-        # Action chip
-        if self._busy == item["dir"]:
-            label, chip_fill, chip_text = "...", theme.MUTED2, theme.TEXT_BRIGHT
-        elif item["installed"]:
-            label, chip_fill, chip_text = "INSTALLED", \
-                                          (theme.CARD if sel else theme.DOCK_SEL), \
-                                          theme.PRIMARY
-        else:
-            label, chip_fill, chip_text = "INSTALL", theme.PRIMARY, api.WHITE
-
-        cx = SW - ROW_PAD_X - ACT_W
-        cy = y + (CARD_H - ACT_H) // 2
-        d.rect(cx, cy, ACT_W, ACT_H, chip_fill, fill=True)
-        if item["installed"] and self._busy != item["dir"]:
-            d.rect(cx,             cy,             ACT_W, 1, theme.PRIMARY, fill=True)
-            d.rect(cx,             cy + ACT_H - 1, ACT_W, 1, theme.PRIMARY, fill=True)
-            d.rect(cx,             cy,             1, ACT_H, theme.PRIMARY, fill=True)
-            d.rect(cx + ACT_W - 1, cy,             1, ACT_H, theme.PRIMARY, fill=True)
-        d.text(label, cx + (ACT_W - len(label) * 8) // 2,
-               cy + (ACT_H - 8) // 2, chip_text, scale=1)
+        # List view is browse-only: A opens the details page where the
+        # install/uninstall button lives. We keep a small "INSTALLED"
+        # badge (not a button) so the user can see at a glance which
+        # apps are already on the badge, plus a chevron to hint the
+        # row is interactive.
+        right_x = SW - ROW_PAD_X
+        chev_x  = right_x - 14
+        if item["installed"]:
+            tag    = "✓"
+            tag_w  = 12
+            tag_x  = chev_x - tag_w - 6
+            tag_y  = y + (CARD_H - 16) // 2
+            d.rect(tag_x, tag_y, tag_w, 16, theme.CARD, fill=True)
+            d.rect(tag_x, tag_y,           tag_w, 1,  theme.PRIMARY, fill=True)
+            d.rect(tag_x, tag_y + 15,      tag_w, 1,  theme.PRIMARY, fill=True)
+            d.rect(tag_x, tag_y,           1, 16,     theme.PRIMARY, fill=True)
+            d.rect(tag_x + tag_w - 1, tag_y, 1, 16,   theme.PRIMARY, fill=True)
+            d.text(tag, tag_x + 2, tag_y + 4, theme.PRIMARY, scale=1)
+        d.text(">", chev_x, y + (CARD_H - 16) // 2 + 2,
+               theme.PRIMARY if sel else theme.MUTED, scale=2)
 
     def _icon_for(self, item):
         """Look up the optimized icon module for an app. The catalogue
@@ -317,3 +354,119 @@ class App(oreoOS.App):
             return (m.DATA, m.W, m.H)
         except (ImportError, AttributeError):
             return None
+
+    # ── details page ───────────────────────────────────────────────────
+    def _draw_details_page(self, d):
+        """Per-app detail screen — name + author + description + size,
+        with a single Install / Uninstall button at the bottom."""
+        if not self._detail or not self._detail.get("ok"):
+            # Loading / error case — header card placeholder. The
+            # bottom status line (self._msg) carries the explanation.
+            self._draw_details_header(d, self._detail_for or "?",
+                                      "loading…", None)
+            return
+
+        det  = self._detail
+        name = det.get("name") or self._detail_for
+        self._draw_details_header(d, name, det.get("author"),
+                                  det.get("icon"))
+
+        # Description block — wrapped to ~36 chars / line, capped at
+        # 5 lines, ellipsis on overflow. Most market manifests won't
+        # have a description, in which case we skip the block.
+        body_y = widgets.HEADER_H + 6 + 56
+        desc = det.get("description") or ""
+        if desc:
+            for i, line in enumerate(_wrap(desc, 36, 5)):
+                d.text(line, ROW_PAD_X, body_y + i * 12,
+                       theme.TEXT_DIM, scale=1)
+
+        # Stats line — file count + bytes. Right-aligned under desc.
+        stats_y = body_y + 5 * 12 + 4
+        files = det.get("files") or []
+        kb    = max(1, det.get("bytes", 0) // 1024)
+        stats = "%d files · %d KB" % (len(files), kb)
+        d.text(stats, ROW_PAD_X, stats_y, theme.MUTED, scale=1)
+
+        # Install / Uninstall button — bottom of the play area, full
+        # width, dim while busy.
+        installed = store.is_installed(self._detail_for)
+        busy      = (self._busy == self._detail_for)
+        btn_h     = 28
+        btn_y     = SH - widgets.HINT_H - btn_h - 14
+        if busy:
+            label, fill, ink = "Working...", theme.MUTED2, theme.TEXT_BRIGHT
+        elif installed:
+            label, fill, ink = "Uninstall", theme.CARD, theme.PRIMARY
+        else:
+            label, fill, ink = "Install on badge", theme.PRIMARY, api.WHITE
+        d.rect(ROW_PAD_X, btn_y, SW - 2 * ROW_PAD_X, btn_h, fill,
+               fill=True)
+        if installed and not busy:
+            d.rect(ROW_PAD_X, btn_y,                 SW - 2 * ROW_PAD_X, 1, theme.PRIMARY, fill=True)
+            d.rect(ROW_PAD_X, btn_y + btn_h - 1,     SW - 2 * ROW_PAD_X, 1, theme.PRIMARY, fill=True)
+            d.rect(ROW_PAD_X, btn_y,                 1, btn_h,             theme.PRIMARY, fill=True)
+            d.rect(SW - ROW_PAD_X - 1, btn_y,        1, btn_h,             theme.PRIMARY, fill=True)
+        d.text(label,
+               (SW - len(label) * 16) // 2,
+               btn_y + (btn_h - 16) // 2,
+               ink, scale=2)
+
+    def _draw_details_header(self, d, name, author, icon_filename):
+        """Top section of the details page — icon, name, by-line."""
+        y = widgets.HEADER_H + 6
+        d.rect(6, y, SW - 12, 50, theme.CARD, fill=True)
+        d.rect(6, y, SW - 12, 3,  theme.PRIMARY, fill=True)
+
+        # Icon
+        icon = self._icon_for_name(icon_filename)
+        if icon:
+            data, iw, ih = icon
+            d.blit(data, ROW_PAD_X, y + (50 - ih) // 2, iw, ih)
+        else:
+            letter = (name or "?")[0].upper()
+            d.text(letter, ROW_PAD_X + 4, y + 8, theme.PRIMARY, scale=4)
+
+        tx = ROW_PAD_X + 40
+        d.text(str(name)[:20], tx, y + 6, theme.TEXT_BRIGHT, scale=2)
+        sub = ("by " + author) if author else ""
+        d.text(sub[:28], tx, y + 26, theme.MUTED, scale=1)
+
+    @staticmethod
+    def _icon_for_name(icon_filename):
+        if not icon_filename:
+            return None
+        stem = icon_filename.rsplit(".", 1)[0].replace("-", "_")
+        try:
+            m = __import__("assets.icons.optimized." + stem,
+                           None, None, ["DATA", "W", "H"])
+            return (m.DATA, m.W, m.H)
+        except (ImportError, AttributeError):
+            return None
+
+
+def _wrap(text, max_chars, max_lines):
+    """Greedy word-wrap; ellipsis on overflow. Returns ≤ max_lines lines."""
+    out  = []
+    rest = (text or "").split()
+    cur  = ""
+    while rest and len(out) < max_lines:
+        w = rest[0]
+        cand = (cur + " " + w) if cur else w
+        if len(cand) <= max_chars:
+            cur = cand
+            rest.pop(0)
+            continue
+        if cur:
+            out.append(cur)
+            cur = ""
+            continue
+        out.append(w[:max_chars])
+        rest[0] = w[max_chars:]
+    if cur and len(out) < max_lines:
+        out.append(cur)
+    if rest and out:
+        last = out[-1]
+        cut  = max_chars - 1
+        out[-1] = (last[:cut].rstrip() + "…") if len(last) > cut else last + "…"
+    return out
