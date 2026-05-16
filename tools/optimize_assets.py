@@ -203,9 +203,17 @@ def optimize_app(app_name, fill_override=None):
       • PER_APP_FILL[app] (e.g. sky blue) for stems in PER_APP_OPAQUE[app]
       • CHROMA_KEY magenta for everything else → blit() treats as transparent
     """
-    raw_dir  = Path("apps") / app_name / "assets" / "raw"
-    tr_dir   = Path("apps") / app_name / "assets" / "transparent"
-    out_dir  = Path("apps") / app_name / "assets" / "optimized"
+    # `--app <name>` resolves to either apps/<name>/ (default-installed)
+    # or apps_market/<name>/ (optional, installed at runtime by the
+    # Store app). Pick whichever has a raw/ folder so existing flows
+    # don't break after a move.
+    for root in (Path("apps"), Path("apps_market")):
+        if (root / app_name / "assets" / "raw").exists() or \
+           (root / app_name / "assets" / "transparent").exists():
+            break
+    raw_dir  = root / app_name / "assets" / "raw"
+    tr_dir   = root / app_name / "assets" / "transparent"
+    out_dir  = root / app_name / "assets" / "optimized"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     opaque_fill = fill_override or PER_APP_FILL.get(app_name, BADGE_BG)
