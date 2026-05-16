@@ -1,69 +1,21 @@
-Oreo Panda Community Licence
-============================
+OreoOS is provided under:
 
-Version 1.0 — 2026
+	SPDX-License-Identifier: MIT WITH Oreo-trademarks
 
-Copyright (c) 2026 Elixpo (Ayushman Bhattacharya / @Circuit-Overtime)
+Being under the terms of the MIT License, according with:
 
-This is a permissive, plain-English licence built on top of MIT. It is
-written this way because we want the Oreo Badge to be picked up,
-remixed, taught with, soldered, and gifted by as many curious people
-as possible — and we want them to read the licence rather than skip it.
+	LICENSES/preferred/MIT
 
-═══════════════════════════════════════════════════════════════════════
-TL;DR  (not legally binding; see the full grant below)
-═══════════════════════════════════════════════════════════════════════
+With an explicit trademark and naming exception, as stated at:
 
-  ✅ Use it.        Personally, in classrooms, at conferences, in
-                    clubs, in lab work, on stage, on YouTube.
-  ✅ Modify it.     Fork, hack, slice, rewrite. Ship new apps.
-  ✅ Distribute it. Hand badges to friends. Sell kits. Run workshops.
-  ✅ Commercial.    Yes — including selling badges with this OS on them.
-  ⚠️  Credit us.    Keep our names + a link to the project visible in
-                    your docs or about screen. Don't pretend you wrote it.
-  ⚠️  Stay nice.    Follow the Code of Conduct when contributing back.
-  ❌ No warranty.   It's a hobby project. If it sets your desk on fire,
-                    that's between you and your desk.
+	LICENSES/exceptions/Oreo-trademarks
 
-═══════════════════════════════════════════════════════════════════════
-Full grant
-═══════════════════════════════════════════════════════════════════════
+In addition, other licenses may also apply to upstream components
+incorporated into this project. Please see:
 
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of this software, the firmware, the hardware design files, the
-prompts, the assets, and any other materials in this repository (the
-"Work"), to deal in the Work without restriction, including without
-limitation the rights to use, copy, modify, merge, publish, distribute,
-sublicense, and/or sell copies of the Work, and to permit persons to
-whom the Work is furnished to do so, subject to the following:
+	LICENSES/notices/notice-board
+	LICENSES/README.md
 
-  1. The above copyright notice and this permission notice shall be
-     included in all copies or substantial portions of the Work, OR a
-     clearly visible "Powered by OreoOS — elixpo.com" credit shall be
-     surfaced in the project's documentation and/or about screen,
-     whichever is more visible to the end user.
+for more details.
 
-  2. The names "Oreo Badge", "OreoOS", "Elixpo", and the panda mascot
-     character may be used to identify the original project and credit
-     its authors. They may NOT be used to imply endorsement of a
-     derivative work without prior written permission from Elixpo.
-
-  3. If you contribute changes back to this repository, you agree to
-     license those contributions under the same Oreo Panda Community
-     Licence and to abide by the project's Code of Conduct.
-
-═══════════════════════════════════════════════════════════════════════
-Disclaimer
-═══════════════════════════════════════════════════════════════════════
-
-THE WORK IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
-THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-ARISING FROM, OUT OF OR IN CONNECTION WITH THE WORK OR THE USE OR OTHER
-DEALINGS IN THE WORK.
-
-═══════════════════════════════════════════════════════════════════════
-
-Questions?  Ideas?  Sponsorship?  →  hello@elixpo.com
+All contributions to OreoOS are subject to this LICENSE file.
