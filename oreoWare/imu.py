@@ -21,7 +21,16 @@ no game is using it.
 """
 
 try:
-    from machine import I2C, Pin
+    from machine import SoftI2C, Pin
+    # SoftI2C bit-bangs through the GPIO matrix and bypasses the
+    # ESP32-S3's HW I²C peripheral. On the MicroPython 1.28 build we
+    # ship, HW I²C scans correctly but `readfrom_mem*` calls time out
+    # against the MPU6050 (ETIMEDOUT, errno 116) regardless of speed
+    # or peripheral index. SoftI2C @ 50 kHz reads cleanly. Throughput
+    # is plenty: a 14-byte burst takes ~3 ms — well under the racer
+    # game's per-frame budget. Aliased as I2C so the rest of the
+    # module reads naturally.
+    I2C = SoftI2C
 except ImportError:
     I2C = None
     Pin = None
@@ -73,7 +82,7 @@ def detect(i2c=None, retries=3):
         return None
     if i2c is None:
         try:
-            i2c = I2C(0, scl=Pin(pins.I2C_SCL), sda=Pin(pins.I2C_SDA),
+            i2c = I2C(scl=Pin(pins.I2C_SCL), sda=Pin(pins.I2C_SDA),
                       freq=100_000)
         except Exception:
             return None
@@ -111,7 +120,7 @@ def i2c_scan(freq=100_000):
     """
     if I2C is None:
         raise RuntimeError("machine.I2C not available")
-    bus = I2C(0, scl=Pin(pins.I2C_SCL), sda=Pin(pins.I2C_SDA), freq=freq)
+    bus = I2C(scl=Pin(pins.I2C_SCL), sda=Pin(pins.I2C_SDA), freq=freq)
     return bus.scan()
 
 
@@ -123,7 +132,7 @@ class MPU6050:
             # 100 kHz default — slow mode, forgiving of breadboard parasitic
             # capacitance and long jumper wires. Bump to 400 kHz only once
             # you've confirmed the bus is stable.
-            i2c = I2C(0, scl=Pin(pins.I2C_SCL), sda=Pin(pins.I2C_SDA), freq=100_000)
+            i2c = I2C(scl=Pin(pins.I2C_SCL), sda=Pin(pins.I2C_SDA), freq=100_000)
         self._i2c    = i2c
         self._addr   = addr
         self._buf    = bytearray(14)

@@ -5,8 +5,10 @@ empty. Drives a sequence of probes against the ESP32-S3 over USB-CDC
 and prints a verdict (wiring fault / power fault / dead chip / ok).
 
 Usage:
-    python tools/imu_probe.py            # default port /dev/ttyACM0
-    python tools/imu_probe.py /dev/ttyACM1
+    python tools/imu_probe.py                              # defaults
+    python tools/imu_probe.py /dev/ttyACM1                 # alt port
+    python tools/imu_probe.py --sda 42 --scl 33            # alt pins
+    python tools/imu_probe.py /dev/ttyACM0 --scl 33        # combined
 
 What it checks
 --------------
@@ -32,12 +34,14 @@ import subprocess
 import sys
 
 DEFAULT_PORT  = "/dev/ttyACM0"
+DEFAULT_SDA   = 42
+DEFAULT_SCL   = 47
 MPREMOTE      = ".venv/bin/mpremote"      # repo-local venv first
 PROBE_SNIPPET = r"""
 from machine import I2C, SoftI2C, Pin
 import time
 
-SDA, SCL = 42, 47
+SDA, SCL = __SDA__, __SCL__
 
 # ── I2C scans ──────────────────────────────────────────────────────────
 results = []
@@ -86,9 +90,10 @@ print("---END---")
 """
 
 
-def _run(port):
+def _run(port, sda, scl):
     """Invoke mpremote exec and return its stdout as text."""
-    cmd = [MPREMOTE, "connect", port, "exec", PROBE_SNIPPET]
+    snippet = PROBE_SNIPPET.replace("__SDA__", str(sda)).replace("__SCL__", str(scl))
+    cmd = [MPREMOTE, "connect", port, "exec", snippet]
     try:
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
     except FileNotFoundError:
@@ -172,10 +177,32 @@ def _verdict(out):
         print("  3V3 pins), and verify the module's GND is actually wired.")
 
 
+def _parse_args():
+    """Tiny ad-hoc parser — keeps the script dep-free.
+    First positional is the serial port; --sda / --scl override pins."""
+    port, sda, scl = DEFAULT_PORT, DEFAULT_SDA, DEFAULT_SCL
+    args = sys.argv[1:]
+    i = 0
+    while i < len(args):
+        a = args[i]
+        if a == "--sda":
+            sda = int(args[i + 1]); i += 2
+        elif a == "--scl":
+            scl = int(args[i + 1]); i += 2
+        elif a in ("-h", "--help"):
+            print(__doc__); sys.exit(0)
+        elif a.startswith("--"):
+            sys.exit("unknown flag: %s" % a)
+        else:
+            port = a; i += 1
+    return port, sda, scl
+
+
 def main():
-    port = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_PORT
-    print("Probing IMU on %s ..." % port)
-    out = _run(port)
+    port, sda, scl = _parse_args()
+    print("Probing IMU on %s  (SDA=GPIO %d, SCL=GPIO %d) ..."
+          % (port, sda, scl))
+    out = _run(port, sda, scl)
     print(out, end="")
     _verdict(out)
 
