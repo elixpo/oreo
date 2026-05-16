@@ -105,6 +105,15 @@ class App(oreoOS.App):
             _Row("Sync Time",   "action",
                  getter=lambda: self._sync_time_summary(),
                  setter=lambda v: self._sync_time()),
+
+            # Gestures — phone-style detail screen. Settings here just
+            # links into apps/gestures/ which owns the per-gesture
+            # toggles + IMU power coordination, mirroring the WiFi /
+            # Bluetooth pattern (deep settings live in their own app).
+            _Row("Gestures",    "action",
+                 getter=lambda: self._gestures_summary(),
+                 setter=lambda v: self._open_gestures()),
+
             _Row("Version",     "info",
                  getter=self._os_version),
             _Row("Check Update","action",
@@ -311,6 +320,30 @@ class App(oreoOS.App):
     # this row lets the user kick it again after they fix a bad clock or
     # land in a new timezone without rebooting. Result is mirrored to the
     # notif panel via timeutil's module-level last_sync_status.
+    # ── gestures (sub-page) ─────────────────────────────────────────────
+    # Settings just launches the dedicated apps/gestures/ app, same as
+    # WiFi / Bluetooth. The summary string gives a glanceable status.
+    def _open_gestures(self):
+        try:
+            self._os.launch("gestures")
+        except Exception:
+            pass
+
+    def _gestures_summary(self):
+        try:
+            if not self._os.settings_get("gestures_enabled", False):
+                return "Off"
+        except Exception:
+            return ""
+        # Master is ON — count which individual gestures are active.
+        try:
+            keys = ("gesture_tap", "gesture_double_tap",
+                    "gesture_flip_up", "gesture_hard_shake")
+            n = sum(1 for k in keys if self._os.settings_get(k, False))
+        except Exception:
+            return "On"
+        return "%d on" % n if n else "Idle"
+
     def _sync_time(self):
         try:
             from oreoOS import timeutil

@@ -125,6 +125,7 @@ DEPLOY = [
     ("oreoOS/storage.py",       "oreoOS/storage.py"),
     ("oreoOS/notifications.py", "oreoOS/notifications.py"),
     ("oreoOS/notif_panel.py",   "oreoOS/notif_panel.py"),
+    ("oreoOS/gestures.py",      "oreoOS/gestures.py"),
 
     # Hardware drivers
     ("oreoWare/__init__.py",    "oreoWare/__init__.py"),

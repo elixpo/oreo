@@ -21,7 +21,16 @@ no game is using it.
 """
 
 try:
-    from machine import I2C, Pin
+    from machine import SoftI2C, Pin
+    # SoftI2C bit-bangs through the GPIO matrix and bypasses the
+    # ESP32-S3's HW I²C peripheral. On the MicroPython 1.28 build we
+    # ship, HW I²C scans correctly but `readfrom_mem*` calls time out
+    # against the MPU6050 (ETIMEDOUT, errno 116) regardless of speed
+    # or peripheral index. SoftI2C @ 50 kHz reads cleanly. Throughput
+    # is plenty: a 14-byte burst takes ~3 ms — well under the racer
+    # game's per-frame budget. Aliased as I2C so the rest of the
+    # module reads naturally.
+    I2C = SoftI2C
 except ImportError:
     I2C = None
     Pin = None
@@ -58,22 +67,23 @@ _ALT_ADDR = 0x69
 
 
 def detect(i2c=None, retries=3):
-    """Probe the I2C bus for an MPU6050 and return a configured driver.
+    """Probe the I2C bus for an MPU6050 and return an idle driver.
 
     Tries the default 0x68 first, then 0x69, up to `retries` rounds.
     Returns the live MPU6050 instance, or None if neither address ACKs
     cleanly across the retries.
 
-    Used by the racer game so a momentary I2C glitch at boot doesn't
-    permanently disable IMU mode — the next call (e.g. next game launch)
-    re-detects from scratch. Keeps callers out of the address-fallback
-    + retry pattern that every app would otherwise reinvent.
+    The returned chip is put back to sleep before this function returns
+    so we don't burn ~3.6 mA between launches. Callers must call
+    `wake()` before reading. The racer game's on_enter / on_exit pair
+    handles this; future tilt-aware apps should follow the same
+    contract.
     """
     if I2C is None:
         return None
     if i2c is None:
         try:
-            i2c = I2C(0, scl=Pin(pins.I2C_SCL), sda=Pin(pins.I2C_SDA),
+            i2c = I2C(scl=Pin(pins.I2C_SCL), sda=Pin(pins.I2C_SDA),
                       freq=100_000)
         except Exception:
             return None
@@ -90,7 +100,15 @@ def detect(i2c=None, retries=3):
             continue
         for _ in range(retries):
             try:
-                return MPU6050(i2c=i2c, addr=addr)
+                m = MPU6050(i2c=i2c, addr=addr)
+                # Park the chip in low-power sleep until the caller
+                # explicitly wakes it. _init_chip already left it
+                # running; flip it back so detect() is power-neutral.
+                try:
+                    m.sleep()
+                except Exception:
+                    pass
+                return m
             except Exception:
                 # Brief settle before retry — bus can recover from a
                 # clock-stretch timeout on a fresh power-on.
@@ -111,7 +129,7 @@ def i2c_scan(freq=100_000):
     """
     if I2C is None:
         raise RuntimeError("machine.I2C not available")
-    bus = I2C(0, scl=Pin(pins.I2C_SCL), sda=Pin(pins.I2C_SDA), freq=freq)
+    bus = I2C(scl=Pin(pins.I2C_SCL), sda=Pin(pins.I2C_SDA), freq=freq)
     return bus.scan()
 
 
@@ -123,7 +141,7 @@ class MPU6050:
             # 100 kHz default — slow mode, forgiving of breadboard parasitic
             # capacitance and long jumper wires. Bump to 400 kHz only once
             # you've confirmed the bus is stable.
-            i2c = I2C(0, scl=Pin(pins.I2C_SCL), sda=Pin(pins.I2C_SDA), freq=100_000)
+            i2c = I2C(scl=Pin(pins.I2C_SCL), sda=Pin(pins.I2C_SDA), freq=100_000)
         self._i2c    = i2c
         self._addr   = addr
         self._buf    = bytearray(14)
@@ -154,6 +172,35 @@ class MPU6050:
         self._w(_PWR_MGMT_1, 0x40)
 
     def wake(self):
+        self._init_chip()
+
+    def enable_cycle_mode(self, rate_hz=5):
+        """Drop the chip into accel-only cycle mode at `rate_hz`.
+
+        Cycle mode auto-toggles between sleep + a single accel sample
+        at the configured wake-up rate, with the gyro disabled. Power
+        is roughly:
+            1.25 Hz   ~10 µA
+            5 Hz      ~25 µA   (default — snappy for gesture detect)
+            20 Hz     ~70 µA
+            40 Hz     ~140 µA
+        Followed by `enable_motion_int()` this gives the gesture engine
+        a near-zero-cost idle: the chip only spends bus cycles when the
+        accel actually crosses the motion threshold.
+        """
+        # PWR_MGMT_1: CYCLE=1, SLEEP=0, TEMP_DIS=1, internal 8MHz osc.
+        self._w(_PWR_MGMT_1, 0x28)
+        # PWR_MGMT_2: gyro X/Y/Z standby + LP_WAKE_CTRL field selects rate.
+        rate_bits = {1: 0b00, 2: 0b00, 5: 0b01,
+                     20: 0b10, 40: 0b11}.get(int(rate_hz), 0b01) << 6
+        # 0x07 = gyro X/Y/Z all in standby.
+        self._w(_PWR_MGMT_2, rate_bits | 0x07)
+
+    def disable_motion_int(self):
+        """Clear the motion-interrupt configuration (re-enable temp,
+        return to the full-rate config from _init_chip)."""
+        self._w(0x37, 0x00)
+        self._w(0x38, 0x00)
         self._init_chip()
 
     # ── reads ────────────────────────────────────────────────────────────

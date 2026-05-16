@@ -228,6 +228,87 @@ def _draw_text_centered(d, s, y, color, scale=1):
 
 # ── show_splash ──────────────────────────────────────────────────────────────
 
+def show_shake_mascot(os_obj, duration_ms=2400):
+    """Quick reaction to a HARD_SHAKE gesture — paints the mascot at
+    centre with a 'head spinning' compress/expand animation.
+
+    The chroma-key mascot already exists in assets; here we just
+    horizontally squish it (W × scale_x) and bounce the scale_x between
+    0.25 and 1.0 a few times to fake rotation around the vertical axis.
+    Cheap enough to run as a blocking overlay — duration_ms keeps the
+    block bounded so the OS run-loop resumes shortly after.
+    """
+    d = os_obj.display
+    mascot = _get_mascot()
+    if not mascot:
+        return
+    data, mw, mh = mascot
+    cx = SW // 2
+    y0 = (SH - mh) // 2
+
+    # Pre-paint background once so the mascot is the only thing
+    # changing per frame. Cheap painted card instead of bg image so
+    # there's no large asset hit at gesture time.
+    d.clear(theme.BG)
+    d.rect(0, 0, SW, 28, theme.PRIMARY, fill=True)
+    label = "WHOA!"
+    d.text(label, (SW - len(label) * 16) // 2, 6, api.WHITE, scale=2)
+    sub   = "shake detected"
+    d.text(sub, (SW - len(sub) * 8) // 2, SH - 24, theme.MUTED, scale=1)
+    d.present()
+
+    import math as _math
+    start = _ms()
+    last_w = -1
+    while True:
+        t = _diff(_ms(), start)
+        if t >= duration_ms:
+            break
+        # 0..1 ramp through 4 full cycles
+        phase = (t / duration_ms) * 4.0
+        s     = abs(_math.cos(phase * _math.pi))      # 1 → 0 → 1 cycle
+        new_w = max(2, int(mw * (0.25 + 0.75 * s)))   # never zero
+        if new_w == last_w:
+            try: _sleep_ms(20)
+            except Exception: pass
+            continue
+        last_w = new_w
+        # Repaint the mascot strip — wipe the previous draw with bg.
+        d.rect(0, y0, SW, mh, theme.BG, fill=True)
+        # Compress the mascot horizontally to new_w.
+        data2 = _compress_x(data, mw, mh, new_w)
+        if data2 is not None:
+            d.blit(data2, cx - new_w // 2, y0, new_w, mh)
+        d.present()
+        try: time.sleep_ms(20)
+        except Exception: pass
+
+
+def _compress_x(src, sw, sh, dst_w):
+    """Horizontally compress an RGB565 BE sprite to width dst_w.
+
+    Mirrors the helper in apps/launcher — kept private here so splash
+    doesn't drag a launcher import along for one reaction animation.
+    """
+    if dst_w >= sw:
+        return src
+    if dst_w <= 0:
+        return None
+    src_stride = sw * 2
+    out_stride = dst_w * 2
+    out = bytearray(out_stride * sh)
+    col_map = [c * sw // dst_w for c in range(dst_w)]
+    for ry in range(sh):
+        sb = ry * src_stride
+        ob = ry * out_stride
+        for ox in range(dst_w):
+            so = sb + col_map[ox] * 2
+            do = ob + ox * 2
+            out[do]     = src[so]
+            out[do + 1] = src[so + 1]
+    return out
+
+
 def show_updating(os_obj, target_version, total_files):
     """Draw a system-update splash while OTA files are being copied.
 
