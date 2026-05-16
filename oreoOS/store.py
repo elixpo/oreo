@@ -394,8 +394,13 @@ def refresh(force=False):
     the in-memory copy.
     """
     global _catalogue, _cache_ms, _last_refresh_ok, _last_error
-    if not force and _catalogue is not None:
+    # Truthy-only short-circuit. An *empty* cached list (left over from
+    # a previous failed refresh) should NOT block a fresh API call —
+    # otherwise the Store sits on "LOADING" forever because
+    # _last_refresh_ok stays None and the classifier never advances.
+    if not force and _catalogue:
         return _catalogue
+    _bc("refresh START force=%s ref=%s" % (force, STORE_REF))
 
     # WiFi gate — same defensive check as the OTA path. If WiFi isn't
     # up, we don't even try to call the API; the local cache is the

@@ -54,9 +54,11 @@ class App(oreoOS.App):
         self._busy      = None     # mid install/uninstall flag
         self._dirty     = True
         # Surface disk cache immediately so the user has something on
-        # screen during the GitHub round-trip.
+        # screen during the GitHub round-trip, then always force a
+        # fresh refresh on entry — the cache might be a stale empty
+        # list from an earlier failure.
         self._items = store.list_market()
-        self._refresh(initial=True)
+        self._refresh(initial=False)
 
     # ── input ──────────────────────────────────────────────────────────
     def on_button_press(self, btn):

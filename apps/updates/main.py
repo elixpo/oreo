@@ -31,8 +31,9 @@ SH = api.SCREEN_H
 
 S_IDLE        = "idle"
 S_CHECKING    = "checking"
-S_UP_TO_DATE  = "up_to_date"
-S_AVAILABLE   = "available"
+S_UP_TO_DATE  = "up_to_date"     # device == latest stable
+S_BETA        = "beta"           # device  > latest stable (dev build)
+S_AVAILABLE   = "available"      # device  < latest stable (update can install)
 S_DOWNLOADING = "downloading"
 S_READY       = "ready"
 S_FAILED      = "failed"
@@ -139,15 +140,41 @@ class App(oreoOS.App):
         except Exception:
             pass
 
-        rel = self._safe(lambda: ota.check())
-        if not rel:
+        # Always fetch the latest tag — we need to compare against the
+        # device's current VERSION to pick the right state, not just
+        # "is there a newer one?".
+        latest_ver, rel = self._safe(lambda: ota.latest_version()) or (None, None)
+        if not latest_ver:
+            self._state = S_FAILED
+            self._error = "no network"
+            self._dirty = True
+            return
+
+        cur = self._current_version()
+        cmp = ota.compare_version(cur, latest_ver)
+        self._release = rel
+        self._notes   = (rel or {}).get("notes", "") or ""
+
+        if cmp > 0:
+            # Device VERSION is ahead of the latest stable release.
+            # Likely a dev build the maintainer flashed directly.
+            self._state = S_BETA
+            try: self._os.settings_set("ota_status", "beta")
+            except Exception: pass
+            self._dirty = True
+            return
+
+        if cmp == 0:
+            # Device matches the latest stable — this is the LTS state.
             self._state = S_UP_TO_DATE
             try: self._os.settings_set("ota_status", "up-to-date")
             except Exception: pass
             self._dirty = True
             return
 
-        try: ota.push_update_notification(rel.get("version", ""))
+        # Device is BEHIND latest — surface the new release + peek the
+        # manifest so the user can hit Install.
+        try: ota.push_update_notification(latest_ver)
         except Exception: pass
 
         peeked = self._safe(lambda: ota.peek(rel))
@@ -157,11 +184,9 @@ class App(oreoOS.App):
             self._dirty = True
             return
 
-        self._release = rel
-        self._peeked  = peeked
-        self._notes   = rel.get("notes", "") or ""
+        self._peeked = peeked
         try:
-            self._os.settings_set("ota_pending_version", rel.get("version", ""))
+            self._os.settings_set("ota_pending_version", latest_ver)
             self._os.settings_set("ota_pending_bytes",   peeked["bytes"])
             self._os.settings_set("ota_pending_url",     rel["manifest_url"])
             self._os.settings_set("ota_status",          "available")
@@ -268,6 +293,9 @@ class App(oreoOS.App):
         if self._state == S_UP_TO_DATE:
             self._draw_lts(d)
             return
+        if self._state == S_BETA:
+            self._draw_beta(d)
+            return
         if self._state == S_FAILED:
             msg = (self._error or "something went wrong")[:34]
             d.text(msg, (SW - len(msg) * 8) // 2,
@@ -292,6 +320,20 @@ class App(oreoOS.App):
         line = "LTS  " + date
         d.text(line, (SW - len(line) * 8) // 2,
                LOAD_Y + 26, theme.MUTED, scale=1)
+
+    def _draw_beta(self, d):
+        # Pink BETA badge — device is running AHEAD of the latest
+        # stable release on GitHub (dev / hotfix build).
+        d.text("BETA", (SW - 4 * 16) // 2,
+               LOAD_Y - 2, theme.PRIMARY, scale=2)
+        line = "ahead of stable"
+        d.text(line, (SW - len(line) * 8) // 2,
+               LOAD_Y + 24, theme.MUTED, scale=1)
+        rel = self._release or {}
+        ver = rel.get("version", "?")
+        sub = "Latest stable: " + ver
+        d.text(sub, (SW - len(sub) * 8) // 2,
+               LOAD_Y + 38, theme.TEXT_DIM, scale=1)
 
     def _draw_available(self, d):
         rel = self._release or {}

@@ -198,6 +198,62 @@ def _newer(a, b):
     return _parse_version(a) > _parse_version(b)
 
 
+def compare_version(a, b):
+    """Public version-compare. Returns -1 / 0 / +1 (a vs b).
+    Same semantics as cmp() on the parsed (maj, min, patch) tuples."""
+    pa, pb = _parse_version(a), _parse_version(b)
+    if pa == pb: return 0
+    return 1 if pa > pb else -1
+
+
+def latest_version(channel=DEFAULT_CHANNEL):
+    """Return (version_str, release_dict) for the most recent release
+    on `channel`, regardless of whether it's newer than the device's
+    current VERSION. None / None on network failure.
+
+    Used by the Updates page to decide BETA / LTS / OUTDATED — we need
+    to know what's "out there" even when we're ahead of it.
+    """
+    if _json is None:
+        return None, None
+    try:
+        from oreoOS import _http as _httpx
+    except Exception:
+        return None, None
+    body = _httpx.get_url(
+        "https://api.github.com/repos/%s/releases" % OTA_REPO,
+        accept="application/vnd.github+json", timeout_s=T_GH_API)
+    if body is None:
+        return None, None
+    try:
+        data = _json.loads(body.decode("utf-8"))
+    except Exception:
+        return None, None
+    if not isinstance(data, list):
+        return None, None
+    prefix = channel + "/"
+    for rel in data:
+        tag = rel.get("tag_name", "")
+        if not (tag == channel or tag.startswith(prefix)):
+            continue
+        ver = tag[len(prefix):] if tag.startswith(prefix) else tag
+        # Build the same shape `check()` would have returned so the
+        # Updates page can reuse the existing peek() flow on OUTDATED.
+        manifest_url = None
+        for a in rel.get("assets", ()):
+            if a.get("name") == MANIFEST_NAME:
+                manifest_url = a.get("browser_download_url")
+                break
+        return ver, {
+            "version":      ver,
+            "notes":        rel.get("body") or "",
+            "manifest_url": manifest_url,
+            "tag":          tag,
+            "major":        _is_major_bump(ver, _current_version()),
+        }
+    return None, None
+
+
 def _is_major_bump(new_ver, cur_ver):
     """True when the MAJOR component changed (v1.x.x -> v2.x.x).
 
