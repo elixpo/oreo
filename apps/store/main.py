@@ -189,6 +189,7 @@ class App(oreoOS.App):
 
         self._draw_header_card(d)
         self._draw_catalogue(d)
+        self._draw_state_chip(d)
         if self._msg:
             d.text(self._msg, ROW_PAD_X, SH - widgets.HINT_H - 12,
                    theme.PRIMARY, scale=1)
@@ -207,12 +208,21 @@ class App(oreoOS.App):
         d.text("A = refresh listing", ROW_PAD_X, y + 22,
                theme.MUTED, scale=1)
 
-        # State pill — right edge.
+    def _draw_state_chip(self, d):
+        """State chip — centered above the hint bar, top-margin from
+        the catalogue list. Renders only for non-OK states so the chip
+        stays out of the way once everything's healthy."""
         pill_text, pill_color = self._state_pill()
-        if pill_text:
-            pw = len(pill_text) * 8 + 12
-            d.rect(SW - pw - 10, y + 8, pw, 18, pill_color, fill=True)
-            d.text(pill_text, SW - pw - 10 + 6, y + 13, api.WHITE, scale=1)
+        if not pill_text:
+            return
+        pw = len(pill_text) * 8 + 16
+        ph = 18
+        # 12 px margin above the hint bar.
+        py = SH - widgets.HINT_H - ph - 12
+        px = (SW - pw) // 2
+        d.rect(px, py, pw, ph, pill_color, fill=True)
+        d.text(pill_text, px + (pw - len(pill_text) * 8) // 2,
+               py + (ph - 8) // 2, api.WHITE, scale=1)
 
     def _state_pill(self):
         # OK is the implicit / quiet state — no pill at all, the
