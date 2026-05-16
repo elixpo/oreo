@@ -122,10 +122,9 @@ class App(oreoOS.App):
             _Row(" Flip Up",     "toggle",
                  getter=lambda: self._gest_get("gesture_flip_up"),
                  setter=lambda v: self._gest_set("gesture_flip_up", v)),
-            _Row(" Flip Action", "toggle",
+            _Row(" Flip Action", "action",
                  getter=lambda: self._gest_flip_action_label(),
-                 setter=lambda v: self._gest_cycle_flip_action(),
-                 on_label="", off_label=""),
+                 setter=lambda v: self._gest_cycle_flip_action()),
             _Row(" Hard Shake",  "toggle",
                  getter=lambda: self._gest_get("gesture_hard_shake"),
                  setter=lambda v: self._gest_set("gesture_hard_shake", v)),
@@ -328,6 +327,65 @@ class App(oreoOS.App):
     # this row lets the user kick it again after they fix a bad clock or
     # land in a new timezone without rebooting. Result is mirrored to the
     # notif panel via timeutil's module-level last_sync_status.
+    # ── gestures ────────────────────────────────────────────────────────
+    # Tiny thin wrappers — the actual detection lives in oreoOS.gestures.
+    # We push to the OS settings store then nudge the gesture singleton
+    # to re-read so the IMU's power state updates immediately.
+    def _gest_get(self, key):
+        try:
+            return bool(self._os.settings_get(key, False))
+        except Exception:
+            return False
+
+    def _gest_set(self, key, value):
+        try:
+            self._os.settings_set(key, bool(value))
+        except Exception:
+            pass
+        # Nudge the engine so it re-reads + reconfigures the IMU now.
+        try:
+            from oreoOS import gestures as _g
+            g = _g.get(self._os)
+            if g:
+                g.apply_settings()
+        except Exception:
+            pass
+
+    _FLIP_ACTIONS  = ("drawer", "notifs", "wifi", "bt", "camera")
+    _FLIP_LABELS   = {"drawer": "Apps", "notifs": "Notifs", "wifi": "WiFi",
+                      "bt": "BT", "camera": "Camera"}
+
+    def _gest_flip_action_label(self):
+        try:
+            cur = self._os.settings_get("gesture_flip_up_action", "drawer")
+        except Exception:
+            cur = "drawer"
+        # The Row renderer reads getter() as either bool or a string;
+        # the label string ends up displayed verbatim in the value slot.
+        return self._FLIP_LABELS.get(cur, cur)
+
+    def _gest_cycle_flip_action(self):
+        try:
+            cur = self._os.settings_get("gesture_flip_up_action", "drawer")
+        except Exception:
+            cur = "drawer"
+        try:
+            i = self._FLIP_ACTIONS.index(cur)
+        except ValueError:
+            i = 0
+        nxt = self._FLIP_ACTIONS[(i + 1) % len(self._FLIP_ACTIONS)]
+        try:
+            self._os.settings_set("gesture_flip_up_action", nxt)
+        except Exception:
+            pass
+        try:
+            from oreoOS import gestures as _g
+            g = _g.get(self._os)
+            if g:
+                g.apply_settings()
+        except Exception:
+            pass
+
     def _sync_time(self):
         try:
             from oreoOS import timeutil
