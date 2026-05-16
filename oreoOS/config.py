@@ -18,11 +18,7 @@ _env = _load_env()
 # OS version. tools/deploy.py auto-bumps the PATCH number on every push.
 # The literal MUST stay on its own line as `VERSION = "vN.N.N"` — the
 # deploy regex relies on that exact format to rewrite in place.
-<<<<<<< Updated upstream
 VERSION           = "v1.4.11"
-=======
-VERSION           = "v1.4.9"
->>>>>>> Stashed changes
 
 GITHUB_USER       = "Circuit-Overtime"
 DISPLAY_NAME      = "Ayushman Bhattacharya"
