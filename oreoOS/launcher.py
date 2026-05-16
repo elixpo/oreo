@@ -355,6 +355,61 @@ def run_app(os_obj, app):
         gc.collect()
 
 
+# ── gesture dispatch ──────────────────────────────────────────────────────────
+
+def _dispatch_gesture(os_obj, app, ev):
+    """Route a gesture event from oreoOS.gestures into the right surface.
+
+    Global-effect gestures (HARD_SHAKE, FLIP_UP) are handled here at the
+    OS layer so any app inherits them. App-local gestures (TAP,
+    DOUBLE_TAP) are forwarded to the current app's on_gesture(kind)
+    hook if one exists; absent hook = silent ignore.
+    """
+    kind = ev.get("kind", "")
+    if kind == "hard_shake":
+        try:
+            from oreoOS.splash import show_shake_mascot
+            show_shake_mascot(os_obj)
+        except Exception:
+            pass
+        # Force a full repaint of the current app so the splash
+        # doesn't leave its frame behind.
+        try:
+            app._dirty = True
+        except Exception:
+            pass
+        return
+    if kind == "flip_up":
+        action = ev.get("action", "drawer")
+        try:
+            if action == "drawer":
+                os_obj.launch("__appmenu__")
+            elif action == "notifs":
+                from oreoOS import notif_panel as _np
+                _np.get(os_obj).toggle()
+            elif action == "wifi":
+                from oreoWare import wifi as _w
+                if _w.is_connected():
+                    _w.disconnect()
+                else:
+                    _w.connect_from_config()
+            elif action == "bt":
+                from oreoWare import bt as _b
+                _b.set_active(not _b.is_active())
+            # "camera" left as a reserved placeholder until we wire IR
+            # quest capture in. Silent no-op for now.
+        except Exception:
+            pass
+        return
+    # TAP / DOUBLE_TAP — hand to the current app's gesture hook.
+    hook = getattr(app, "on_gesture", None)
+    if hook is not None:
+        try:
+            hook(kind)
+        except Exception:
+            pass
+
+
 # ── crash screen ──────────────────────────────────────────────────────────────
 
 def show_crash(os_obj, name, err):
@@ -561,6 +616,15 @@ def boot():
         os_obj._boot_ts_s = int(time.time())
     except Exception:
         os_obj._boot_ts_s = 0
+
+    # Seed gesture-related Settings keys so the Settings rows display
+    # sensible values on first boot. Pure dictionary writes — no IMU
+    # touch yet, so this is cheap.
+    try:
+        from oreoOS import gestures as _g
+        _g.push_default_settings(os_obj)
+    except Exception:
+        pass
 
     _bc("checking pending OTA")
     applied = _maybe_apply_ota(os_obj)
