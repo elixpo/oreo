@@ -536,6 +536,12 @@ def refresh(force=False):
 
     _catalogue       = fresh
     _last_refresh_ok = True
+    # Stamp install state on every entry so callers using the returned
+    # list directly (instead of going through list_market()) don't trip
+    # on a missing key — the Store UI's _draw_card reads `installed`
+    # unconditionally.
+    for e in _catalogue:
+        e["installed"] = is_installed(e["dir"])
     _invalidate_details()
     try:
         _cache_ms = time.ticks_ms()
