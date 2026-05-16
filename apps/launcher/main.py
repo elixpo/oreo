@@ -297,7 +297,7 @@ class App(oreoOS.App):
         # bt + wifi are surfaced through Settings rather than as their
         # own drawer tiles — Settings has dedicated rows that launch
         # those screens, so a separate tile would just be duplication.
-        DRAWER_HIDDEN = ("launcher", "bt", "wifi")
+        DRAWER_HIDDEN = ("launcher", "bt", "wifi", "gestures")
         self._apps = [a for a in list_apps() if a["dir"] not in DRAWER_HIDDEN]
 
         # Icon cache lives at module scope (see _ICON_CACHE above). We
