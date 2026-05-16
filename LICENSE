@@ -1,49 +1,21 @@
-Oreo Panda Community License
-Version 1.0, 2026
+OreoOS is provided under:
 
-Copyright (c) 2026 Elixpo (Ayushman Bhattacharya / @Circuit-Overtime)
+	SPDX-License-Identifier: MIT WITH Oreo-trademarks
 
-Permission is hereby granted, free of charge, to any person obtaining a
-copy of this software, the firmware, the hardware design files, the
-prompts, the assets, and any other materials contained in this
-repository (the "Work"), to deal in the Work without restriction,
-including without limitation the rights to use, copy, modify, merge,
-publish, distribute, sublicense, and/or sell copies of the Work, and to
-permit persons to whom the Work is furnished to do so, subject to the
-following conditions:
+Being under the terms of the MIT License, according with:
 
-  1. Attribution. The above copyright notice and this permission notice
-     shall be included in all copies or substantial portions of the
-     Work. Alternatively, a clearly visible "Powered by OreoOS" credit,
-     with a link to the upstream project, shall be surfaced in the
-     derivative work's documentation or in an end-user-visible "about"
-     screen, whichever is more prominent to the end user.
+	LICENSES/preferred/MIT
 
-  2. Trademarks. The names "Oreo Badge", "OreoOS", "Elixpo", and the
-     associated panda mascot are identifiers of the original project
-     and its authors. They may be used to identify the original work
-     and to give credit to its authors. They may not be used to name,
-     brand, or imply endorsement of a derivative work without the prior
-     written permission of the copyright holders.
+With an explicit trademark and naming exception, as stated at:
 
-  3. Contributions. Contributions submitted for inclusion in this
-     repository are licensed to the project under the terms of this
-     License, and contributors agree to abide by the project's Code of
-     Conduct.
+	LICENSES/exceptions/Oreo-trademarks
 
-THE WORK IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
-THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES, OR
-OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE,
-ARISING FROM, OUT OF, OR IN CONNECTION WITH THE WORK OR THE USE OR
-OTHER DEALINGS IN THE WORK.
+In addition, other licenses may also apply to upstream components
+incorporated into this project. Please see:
 
-----------------------------------------------------------------------
+	LICENSES/notices/notice-board
+	LICENSES/README.md
 
-This Work incorporates and depends on third-party components, each of
-which is distributed under its own license. Notable upstream projects
-include MicroPython (MIT License) and the Espressif ESP-IDF
-(Apache License 2.0). See NOTICES for a full list.
+for more details.
 
-Contact: hello@elixpo.com
+All contributions to OreoOS are subject to this LICENSE file.
