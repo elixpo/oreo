@@ -152,12 +152,21 @@ if _fonts_dir.exists():
         DEPLOY.append((str(_f), "assets/fonts/optimized/" + _f.name))
 
 # apps — include only dirs that have both manifest.json and main.py
-# Also pull in per-app assets/optimized/*.py
-APPS_DIR = Path("apps")
-for app_dir in sorted(APPS_DIR.iterdir()):
-    if not app_dir.is_dir() or app_dir.name.startswith("_"):
-        continue
-    if (app_dir / "main.py").exists() and (app_dir / "manifest.json").exists():
+# from BOTH the default apps/ tree AND the apps_market/ tree (optional,
+# user-installable apps). They ship to their respective device paths;
+# the Store app moves trees between them at install/uninstall time.
+APPS_DIR        = Path("apps")
+MARKET_DIR      = Path("apps_market")
+_app_roots      = [APPS_DIR]
+if MARKET_DIR.exists():
+    _app_roots.append(MARKET_DIR)
+for _root in _app_roots:
+    for app_dir in sorted(_root.iterdir()):
+        if not app_dir.is_dir() or app_dir.name.startswith("_"):
+            continue
+        if not ((app_dir / "main.py").exists() and
+                (app_dir / "manifest.json").exists()):
+            continue
         rel = str(app_dir)
         DEPLOY += [
             ("%s/__init__.py" % rel,      "%s/__init__.py" % rel),
