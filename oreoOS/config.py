@@ -18,7 +18,11 @@ _env = _load_env()
 # OS version. tools/deploy.py auto-bumps the PATCH number on every push.
 # The literal MUST stay on its own line as `VERSION = "vN.N.N"` — the
 # deploy regex relies on that exact format to rewrite in place.
-VERSION           = "v1.4.13"
+VERSION           = "v1.4.25"
+# ISO-date stamp of the current VERSION. Updated by tools/release.py
+# (or by hand for hot-fix builds). Shown on the Updates page as the
+# "Latest stable as of …" line when no newer release is available.
+RELEASE_DATE      = "2026-05-16"
 
 GITHUB_USER       = "Circuit-Overtime"
 DISPLAY_NAME      = "Ayushman Bhattacharya"
@@ -27,14 +31,12 @@ WEATHER_LAT       = 22.57
 WEATHER_LON       = 88.36
 WEATHER_NAME      = ""
 BT_AUTO_ENABLE    = False
-
-# Local timezone offset from UTC, in hours. India = +5.5, GMT = 0, EST = -5.
-# Applied after NTP sync so the home-screen clock reads correctly.
 TIMEZONE_OFFSET   = 5.5
 
 WIFI_SSID         = _env.get("WIFI_SSID", "")
 WIFI_PASSWORD     = _env.get("WIFI_PASSWORD", "")
 OWM_API_KEY       = _env.get("OWM_API_KEY", "")
+GH_TOKEN          = _env.get("GH_TOKEN", "")
 
 WIFI_AUTO_CONNECT = True
 WIFI_TX_DBM       = 11

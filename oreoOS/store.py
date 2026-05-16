@@ -32,17 +32,186 @@ import os as _os
 import time
 
 try:
-    import urequests as _http
-except ImportError:
-    try:
-        import requests as _http
-    except ImportError:
-        _http = None
-
-try:
     import json as _json
 except ImportError:
     _json = None
+
+# Raw-socket HTTP. We bypass urequests because its `timeout=` flag on
+# this MicroPython 1.28 build only covers the connect, not the body
+# read — which lets a slow GitHub edge wedge the OS run loop for
+# minutes. socket.settimeout() applies to every recv() so the timeout
+# is enforced end-to-end. Same fix we'll back-port to ota.py later.
+try:
+    import socket as _socket
+    import ssl    as _ssl
+    _RAW_OK = True
+except ImportError:
+    _RAW_OK = False
+
+
+def _bc(msg):
+    """One-line USB-CDC breadcrumb — tail with `mpremote connect ...`
+    while the Store app is open to see exactly where a hang lands."""
+    try:
+        print("[store] " + msg)
+    except Exception:
+        pass
+
+
+def _http_get(url, accept_raw=False, timeout_s=4):
+    """Tiny GET that returns the body as bytes (or None on failure).
+
+    `accept_raw=True` flips the Accept header to application/vnd.github.raw
+    so file fetches return the raw file body instead of JSON-wrapped
+    base64. Used by the install path.
+    """
+    if not _RAW_OK:
+        return None
+    # Parse https://host[:port]/path
+    if not url.startswith("https://"):
+        return None
+    rest = url[len("https://"):]
+    slash = rest.find("/")
+    if slash < 0:
+        host, path = rest, "/"
+    else:
+        host, path = rest[:slash], rest[slash:]
+    port = 443
+    if ":" in host:
+        host, p = host.split(":", 1)
+        try: port = int(p)
+        except ValueError: port = 443
+
+    accept = ("application/vnd.github.raw" if accept_raw
+              else "application/vnd.github+json")
+
+    s = None
+    raw = None
+    # Wallclock guard — even if a single recv stalls a few times in
+    # quick succession, the outer loop notices we've blown the budget
+    # and bails. Belt-and-suspenders next to settimeout.
+    deadline = None
+    try:
+        import time as _t
+        deadline = _t.ticks_add(_t.ticks_ms(), int(timeout_s * 1000) + 500)
+    except Exception:
+        pass
+
+    auth_hdr = ""
+    try:
+        from oreoOS.config import GH_TOKEN as _TOK
+        if _TOK:
+            auth_hdr = "Authorization: Bearer " + _TOK + "\r\n"
+    except Exception:
+        pass
+
+    try:
+        _bc("  dns " + host)
+        addr = _socket.getaddrinfo(host, port)[0][-1]
+        _bc("  connect " + host + ":" + str(port))
+        raw = _socket.socket()
+        raw.settimeout(timeout_s)
+        raw.connect(addr)
+        _bc("  ssl handshake")
+        s = _ssl.wrap_socket(raw, server_hostname=host)
+        # CRITICAL: settimeout BEFORE connect applies to the raw
+        # socket, but MicroPython's SSLSocket wraps it and doesn't
+        # always inherit the timeout — set again on the wrapped
+        # socket so subsequent .read() calls actually honour it.
+        try:
+            s.settimeout(timeout_s)
+        except Exception:
+            pass
+
+        req = (
+            "GET %s HTTP/1.1\r\n"
+            "Host: %s\r\n"
+            "User-Agent: %s\r\n"
+            "Accept: %s\r\n"
+            "Accept-Encoding: identity\r\n"
+            "%s"
+            "Connection: close\r\n\r\n"
+        ) % (path, host, USER_AGENT, accept, auth_hdr)
+        _bc("  write request")
+        s.write(req.encode())
+
+        _bc("  read body")
+        buf = bytearray()
+        while True:
+            # Wallclock check — if we've blown our budget, bail no
+            # matter what settimeout says.
+            try:
+                import time as _t2
+                if deadline is not None and \
+                   _t2.ticks_diff(deadline, _t2.ticks_ms()) <= 0:
+                    _bc("  read deadline blown after %d bytes" % len(buf))
+                    break
+            except Exception:
+                pass
+            try:
+                chunk = s.read(2048)
+            except Exception as e:
+                _bc("  read err: " + str(e))
+                break
+            if not chunk:
+                break
+            buf.extend(chunk)
+            if len(buf) > 256 * 1024:
+                break
+    except Exception as e:
+        _bc("http_get FAIL %s: %s" % (host, e))
+        return None
+    finally:
+        for _h in (s, raw):
+            try:
+                if _h is not None:
+                    _h.close()
+            except Exception:
+                pass
+
+    # Split off the response head — body starts after \r\n\r\n.
+    head_end = buf.find(b"\r\n\r\n")
+    if head_end < 0:
+        return None
+    head = bytes(buf[:head_end])
+    body = bytes(buf[head_end + 4:])
+
+    # Parse the status line for breadcrumbs + 200-check.
+    status = 0
+    line0  = head.split(b"\r\n", 1)[0]
+    parts  = line0.split(b" ", 2)
+    if len(parts) >= 2:
+        try: status = int(parts[1])
+        except ValueError: status = 0
+    if status != 200:
+        _bc("http_get %s -> HTTP %d" % (host, status))
+        return None
+
+    # If the response was chunked (rare for github.com but defensive),
+    # decode chunks. We detect it via Transfer-Encoding header.
+    if b"\r\ntransfer-encoding: chunked" in (b"\r\n" + head.lower()):
+        body = _dechunk(body)
+
+    return body
+
+
+def _dechunk(body):
+    out = bytearray()
+    i   = 0
+    while i < len(body):
+        nl = body.find(b"\r\n", i)
+        if nl < 0:
+            break
+        try:
+            n = int(body[i:nl].split(b";")[0], 16)
+        except Exception:
+            break
+        i = nl + 2
+        if n == 0:
+            break
+        out.extend(body[i:i + n])
+        i += n + 2
+    return bytes(out)
 
 
 # ── tunables ────────────────────────────────────────────────────────────
@@ -130,26 +299,24 @@ def _api(path):
     merged?", "timeout", etc.) instead of a generic empty list.
     """
     global _last_error
-    if _http is None or _json is None:
-        _last_error = "no http / json"
+    if not _RAW_OK or _json is None:
+        _last_error = "no socket / json"
         return None
     url = ("https://api.github.com/repos/%s/contents/%s?ref=%s"
            % (STORE_REPO, path, STORE_REF))
-    try:
-        r = _http.get(url, headers={"User-Agent": USER_AGENT,
-                                    "Accept": "application/vnd.github+json"},
-                      timeout=T_API)
-        sc = r.status_code
-        if sc != 200:
-            r.close()
-            _last_error = "HTTP %d on %s@%s" % (sc, path, STORE_REF)
-            return None
-        data = r.json()
-        r.close()
-        return data
-    except Exception as e:
-        _last_error = ("api: " + str(e))[:48]
+    _bc("API GET " + path + "@" + STORE_REF)
+    body = _http_get(url, accept_raw=False, timeout_s=T_API)
+    if body is None:
+        _last_error = "api %s@%s timeout/error" % (path, STORE_REF)
         return None
+    try:
+        data = _json.loads(body.decode("utf-8"))
+    except Exception as e:
+        _last_error = "api parse: " + str(e)[:32]
+        return None
+    _bc("API OK %s (%d entries)" %
+        (path, len(data) if isinstance(data, list) else 1))
+    return data
 
 
 def _walk(path):
@@ -171,22 +338,92 @@ def _walk(path):
     return out
 
 
+_STORE_ICONS_DIR = "/store_icons"
+
+
+def _fetch_store_icon(name_dir, app_path, icon_filename):
+    """Best-effort download of an app's optimized icon .py from GitHub
+    so the Store card can render the real icon BEFORE the app is
+    installed. Source path follows the project convention:
+        apps_market/<dir>/assets/optimized/<icon_stem>.py
+    Cached to /store_icons/<name_dir>.py. Silently no-ops on failure —
+    the UI falls back to a letter glyph in that case.
+    """
+    if not icon_filename:
+        return False
+    stem = icon_filename.rsplit(".", 1)[0].replace("-", "_")
+    dst  = _STORE_ICONS_DIR + "/" + name_dir + ".py"
+    if _exists(dst):
+        return True
+    url = ("https://raw.githubusercontent.com/%s/%s/%s/assets/optimized/%s.py"
+           % (STORE_REPO, STORE_REF, app_path, stem))
+    _bc("icon GET " + name_dir)
+    body = _http_get(url, accept_raw=True, timeout_s=T_API)
+    if body is None:
+        return False
+    _ensure_dir(_STORE_ICONS_DIR)
+    try:
+        with open(dst, "wb") as f:
+            f.write(body)
+        return True
+    except Exception:
+        return False
+
+
+def load_store_icon(name_dir):
+    """Read a cached store icon back as (data, w, h) — the UI hook for
+    cards/details pages of apps that aren't installed yet."""
+    path = _STORE_ICONS_DIR + "/" + name_dir + ".py"
+    if not _exists(path):
+        return None
+    try:
+        ns = {}
+        with open(path) as f:
+            exec(f.read(), ns)
+        return (bytearray(ns["DATA"]), int(ns["W"]), int(ns["H"]))
+    except Exception:
+        return None
+
+
+def installed_size(name_dir):
+    """Sum of file sizes under /apps/<name>/, in bytes. 0 if not
+    installed. Walks the dir each call — cheap on the tiny app trees
+    we ship, and avoids stale cached numbers."""
+    root = APPS_DIR + "/" + name_dir
+    if not _exists(root):
+        return 0
+    total = 0
+    stack = [root]
+    while stack:
+        d = stack.pop()
+        try:
+            for f in _os.listdir(d):
+                p = d + "/" + f
+                try:
+                    st = _os.stat(p)
+                except OSError:
+                    continue
+                if st[0] & 0x4000:
+                    stack.append(p)
+                else:
+                    total += st[6]
+        except OSError:
+            pass
+    return total
+
+
 def _fetch_manifest(app_path):
     """Read the manifest.json for a single market app via the API."""
+    if _json is None:
+        return {}
     url = ("https://api.github.com/repos/%s/contents/%s/manifest.json?ref=%s"
            % (STORE_REPO, app_path, STORE_REF))
+    _bc("manifest GET " + app_path)
+    body = _http_get(url, accept_raw=True, timeout_s=T_API)
+    if body is None:
+        return {}
     try:
-        r = _http.get(url, headers={"User-Agent": USER_AGENT,
-                                    "Accept": "application/vnd.github.raw"},
-                      timeout=T_API)
-        if r.status_code != 200:
-            r.close()
-            return {}
-        # With the .raw Accept header GitHub returns the file body as
-        # text — no base64 decode needed.
-        m = _json.loads(r.text) if _json else {}
-        r.close()
-        return m
+        return _json.loads(body.decode("utf-8"))
     except Exception:
         return {}
 
@@ -231,8 +468,13 @@ def refresh(force=False):
     the in-memory copy.
     """
     global _catalogue, _cache_ms, _last_refresh_ok, _last_error
-    if not force and _catalogue is not None:
+    # Truthy-only short-circuit. An *empty* cached list (left over from
+    # a previous failed refresh) should NOT block a fresh API call —
+    # otherwise the Store sits on "LOADING" forever because
+    # _last_refresh_ok stays None and the classifier never advances.
+    if not force and _catalogue:
         return _catalogue
+    _bc("refresh START force=%s ref=%s" % (force, STORE_REF))
 
     # WiFi gate — same defensive check as the OTA path. If WiFi isn't
     # up, we don't even try to call the API; the local cache is the
@@ -260,28 +502,41 @@ def refresh(force=False):
         _last_refresh_ok = False
         return _catalogue or []
 
+    # Catalogue enrichment: for every dir in the listing we also fetch
+    # its manifest.json AND its icon's optimized .py blob so the list
+    # view can render the real name, author, and icon without a follow-
+    # up network round-trip per card. N+1 in raw call count but bounded:
+    # the market is small (< 20 apps) and each manifest is <300 B. The
+    # icon .py is typically 1–2 KB. Both are cached to disk so a stale
+    # session reload paints instantly from `/store_cache.json` and
+    # `/store_icons/<dir>.py`.
     fresh = []
     for it in listing:
         if it.get("type") != "dir":
             continue
-        name_dir   = it.get("name", "")
-        app_path   = it.get("path", "")
+        name_dir = it.get("name", "")
+        app_path = it.get("path", "")
         if not name_dir or not app_path:
             continue
-        manifest = _fetch_manifest(app_path)
-        if not manifest:
-            continue
+        manifest = _fetch_manifest(app_path) or {}
+        icon_file = manifest.get("icon") or ""
+        # Pull the icon module bytes so the card can paint without the
+        # app being installed. Best-effort — if it fails we just fall
+        # back to the letter glyph in _draw_card.
+        if icon_file:
+            _fetch_store_icon(name_dir, app_path, icon_file)
         fresh.append({
-            "dir":       name_dir,
-            "name":      manifest.get("name",   name_dir),
-            "icon":      manifest.get("icon",   None),
-            "author":    manifest.get("author", None),
-            "path":      app_path,             # used by install() later
+            "dir":          name_dir,
+            "name":         manifest.get("name", name_dir) or name_dir,
+            "icon":         icon_file or None,
+            "author":       manifest.get("author") or None,
+            "description":  manifest.get("description", "") or "",
+            "path":         app_path,
         })
-        gc.collect()
 
     _catalogue       = fresh
     _last_refresh_ok = True
+    _invalidate_details()
     try:
         _cache_ms = time.ticks_ms()
     except Exception:
@@ -297,6 +552,112 @@ def last_refresh_ok():
 
 def last_error():
     return _last_error
+
+
+# Per-app detail cache so repeatedly opening + closing the details page
+# for the same app doesn't re-hit GitHub. Cleared by refresh().
+_details_cache = {}
+
+
+def get_details(name_dir):
+    """Lazy fetch of the manifest + file listing for one market app.
+
+    Returns a dict:
+        {
+            "name":       human display name from manifest, fallback dir
+            "icon":       manifest 'icon' field (filename) or None
+            "author":     manifest 'author' field or None
+            "description": manifest 'description' field or "" (if any)
+            "files":      [{path, download_url, size}, ...] for install()
+            "bytes":      total bytes the install would download
+            "ok":         True iff both API calls returned cleanly
+        }
+
+    Cached in-memory per OS session; the next refresh() invalidates
+    every entry so a contributor pushing a manifest change can be
+    picked up without rebooting.
+    """
+    if name_dir in _details_cache:
+        return _details_cache[name_dir]
+    cat = list_market()
+    entry = None
+    for e in cat:
+        if e["dir"] == name_dir:
+            entry = e
+            break
+    if not entry:
+        return {"ok": False}
+
+    # Disk-cache hit? Cached details mirror the manifest as of the last
+    # refresh, so they're fine until refresh() wipes _details_cache.
+    disk = _details_disk_load(name_dir)
+    if disk and disk.get("ok"):
+        _details_cache[name_dir] = disk
+        return disk
+
+    # No network call — refresh() already enriched the catalogue entry
+    # with everything we need for the details page. The file-tree walk
+    # is deferred to install() so opening details is instant after the
+    # first catalogue load.
+    out = {
+        "name":         entry.get("name")        or name_dir,
+        "icon":         entry.get("icon")        or None,
+        "author":       entry.get("author")      or None,
+        "description":  entry.get("description") or "",
+        "files":        None,    # populated lazily by install()
+        "bytes":        None,
+        "ok":           True,
+    }
+    _details_cache[name_dir] = out
+    _details_disk_save(name_dir, out)
+    return out
+
+
+# ── disk persistence for the per-app details cache ─────────────────────
+# One small JSON file per app under /store_details/. Survives reboots
+# so opening Store + tapping an app is instant after the first time.
+_DETAILS_DIR = "/store_details"
+
+
+def _details_disk_path(name_dir):
+    return _DETAILS_DIR + "/" + name_dir + ".json"
+
+
+def _details_disk_load(name_dir):
+    if _json is None:
+        return None
+    try:
+        with open(_details_disk_path(name_dir)) as f:
+            return _json.loads(f.read())
+    except Exception:
+        return None
+
+
+def _details_disk_save(name_dir, payload):
+    if _json is None:
+        return
+    _ensure_dir(_DETAILS_DIR)
+    try:
+        with open(_details_disk_path(name_dir), "w") as f:
+            f.write(_json.dumps(payload))
+    except Exception:
+        pass
+
+
+def _details_disk_clear():
+    try:
+        for f in _os.listdir(_DETAILS_DIR):
+            try: _os.remove(_DETAILS_DIR + "/" + f)
+            except OSError: pass
+    except Exception:
+        pass
+
+
+# When refresh() succeeds we wipe the per-app details cache so a
+# contributor pushing a manifest update isn't masked by stale cache.
+def _invalidate_details():
+    _details_cache.clear()
+    _details_disk_clear()
 
 
 def list_market():
@@ -339,8 +700,12 @@ def install(name):
     keeps going so the user gets a partial install rather than a
     nothing-at-all failure (they can hit A again to retry).
     """
-    if _http is None:
+    if not _RAW_OK:
         return False
+    # Find the catalogue entry first so we know the GitHub path. We
+    # walk lazily here (NOT in get_details) so opening the details
+    # page is cheap (one API call) — install is the user's explicit
+    # "I want this" so the heavier walk is acceptable.
     cat = list_market()
     entry = None
     for e in cat:
@@ -365,27 +730,42 @@ def install(name):
         parent = dst.rsplit("/", 1)[0] if "/" in dst else ""
         if parent:
             _ensure_dir(parent)
-        try:
-            r = _http.get(f["download_url"],
-                          headers={"User-Agent": USER_AGENT},
-                          timeout=T_FILE)
-            if r.status_code != 200:
-                r.close()
-                continue
-            # Stream to disk so a large asset doesn't OOM the heap.
-            with open(dst, "wb") as out:
-                while True:
-                    chunk = r.raw.read(2048) if hasattr(r, "raw") else r.content
-                    if isinstance(chunk, (bytes, bytearray)) and chunk:
-                        out.write(chunk)
-                        if not hasattr(r, "raw"):
-                            break    # already-loaded body, single write
-                    else:
-                        break
-            r.close()
-        except Exception:
+        _bc("install GET " + rel)
+        body = _http_get(f["download_url"], accept_raw=False,
+                         timeout_s=T_FILE)
+        if body is None:
             continue
+        try:
+            with open(dst, "wb") as out:
+                out.write(body)
+        except Exception:
+            pass
         gc.collect()
+
+    # Post-install integrity check: the launcher's drawer skips any
+    # app whose manifest.json is missing or unparseable, so a silent
+    # failure here surfaces as "the app vanished from the drawer".
+    # Verify and try to re-fetch once if the file is bad.
+    mf_path = target_root + "/manifest.json"
+    if _json is not None:
+        ok_mf = False
+        try:
+            with open(mf_path) as f:
+                _json.loads(f.read())
+            ok_mf = True
+        except Exception:
+            ok_mf = False
+        if not ok_mf:
+            _bc("install manifest invalid, retrying")
+            url = ("https://raw.githubusercontent.com/%s/%s/%s/manifest.json"
+                   % (STORE_REPO, STORE_REF, entry["path"]))
+            body = _http_get(url, accept_raw=True, timeout_s=T_FILE)
+            if body is not None:
+                try:
+                    with open(mf_path, "wb") as out:
+                        out.write(body)
+                except Exception:
+                    pass
 
     return is_installed(name)
 

@@ -98,7 +98,9 @@ SMALL_PATCH_BYTES = 80 * 1024     # 80 KB
 # kept short. Tuned down from 10s -> 4s after on-device reports of
 # "press A, OS stuck" — every frame was potentially eating a 10 s GET
 # while GitHub's edge throttled the badge's IP.
-T_GH_API       = 4         # GitHub releases API listing
+T_GH_API       = 8         # GitHub releases API listing (per_page=10 keeps
+                           # the body in the low single-KB range; 8 s is
+                           # the slow-WiFi + SSL handshake headroom)
 T_MANIFEST     = 4         # manifest.json download (tiny)
 T_FILE         = 25        # individual file download (user-triggered)
 
@@ -198,6 +200,64 @@ def _newer(a, b):
     return _parse_version(a) > _parse_version(b)
 
 
+def compare_version(a, b):
+    """Public version-compare. Returns -1 / 0 / +1 (a vs b).
+    Same semantics as cmp() on the parsed (maj, min, patch) tuples."""
+    pa, pb = _parse_version(a), _parse_version(b)
+    if pa == pb: return 0
+    return 1 if pa > pb else -1
+
+
+def latest_version(channel=DEFAULT_CHANNEL):
+    """Return (version_str, release_dict) for the most recent release
+    on `channel`, regardless of whether it's newer than the device's
+    current VERSION. (None, None) on network failure.
+
+    Uses the lightweight /tags endpoint (~2 KB for 10 tags) to discover
+    the version. The release dict is returned with `manifest_url=None`
+    and empty `notes` — the heavy `/releases/latest` body is only
+    fetched lazily by `check()` when the user actually wants to
+    install or view the changelog. This keeps the version probe cheap
+    enough to complete inside our 8 s API budget even on slow WiFi.
+
+    Used by the Updates page to decide BETA / LTS / OUTDATED.
+    """
+    if _json is None:
+        return None, None
+    try:
+        from oreoOS import _http as _httpx
+    except Exception:
+        return None, None
+    body = _httpx.get_url(
+        "https://api.github.com/repos/%s/tags?per_page=10" % OTA_REPO,
+        accept="application/vnd.github+json", timeout_s=T_GH_API)
+    if body is None:
+        return None, None
+    try:
+        data = _json.loads(body.decode("utf-8"))
+    except Exception:
+        return None, None
+    if not isinstance(data, list):
+        return None, None
+    prefix = channel + "/"
+    for t in data:
+        tag = t.get("name", "")
+        if not (tag == channel or tag.startswith(prefix)):
+            continue
+        ver = tag[len(prefix):] if tag.startswith(prefix) else tag
+        manifest_url = (
+            "https://github.com/%s/releases/download/%s/%s"
+            % (OTA_REPO, tag, MANIFEST_NAME))
+        return ver, {
+            "version":      ver,
+            "notes":        "",
+            "manifest_url": manifest_url,
+            "tag":          tag,
+            "major":        _is_major_bump(ver, _current_version()),
+        }
+    return None, None
+
+
 def _is_major_bump(new_ver, cur_ver):
     """True when the MAJOR component changed (v1.x.x -> v2.x.x).
 
@@ -229,43 +289,19 @@ def check(channel=DEFAULT_CHANNEL):
     Returns None on no-network / no-release / already-on-latest. Bounded
     to T_GH_API seconds so the caller can never hang on it.
     """
-    if _http is None or _json is None:
-        return None
+    # Delegate to the cheap /tags helper. `latest_version()` already
+    # constructs the manifest_url from the tag, so we don't need a
+    # second API call to read the full release body — which on this
+    # repo can hit 3 MB and time out.
     cur = _current_version()
-    url = "https://api.github.com/repos/%s/releases" % OTA_REPO
-    try:
-        r = _http.get(url, headers={"User-Agent": USER_AGENT}, timeout=T_GH_API)
-        data = r.json()
-        r.close()
-    except Exception:
+    ver, rel = latest_version(channel)
+    if not ver or not rel:
         return None
-
-    if not isinstance(data, list):
+    if not _newer(ver, cur):
         return None
-
-    prefix = channel + "/"
-    for rel in data:
-        tag = rel.get("tag_name", "")
-        if not (tag == channel or tag.startswith(prefix)):
-            continue
-        ver = tag[len(prefix):] if tag.startswith(prefix) else tag
-        if not _newer(ver, cur):
-            return None
-        manifest_url = None
-        for a in rel.get("assets", ()):
-            if a.get("name") == MANIFEST_NAME:
-                manifest_url = a.get("browser_download_url")
-                break
-        if not manifest_url:
-            continue
-        return {
-            "version":      ver,
-            "notes":        rel.get("body") or "",
-            "manifest_url": manifest_url,
-            "tag":          tag,
-            "major":        _is_major_bump(ver, cur),
-        }
-    return None
+    if not rel.get("manifest_url"):
+        return None
+    return rel
 
 
 def peek(release):
@@ -290,13 +326,17 @@ def peek(release):
     manifest itself is a few KB. The expensive part (file-by-file
     download) lives in download().
     """
-    if not release or _http is None or _json is None:
+    if not release or _json is None:
         return None
     try:
-        r = _http.get(release["manifest_url"],
-                      headers={"User-Agent": USER_AGENT}, timeout=T_MANIFEST)
-        manifest = r.json()
-        r.close()
+        from oreoOS import _http as _httpx
+    except Exception:
+        return None
+    body = _httpx.get_url(release["manifest_url"], timeout_s=T_MANIFEST)
+    if body is None:
+        return None
+    try:
+        manifest = _json.loads(body.decode("utf-8"))
     except Exception:
         return None
     if not isinstance(manifest, dict):
@@ -379,23 +419,24 @@ def _download_file(url, dest_remote, expected_sha=None):
     parent = stage_path.rsplit("/", 1)[0]
     _ensure_dir(parent)
     try:
-        r = _http.get(url, headers={"User-Agent": USER_AGENT}, timeout=T_FILE)
-        h  = _hashlib.sha256() if _hashlib else None
-        with open(stage_path, "wb") as f:
-            # urequests doesn't always stream; the safe path is to read
-            # the body once. Files are kept small (≤ a few hundred KB).
-            data = r.content
-            if h: h.update(data)
-            f.write(data)
-        r.close()
+        from oreoOS import _http as _httpx
     except Exception:
         return False
-    if expected_sha and h and _hex(h.digest()) != expected_sha:
-        try:
-            _os.remove(stage_path)
-        except Exception:
-            pass
+    body = _httpx.get_url(url, timeout_s=T_FILE)
+    if body is None:
         return False
+    try:
+        with open(stage_path, "wb") as f:
+            f.write(body)
+    except Exception:
+        return False
+    if expected_sha and _hashlib is not None:
+        if _hex(_hashlib.sha256(body).digest()) != expected_sha:
+            try:
+                _os.remove(stage_path)
+            except Exception:
+                pass
+            return False
     return True
 
 
@@ -490,8 +531,8 @@ def background_check(os_obj, min_interval_s=6 * 3600):
 
     Returns True iff a new release was discovered this call.
     """
-    if _http is None:
-        return False
+    # _http is the raw-socket helper at module scope; nothing to gate
+    # on here since it lazy-imports inside check()/peek()/download().
 
     # Opt-out gate. Default ON because the boot-grace + 4 s API timeout
     # + 6 h rate-limit cap the worst-case freeze at 4 s once every 6 h,

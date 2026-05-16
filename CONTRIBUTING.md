@@ -163,8 +163,16 @@ notification probably got lost in conference-season chaos.
 Maintainers only — feel free to skip this section.
 
 Releases are **manual on purpose**. We want a human to look at a badge
-running the release candidate before the wider fleet pulls it in. The
-one-liner:
+running the release candidate before the wider fleet pulls it in.
+
+**Before tagging:** add the new version's section to the top of
+[`CHANGELOG.md`](CHANGELOG.md). The CI release workflow takes the
+**top section** of that file verbatim and posts it as the GitHub
+release's `body` — which is what the badge's **Updates** screen shows
+as the in-device changelog when an upgrade is found. Keep entries
+short, bullet-style, present tense.
+
+The one-liner:
 
 ```bash
 # Dry-run first so you can read every command the script will execute.

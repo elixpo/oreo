@@ -106,6 +106,7 @@ DEPLOY = [
 
     # OS layer (flat namespace: api, app, theme, widgets, font, …)
     ("oreoOS/__init__.py",      "oreoOS/__init__.py"),
+    ("oreoOS/_http.py",         "oreoOS/_http.py"),
     ("oreoOS/config.py",        "oreoOS/config.py"),
     ("oreoOS/api.py",           "oreoOS/api.py"),
     ("oreoOS/app.py",           "oreoOS/app.py"),
@@ -152,15 +153,8 @@ if _fonts_dir.exists():
     for _f in sorted(_fonts_dir.glob("pixelify_*.py")):
         DEPLOY.append((str(_f), "assets/fonts/optimized/" + _f.name))
 
-# apps — include only dirs that have both manifest.json and main.py
-# from BOTH the default apps/ tree AND the apps_market/ tree (optional,
-# user-installable apps). They ship to their respective device paths;
-# the Store app moves trees between them at install/uninstall time.
-APPS_DIR        = Path("apps")
-MARKET_DIR      = Path("apps_market")
-_app_roots      = [APPS_DIR]
-if MARKET_DIR.exists():
-    _app_roots.append(MARKET_DIR)
+APPS_DIR     = Path("apps")
+_app_roots   = [APPS_DIR]
 for _root in _app_roots:
     for app_dir in sorted(_root.iterdir()):
         if not app_dir.is_dir() or app_dir.name.startswith("_"):
@@ -449,10 +443,6 @@ remote_dirs = sorted(remote_dirs, key=lambda p: p.count("/"))
 def main():
     import time as _t
     t0 = _t.time()
-
-    # Bump the patch BEFORE we hash files, so the new oreoOS/config.py is what
-    # gets pushed in this same deploy. --no-bump skips it (useful when you're
-    # just iterating locally and don't want VERSION churn in git history).
     if "--no-bump" not in sys.argv:
         old, new = bump_patch_version()
         if new:
@@ -543,12 +533,6 @@ def main():
         ) % keep
         print("  pruning stale gallery photos on device (keep=%d)" % len(keep))
         mpremote("exec", cleanup)
-
-    # apps/ sync: remove device-side app directories that no longer
-    # exist in the repo's apps/ tree. Catches the apps_market move case
-    # (color_picker + pet moved out of apps/ → device still had stale
-    # copies and the drawer kept rendering them). The Store app's
-    # runtime install path repopulates these on demand.
     repo_apps = sorted({
         p.name for p in Path("apps").iterdir()
         if p.is_dir() and (p / "main.py").exists()
