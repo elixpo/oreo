@@ -260,28 +260,30 @@ def refresh(force=False):
         _last_refresh_ok = False
         return _catalogue or []
 
+    # Single-call catalogue. Display name + icon + author come from the
+    # manifest, fetched lazily by get_details() when the user opens an
+    # app's detail page. The previous N+1 pattern was the source of
+    # "stuck on LOADING" — any single GET that hung on body-read would
+    # take the whole catalogue down.
     fresh = []
     for it in listing:
         if it.get("type") != "dir":
             continue
-        name_dir   = it.get("name", "")
-        app_path   = it.get("path", "")
+        name_dir = it.get("name", "")
+        app_path = it.get("path", "")
         if not name_dir or not app_path:
             continue
-        manifest = _fetch_manifest(app_path)
-        if not manifest:
-            continue
         fresh.append({
-            "dir":       name_dir,
-            "name":      manifest.get("name",   name_dir),
-            "icon":      manifest.get("icon",   None),
-            "author":    manifest.get("author", None),
-            "path":      app_path,             # used by install() later
+            "dir":    name_dir,
+            "name":   name_dir,    # placeholder; details page upgrades this
+            "icon":   None,
+            "author": None,
+            "path":   app_path,
         })
-        gc.collect()
 
     _catalogue       = fresh
     _last_refresh_ok = True
+    _details_cache.clear()
     try:
         _cache_ms = time.ticks_ms()
     except Exception:
@@ -297,6 +299,68 @@ def last_refresh_ok():
 
 def last_error():
     return _last_error
+
+
+# Per-app detail cache so repeatedly opening + closing the details page
+# for the same app doesn't re-hit GitHub. Cleared by refresh().
+_details_cache = {}
+
+
+def get_details(name_dir):
+    """Lazy fetch of the manifest + file listing for one market app.
+
+    Returns a dict:
+        {
+            "name":       human display name from manifest, fallback dir
+            "icon":       manifest 'icon' field (filename) or None
+            "author":     manifest 'author' field or None
+            "description": manifest 'description' field or "" (if any)
+            "files":      [{path, download_url, size}, ...] for install()
+            "bytes":      total bytes the install would download
+            "ok":         True iff both API calls returned cleanly
+        }
+
+    Cached in-memory per OS session; the next refresh() invalidates
+    every entry so a contributor pushing a manifest change can be
+    picked up without rebooting.
+    """
+    if name_dir in _details_cache:
+        return _details_cache[name_dir]
+    cat = list_market()
+    entry = None
+    for e in cat:
+        if e["dir"] == name_dir:
+            entry = e
+            break
+    if not entry:
+        return {"ok": False}
+
+    manifest = _fetch_manifest(entry["path"])
+    files    = _walk(entry["path"])
+    total    = sum(f.get("size", 0) for f in files)
+    out = {
+        "name":         manifest.get("name",        name_dir),
+        "icon":         manifest.get("icon",        None),
+        "author":       manifest.get("author",      None),
+        "description":  manifest.get("description", "") or "",
+        "files":        files,
+        "bytes":        total,
+        "ok":           bool(manifest) and bool(files),
+    }
+    _details_cache[name_dir] = out
+    # Also patch the catalogue entry so the list view picks up the
+    # nicer display name on the next paint.
+    if manifest:
+        entry["name"]   = out["name"]
+        entry["icon"]   = out["icon"]
+        entry["author"] = out["author"]
+    return out
+
+
+# When refresh() succeeds we wipe the per-app details cache so a
+# contributor pushing a manifest update isn't masked by stale cache.
+def _invalidate_details():
+    _details_cache.clear()
 
 
 def list_market():
@@ -341,6 +405,16 @@ def install(name):
     """
     if _http is None:
         return False
+    # Reuse the file tree the details page already walked. Cheap when
+    # the user clicks Install from the details page (no extra API
+    # calls); falls back to a fresh walk for any caller that bypasses
+    # the details flow.
+    details = get_details(name)
+    if not details.get("ok"):
+        return False
+    files = details.get("files") or []
+    if not files:
+        return False
     cat = list_market()
     entry = None
     for e in cat:
@@ -348,9 +422,6 @@ def install(name):
             entry = e
             break
     if not entry:
-        return False
-    files = _walk(entry["path"])
-    if not files:
         return False
 
     root_prefix = entry["path"] + "/"
