@@ -1,32 +1,3 @@
-"""App Store — remote catalogue of installable apps, fetched from
-the project's GitHub repo and cached locally.
-
-Listing source
-==============
-We hit the GitHub Contents API for the `apps_market/` directory of the
-OreoOS repo and treat every subfolder containing a `main.py` + a
-`manifest.json` as an installable entry. For each entry we cache:
-
-    {dir, name, icon_url, author,  files: [{path, download_url, size}]}
-
-The cache lives at `/store_cache.json` on flash. A press in the Store
-app overwrites it with a fresh fetch — otherwise the in-memory copy
-stays sticky for the OS session so navigating in / out of the app
-doesn't re-spend the API budget.
-
-Install
-=======
-`install(dir)` walks the cached `files` list, fetches each
-`download_url`, and writes it to `apps/<dir>/<rel_path>`. Uninstall is
-still local: `rm -rf apps/<dir>/`.
-
-No-network behaviour
-====================
-If the cache exists, we surface it as the source of truth even when
-WiFi is down. The UI shows a "stale" / "offline" pill so the user
-knows they're looking at the last successful refresh.
-"""
-
 import gc
 import os as _os
 import time
@@ -536,13 +507,17 @@ def refresh(force=False):
 
     _catalogue       = fresh
     _last_refresh_ok = True
-    # Stamp install state on every entry so callers using the returned
-    # list directly (instead of going through list_market()) don't trip
-    # on a missing key — the Store UI's _draw_card reads `installed`
-    # unconditionally.
     for e in _catalogue:
         e["installed"] = is_installed(e["dir"])
     _invalidate_details()
+    try:
+        live = {e["dir"] + ".py" for e in _catalogue}
+        for f in _os.listdir(_STORE_ICONS_DIR):
+            if f.endswith(".py") and f not in live:
+                try: _os.remove(_STORE_ICONS_DIR + "/" + f)
+                except OSError: pass
+    except OSError:
+        pass
     try:
         _cache_ms = time.ticks_ms()
     except Exception:
