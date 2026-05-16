@@ -174,6 +174,35 @@ class MPU6050:
     def wake(self):
         self._init_chip()
 
+    def enable_cycle_mode(self, rate_hz=5):
+        """Drop the chip into accel-only cycle mode at `rate_hz`.
+
+        Cycle mode auto-toggles between sleep + a single accel sample
+        at the configured wake-up rate, with the gyro disabled. Power
+        is roughly:
+            1.25 Hz   ~10 µA
+            5 Hz      ~25 µA   (default — snappy for gesture detect)
+            20 Hz     ~70 µA
+            40 Hz     ~140 µA
+        Followed by `enable_motion_int()` this gives the gesture engine
+        a near-zero-cost idle: the chip only spends bus cycles when the
+        accel actually crosses the motion threshold.
+        """
+        # PWR_MGMT_1: CYCLE=1, SLEEP=0, TEMP_DIS=1, internal 8MHz osc.
+        self._w(_PWR_MGMT_1, 0x28)
+        # PWR_MGMT_2: gyro X/Y/Z standby + LP_WAKE_CTRL field selects rate.
+        rate_bits = {1: 0b00, 2: 0b00, 5: 0b01,
+                     20: 0b10, 40: 0b11}.get(int(rate_hz), 0b01) << 6
+        # 0x07 = gyro X/Y/Z all in standby.
+        self._w(_PWR_MGMT_2, rate_bits | 0x07)
+
+    def disable_motion_int(self):
+        """Clear the motion-interrupt configuration (re-enable temp,
+        return to the full-rate config from _init_chip)."""
+        self._w(0x37, 0x00)
+        self._w(0x38, 0x00)
+        self._init_chip()
+
     # ── reads ────────────────────────────────────────────────────────────
     def _burst(self):
         """Single 14-byte read → 7 signed-16 ints: ax, ay, az, temp, gx, gy, gz."""

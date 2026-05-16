@@ -328,12 +328,86 @@ def run_app(os_obj, app):
             except Exception:
                 pass
 
+            # Gesture engine — early-exits when all toggles are off, so
+            # the cost on the disabled path is one dict lookup per frame.
+            # When events fire we dispatch them globally: HARD_SHAKE
+            # paints a mascot splash, FLIP_UP runs the user's chosen
+            # quick action, TAP / DOUBLE_TAP route to the current app's
+            # `on_gesture` hook if it has one.
+            try:
+                from oreoOS import gestures as _g
+                gs = _g.get(os_obj)
+                if gs:
+                    gs.tick()
+                    while True:
+                        ev = gs.pop_event()
+                        if not ev:
+                            break
+                        _dispatch_gesture(os_obj, app, ev)
+            except Exception:
+                pass
+
             elapsed = time.ticks_diff(time.ticks_ms(), now)
             if elapsed < FRAME_MIN_MS:
                 time.sleep_ms(FRAME_MIN_MS - elapsed)
     finally:
         app.on_exit()
         gc.collect()
+
+
+# ── gesture dispatch ──────────────────────────────────────────────────────────
+
+def _dispatch_gesture(os_obj, app, ev):
+    """Route a gesture event from oreoOS.gestures into the right surface.
+
+    Global-effect gestures (HARD_SHAKE, FLIP_UP) are handled here at the
+    OS layer so any app inherits them. App-local gestures (TAP,
+    DOUBLE_TAP) are forwarded to the current app's on_gesture(kind)
+    hook if one exists; absent hook = silent ignore.
+    """
+    kind = ev.get("kind", "")
+    if kind == "hard_shake":
+        try:
+            from oreoOS.splash import show_shake_mascot
+            show_shake_mascot(os_obj)
+        except Exception:
+            pass
+        # Force a full repaint of the current app so the splash
+        # doesn't leave its frame behind.
+        try:
+            app._dirty = True
+        except Exception:
+            pass
+        return
+    if kind == "flip_up":
+        action = ev.get("action", "drawer")
+        try:
+            if action == "drawer":
+                os_obj.launch("__appmenu__")
+            elif action == "notifs":
+                from oreoOS import notif_panel as _np
+                _np.get(os_obj).toggle()
+            elif action == "wifi":
+                from oreoWare import wifi as _w
+                if _w.is_connected():
+                    _w.disconnect()
+                else:
+                    _w.connect_from_config()
+            elif action == "bt":
+                from oreoWare import bt as _b
+                _b.set_active(not _b.is_active())
+            # "camera" left as a reserved placeholder until we wire IR
+            # quest capture in. Silent no-op for now.
+        except Exception:
+            pass
+        return
+    # TAP / DOUBLE_TAP — hand to the current app's gesture hook.
+    hook = getattr(app, "on_gesture", None)
+    if hook is not None:
+        try:
+            hook(kind)
+        except Exception:
+            pass
 
 
 # ── crash screen ──────────────────────────────────────────────────────────────
@@ -543,6 +617,15 @@ def boot():
     except Exception:
         os_obj._boot_ts_s = 0
 
+    # Seed gesture-related Settings keys so the Settings rows display
+    # sensible values on first boot. Pure dictionary writes — no IMU
+    # touch yet, so this is cheap.
+    try:
+        from oreoOS import gestures as _g
+        _g.push_default_settings(os_obj)
+    except Exception:
+        pass
+
     _bc("checking pending OTA")
     applied = _maybe_apply_ota(os_obj)
     _bc("OTA check done (applied=%s)" % bool(applied))
@@ -634,31 +717,29 @@ def boot():
             show_crash(os_obj, "home", e)
             continue
 
-        target = os_obj._launch_request
+        # Chain-launch loop. Each app may call os.launch(...) on the
+        # way out (e.g. Settings → Gestures, Settings → WiFi). We keep
+        # consuming _launch_request until it's empty — otherwise a
+        # sub-launched app would get clobbered by Home's run_app re-
+        # initialising _launch_request = None on entry, and the user
+        # would briefly see Home flash before having to re-navigate.
+        while True:
+            target = os_obj._launch_request
 
-        # Home's APPS dock sends "__appmenu__" — route it to the
-        # first-class apps/launcher/ implementation.
-        if target == "__appmenu__":
-            target = "launcher"
+            # Home's APPS dock sends "__appmenu__" — route it to the
+            # first-class apps/launcher/ implementation.
+            if target == "__appmenu__":
+                target = "launcher"
 
-        # If the user picked the launcher, run it then CHAIN into whichever
-        # app it selected. `run_app` clears _launch_request on entry, so we
-        # have to re-read it after the launcher exits — otherwise pressing A
-        # on a tile would drop us back to home instead of launching the app.
-        if target == "launcher":
-            try:
-                app = load_app("launcher")
-                run_app(os_obj, app)
-            except Exception as e:
-                show_crash(os_obj, "launcher", e)
-            target = os_obj._launch_request   # ← the launcher's selection
+            if not target:
+                break    # nothing queued; outer loop returns to Home
 
-        if target and target not in (None, "launcher", "__appmenu__"):
             try:
                 app = load_app(target)
                 run_app(os_obj, app)
             except Exception as e:
                 show_crash(os_obj, target, e)
+                break
 
 
 if __name__ == "__main__":
