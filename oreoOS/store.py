@@ -48,7 +48,15 @@ except ImportError:
 # ── tunables ────────────────────────────────────────────────────────────
 
 STORE_REPO   = "elixpo/oreo"
-STORE_REF    = "main"
+# Branch/tag/sha on the repo to pull the catalogue from. Defaults to
+# `main`; override via oreoOS/config.py `STORE_REF = "feat/app-market"`
+# while apps_market/ hasn't landed on main yet, otherwise the API
+# returns 404 and the page shows an empty catalogue.
+try:
+    from oreoOS.config import STORE_REF as _CFG_REF
+    STORE_REF = _CFG_REF
+except Exception:
+    STORE_REF = "main"
 MARKET_PATH  = "apps_market"
 CACHE_PATH   = "/store_cache.json"
 
@@ -60,8 +68,10 @@ APPS_DIR     = "apps"
 
 
 # In-memory mirror of the catalogue. Loaded lazily on first access.
-_catalogue   = None
-_cache_ms    = 0   # ticks_ms at last successful refresh
+_catalogue       = None
+_cache_ms        = 0      # ticks_ms at last successful refresh
+_last_refresh_ok = None   # True / False / None — never-tried | succeeded | failed
+_last_error      = ""     # human-readable summary for the page
 
 
 # ── filesystem helpers ──────────────────────────────────────────────────
@@ -113,8 +123,15 @@ def _rm_tree(path):
 # ── GitHub API wrappers ─────────────────────────────────────────────────
 
 def _api(path):
-    """GET https://api.github.com/repos/<repo>/contents/<path>?ref=<ref>"""
+    """GET https://api.github.com/repos/<repo>/contents/<path>?ref=<ref>.
+
+    Records the last error into the module-level `_last_error` slot so
+    the UI can surface a real reason ("404 on main — apps_market not
+    merged?", "timeout", etc.) instead of a generic empty list.
+    """
+    global _last_error
     if _http is None or _json is None:
+        _last_error = "no http / json"
         return None
     url = ("https://api.github.com/repos/%s/contents/%s?ref=%s"
            % (STORE_REPO, path, STORE_REF))
@@ -122,13 +139,16 @@ def _api(path):
         r = _http.get(url, headers={"User-Agent": USER_AGENT,
                                     "Accept": "application/vnd.github+json"},
                       timeout=T_API)
-        if r.status_code != 200:
+        sc = r.status_code
+        if sc != 200:
             r.close()
+            _last_error = "HTTP %d on %s@%s" % (sc, path, STORE_REF)
             return None
         data = r.json()
         r.close()
         return data
-    except Exception:
+    except Exception as e:
+        _last_error = ("api: " + str(e))[:48]
         return None
 
 
@@ -210,7 +230,7 @@ def refresh(force=False):
     A. Without force, repeated calls inside the same OS session reuse
     the in-memory copy.
     """
-    global _catalogue, _cache_ms
+    global _catalogue, _cache_ms, _last_refresh_ok, _last_error
     if not force and _catalogue is not None:
         return _catalogue
 
@@ -222,16 +242,22 @@ def refresh(force=False):
         if not wifi.is_connected():
             if _catalogue is None:
                 _load_cache_from_disk()
+            _last_refresh_ok = False
+            _last_error      = "wifi down"
             return _catalogue or []
     except Exception:
         pass
 
+    _last_error = ""
     listing = _api(MARKET_PATH)
     if not isinstance(listing, list):
-        # Network blew up — fall back to disk cache so the user still
-        # sees something rather than an empty page.
+        # API call failed (_api logged the reason into _last_error).
+        # Fall back to disk cache so the user still sees something
+        # rather than an empty page; flag the attempt as failed so the
+        # UI can show an ERROR pill rather than a clean state.
         if _catalogue is None:
             _load_cache_from_disk()
+        _last_refresh_ok = False
         return _catalogue or []
 
     fresh = []
@@ -254,13 +280,23 @@ def refresh(force=False):
         })
         gc.collect()
 
-    _catalogue = fresh
+    _catalogue       = fresh
+    _last_refresh_ok = True
     try:
         _cache_ms = time.ticks_ms()
     except Exception:
         _cache_ms = 0
     _save_cache_to_disk()
     return _catalogue
+
+
+def last_refresh_ok():
+    """Tri-state: True / False / None (never tried this boot)."""
+    return _last_refresh_ok
+
+
+def last_error():
+    return _last_error
 
 
 def list_market():

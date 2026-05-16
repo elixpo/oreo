@@ -142,22 +142,41 @@ class App(oreoOS.App):
         self._dirty = True
 
     def _classify_state(self):
+        """Decide the header pill based on what actually happened:
+        - last refresh tried + failed → ERROR (with the error string
+          stamped into self._msg so the user can see why)
+        - wifi physically down → OFFLINE (cache may be valid)
+        - cache > 12 h old → STALE
+        - otherwise → OK
+        We deliberately never show "NO WIFI" when WiFi is actually up
+        and the catalogue just happens to be empty (that was the bug)."""
         age = store.cache_age_ms()
+        ok  = store.last_refresh_ok()
+        wifi_up = self._wifi_up()
+        if ok is False and not wifi_up:
+            return "OFFLINE"
+        if ok is False:
+            err = store.last_error() or ""
+            if err:
+                self._msg = err
+            return "ERROR"
         if not self._items:
-            # Check whether WiFi is the blocker so the user gets a
-            # useful pill rather than a generic empty state.
-            try:
-                from oreoWare import wifi
-                if not wifi.is_connected():
-                    return "OFFLINE"
-            except Exception:
-                pass
-            return "EMPTY"
+            # Refresh hasn't actually run yet (cold cache, first boot
+            # without a network round-trip) — keep the pill neutral.
+            return "LOADING" if ok is None else "OK"
         if age is None:
             return "OK"
         if age > STALE_AFTER_MS:
             return "STALE"
         return "OK"
+
+    @staticmethod
+    def _wifi_up():
+        try:
+            from oreoWare import wifi
+            return bool(wifi.is_connected())
+        except Exception:
+            return False
 
     # ── render ─────────────────────────────────────────────────────────
     def draw(self, d):
@@ -196,26 +215,21 @@ class App(oreoOS.App):
             d.text(pill_text, SW - pw - 10 + 6, y + 13, api.WHITE, scale=1)
 
     def _state_pill(self):
+        # OK is the implicit / quiet state — no pill at all, the
+        # absence of a chip reads as "fresh" so we don't clutter the
+        # header on the common case.
         return {
-            "LOADING": ("LOADING",  theme.MUTED),
-            "OK":      ("FRESH",    theme.TEAL),
-            "STALE":   ("STALE",    theme.GOLD),
-            "OFFLINE": ("OFFLINE",  theme.MUTED),
-            "EMPTY":   ("NO WIFI",  theme.PRIMARY),
-            "ERROR":   ("ERROR",    theme.PRIMARY),
+            "LOADING": ("LOADING", theme.MUTED),
+            "STALE":   ("STALE",   theme.GOLD),
+            "OFFLINE": ("OFFLINE", theme.MUTED),
+            "ERROR":   ("ERROR",   theme.PRIMARY),
         }.get(self._state, (None, None))
 
     def _draw_catalogue(self, d):
+        # No empty-state card — the header pill (LOADING / OFFLINE /
+        # ERROR / STALE) already communicates the situation, and a big
+        # "no wifi" message under it is redundant + sometimes misleading.
         if not self._items:
-            y = LIST_TOP_Y + HEADER_CARD_H + 8
-            if self._state == "LOADING":
-                msg = "fetching catalogue..."
-            elif self._state in ("OFFLINE", "EMPTY"):
-                msg = "connect WiFi to load the catalogue"
-            else:
-                msg = "no apps available"
-            d.text(msg, (SW - len(msg) * 8) // 2, y + 40,
-                   theme.MUTED, scale=1)
             return
 
         vis = self._visible_card_count()
