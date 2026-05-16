@@ -584,7 +584,7 @@ def push_update_notification(version):
                       for n in notifications.items())
         if not already:
             notifications.push("ota", "Update available",
-                               version, target="settings")
+                               version, target="updates")
     except Exception:
         pass
 

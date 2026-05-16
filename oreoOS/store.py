@@ -32,17 +32,156 @@ import os as _os
 import time
 
 try:
-    import urequests as _http
-except ImportError:
-    try:
-        import requests as _http
-    except ImportError:
-        _http = None
-
-try:
     import json as _json
 except ImportError:
     _json = None
+
+# Raw-socket HTTP. We bypass urequests because its `timeout=` flag on
+# this MicroPython 1.28 build only covers the connect, not the body
+# read — which lets a slow GitHub edge wedge the OS run loop for
+# minutes. socket.settimeout() applies to every recv() so the timeout
+# is enforced end-to-end. Same fix we'll back-port to ota.py later.
+try:
+    import socket as _socket
+    import ssl    as _ssl
+    _RAW_OK = True
+except ImportError:
+    _RAW_OK = False
+
+
+def _bc(msg):
+    """One-line USB-CDC breadcrumb — tail with `mpremote connect ...`
+    while the Store app is open to see exactly where a hang lands."""
+    try:
+        print("[store] " + msg)
+    except Exception:
+        pass
+
+
+def _http_get(url, accept_raw=False, timeout_s=4):
+    """Tiny GET that returns the body as bytes (or None on failure).
+
+    `accept_raw=True` flips the Accept header to application/vnd.github.raw
+    so file fetches return the raw file body instead of JSON-wrapped
+    base64. Used by the install path.
+    """
+    if not _RAW_OK:
+        return None
+    # Parse https://host[:port]/path
+    if not url.startswith("https://"):
+        return None
+    rest = url[len("https://"):]
+    slash = rest.find("/")
+    if slash < 0:
+        host, path = rest, "/"
+    else:
+        host, path = rest[:slash], rest[slash:]
+    port = 443
+    if ":" in host:
+        host, p = host.split(":", 1)
+        try: port = int(p)
+        except ValueError: port = 443
+
+    accept = ("application/vnd.github.raw" if accept_raw
+              else "application/vnd.github+json")
+
+    s = None
+    try:
+        addr = _socket.getaddrinfo(host, port)[0][-1]
+        s = _socket.socket()
+        s.settimeout(timeout_s)
+        s.connect(addr)
+        s = _ssl.wrap_socket(s, server_hostname=host)
+        # Auth header from .env if present — bumps GitHub's anonymous
+        # 60 req/hr limit to 5000.
+        auth_hdr = ""
+        try:
+            from oreoOS.config import GH_TOKEN as _TOK
+            if _TOK:
+                auth_hdr = "Authorization: Bearer " + _TOK + "\r\n"
+        except Exception:
+            pass
+        req = (
+            "GET %s HTTP/1.1\r\n"
+            "Host: %s\r\n"
+            "User-Agent: %s\r\n"
+            "Accept: %s\r\n"
+            "Accept-Encoding: identity\r\n"
+            "%s"
+            "Connection: close\r\n\r\n"
+        ) % (path, host, USER_AGENT, accept, auth_hdr)
+        s.write(req.encode())
+
+        # Read until socket close. settimeout enforces a hard cap on
+        # each recv so a hung edge can't wedge us — worst case the
+        # whole exchange dies after timeout_s with OSError.
+        buf = bytearray()
+        while True:
+            try:
+                chunk = s.read(2048)
+            except OSError:
+                break
+            if not chunk:
+                break
+            buf.extend(chunk)
+            if len(buf) > 256 * 1024:
+                # Safety ceiling. The Contents API listings we care
+                # about are < 50 KB; anything bigger is a paginated
+                # tree we shouldn't try to swallow whole.
+                break
+    except Exception as e:
+        _bc("http_get FAIL %s: %s" % (host, e))
+        return None
+    finally:
+        try:
+            if s is not None:
+                s.close()
+        except Exception:
+            pass
+
+    # Split off the response head — body starts after \r\n\r\n.
+    head_end = buf.find(b"\r\n\r\n")
+    if head_end < 0:
+        return None
+    head = bytes(buf[:head_end])
+    body = bytes(buf[head_end + 4:])
+
+    # Parse the status line for breadcrumbs + 200-check.
+    status = 0
+    line0  = head.split(b"\r\n", 1)[0]
+    parts  = line0.split(b" ", 2)
+    if len(parts) >= 2:
+        try: status = int(parts[1])
+        except ValueError: status = 0
+    if status != 200:
+        _bc("http_get %s -> HTTP %d" % (host, status))
+        return None
+
+    # If the response was chunked (rare for github.com but defensive),
+    # decode chunks. We detect it via Transfer-Encoding header.
+    if b"\r\ntransfer-encoding: chunked" in (b"\r\n" + head.lower()):
+        body = _dechunk(body)
+
+    return body
+
+
+def _dechunk(body):
+    out = bytearray()
+    i   = 0
+    while i < len(body):
+        nl = body.find(b"\r\n", i)
+        if nl < 0:
+            break
+        try:
+            n = int(body[i:nl].split(b";")[0], 16)
+        except Exception:
+            break
+        i = nl + 2
+        if n == 0:
+            break
+        out.extend(body[i:i + n])
+        i += n + 2
+    return bytes(out)
 
 
 # ── tunables ────────────────────────────────────────────────────────────
@@ -130,26 +269,24 @@ def _api(path):
     merged?", "timeout", etc.) instead of a generic empty list.
     """
     global _last_error
-    if _http is None or _json is None:
-        _last_error = "no http / json"
+    if not _RAW_OK or _json is None:
+        _last_error = "no socket / json"
         return None
     url = ("https://api.github.com/repos/%s/contents/%s?ref=%s"
            % (STORE_REPO, path, STORE_REF))
-    try:
-        r = _http.get(url, headers={"User-Agent": USER_AGENT,
-                                    "Accept": "application/vnd.github+json"},
-                      timeout=T_API)
-        sc = r.status_code
-        if sc != 200:
-            r.close()
-            _last_error = "HTTP %d on %s@%s" % (sc, path, STORE_REF)
-            return None
-        data = r.json()
-        r.close()
-        return data
-    except Exception as e:
-        _last_error = ("api: " + str(e))[:48]
+    _bc("API GET " + path + "@" + STORE_REF)
+    body = _http_get(url, accept_raw=False, timeout_s=T_API)
+    if body is None:
+        _last_error = "api %s@%s timeout/error" % (path, STORE_REF)
         return None
+    try:
+        data = _json.loads(body.decode("utf-8"))
+    except Exception as e:
+        _last_error = "api parse: " + str(e)[:32]
+        return None
+    _bc("API OK %s (%d entries)" %
+        (path, len(data) if isinstance(data, list) else 1))
+    return data
 
 
 def _walk(path):
@@ -173,20 +310,16 @@ def _walk(path):
 
 def _fetch_manifest(app_path):
     """Read the manifest.json for a single market app via the API."""
+    if _json is None:
+        return {}
     url = ("https://api.github.com/repos/%s/contents/%s/manifest.json?ref=%s"
            % (STORE_REPO, app_path, STORE_REF))
+    _bc("manifest GET " + app_path)
+    body = _http_get(url, accept_raw=True, timeout_s=T_API)
+    if body is None:
+        return {}
     try:
-        r = _http.get(url, headers={"User-Agent": USER_AGENT,
-                                    "Accept": "application/vnd.github.raw"},
-                      timeout=T_API)
-        if r.status_code != 200:
-            r.close()
-            return {}
-        # With the .raw Accept header GitHub returns the file body as
-        # text — no base64 decode needed.
-        m = _json.loads(r.text) if _json else {}
-        r.close()
-        return m
+        return _json.loads(body.decode("utf-8"))
     except Exception:
         return {}
 
@@ -403,7 +536,7 @@ def install(name):
     keeps going so the user gets a partial install rather than a
     nothing-at-all failure (they can hit A again to retry).
     """
-    if _http is None:
+    if not _RAW_OK:
         return False
     # Reuse the file tree the details page already walked. Cheap when
     # the user clicks Install from the details page (no extra API
@@ -436,26 +569,16 @@ def install(name):
         parent = dst.rsplit("/", 1)[0] if "/" in dst else ""
         if parent:
             _ensure_dir(parent)
-        try:
-            r = _http.get(f["download_url"],
-                          headers={"User-Agent": USER_AGENT},
-                          timeout=T_FILE)
-            if r.status_code != 200:
-                r.close()
-                continue
-            # Stream to disk so a large asset doesn't OOM the heap.
-            with open(dst, "wb") as out:
-                while True:
-                    chunk = r.raw.read(2048) if hasattr(r, "raw") else r.content
-                    if isinstance(chunk, (bytes, bytearray)) and chunk:
-                        out.write(chunk)
-                        if not hasattr(r, "raw"):
-                            break    # already-loaded body, single write
-                    else:
-                        break
-            r.close()
-        except Exception:
+        _bc("install GET " + rel)
+        body = _http_get(f["download_url"], accept_raw=False,
+                         timeout_s=T_FILE)
+        if body is None:
             continue
+        try:
+            with open(dst, "wb") as out:
+                out.write(body)
+        except Exception:
+            pass
         gc.collect()
 
     return is_installed(name)
