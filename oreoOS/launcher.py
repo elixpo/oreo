@@ -623,6 +623,16 @@ def boot():
     while True:
         apps = list_apps()
         home = Home(apps)
+        # Reaching the home screen is the "I'm done" signal — clear any
+        # launcher resume context so the next drawer open starts fresh
+        # rather than restoring the user to where they last were inside
+        # a category. HOME-from-app already chains via __appmenu__ and
+        # consumes the context; this just guarantees a clean slate when
+        # the user actually lands on home.
+        try:
+            os_obj._launcher_resume = None
+        except Exception:
+            pass
         # Home is wrapped just like app launches below — a crash in the
         # home screen used to take the whole OS down silently (the LCD
         # froze on whatever was last drawn, no button polling, requiring
