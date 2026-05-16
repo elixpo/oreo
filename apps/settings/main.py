@@ -105,6 +105,31 @@ class App(oreoOS.App):
             _Row("Sync Time",   "action",
                  getter=lambda: self._sync_time_summary(),
                  setter=lambda v: self._sync_time()),
+
+            # ── Gestures (IMU) ──
+            # Master switch first; per-gesture toggles only have effect
+            # while the master is ON. Each gesture costs some standby
+            # power, so they're all opt-in.
+            _Row("Gestures",     "toggle",
+                 getter=lambda: self._gest_get("gestures_enabled"),
+                 setter=lambda v: self._gest_set("gestures_enabled", v)),
+            _Row(" Tap",         "toggle",
+                 getter=lambda: self._gest_get("gesture_tap"),
+                 setter=lambda v: self._gest_set("gesture_tap", v)),
+            _Row(" Double Tap",  "toggle",
+                 getter=lambda: self._gest_get("gesture_double_tap"),
+                 setter=lambda v: self._gest_set("gesture_double_tap", v)),
+            _Row(" Flip Up",     "toggle",
+                 getter=lambda: self._gest_get("gesture_flip_up"),
+                 setter=lambda v: self._gest_set("gesture_flip_up", v)),
+            _Row(" Flip Action", "toggle",
+                 getter=lambda: self._gest_flip_action_label(),
+                 setter=lambda v: self._gest_cycle_flip_action(),
+                 on_label="", off_label=""),
+            _Row(" Hard Shake",  "toggle",
+                 getter=lambda: self._gest_get("gesture_hard_shake"),
+                 setter=lambda v: self._gest_set("gesture_hard_shake", v)),
+
             _Row("Version",     "info",
                  getter=self._os_version),
             _Row("Check Update","action",
