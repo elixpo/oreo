@@ -717,31 +717,29 @@ def boot():
             show_crash(os_obj, "home", e)
             continue
 
-        target = os_obj._launch_request
+        # Chain-launch loop. Each app may call os.launch(...) on the
+        # way out (e.g. Settings → Gestures, Settings → WiFi). We keep
+        # consuming _launch_request until it's empty — otherwise a
+        # sub-launched app would get clobbered by Home's run_app re-
+        # initialising _launch_request = None on entry, and the user
+        # would briefly see Home flash before having to re-navigate.
+        while True:
+            target = os_obj._launch_request
 
-        # Home's APPS dock sends "__appmenu__" — route it to the
-        # first-class apps/launcher/ implementation.
-        if target == "__appmenu__":
-            target = "launcher"
+            # Home's APPS dock sends "__appmenu__" — route it to the
+            # first-class apps/launcher/ implementation.
+            if target == "__appmenu__":
+                target = "launcher"
 
-        # If the user picked the launcher, run it then CHAIN into whichever
-        # app it selected. `run_app` clears _launch_request on entry, so we
-        # have to re-read it after the launcher exits — otherwise pressing A
-        # on a tile would drop us back to home instead of launching the app.
-        if target == "launcher":
-            try:
-                app = load_app("launcher")
-                run_app(os_obj, app)
-            except Exception as e:
-                show_crash(os_obj, "launcher", e)
-            target = os_obj._launch_request   # ← the launcher's selection
+            if not target:
+                break    # nothing queued; outer loop returns to Home
 
-        if target and target not in (None, "launcher", "__appmenu__"):
             try:
                 app = load_app(target)
                 run_app(os_obj, app)
             except Exception as e:
                 show_crash(os_obj, target, e)
+                break
 
 
 if __name__ == "__main__":
