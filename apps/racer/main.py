@@ -174,6 +174,13 @@ class App(oreoOS.App):
                 except Exception:
                     pass
         if self._imu is not None:
+            # The cached instance may have been put to sleep by a prior
+            # on_exit (~5 µA). wake() is idempotent so a fresh-detected
+            # instance going through this path is also safe.
+            try:
+                self._imu.wake()
+            except Exception:
+                pass
             try:
                 self._imu.calibrate(samples=80)
             except Exception:
@@ -195,6 +202,19 @@ class App(oreoOS.App):
         self._btn_throttle = 0.0
 
         self._reset_run()
+
+    def on_exit(self):
+        # Drop the IMU into ~5 µA sleep when the user leaves the racer.
+        # The cached instance lives on os._imu so the next launch can
+        # wake() it without re-detecting. Future apps that want tilt
+        # input will follow the same wake-on-enter / sleep-on-exit
+        # contract; if any app forgets to wake, _init_chip is called
+        # by detect()/wake() so it self-heals.
+        if self._imu is not None:
+            try:
+                self._imu.sleep()
+            except Exception:
+                pass
 
     def _save_mode(self):
         try:

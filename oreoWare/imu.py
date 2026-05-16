@@ -67,16 +67,17 @@ _ALT_ADDR = 0x69
 
 
 def detect(i2c=None, retries=3):
-    """Probe the I2C bus for an MPU6050 and return a configured driver.
+    """Probe the I2C bus for an MPU6050 and return an idle driver.
 
     Tries the default 0x68 first, then 0x69, up to `retries` rounds.
     Returns the live MPU6050 instance, or None if neither address ACKs
     cleanly across the retries.
 
-    Used by the racer game so a momentary I2C glitch at boot doesn't
-    permanently disable IMU mode — the next call (e.g. next game launch)
-    re-detects from scratch. Keeps callers out of the address-fallback
-    + retry pattern that every app would otherwise reinvent.
+    The returned chip is put back to sleep before this function returns
+    so we don't burn ~3.6 mA between launches. Callers must call
+    `wake()` before reading. The racer game's on_enter / on_exit pair
+    handles this; future tilt-aware apps should follow the same
+    contract.
     """
     if I2C is None:
         return None
@@ -99,7 +100,15 @@ def detect(i2c=None, retries=3):
             continue
         for _ in range(retries):
             try:
-                return MPU6050(i2c=i2c, addr=addr)
+                m = MPU6050(i2c=i2c, addr=addr)
+                # Park the chip in low-power sleep until the caller
+                # explicitly wakes it. _init_chip already left it
+                # running; flip it back so detect() is power-neutral.
+                try:
+                    m.sleep()
+                except Exception:
+                    pass
+                return m
             except Exception:
                 # Brief settle before retry — bus can recover from a
                 # clock-stretch timeout on a fresh power-on.
