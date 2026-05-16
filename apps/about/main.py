@@ -80,6 +80,14 @@ class App(oreoOS.App):
         elif btn == api.BTN_DOWN:
             self._scroll = min(self._max_scroll, self._scroll + 12)
             self._dirty = True
+        elif btn == api.BTN_A:
+            # Version is the headline detail on this page — pressing A
+            # opens the dedicated Updates app where the user can run
+            # Check + Install. Matches the Settings → Version flow.
+            try:
+                self._os.launch("updates")
+            except Exception:
+                pass
 
     def _info_rows(self):
         secs = self._last_s
