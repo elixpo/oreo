@@ -327,7 +327,7 @@ def _fetch_store_icon(name_dir, app_path, icon_filename):
     if _exists(dst):
         return True
     url = ("https://raw.githubusercontent.com/%s/%s/%s/assets/optimized/%s.py"
-           % (STORE_REPO, STORE_REF, app_path, stem))
+           % (STORE_REPO, STORE_REF, _q(app_path), stem))
     _bc("icon GET " + name_dir)
     body = _http_get(url, accept_raw=True, timeout_s=T_API)
     if body is None:
