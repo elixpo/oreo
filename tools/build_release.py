@@ -100,15 +100,6 @@ SHIP_GLOBS = [
     "apps/*/assets/__init__.py",
     "apps/*/assets/optimized/__init__.py",
     "apps/*/assets/optimized/*.py",
-    # apps_market/ — the same shape as apps/, but these apps live in a
-    # parallel tree and aren't shown in the drawer until the Store app
-    # copies them across into apps/.
-    "apps_market/*/main.py",
-    "apps_market/*/manifest.json",
-    "apps_market/*/__init__.py",
-    "apps_market/*/assets/__init__.py",
-    "apps_market/*/assets/optimized/__init__.py",
-    "apps_market/*/assets/optimized/*.py",
 ]
 
 
