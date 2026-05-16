@@ -451,7 +451,7 @@ def refresh(force=False):
 
     _catalogue       = fresh
     _last_refresh_ok = True
-    _details_cache.clear()
+    _invalidate_details()
     try:
         _cache_ms = time.ticks_ms()
     except Exception:
@@ -503,32 +503,88 @@ def get_details(name_dir):
     if not entry:
         return {"ok": False}
 
+    # Disk-cache hit? Manifests rarely change for a given app version,
+    # so the persisted copy is fine until the user explicitly refreshes
+    # the catalogue (refresh() wipes _details_cache).
+    disk = _details_disk_load(name_dir)
+    if disk and disk.get("ok"):
+        _details_cache[name_dir] = disk
+        if entry and disk.get("name"):
+            entry["name"]   = disk["name"]
+            entry["icon"]   = disk["icon"]
+            entry["author"] = disk["author"]
+        return disk
+
+    # ONE API call — just the manifest. The full file-tree walk (which
+    # used to live here) is deferred to install() so opening details
+    # takes <2 s instead of >10 s. The previous N+1 _walk() pattern
+    # was the source of the slow details page.
     manifest = _fetch_manifest(entry["path"])
-    files    = _walk(entry["path"])
-    total    = sum(f.get("size", 0) for f in files)
+    if not manifest:
+        return {"ok": False}
     out = {
         "name":         manifest.get("name",        name_dir),
         "icon":         manifest.get("icon",        None),
         "author":       manifest.get("author",      None),
         "description":  manifest.get("description", "") or "",
-        "files":        files,
-        "bytes":        total,
-        "ok":           bool(manifest) and bool(files),
+        "files":        None,    # populated lazily by install()
+        "bytes":        None,
+        "ok":           True,
     }
     _details_cache[name_dir] = out
-    # Also patch the catalogue entry so the list view picks up the
-    # nicer display name on the next paint.
-    if manifest:
+    _details_disk_save(name_dir, out)
+    if entry:
         entry["name"]   = out["name"]
         entry["icon"]   = out["icon"]
         entry["author"] = out["author"]
     return out
 
 
+# ── disk persistence for the per-app details cache ─────────────────────
+# One small JSON file per app under /store_details/. Survives reboots
+# so opening Store + tapping an app is instant after the first time.
+_DETAILS_DIR = "/store_details"
+
+
+def _details_disk_path(name_dir):
+    return _DETAILS_DIR + "/" + name_dir + ".json"
+
+
+def _details_disk_load(name_dir):
+    if _json is None:
+        return None
+    try:
+        with open(_details_disk_path(name_dir)) as f:
+            return _json.loads(f.read())
+    except Exception:
+        return None
+
+
+def _details_disk_save(name_dir, payload):
+    if _json is None:
+        return
+    _ensure_dir(_DETAILS_DIR)
+    try:
+        with open(_details_disk_path(name_dir), "w") as f:
+            f.write(_json.dumps(payload))
+    except Exception:
+        pass
+
+
+def _details_disk_clear():
+    try:
+        for f in _os.listdir(_DETAILS_DIR):
+            try: _os.remove(_DETAILS_DIR + "/" + f)
+            except OSError: pass
+    except Exception:
+        pass
+
+
 # When refresh() succeeds we wipe the per-app details cache so a
 # contributor pushing a manifest update isn't masked by stale cache.
 def _invalidate_details():
     _details_cache.clear()
+    _details_disk_clear()
 
 
 def list_market():
@@ -573,16 +629,10 @@ def install(name):
     """
     if not _RAW_OK:
         return False
-    # Reuse the file tree the details page already walked. Cheap when
-    # the user clicks Install from the details page (no extra API
-    # calls); falls back to a fresh walk for any caller that bypasses
-    # the details flow.
-    details = get_details(name)
-    if not details.get("ok"):
-        return False
-    files = details.get("files") or []
-    if not files:
-        return False
+    # Find the catalogue entry first so we know the GitHub path. We
+    # walk lazily here (NOT in get_details) so opening the details
+    # page is cheap (one API call) — install is the user's explicit
+    # "I want this" so the heavier walk is acceptable.
     cat = list_market()
     entry = None
     for e in cat:
@@ -590,6 +640,9 @@ def install(name):
             entry = e
             break
     if not entry:
+        return False
+    files = _walk(entry["path"])
+    if not files:
         return False
 
     root_prefix = entry["path"] + "/"

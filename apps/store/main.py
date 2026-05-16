@@ -42,57 +42,61 @@ class App(oreoOS.App):
         super().on_enter(os_)
         self._os    = os_
         # ── list mode state
-        self._sel   = 0     # 0 = refresh header, 1+ = catalogue cards
-        self._top   = 0     # first visible CARD index (0..len(items))
+        self._sel   = 0     # index into self._items (no virtual rows)
+        self._top   = 0     # first visible CARD index
         self._state = "LOADING"
         self._msg   = ""
         self._items = []
         # ── details mode state
-        self._mode      = "list"   # "list" | "details"
-        self._detail    = None     # cached details dict for the open app
-        self._detail_for = None    # name_dir the details belong to
-        self._busy      = None     # mid install/uninstall flag
-        self._dirty     = True
-        # Surface disk cache immediately so the user has something on
-        # screen during the GitHub round-trip, then always force a
-        # fresh refresh on entry — the cache might be a stale empty
-        # list from an earlier failure.
+        self._mode       = "list"   # "list" | "details"
+        self._detail     = None     # cached details dict for the open app
+        self._detail_for = None     # name_dir the details belong to
+        self._busy       = None
+        self._dirty      = True
+        # Surface disk cache immediately, then force a fresh refresh on
+        # entry — an empty cache from a previous failed refresh must
+        # not block the API call.
         self._items = store.list_market()
         self._refresh(initial=False)
 
     # ── input ──────────────────────────────────────────────────────────
+    # Controls in list mode:
+    #   A      = open details for the focused card
+    #   B      = quit Store (back to launcher)
+    #   LEFT   = manual refresh (C is reserved by the OS notif panel)
+    #   UP/DN  = move selection
+    #   HOME   = OS-default route through launcher (kept as backup)
     def on_button_press(self, btn):
         if self._mode == "details":
             return self._on_btn_details(btn)
         return self._on_btn_list(btn)
 
     def _on_btn_list(self, btn):
-        if btn == api.BTN_HOME:
+        if btn in (api.BTN_HOME, api.BTN_B):
             self._os.quit()
             return
-        total = 1 + len(self._items)
+        if btn == api.BTN_LEFT:
+            self._refresh(initial=False)
+            return
+        n = len(self._items)
+        if n == 0:
+            return
         if btn == api.BTN_UP:
-            self._sel = (self._sel - 1) % total
+            self._sel = (self._sel - 1) % n
         elif btn == api.BTN_DOWN:
-            self._sel = (self._sel + 1) % total
+            self._sel = (self._sel + 1) % n
         elif btn == api.BTN_A:
-            if self._sel == 0:
-                self._refresh(initial=False)
-            else:
-                idx = self._sel - 1
-                if 0 <= idx < len(self._items):
-                    self._open_details(self._items[idx]["dir"])
+            self._open_details(self._items[self._sel]["dir"])
         else:
             return
         self._scroll_to_sel()
         self._dirty = True
 
     def _on_btn_details(self, btn):
-        if btn == api.BTN_HOME:
-            self._mode  = "list"
-            self._msg   = ""
-            self._busy  = None
-            # Re-snapshot the installed flag in case install completed.
+        if btn in (api.BTN_HOME, api.BTN_B):
+            self._mode = "list"
+            self._msg  = ""
+            self._busy = None
             for e in self._items:
                 e["installed"] = store.is_installed(e["dir"])
             self._dirty = True
@@ -142,17 +146,14 @@ class App(oreoOS.App):
     def _scroll_to_sel(self):
         """Keep the focused row inside the visible window."""
         vis = self._visible_card_count()
-        if self._sel == 0:
-            self._top = 0
-            return
-        card_idx = self._sel - 1
-        if card_idx < self._top:
-            self._top = card_idx
-        elif card_idx >= self._top + vis:
-            self._top = card_idx - vis + 1
+        if self._sel < self._top:
+            self._top = self._sel
+        elif self._sel >= self._top + vis:
+            self._top = self._sel - vis + 1
 
     def _visible_card_count(self):
-        avail = SH - LIST_TOP_Y - HEADER_CARD_H - 6 - widgets.HINT_H - 6
+        # No header card any more, so the entire play area is cards.
+        avail = SH - LIST_TOP_Y - widgets.HINT_H - 6
         return max(1, avail // (CARD_H + CARD_GAP))
 
     # ── refresh action ─────────────────────────────────────────────────
@@ -219,33 +220,18 @@ class App(oreoOS.App):
         d.clear(theme.BG)
         widgets.draw_header(d, "STORE")
         if self._mode == "details":
-            widgets.draw_hint(d, "A=install/uninstall  HOME=back")
+            widgets.draw_hint(d, "A=install/uninstall  B=back")
         else:
-            widgets.draw_hint(d, "A=open  HOME=back")
+            widgets.draw_hint(d, "A=open  LEFT=refresh  B=quit")
 
         if self._mode == "details":
             self._draw_details_page(d)
         else:
-            self._draw_header_card(d)
             self._draw_catalogue(d)
             self._draw_state_chip(d)
         if self._msg:
             d.text(self._msg[:36], ROW_PAD_X, SH - widgets.HINT_H - 12,
                    theme.PRIMARY, scale=1)
-
-    def _draw_header_card(self, d):
-        y = LIST_TOP_Y
-        sel = (self._sel == 0)
-        bg = theme.DOCK_SEL if sel else theme.CARD
-        d.rect(6, y, SW - 12, HEADER_CARD_H, bg, fill=True)
-        if sel:
-            d.rect(6,        y,                    SW - 12, 1, theme.SEL_BORDER, fill=True)
-            d.rect(6,        y + HEADER_CARD_H - 1, SW - 12, 1, theme.SEL_BORDER, fill=True)
-            d.rect(6,        y,                    1, HEADER_CARD_H, theme.SEL_BORDER, fill=True)
-            d.rect(SW - 7,   y,                    1, HEADER_CARD_H, theme.SEL_BORDER, fill=True)
-        d.text("Apps from GitHub", ROW_PAD_X, y + 4, theme.PRIMARY, scale=2)
-        d.text("A = refresh listing", ROW_PAD_X, y + 22,
-               theme.MUTED, scale=1)
 
     def _draw_state_chip(self, d):
         """State chip — centered above the hint bar, top-margin from
@@ -275,23 +261,23 @@ class App(oreoOS.App):
         }.get(self._state, (None, None))
 
     def _draw_catalogue(self, d):
-        # No empty-state card — the header pill (LOADING / OFFLINE /
-        # ERROR / STALE) already communicates the situation, and a big
-        # "no wifi" message under it is redundant + sometimes misleading.
+        # No empty-state card — the bottom state chip (LOADING /
+        # OFFLINE / ERROR / STALE) is enough; a duplicated "no wifi"
+        # text in the body would just clutter.
         if not self._items:
             return
-
         vis = self._visible_card_count()
-        list_y0 = LIST_TOP_Y + HEADER_CARD_H + 6
         for vi in range(vis):
             i = self._top + vi
             if i >= len(self._items):
                 break
-            self._draw_card(d, list_y0 + vi * (CARD_H + CARD_GAP), i)
+            self._draw_card(d, LIST_TOP_Y + vi * (CARD_H + CARD_GAP), i)
 
     def _draw_card(self, d, y, i):
         item = self._items[i]
-        sel  = (self._sel == i + 1)
+        # _sel is a direct index into self._items now (no virtual
+        # header row above the cards).
+        sel  = (self._sel == i)
         bg   = theme.DOCK_SEL if sel else theme.CARD
         d.rect(6, y, SW - 12, CARD_H, bg, fill=True)
         if sel:
@@ -383,11 +369,17 @@ class App(oreoOS.App):
                 d.text(line, ROW_PAD_X, body_y + i * 12,
                        theme.TEXT_DIM, scale=1)
 
-        # Stats line — file count + bytes. Right-aligned under desc.
+        # Stats line. files/bytes are populated lazily by install()
+        # — kept out of the details fetch to keep that flow under
+        # 1 API call. If known, show them; otherwise show "size at
+        # install time" as a tiny disclosure.
         stats_y = body_y + 5 * 12 + 4
-        files = det.get("files") or []
-        kb    = max(1, det.get("bytes", 0) // 1024)
-        stats = "%d files · %d KB" % (len(files), kb)
+        files = det.get("files")
+        if files:
+            kb = max(1, (det.get("bytes") or 0) // 1024)
+            stats = "%d files · %d KB" % (len(files), kb)
+        else:
+            stats = "size computed at install"
         d.text(stats, ROW_PAD_X, stats_y, theme.MUTED, scale=1)
 
         # Install / Uninstall button — bottom of the play area, full
