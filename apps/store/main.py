@@ -310,7 +310,7 @@ class App(oreoOS.App):
         # row is interactive.
         right_x = SW - ROW_PAD_X
         chev_x  = right_x - 14
-        if item["installed"]:
+        if item.get("installed"):
             tag    = "✓"
             tag_w  = 12
             tag_x  = chev_x - tag_w - 6

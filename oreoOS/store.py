@@ -1,32 +1,3 @@
-"""App Store — remote catalogue of installable apps, fetched from
-the project's GitHub repo and cached locally.
-
-Listing source
-==============
-We hit the GitHub Contents API for the `apps_market/` directory of the
-OreoOS repo and treat every subfolder containing a `main.py` + a
-`manifest.json` as an installable entry. For each entry we cache:
-
-    {dir, name, icon_url, author,  files: [{path, download_url, size}]}
-
-The cache lives at `/store_cache.json` on flash. A press in the Store
-app overwrites it with a fresh fetch — otherwise the in-memory copy
-stays sticky for the OS session so navigating in / out of the app
-doesn't re-spend the API budget.
-
-Install
-=======
-`install(dir)` walks the cached `files` list, fetches each
-`download_url`, and writes it to `apps/<dir>/<rel_path>`. Uninstall is
-still local: `rm -rf apps/<dir>/`.
-
-No-network behaviour
-====================
-If the cache exists, we surface it as the source of truth even when
-WiFi is down. The UI shows a "stale" / "offline" pill so the user
-knows they're looking at the last successful refresh.
-"""
-
 import gc
 import os as _os
 import time
@@ -303,7 +274,7 @@ def _api(path):
         _last_error = "no socket / json"
         return None
     url = ("https://api.github.com/repos/%s/contents/%s?ref=%s"
-           % (STORE_REPO, path, STORE_REF))
+           % (STORE_REPO, _q(path), STORE_REF))
     _bc("API GET " + path + "@" + STORE_REF)
     body = _http_get(url, accept_raw=False, timeout_s=T_API)
     if body is None:
@@ -341,6 +312,15 @@ def _walk(path):
 _STORE_ICONS_DIR = "/store_icons"
 
 
+def _q(path):
+    """Minimal URL-quoting for GitHub paths. We don't pull in urllib on
+    device, and the only character we actually ship that needs encoding
+    is the space ("Oreo Pet"). Anything more exotic in a dir name would
+    need a real quote() — flag it here if we ever add it.
+    """
+    return path.replace(" ", "%20")
+
+
 def _fetch_store_icon(name_dir, app_path, icon_filename):
     """Best-effort download of an app's optimized icon .py from GitHub
     so the Store card can render the real icon BEFORE the app is
@@ -356,7 +336,7 @@ def _fetch_store_icon(name_dir, app_path, icon_filename):
     if _exists(dst):
         return True
     url = ("https://raw.githubusercontent.com/%s/%s/%s/assets/optimized/%s.py"
-           % (STORE_REPO, STORE_REF, app_path, stem))
+           % (STORE_REPO, STORE_REF, _q(app_path), stem))
     _bc("icon GET " + name_dir)
     body = _http_get(url, accept_raw=True, timeout_s=T_API)
     if body is None:
@@ -417,7 +397,7 @@ def _fetch_manifest(app_path):
     if _json is None:
         return {}
     url = ("https://api.github.com/repos/%s/contents/%s/manifest.json?ref=%s"
-           % (STORE_REPO, app_path, STORE_REF))
+           % (STORE_REPO, _q(app_path), STORE_REF))
     _bc("manifest GET " + app_path)
     body = _http_get(url, accept_raw=True, timeout_s=T_API)
     if body is None:
@@ -536,7 +516,17 @@ def refresh(force=False):
 
     _catalogue       = fresh
     _last_refresh_ok = True
+    for e in _catalogue:
+        e["installed"] = is_installed(e["dir"])
     _invalidate_details()
+    try:
+        live = {e["dir"] + ".py" for e in _catalogue}
+        for f in _os.listdir(_STORE_ICONS_DIR):
+            if f.endswith(".py") and f not in live:
+                try: _os.remove(_STORE_ICONS_DIR + "/" + f)
+                except OSError: pass
+    except OSError:
+        pass
     try:
         _cache_ms = time.ticks_ms()
     except Exception:
@@ -758,7 +748,7 @@ def install(name):
         if not ok_mf:
             _bc("install manifest invalid, retrying")
             url = ("https://raw.githubusercontent.com/%s/%s/%s/manifest.json"
-                   % (STORE_REPO, STORE_REF, entry["path"]))
+                   % (STORE_REPO, STORE_REF, _q(entry["path"])))
             body = _http_get(url, accept_raw=True, timeout_s=T_FILE)
             if body is not None:
                 try:

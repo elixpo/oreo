@@ -1,9 +1,15 @@
 """Deploy Oreo Badge OS to the ESP32-S3 via mpremote.
 
 Usage:
-    python tools/deploy.py              # auto-detect port
+    python tools/deploy.py                          # auto-detect port
     python tools/deploy.py /dev/ttyACM0
-    python tools/deploy.py --clean      # wipe device first, then deploy
+    python tools/deploy.py --clean                  # wipe device first
+    python tools/deploy.py --override=gallery,reader
+        # before the push, wipe the named app dirs on device (and force
+        # any of their files in our hash cache to re-push). Use this when
+        # BT-uploaded photos / documents or Store-installed apps have
+        # diverged on device and you want the laptop copy to win. Without
+        # --override the device-side content for those apps is preserved.
 
 Must be run from the project root.
 """
@@ -38,6 +44,24 @@ for _arg in sys.argv[1:]:
         except ValueError:
             pass
 SKIP_FREE_GUARD = "--no-free-guard" in sys.argv
+
+# --override=<csv>  -- list of app dir names to wipe on device BEFORE the
+# push. The deploy still pushes the laptop copy afterwards, so the net
+# effect is "force-replace these apps wholesale (including any BT-
+# uploaded or store-installed content under them) with the repo state."
+# Without this flag the device-side trees for these apps are left alone.
+OVERRIDE_DIRS = []
+for _arg in sys.argv[1:]:
+    if _arg.startswith("--override="):
+        OVERRIDE_DIRS = [s.strip() for s in _arg.split("=", 1)[1].split(",")
+                         if s.strip()]
+        break
+    if _arg == "--override":
+        # Bare `--override` defaults to the two trees that accumulate
+        # device-side content most aggressively: gallery (BT photos) and
+        # reader (BT documents). Cheap reset for the common case.
+        OVERRIDE_DIRS = ["gallery", "reader"]
+        break
 
 
 def _hash_file(path):
@@ -457,6 +481,50 @@ def main():
     if r.returncode != 0:
         print("Cannot reach device on %s. Check USB cable and port." % PORT)
         sys.exit(1)
+
+    if OVERRIDE_DIRS:
+        # Wipe the specified app trees on device. We do this BEFORE the
+        # hash-cache scan so the entries we just nuked get re-pushed in
+        # this same run rather than waiting for --force.
+        print("Override: wiping device-side apps/{%s}/..."
+              % ",".join(OVERRIDE_DIRS))
+        wipe_script = (
+            "import os\n"
+            "def _rm(p):\n"
+            "    try:\n"
+            "        for f in os.listdir(p): _rm(p + '/' + f)\n"
+            "        os.rmdir(p)\n"
+            "    except OSError:\n"
+            "        try: os.remove(p)\n"
+            "        except: pass\n"
+            "for d in %r:\n"
+            "    path = 'apps/' + d\n"
+            "    try:\n"
+            "        os.stat(path)\n"
+            "    except OSError:\n"
+            "        continue\n"
+            "    print('  wipe apps/' + d)\n"
+            "    _rm(path)\n"
+        ) % list(OVERRIDE_DIRS)
+        mpremote("exec", wipe_script)
+        # Drop hash-cache entries under the wiped dirs so the push step
+        # re-uploads every file (otherwise the cache would say "already
+        # there" and skip them, and the device would be left empty).
+        cache_path = HASH_CACHE_PATH
+        if cache_path.exists():
+            try:
+                cached = json.loads(cache_path.read_text())
+            except Exception:
+                cached = {}
+            prefixes = tuple("apps/%s/" % d for d in OVERRIDE_DIRS)
+            kept = {k: v for k, v in cached.items()
+                    if not k.startswith(prefixes)}
+            dropped = len(cached) - len(kept)
+            if dropped:
+                cache_path.write_text(json.dumps(kept))
+                print("  dropped %d hash-cache entr%s under override dirs"
+                      % (dropped, "y" if dropped == 1 else "ies"))
+        print()
 
     if CLEAN:
         print("Wiping device filesystem...")

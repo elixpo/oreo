@@ -222,21 +222,45 @@ class App(oreoOS.App):
             if not self._bt:
                 return
             try:
-                self._bt.set_active(not self._bt.is_active())
+                now_on = not self._bt.is_active()
+                self._bt.set_active(now_on)
+                # Auto-discover the moment BT comes up — the user
+                # expectation is "turn it on, see what's nearby."
+                # We also leave the local beacon broadcasting (handled
+                # inside set_active(True) → _start_advertising) so this
+                # badge can be paired *to* without a second tap.
+                if now_on:
+                    try:
+                        self._bt.scan_start(SCAN_DUR_MS)
+                        self._scan_left = SCAN_DUR_MS
+                    except Exception:
+                        pass
             except Exception:
                 pass
             self._dirty = True
         elif kind == "nearby":
-            # Pair flow lands in slice 3 — for now we just remember the
-            # last requested target and surface it as a notification so
-            # the user can see the round-trip wiring is in place.
+            # Kick the real pair flow. oreoWare.bt.start_pair() owns the
+            # central-role connect + SMP handshake; we just hand it the
+            # selected scan entry and surface the result as a
+            # notification. The notification panel is where the user
+            # tracks pair state once they leave this app.
             mac  = payload.get("mac", "?")
             name = payload.get("name", "?")
+            ok = False
+            err = ""
+            if self._bt:
+                try:
+                    ok = bool(self._bt.start_pair(payload))
+                except Exception as e:
+                    err = str(e)[:40]
             try:
                 from oreoOS import notifications
-                notifications.push("bt", "Pair queued",
-                                   "%s · %s" % (name[:14], mac[-8:]),
-                                   target=None)
+                if ok:
+                    title, body = "Pairing…", "%s · %s" % (name[:14], mac[-8:])
+                else:
+                    title = "Pair failed"
+                    body  = err or ("%s · %s" % (name[:14], mac[-8:]))
+                notifications.push("bt", title, body, target=None)
             except Exception:
                 pass
             self._dirty = True
@@ -248,7 +272,13 @@ class App(oreoOS.App):
         self._dirty = False
         d.clear(theme.BG)
         widgets.draw_header(d, "BLUETOOTH")
-        widgets.draw_hint(d, "A=select  B=scan  HOME=back")
+        # Contextual hint — when the selection lands on a discovered
+        # device we promise "A = Connect" instead of the generic
+        # "select" so the user knows the next tap kicks off a pair.
+        if self._sel_key[0] == "nearby":
+            widgets.draw_hint(d, "A=Connect  B=scan  HOME=back")
+        else:
+            widgets.draw_hint(d, "A=toggle  B=scan  HOME=back")
 
         self._draw_identity(d)
 
