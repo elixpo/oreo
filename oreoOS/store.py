@@ -274,7 +274,7 @@ def _api(path):
         _last_error = "no socket / json"
         return None
     url = ("https://api.github.com/repos/%s/contents/%s?ref=%s"
-           % (STORE_REPO, path, STORE_REF))
+           % (STORE_REPO, _q(path), STORE_REF))
     _bc("API GET " + path + "@" + STORE_REF)
     body = _http_get(url, accept_raw=False, timeout_s=T_API)
     if body is None:
@@ -310,6 +310,15 @@ def _walk(path):
 
 
 _STORE_ICONS_DIR = "/store_icons"
+
+
+def _q(path):
+    """Minimal URL-quoting for GitHub paths. We don't pull in urllib on
+    device, and the only character we actually ship that needs encoding
+    is the space ("Oreo Pet"). Anything more exotic in a dir name would
+    need a real quote() — flag it here if we ever add it.
+    """
+    return path.replace(" ", "%20")
 
 
 def _fetch_store_icon(name_dir, app_path, icon_filename):
@@ -388,7 +397,7 @@ def _fetch_manifest(app_path):
     if _json is None:
         return {}
     url = ("https://api.github.com/repos/%s/contents/%s/manifest.json?ref=%s"
-           % (STORE_REPO, app_path, STORE_REF))
+           % (STORE_REPO, _q(app_path), STORE_REF))
     _bc("manifest GET " + app_path)
     body = _http_get(url, accept_raw=True, timeout_s=T_API)
     if body is None:
@@ -739,7 +748,7 @@ def install(name):
         if not ok_mf:
             _bc("install manifest invalid, retrying")
             url = ("https://raw.githubusercontent.com/%s/%s/%s/manifest.json"
-                   % (STORE_REPO, STORE_REF, entry["path"]))
+                   % (STORE_REPO, STORE_REF, _q(entry["path"])))
             body = _http_get(url, accept_raw=True, timeout_s=T_FILE)
             if body is not None:
                 try:
