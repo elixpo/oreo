@@ -314,12 +314,14 @@ class App(oreoOS.App):
                LOAD_Y + 6, theme.MUTED, scale=1)
 
     def _draw_lts(self, d):
-        d.text("Up to date", (SW - 10 * 16) // 2,
-               LOAD_Y, theme.TEAL, scale=2)
+        # LTS-only compact render. The OREO OS <version> headline above
+        # already tells the user where they're at; the redundant
+        # "Up to date" heading was just chrome. Drop it so the date
+        # has room to breathe and the page stays uncluttered.
         date = self._release_date()
         line = "LTS  " + date
-        d.text(line, (SW - len(line) * 8) // 2,
-               LOAD_Y + 26, theme.MUTED, scale=1)
+        d.text(line, (SW - len(line) * 16) // 2,
+               LOAD_Y + 6, theme.TEAL, scale=2)
 
     def _draw_beta(self, d):
         # Pink BETA badge — device is running AHEAD of the latest

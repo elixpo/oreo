@@ -289,49 +289,19 @@ def check(channel=DEFAULT_CHANNEL):
     Returns None on no-network / no-release / already-on-latest. Bounded
     to T_GH_API seconds so the caller can never hang on it.
     """
-    if _json is None:
-        return None
-    try:
-        from oreoOS import _http as _httpx
-    except Exception:
-        return None
+    # Delegate to the cheap /tags helper. `latest_version()` already
+    # constructs the manifest_url from the tag, so we don't need a
+    # second API call to read the full release body — which on this
+    # repo can hit 3 MB and time out.
     cur = _current_version()
-    url = "https://api.github.com/repos/%s/releases?per_page=10" % OTA_REPO
-    body = _httpx.get_url(url,
-                          accept="application/vnd.github+json",
-                          timeout_s=T_GH_API)
-    if body is None:
+    ver, rel = latest_version(channel)
+    if not ver or not rel:
         return None
-    try:
-        data = _json.loads(body.decode("utf-8"))
-    except Exception:
+    if not _newer(ver, cur):
         return None
-    if not isinstance(data, list):
+    if not rel.get("manifest_url"):
         return None
-
-    prefix = channel + "/"
-    for rel in data:
-        tag = rel.get("tag_name", "")
-        if not (tag == channel or tag.startswith(prefix)):
-            continue
-        ver = tag[len(prefix):] if tag.startswith(prefix) else tag
-        if not _newer(ver, cur):
-            return None
-        manifest_url = None
-        for a in rel.get("assets", ()):
-            if a.get("name") == MANIFEST_NAME:
-                manifest_url = a.get("browser_download_url")
-                break
-        if not manifest_url:
-            continue
-        return {
-            "version":      ver,
-            "notes":        rel.get("body") or "",
-            "manifest_url": manifest_url,
-            "tag":          tag,
-            "major":        _is_major_bump(ver, cur),
-        }
-    return None
+    return rel
 
 
 def peek(release):
