@@ -325,23 +325,33 @@ class App(oreoOS.App):
                theme.PRIMARY if sel else theme.MUTED, scale=2)
 
     def _icon_for(self, item):
-        """Look up the optimized icon module for an app. The catalogue
-        entry's `icon` field is the filename from the app's manifest;
-        we strip the extension and reach into assets.icons.optimized.
-
-        Cheap and offline-only — no network hit needed to paint a card
-        once the catalogue is cached. If the icon isn't shipped in the
-        global icon bundle, the card falls back to a letter glyph."""
+        """Resolve a market app's icon. Lookup order:
+          1. Per-app store cache (`/store_icons/<dir>.py`) — populated
+             during `store.refresh()` so we can paint the real icon
+             BEFORE the app is installed.
+          2. The installed app's own bundled icon
+             (`apps.<dir>.assets.optimized.<stem>`) — for apps the user
+             already installed.
+          3. The OS-shipped global icon bundle
+             (`assets.icons.optimized.<stem>`).
+        Falls through to a letter glyph if nothing matches.
+        """
+        name_dir  = item.get("dir") or ""
         icon_file = item.get("icon") or ""
+        ico = store.load_store_icon(name_dir) if name_dir else None
+        if ico:
+            return ico
         if not icon_file:
             return None
         stem = icon_file.rsplit(".", 1)[0].replace("-", "_")
-        try:
-            m = __import__("assets.icons.optimized." + stem,
-                           None, None, ["DATA", "W", "H"])
-            return (m.DATA, m.W, m.H)
-        except (ImportError, AttributeError):
-            return None
+        for modpath in ("apps.%s.assets.optimized.%s" % (name_dir, stem),
+                        "assets.icons.optimized." + stem):
+            try:
+                m = __import__(modpath, None, None, ["DATA", "W", "H"])
+                return (m.DATA, m.W, m.H)
+            except (ImportError, AttributeError):
+                continue
+        return None
 
     # ── details page ───────────────────────────────────────────────────
     def _draw_details_page(self, d):
@@ -369,17 +379,21 @@ class App(oreoOS.App):
                 d.text(line, ROW_PAD_X, body_y + i * 12,
                        theme.TEXT_DIM, scale=1)
 
-        # Stats line. files/bytes are populated lazily by install()
-        # — kept out of the details fetch to keep that flow under
-        # 1 API call. If known, show them; otherwise show "size at
-        # install time" as a tiny disclosure.
-        stats_y = body_y + 5 * 12 + 4
-        files = det.get("files")
-        if files:
-            kb = max(1, (det.get("bytes") or 0) // 1024)
-            stats = "%d files · %d KB" % (len(files), kb)
+        # Stats line. If the app is already installed we walk
+        # /apps/<dir>/ on disk and show its actual on-flash footprint;
+        # otherwise we show "Tap install to download" as a tiny
+        # disclosure. We deliberately don't probe GitHub for an
+        # estimated remote size — that's an extra round-trip the
+        # details page doesn't need to block on.
+        stats_y  = body_y + 5 * 12 + 4
+        if store.is_installed(self._detail_for):
+            sz = store.installed_size(self._detail_for)
+            if sz >= 10 * 1024:
+                stats = "Installed · %d KB on flash" % (sz // 1024)
+            else:
+                stats = "Installed · %d B on flash" % sz
         else:
-            stats = "size computed at install"
+            stats = "Tap install to download"
         d.text(stats, ROW_PAD_X, stats_y, theme.MUTED, scale=1)
 
         # Install / Uninstall button — bottom of the play area, full
@@ -412,8 +426,11 @@ class App(oreoOS.App):
         d.rect(6, y, SW - 12, 50, theme.CARD, fill=True)
         d.rect(6, y, SW - 12, 3,  theme.PRIMARY, fill=True)
 
-        # Icon
-        icon = self._icon_for_name(icon_filename)
+        # Icon — try the per-app store cache first (same lookup the
+        # list view uses) so the details header shows a real icon
+        # even for apps that aren't installed yet.
+        icon = store.load_store_icon(self._detail_for or "") \
+               or self._icon_for_name(icon_filename)
         if icon:
             data, iw, ih = icon
             d.blit(data, ROW_PAD_X, y + (50 - ih) // 2, iw, ih)

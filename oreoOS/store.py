@@ -338,6 +338,80 @@ def _walk(path):
     return out
 
 
+_STORE_ICONS_DIR = "/store_icons"
+
+
+def _fetch_store_icon(name_dir, app_path, icon_filename):
+    """Best-effort download of an app's optimized icon .py from GitHub
+    so the Store card can render the real icon BEFORE the app is
+    installed. Source path follows the project convention:
+        apps_market/<dir>/assets/optimized/<icon_stem>.py
+    Cached to /store_icons/<name_dir>.py. Silently no-ops on failure —
+    the UI falls back to a letter glyph in that case.
+    """
+    if not icon_filename:
+        return False
+    stem = icon_filename.rsplit(".", 1)[0].replace("-", "_")
+    dst  = _STORE_ICONS_DIR + "/" + name_dir + ".py"
+    if _exists(dst):
+        return True
+    url = ("https://raw.githubusercontent.com/%s/%s/%s/assets/optimized/%s.py"
+           % (STORE_REPO, STORE_REF, app_path, stem))
+    _bc("icon GET " + name_dir)
+    body = _http_get(url, accept_raw=True, timeout_s=T_API)
+    if body is None:
+        return False
+    _ensure_dir(_STORE_ICONS_DIR)
+    try:
+        with open(dst, "wb") as f:
+            f.write(body)
+        return True
+    except Exception:
+        return False
+
+
+def load_store_icon(name_dir):
+    """Read a cached store icon back as (data, w, h) — the UI hook for
+    cards/details pages of apps that aren't installed yet."""
+    path = _STORE_ICONS_DIR + "/" + name_dir + ".py"
+    if not _exists(path):
+        return None
+    try:
+        ns = {}
+        with open(path) as f:
+            exec(f.read(), ns)
+        return (bytearray(ns["DATA"]), int(ns["W"]), int(ns["H"]))
+    except Exception:
+        return None
+
+
+def installed_size(name_dir):
+    """Sum of file sizes under /apps/<name>/, in bytes. 0 if not
+    installed. Walks the dir each call — cheap on the tiny app trees
+    we ship, and avoids stale cached numbers."""
+    root = APPS_DIR + "/" + name_dir
+    if not _exists(root):
+        return 0
+    total = 0
+    stack = [root]
+    while stack:
+        d = stack.pop()
+        try:
+            for f in _os.listdir(d):
+                p = d + "/" + f
+                try:
+                    st = _os.stat(p)
+                except OSError:
+                    continue
+                if st[0] & 0x4000:
+                    stack.append(p)
+                else:
+                    total += st[6]
+        except OSError:
+            pass
+    return total
+
+
 def _fetch_manifest(app_path):
     """Read the manifest.json for a single market app via the API."""
     if _json is None:
@@ -428,11 +502,14 @@ def refresh(force=False):
         _last_refresh_ok = False
         return _catalogue or []
 
-    # Single-call catalogue. Display name + icon + author come from the
-    # manifest, fetched lazily by get_details() when the user opens an
-    # app's detail page. The previous N+1 pattern was the source of
-    # "stuck on LOADING" — any single GET that hung on body-read would
-    # take the whole catalogue down.
+    # Catalogue enrichment: for every dir in the listing we also fetch
+    # its manifest.json AND its icon's optimized .py blob so the list
+    # view can render the real name, author, and icon without a follow-
+    # up network round-trip per card. N+1 in raw call count but bounded:
+    # the market is small (< 20 apps) and each manifest is <300 B. The
+    # icon .py is typically 1–2 KB. Both are cached to disk so a stale
+    # session reload paints instantly from `/store_cache.json` and
+    # `/store_icons/<dir>.py`.
     fresh = []
     for it in listing:
         if it.get("type") != "dir":
@@ -441,12 +518,20 @@ def refresh(force=False):
         app_path = it.get("path", "")
         if not name_dir or not app_path:
             continue
+        manifest = _fetch_manifest(app_path) or {}
+        icon_file = manifest.get("icon") or ""
+        # Pull the icon module bytes so the card can paint without the
+        # app being installed. Best-effort — if it fails we just fall
+        # back to the letter glyph in _draw_card.
+        if icon_file:
+            _fetch_store_icon(name_dir, app_path, icon_file)
         fresh.append({
-            "dir":    name_dir,
-            "name":   name_dir,    # placeholder; details page upgrades this
-            "icon":   None,
-            "author": None,
-            "path":   app_path,
+            "dir":          name_dir,
+            "name":         manifest.get("name", name_dir) or name_dir,
+            "icon":         icon_file or None,
+            "author":       manifest.get("author") or None,
+            "description":  manifest.get("description", "") or "",
+            "path":         app_path,
         })
 
     _catalogue       = fresh
@@ -503,40 +588,28 @@ def get_details(name_dir):
     if not entry:
         return {"ok": False}
 
-    # Disk-cache hit? Manifests rarely change for a given app version,
-    # so the persisted copy is fine until the user explicitly refreshes
-    # the catalogue (refresh() wipes _details_cache).
+    # Disk-cache hit? Cached details mirror the manifest as of the last
+    # refresh, so they're fine until refresh() wipes _details_cache.
     disk = _details_disk_load(name_dir)
     if disk and disk.get("ok"):
         _details_cache[name_dir] = disk
-        if entry and disk.get("name"):
-            entry["name"]   = disk["name"]
-            entry["icon"]   = disk["icon"]
-            entry["author"] = disk["author"]
         return disk
 
-    # ONE API call — just the manifest. The full file-tree walk (which
-    # used to live here) is deferred to install() so opening details
-    # takes <2 s instead of >10 s. The previous N+1 _walk() pattern
-    # was the source of the slow details page.
-    manifest = _fetch_manifest(entry["path"])
-    if not manifest:
-        return {"ok": False}
+    # No network call — refresh() already enriched the catalogue entry
+    # with everything we need for the details page. The file-tree walk
+    # is deferred to install() so opening details is instant after the
+    # first catalogue load.
     out = {
-        "name":         manifest.get("name",        name_dir),
-        "icon":         manifest.get("icon",        None),
-        "author":       manifest.get("author",      None),
-        "description":  manifest.get("description", "") or "",
+        "name":         entry.get("name")        or name_dir,
+        "icon":         entry.get("icon")        or None,
+        "author":       entry.get("author")      or None,
+        "description":  entry.get("description") or "",
         "files":        None,    # populated lazily by install()
         "bytes":        None,
         "ok":           True,
     }
     _details_cache[name_dir] = out
     _details_disk_save(name_dir, out)
-    if entry:
-        entry["name"]   = out["name"]
-        entry["icon"]   = out["icon"]
-        entry["author"] = out["author"]
     return out
 
 
@@ -668,6 +741,31 @@ def install(name):
         except Exception:
             pass
         gc.collect()
+
+    # Post-install integrity check: the launcher's drawer skips any
+    # app whose manifest.json is missing or unparseable, so a silent
+    # failure here surfaces as "the app vanished from the drawer".
+    # Verify and try to re-fetch once if the file is bad.
+    mf_path = target_root + "/manifest.json"
+    if _json is not None:
+        ok_mf = False
+        try:
+            with open(mf_path) as f:
+                _json.loads(f.read())
+            ok_mf = True
+        except Exception:
+            ok_mf = False
+        if not ok_mf:
+            _bc("install manifest invalid, retrying")
+            url = ("https://raw.githubusercontent.com/%s/%s/%s/manifest.json"
+                   % (STORE_REPO, STORE_REF, entry["path"]))
+            body = _http_get(url, accept_raw=True, timeout_s=T_FILE)
+            if body is not None:
+                try:
+                    with open(mf_path, "wb") as out:
+                        out.write(body)
+                except Exception:
+                    pass
 
     return is_installed(name)
 
