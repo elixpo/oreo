@@ -50,6 +50,23 @@ cp -r templates/example_app apps/my_app
 python tools/deploy.py /dev/ttyACM0
 ```
 
+**Default-installed vs Market apps.** Where you put the folder decides
+how the app reaches the user:
+
+| Path | Behaviour |
+|---|---|
+| `apps/<name>/` | **Default-installed.** Tile appears in the drawer on every fresh deploy. Use for core OS tools + apps every badge owner should have |
+| `apps_market/<name>/` | **Opt-in.** Ships in the catalogue but isn't in the drawer until the user installs from the on-device **App Market** tile. Use for games, sketches, hackathon entries, themed extras |
+
+The two trees have **identical shape** — `main.py + manifest.json +
+__init__.py + assets/`. `tools/deploy.py` walks both and ships them to
+the matching path on the device. The Market app calls into
+[`oreoOS.store`](oreoOS/store.py) which `cp -r`s a folder between the
+two trees on install / uninstall.
+
+When in doubt, ship to `apps_market/` — flash and drawer real estate
+are precious, and the install flow is one tap away.
+
 **The contract.** Your app subclasses `oreoOS.App` and implements three
 lifecycle methods:
 
