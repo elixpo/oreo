@@ -6,12 +6,6 @@ try:
     import json as _json
 except ImportError:
     _json = None
-
-# Raw-socket HTTP. We bypass urequests because its `timeout=` flag on
-# this MicroPython 1.28 build only covers the connect, not the body
-# read — which lets a slow GitHub edge wedge the OS run loop for
-# minutes. socket.settimeout() applies to every recv() so the timeout
-# is enforced end-to-end. Same fix we'll back-port to ota.py later.
 try:
     import socket as _socket
     import ssl    as _ssl
@@ -58,9 +52,6 @@ def _http_get(url, accept_raw=False, timeout_s=4):
 
     s = None
     raw = None
-    # Wallclock guard — even if a single recv stalls a few times in
-    # quick succession, the outer loop notices we've blown the budget
-    # and bails. Belt-and-suspenders next to settimeout.
     deadline = None
     try:
         import time as _t
@@ -85,10 +76,6 @@ def _http_get(url, accept_raw=False, timeout_s=4):
         raw.connect(addr)
         _bc("  ssl handshake")
         s = _ssl.wrap_socket(raw, server_hostname=host)
-        # CRITICAL: settimeout BEFORE connect applies to the raw
-        # socket, but MicroPython's SSLSocket wraps it and doesn't
-        # always inherit the timeout — set again on the wrapped
-        # socket so subsequent .read() calls actually honour it.
         try:
             s.settimeout(timeout_s)
         except Exception:
@@ -473,23 +460,10 @@ def refresh(force=False):
     _last_error = ""
     listing = _api(MARKET_PATH)
     if not isinstance(listing, list):
-        # API call failed (_api logged the reason into _last_error).
-        # Fall back to disk cache so the user still sees something
-        # rather than an empty page; flag the attempt as failed so the
-        # UI can show an ERROR pill rather than a clean state.
         if _catalogue is None:
             _load_cache_from_disk()
         _last_refresh_ok = False
         return _catalogue or []
-
-    # Catalogue enrichment: for every dir in the listing we also fetch
-    # its manifest.json AND its icon's optimized .py blob so the list
-    # view can render the real name, author, and icon without a follow-
-    # up network round-trip per card. N+1 in raw call count but bounded:
-    # the market is small (< 20 apps) and each manifest is <300 B. The
-    # icon .py is typically 1–2 KB. Both are cached to disk so a stale
-    # session reload paints instantly from `/store_cache.json` and
-    # `/store_icons/<dir>.py`.
     fresh = []
     for it in listing:
         if it.get("type") != "dir":
@@ -761,7 +735,6 @@ def install(name):
 
 
 def uninstall(name):
-    """rm -rf /apps/<name>/. The remote catalogue is untouched."""
     dst = APPS_DIR + "/" + name
     if not _exists(dst):
         return True
