@@ -229,17 +229,23 @@ def check(channel=DEFAULT_CHANNEL):
     Returns None on no-network / no-release / already-on-latest. Bounded
     to T_GH_API seconds so the caller can never hang on it.
     """
-    if _http is None or _json is None:
+    if _json is None:
+        return None
+    try:
+        from oreoOS import _http as _httpx
+    except Exception:
         return None
     cur = _current_version()
     url = "https://api.github.com/repos/%s/releases" % OTA_REPO
+    body = _httpx.get_url(url,
+                          accept="application/vnd.github+json",
+                          timeout_s=T_GH_API)
+    if body is None:
+        return None
     try:
-        r = _http.get(url, headers={"User-Agent": USER_AGENT}, timeout=T_GH_API)
-        data = r.json()
-        r.close()
+        data = _json.loads(body.decode("utf-8"))
     except Exception:
         return None
-
     if not isinstance(data, list):
         return None
 
@@ -290,13 +296,17 @@ def peek(release):
     manifest itself is a few KB. The expensive part (file-by-file
     download) lives in download().
     """
-    if not release or _http is None or _json is None:
+    if not release or _json is None:
         return None
     try:
-        r = _http.get(release["manifest_url"],
-                      headers={"User-Agent": USER_AGENT}, timeout=T_MANIFEST)
-        manifest = r.json()
-        r.close()
+        from oreoOS import _http as _httpx
+    except Exception:
+        return None
+    body = _httpx.get_url(release["manifest_url"], timeout_s=T_MANIFEST)
+    if body is None:
+        return None
+    try:
+        manifest = _json.loads(body.decode("utf-8"))
     except Exception:
         return None
     if not isinstance(manifest, dict):
@@ -379,23 +389,24 @@ def _download_file(url, dest_remote, expected_sha=None):
     parent = stage_path.rsplit("/", 1)[0]
     _ensure_dir(parent)
     try:
-        r = _http.get(url, headers={"User-Agent": USER_AGENT}, timeout=T_FILE)
-        h  = _hashlib.sha256() if _hashlib else None
-        with open(stage_path, "wb") as f:
-            # urequests doesn't always stream; the safe path is to read
-            # the body once. Files are kept small (≤ a few hundred KB).
-            data = r.content
-            if h: h.update(data)
-            f.write(data)
-        r.close()
+        from oreoOS import _http as _httpx
     except Exception:
         return False
-    if expected_sha and h and _hex(h.digest()) != expected_sha:
-        try:
-            _os.remove(stage_path)
-        except Exception:
-            pass
+    body = _httpx.get_url(url, timeout_s=T_FILE)
+    if body is None:
         return False
+    try:
+        with open(stage_path, "wb") as f:
+            f.write(body)
+    except Exception:
+        return False
+    if expected_sha and _hashlib is not None:
+        if _hex(_hashlib.sha256(body).digest()) != expected_sha:
+            try:
+                _os.remove(stage_path)
+            except Exception:
+                pass
+            return False
     return True
 
 
@@ -490,8 +501,8 @@ def background_check(os_obj, min_interval_s=6 * 3600):
 
     Returns True iff a new release was discovered this call.
     """
-    if _http is None:
-        return False
+    # _http is the raw-socket helper at module scope; nothing to gate
+    # on here since it lazy-imports inside check()/peek()/download().
 
     # Opt-out gate. Default ON because the boot-grace + 4 s API timeout
     # + 6 h rate-limit cap the worst-case freeze at 4 s once every 6 h,

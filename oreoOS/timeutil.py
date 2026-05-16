@@ -39,18 +39,61 @@ def last_sync_ts():
     return _last_sync_ts
 
 
+# NTP epoch (1900-01-01) → MicroPython epoch (2000-01-01) offset.
+# (30 years × 365 days + 7 leap days) × 86400 seconds.
+_NTP_DELTA = 3155673600
+
+
+def _ntp_raw(host="pool.ntp.org", port=123, timeout_s=2.5):
+    """Single-shot NTP query via raw UDP with a hard socket timeout.
+
+    Returns the Unix-2000 epoch seconds on success, or None on
+    timeout / DNS failure / malformed reply. Used instead of
+    `ntptime.settime()` because the stock module's recvfrom can hang
+    indefinitely on this MicroPython build — the OS run loop locks up
+    for tens of seconds while it waits.
+    """
+    try:
+        import socket as _socket
+    except ImportError:
+        return None
+    s = None
+    try:
+        addr = _socket.getaddrinfo(host, port)[0][-1]
+        s = _socket.socket(_socket.AF_INET, _socket.SOCK_DGRAM)
+        s.settimeout(timeout_s)
+        # 48-byte NTP request: LI=0, VN=3, Mode=3 (client). Everything
+        # else zero. The server fills in the rest in the reply.
+        pkt = bytearray(48)
+        pkt[0] = 0x1B
+        s.sendto(pkt, addr)
+        data, _src = s.recvfrom(48)
+        if len(data) < 48:
+            return None
+        # Transmit timestamp seconds — big-endian uint32 at offset 40.
+        secs = ((data[40] << 24) | (data[41] << 16)
+                | (data[42] << 8) |  data[43])
+        return secs - _NTP_DELTA
+    except Exception:
+        return None
+    finally:
+        try:
+            if s is not None:
+                s.close()
+        except Exception:
+            pass
+
+
 def sync_from_ntp(timezone_offset_h=None):
     """Pull NTP time once, shift by the user's timezone offset, and write
     the RTC. Returns (ok, message).
 
-    Blocks for ~2 s on success, returns immediately on no-wifi. Safe to
-    call from a UI event handler — exceptions are caught and surfaced
-    through the return value plus `last_sync_status()`.
+    Uses a raw UDP socket with a 2.5 s settimeout so the OS run loop
+    can never block longer than that — bypasses MicroPython's stock
+    ntptime, whose recvfrom doesn't honour timeouts on this build.
     """
     global _last_sync_status, _last_sync_ts
 
-    # WiFi gate — the radio sometimes lingers as "connected" right after
-    # disconnect, so we still wrap the NTP call in try/except below.
     try:
         from oreoWare import wifi
         if not wifi.is_connected():
@@ -59,12 +102,21 @@ def sync_from_ntp(timezone_offset_h=None):
     except Exception:
         pass
 
+    epoch_2000 = _ntp_raw()
+    if epoch_2000 is None:
+        _last_sync_status = "failed"
+        return False, "ntp timeout"
+
     try:
-        import ntptime
         import machine
         import time as _t
-        ntptime.host = "pool.ntp.org"
-        ntptime.settime()
+
+        # Write the RTC in UTC first, then optionally shift by the
+        # user's timezone offset so localtime() reads correctly.
+        utc = _t.localtime(epoch_2000)
+        machine.RTC().datetime(
+            (utc[0], utc[1], utc[2], utc[6] + 1,
+             utc[3], utc[4], utc[5], 0))
 
         if timezone_offset_h is None:
             try:
@@ -82,9 +134,6 @@ def sync_from_ntp(timezone_offset_h=None):
         _last_sync_ts     = _t.time()
         _last_sync_status = "ok"
         return True, "synced"
-    except ImportError:
-        _last_sync_status = "failed"
-        return False, "no ntptime"
     except Exception as e:
         _last_sync_status = "failed"
         return False, (str(e) or "failed")[:20]

@@ -86,21 +86,43 @@ def _http_get(url, accept_raw=False, timeout_s=4):
               else "application/vnd.github+json")
 
     s = None
+    raw = None
+    # Wallclock guard — even if a single recv stalls a few times in
+    # quick succession, the outer loop notices we've blown the budget
+    # and bails. Belt-and-suspenders next to settimeout.
+    deadline = None
     try:
+        import time as _t
+        deadline = _t.ticks_add(_t.ticks_ms(), int(timeout_s * 1000) + 500)
+    except Exception:
+        pass
+
+    auth_hdr = ""
+    try:
+        from oreoOS.config import GH_TOKEN as _TOK
+        if _TOK:
+            auth_hdr = "Authorization: Bearer " + _TOK + "\r\n"
+    except Exception:
+        pass
+
+    try:
+        _bc("  dns " + host)
         addr = _socket.getaddrinfo(host, port)[0][-1]
-        s = _socket.socket()
-        s.settimeout(timeout_s)
-        s.connect(addr)
-        s = _ssl.wrap_socket(s, server_hostname=host)
-        # Auth header from .env if present — bumps GitHub's anonymous
-        # 60 req/hr limit to 5000.
-        auth_hdr = ""
+        _bc("  connect " + host + ":" + str(port))
+        raw = _socket.socket()
+        raw.settimeout(timeout_s)
+        raw.connect(addr)
+        _bc("  ssl handshake")
+        s = _ssl.wrap_socket(raw, server_hostname=host)
+        # CRITICAL: settimeout BEFORE connect applies to the raw
+        # socket, but MicroPython's SSLSocket wraps it and doesn't
+        # always inherit the timeout — set again on the wrapped
+        # socket so subsequent .read() calls actually honour it.
         try:
-            from oreoOS.config import GH_TOKEN as _TOK
-            if _TOK:
-                auth_hdr = "Authorization: Bearer " + _TOK + "\r\n"
+            s.settimeout(timeout_s)
         except Exception:
             pass
+
         req = (
             "GET %s HTTP/1.1\r\n"
             "Host: %s\r\n"
@@ -110,34 +132,42 @@ def _http_get(url, accept_raw=False, timeout_s=4):
             "%s"
             "Connection: close\r\n\r\n"
         ) % (path, host, USER_AGENT, accept, auth_hdr)
+        _bc("  write request")
         s.write(req.encode())
 
-        # Read until socket close. settimeout enforces a hard cap on
-        # each recv so a hung edge can't wedge us — worst case the
-        # whole exchange dies after timeout_s with OSError.
+        _bc("  read body")
         buf = bytearray()
         while True:
+            # Wallclock check — if we've blown our budget, bail no
+            # matter what settimeout says.
+            try:
+                import time as _t2
+                if deadline is not None and \
+                   _t2.ticks_diff(deadline, _t2.ticks_ms()) <= 0:
+                    _bc("  read deadline blown after %d bytes" % len(buf))
+                    break
+            except Exception:
+                pass
             try:
                 chunk = s.read(2048)
-            except OSError:
+            except Exception as e:
+                _bc("  read err: " + str(e))
                 break
             if not chunk:
                 break
             buf.extend(chunk)
             if len(buf) > 256 * 1024:
-                # Safety ceiling. The Contents API listings we care
-                # about are < 50 KB; anything bigger is a paginated
-                # tree we shouldn't try to swallow whole.
                 break
     except Exception as e:
         _bc("http_get FAIL %s: %s" % (host, e))
         return None
     finally:
-        try:
-            if s is not None:
-                s.close()
-        except Exception:
-            pass
+        for _h in (s, raw):
+            try:
+                if _h is not None:
+                    _h.close()
+            except Exception:
+                pass
 
     # Split off the response head — body starts after \r\n\r\n.
     head_end = buf.find(b"\r\n\r\n")
