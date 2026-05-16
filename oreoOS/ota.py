@@ -98,7 +98,9 @@ SMALL_PATCH_BYTES = 80 * 1024     # 80 KB
 # kept short. Tuned down from 10s -> 4s after on-device reports of
 # "press A, OS stuck" — every frame was potentially eating a 10 s GET
 # while GitHub's edge throttled the badge's IP.
-T_GH_API       = 4         # GitHub releases API listing
+T_GH_API       = 8         # GitHub releases API listing (per_page=10 keeps
+                           # the body in the low single-KB range; 8 s is
+                           # the slow-WiFi + SSL handshake headroom)
 T_MANIFEST     = 4         # manifest.json download (tiny)
 T_FILE         = 25        # individual file download (user-triggered)
 
@@ -209,10 +211,16 @@ def compare_version(a, b):
 def latest_version(channel=DEFAULT_CHANNEL):
     """Return (version_str, release_dict) for the most recent release
     on `channel`, regardless of whether it's newer than the device's
-    current VERSION. None / None on network failure.
+    current VERSION. (None, None) on network failure.
 
-    Used by the Updates page to decide BETA / LTS / OUTDATED — we need
-    to know what's "out there" even when we're ahead of it.
+    Uses the lightweight /tags endpoint (~2 KB for 10 tags) to discover
+    the version. The release dict is returned with `manifest_url=None`
+    and empty `notes` — the heavy `/releases/latest` body is only
+    fetched lazily by `check()` when the user actually wants to
+    install or view the changelog. This keeps the version probe cheap
+    enough to complete inside our 8 s API budget even on slow WiFi.
+
+    Used by the Updates page to decide BETA / LTS / OUTDATED.
     """
     if _json is None:
         return None, None
@@ -221,7 +229,7 @@ def latest_version(channel=DEFAULT_CHANNEL):
     except Exception:
         return None, None
     body = _httpx.get_url(
-        "https://api.github.com/repos/%s/releases" % OTA_REPO,
+        "https://api.github.com/repos/%s/tags?per_page=10" % OTA_REPO,
         accept="application/vnd.github+json", timeout_s=T_GH_API)
     if body is None:
         return None, None
@@ -232,22 +240,15 @@ def latest_version(channel=DEFAULT_CHANNEL):
     if not isinstance(data, list):
         return None, None
     prefix = channel + "/"
-    for rel in data:
-        tag = rel.get("tag_name", "")
+    for t in data:
+        tag = t.get("name", "")
         if not (tag == channel or tag.startswith(prefix)):
             continue
         ver = tag[len(prefix):] if tag.startswith(prefix) else tag
-        # Build the same shape `check()` would have returned so the
-        # Updates page can reuse the existing peek() flow on OUTDATED.
-        manifest_url = None
-        for a in rel.get("assets", ()):
-            if a.get("name") == MANIFEST_NAME:
-                manifest_url = a.get("browser_download_url")
-                break
         return ver, {
             "version":      ver,
-            "notes":        rel.get("body") or "",
-            "manifest_url": manifest_url,
+            "notes":        "",        # populated by check()/changelog fetch
+            "manifest_url": None,      # populated by check() when needed
             "tag":          tag,
             "major":        _is_major_bump(ver, _current_version()),
         }
@@ -292,7 +293,7 @@ def check(channel=DEFAULT_CHANNEL):
     except Exception:
         return None
     cur = _current_version()
-    url = "https://api.github.com/repos/%s/releases" % OTA_REPO
+    url = "https://api.github.com/repos/%s/releases?per_page=10" % OTA_REPO
     body = _httpx.get_url(url,
                           accept="application/vnd.github+json",
                           timeout_s=T_GH_API)

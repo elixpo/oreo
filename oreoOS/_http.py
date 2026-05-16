@@ -57,7 +57,19 @@ def get_url(url, accept=None, timeout_s=4, auth=None):
         except ValueError: port = 443
 
     accept_hdr = accept or "*/*"
-    auth_hdr   = ("Authorization: " + auth + "\r\n") if auth else ""
+
+    # Auto-inject a GitHub token for *.github.com calls if one is
+    # present in oreoOS.config. Bumps anonymous limit (60 / hr / IP)
+    # to 5000 / hr — relevant only for sustained Store / OTA polling.
+    # `auth` arg overrides if the caller wants something custom.
+    if auth is None and ("github.com" in host or "githubusercontent.com" in host):
+        try:
+            from oreoOS.config import GH_TOKEN as _TOK
+            if _TOK:
+                auth = "Bearer " + _TOK
+        except Exception:
+            pass
+    auth_hdr = ("Authorization: " + auth + "\r\n") if auth else ""
 
     deadline = time.ticks_add(time.ticks_ms(), int(timeout_s * 1000) + 500)
     s = None
