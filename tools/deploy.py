@@ -106,6 +106,7 @@ DEPLOY = [
 
     # OS layer (flat namespace: api, app, theme, widgets, font, …)
     ("oreoOS/__init__.py",      "oreoOS/__init__.py"),
+    ("oreoOS/_http.py",         "oreoOS/_http.py"),
     ("oreoOS/config.py",        "oreoOS/config.py"),
     ("oreoOS/api.py",           "oreoOS/api.py"),
     ("oreoOS/app.py",           "oreoOS/app.py"),

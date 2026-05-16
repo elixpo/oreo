@@ -41,6 +41,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 SHIP_PATTERNS = [
     # OS + drivers
     "oreoOS/__init__.py",
+    "oreoOS/_http.py",
     "oreoOS/config.py",
     "oreoOS/api.py",
     "oreoOS/app.py",
