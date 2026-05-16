@@ -245,10 +245,13 @@ def latest_version(channel=DEFAULT_CHANNEL):
         if not (tag == channel or tag.startswith(prefix)):
             continue
         ver = tag[len(prefix):] if tag.startswith(prefix) else tag
+        manifest_url = (
+            "https://github.com/%s/releases/download/%s/%s"
+            % (OTA_REPO, tag, MANIFEST_NAME))
         return ver, {
             "version":      ver,
-            "notes":        "",        # populated by check()/changelog fetch
-            "manifest_url": None,      # populated by check() when needed
+            "notes":        "",
+            "manifest_url": manifest_url,
             "tag":          tag,
             "major":        _is_major_bump(ver, _current_version()),
         }
