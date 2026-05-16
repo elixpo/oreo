@@ -493,10 +493,12 @@ def background_check(os_obj, min_interval_s=6 * 3600):
     if _http is None:
         return False
 
-    # Hard-off until we have a non-hangable HTTP client. The Settings
-    # row can flip this true once the user opts in to background checks.
+    # Opt-out gate. Default ON because the boot-grace + 4 s API timeout
+    # + 6 h rate-limit cap the worst-case freeze at 4 s once every 6 h,
+    # which is tolerable. Users on a flaky GitHub edge can flip this off
+    # via Settings if the cap turns out to leak through.
     try:
-        if not os_obj.settings_get("ota_bg_check", False):
+        if not os_obj.settings_get("ota_bg_check", True):
             return False
     except Exception:
         return False
@@ -563,18 +565,28 @@ def background_check(os_obj, min_interval_s=6 * 3600):
             os_obj.settings_set("ota_pending_warn_seen", False)
     except Exception:
         pass
-    # Surface in the notification ring too. De-duped by version so the
-    # background_check loop doesn't add a fresh entry every probe.
+    push_update_notification(rel.get("version", ""))
+    return True
+
+
+def push_update_notification(version):
+    """De-duped 'Update available' push into the notification ring.
+
+    Shared by background_check + the manual Check Update flow in
+    Settings so both surfaces produce the same notif. Idempotent on
+    version: if there's already a card for vX.Y.Z, this is a no-op.
+    """
+    if not version:
+        return
     try:
         from oreoOS import notifications
-        ver = rel.get("version", "")
-        already = any(n["kind"] == "ota" and n["body"] == ver
+        already = any(n.get("kind") == "ota" and n.get("body") == version
                       for n in notifications.items())
         if not already:
-            notifications.push("ota", "Update available", ver, target="settings")
+            notifications.push("ota", "Update available",
+                               version, target="settings")
     except Exception:
         pass
-    return True
 
 
 def has_attention():

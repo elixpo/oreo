@@ -224,6 +224,14 @@ class App(oreoOS.App):
             self._set_ota_status("up-to-date")
             return
 
+        # Surface the discovery in the notification ring so the user
+        # sees the new version arrive even if they leave Settings before
+        # the install finishes. De-duped on version inside the helper.
+        try:
+            ota.push_update_notification(rel.get("version", ""))
+        except Exception:
+            pass
+
         peeked = self._ota_safe(lambda: ota.peek(rel))
         if not peeked:
             self._set_ota_status("peek-failed")

@@ -361,6 +361,11 @@ class App(oreoOS.App):
         self._anim_t    = ANIM_DUR
         self._dirty     = True
 
+        # Restore the previous (sel, scroll, cat_level) if HOME from an
+        # app brought us back here. Done last so it overrides the
+        # fresh-state defaults set above.
+        self._try_restore_resume_ctx()
+
         try:
             if _t0 is not None:
                 print("[launcher] on_enter done in %d ms (cached=%s)"
@@ -437,6 +442,76 @@ class App(oreoOS.App):
         self._view_apps = list(range(len(self._apps)))
         self._anim_t    = 0.0
 
+    # ── HOME-button resume context ───────────────────────────────────────
+    # The launcher snapshots its scroll/selection before launching an
+    # app, then restores from that snapshot on the next on_enter so HOME
+    # from the launched app brings the user back to the SAME tile they
+    # picked from. The outer boot loop clears the snapshot when the
+    # home screen is reached, so re-opening the drawer from the home
+    # screen is always a fresh start.
+    def _save_resume_ctx(self):
+        try:
+            self._os._launcher_resume = {
+                "mode":      self._mode,
+                "cat_level": self._cat_level,
+                "cat_sel":   self._cat_sel,
+                "sel":       self._sel,
+                "top_row":   self._top_row,
+                "scroll_y":  self._scroll_y,
+            }
+        except Exception:
+            pass
+
+    def _try_restore_resume_ctx(self):
+        """Apply a saved snapshot to the freshly-built launcher state.
+        Called at the tail of on_enter. No-op if no snapshot exists OR
+        if the saved mode no longer matches (e.g. user toggled grid /
+        categories in Settings between the launch and the HOME press).
+        """
+        ctx = getattr(self._os, "_launcher_resume", None)
+        if not ctx or ctx.get("mode") != self._mode:
+            return
+        # The snapshot is consumed once — clearing here keeps the next
+        # drawer-open-from-home (no resume context) fresh.
+        try:
+            self._os._launcher_resume = None
+        except Exception:
+            pass
+
+        if self._mode == "categories":
+            self._cat_sel = max(0, min(len(self._categories) - 1,
+                                       int(ctx.get("cat_sel", 0) or 0)))
+            if ctx.get("cat_level", 0) == 1:
+                self._enter_category(self._cat_sel)
+                # _enter_category resets sel/top_row/scroll_y — re-apply.
+                n = len(self._view_apps)
+                if n:
+                    self._sel      = max(0, min(n - 1, int(ctx.get("sel", 0))))
+                    self._top_row  = max(0, int(ctx.get("top_row", 0)))
+                    self._scroll_y = float(ctx.get("scroll_y", 0.0))
+        else:
+            n = len(self._view_apps)
+            if n:
+                self._sel      = max(0, min(n - 1, int(ctx.get("sel", 0))))
+                self._top_row  = max(0, int(ctx.get("top_row", 0)))
+                self._scroll_y = float(ctx.get("scroll_y", 0.0))
+        self._anim_t = ANIM_DUR
+        self._dirty  = True
+
+    def on_home_press(self):
+        """Override the OS-level HOME default so the categories mode
+        treats HOME as a one-level-up nav: cat-grid → cat-picker → home.
+        Returns True to suppress the default (which would launch
+        __appmenu__ — an infinite re-entry into ourselves).
+        """
+        if self._mode == "categories" and self._cat_level == 1:
+            self._leave_category()
+            self._dirty = True
+            return True
+        # Grid mode OR cat-picker level 0 — fall through to the default
+        # quit-to-home behaviour.
+        return False
+
     # ── input ────────────────────────────────────────────────────────────
     def on_button_press(self, btn):
         # BTN_C is consumed by the OS-level notification panel before it
@@ -465,6 +540,11 @@ class App(oreoOS.App):
                 self._os.settings_set("recent_app", target)
             except Exception:
                 pass
+            # Snapshot the launcher's current position so HOME from
+            # the launched app can resume HERE (matches the user's
+            # one-level-up navigation expectation). Cleared on the
+            # outer boot loop when the home screen is reached.
+            self._save_resume_ctx()
             self._os.launch(target)
             return
         elif btn == api.BTN_B and self._mode == "categories":

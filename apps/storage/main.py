@@ -24,14 +24,19 @@ BAR_GAP    = 6
 ROW_H      = 22
 ROW_GAP    = 4
 
-# Bucket → display color. Picked to read well against the cream BG and
-# keep the stacked bar legible at small widths.
+# Bucket → display color. Misc gets an explicit brown (vs theme.MUTED
+# which is a warm beige that bleeds into the free-space colour); free
+# space (the unfilled portion of the bar) gets a clear light grey so
+# it reads as "empty", not "another small bucket".
+_MISC_BROWN = api.rgb(120,  80,  45)    # solid earthy brown
+_FREE_GREY  = api.rgb(210, 215, 220)    # cool grey, distinct from MUTED2
+
 _BUCKET_COLORS = {
     "system":    "PRIMARY",     # pink — the OS itself
-    "apps":      "TEAL",        # teal — your installed apps
+    "apps":      "TEAL",        # teal — installed apps
     "gallery":   "GOLD",        # gold — photos
     "documents": "PURPLE",      # purple — text / md
-    "misc":      "MUTED",       # warm-grey — caches + leftovers
+    "misc":      _MISC_BROWN,   # brown — caches + leftovers
 }
 
 _BUCKET_LABEL = {
@@ -52,6 +57,10 @@ def _human(n):
 
 
 def _color(name):
+    """Resolve a bucket-colour entry — supports either a theme attr name
+    (string, e.g. "PRIMARY") or a pre-built api.rgb() integer."""
+    if isinstance(name, int):
+        return name
     return getattr(theme, name, theme.MUTED)
 
 
@@ -115,9 +124,12 @@ class App(oreoOS.App):
         d.text(free_txt, SW - PAD_X - tw, y + 18, theme.TEAL, scale=1)
 
         # ── stacked usage bar (one segment per non-empty bucket) ────────
+        # Base fill = free-space colour. Bucket segments are stacked on
+        # top from the left; whatever remains uncovered visualises as
+        # free flash.
         bar_y = y + SUMMARY_H
         bar_w = SW - 2 * PAD_X
-        d.rect(PAD_X, bar_y, bar_w, BAR_H, theme.MUTED2, fill=True)
+        d.rect(PAD_X, bar_y, bar_w, BAR_H, _FREE_GREY, fill=True)
 
         x = PAD_X
         for name in storage.BUCKETS:
@@ -135,19 +147,20 @@ class App(oreoOS.App):
             x += seg_w
 
         # ── per-bucket rows ─────────────────────────────────────────────
+        # Buckets first, then a closing "Free" row so the grey strip in
+        # the bar above is also labelled (otherwise users wonder what
+        # the unfilled portion represents).
         row_y = bar_y + BAR_H + 10
-        for name in storage.BUCKETS:
-            entry = bks[name]
+        legend_rows = [(_BUCKET_LABEL[n], _color(_BUCKET_COLORS[n]),
+                        bks[n]["bytes"]) for n in storage.BUCKETS]
+        legend_rows.append(("Free", _FREE_GREY, free))
+        for label, swatch_color, byte_count in legend_rows:
             sw_x = PAD_X
             sw_w = 10
-            # Color swatch
-            d.rect(sw_x, row_y + 4, sw_w, sw_w,
-                   _color(_BUCKET_COLORS[name]), fill=True)
-            # Label
-            d.text(_BUCKET_LABEL[name],
-                   sw_x + sw_w + 8, row_y + 4, theme.TEXT_BRIGHT, scale=1)
-            # Size (right-aligned)
-            sz_txt = _human(entry["bytes"])
+            d.rect(sw_x, row_y + 4, sw_w, sw_w, swatch_color, fill=True)
+            d.text(label, sw_x + sw_w + 8, row_y + 4,
+                   theme.TEXT_BRIGHT, scale=1)
+            sz_txt = _human(byte_count)
             tw = len(sz_txt) * 8
             d.text(sz_txt, SW - PAD_X - tw, row_y + 4,
                    theme.TEXT_DIM, scale=1)
