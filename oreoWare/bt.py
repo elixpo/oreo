@@ -261,12 +261,18 @@ def scan_is_active():
 
 
 def scan_results():
-    """Filtered, RSSI-sorted snapshot of discovered devices."""
+    """Filtered, RSSI-sorted snapshot of discovered devices.
+
+    Filtering deliberately uses the *Appearance* field only — earbuds,
+    speakers, and hearing aids all declare an audio appearance, so this
+    cleanly removes them. We used to also blocklist devices that
+    advertised audio service UUIDs (A2DP / AVRCP) but that was hiding
+    phones too: many Android handsets advertise A2DP-source capability
+    in their adv payload, so the badge was silently dropping them.
+    """
     out = []
     for v in _scan_results.values():
         if _is_audio_appearance(v.get("appearance")):
-            continue
-        if _has_audio_service(v.get("services", [])):
             continue
         out.append(v)
     out.sort(key=lambda d: d.get("rssi", -999), reverse=True)
@@ -663,17 +669,26 @@ def _irq(event, data):
         mac = _mac_str(bytes(addr))
         name, appearance, services, mfr_id = _parse_adv(bytes(adv_data))
         # Best-effort label when the peer suppresses its name (common
-        # on iOS, where the GAP name is hidden until pairing). The
-        # Apple "iPhone" string is the most useful fallback for the
-        # in-hall conference scenario.
+        # on iOS — and on Android in privacy mode). Cascade of
+        # fallbacks: real name → manufacturer tag → MAC tail. The MAC
+        # tail "device EE:FF" beats "(unknown)" because the user can
+        # at least see how many distinct anonymous peers are nearby.
         if not name and mfr_id is not None:
             tag = _MFR_TAGS.get(mfr_id)
             if tag:
                 name = tag + " device"
+        if not name:
+            tail = mac[-5:] if len(mac) >= 5 else mac
+            # addr_type 1 = Random — tag it so the user knows the name
+            # won't stick even after a successful association.
+            if addr_type == 1:
+                name = "device " + tail + " (R)"
+            else:
+                name = "device " + tail
         cur = _scan_results.get(mac)
         if cur is None:
             cur = {"mac":         mac,
-                   "name":        name or "(unknown)",
+                   "name":        name,
                    "rssi":        rssi,
                    "appearance":  appearance,
                    "services":    services,
@@ -691,11 +706,19 @@ def _irq(event, data):
             cur["addr_type"] = addr_type
             cur["addr"]      = bytes(addr)
             # Names from active scan responses are usually more complete
-            # than the ones in the initial adv. Prefer longer.
-            if name and (cur["name"] == "(unknown)" or
-                         (cur["name"].endswith("device") and
-                          not name.endswith("device")) or
-                         len(name) > len(cur["name"])):
+            # than the ones in the initial adv. Prefer real names over
+            # our manufacturer-tag / MAC-tail fallbacks; among real
+            # names prefer the longer one.
+            cur_name = cur["name"] or ""
+            cur_is_fallback = (cur_name.startswith("device ") or
+                               cur_name.endswith("device"))
+            new_is_fallback = (name and (name.startswith("device ") or
+                                         name.endswith("device")))
+            if name and not new_is_fallback and (
+                    cur_is_fallback or len(name) > len(cur_name)):
+                cur["name"] = name
+            elif name and new_is_fallback and cur_is_fallback and \
+                    len(name) > len(cur_name):
                 cur["name"] = name
             if appearance and not cur["appearance"]:
                 cur["appearance"] = appearance
@@ -748,12 +771,12 @@ def _irq(event, data):
                 pass
             _set_pair_state(PAIR_DONE,
                             "paired" + (" + bonded" if bonded else ""))
-            # Politely disconnect now that bonding's stashed — the user
-            # doesn't need an active link sitting open.
-            try:
-                _get_ble().gap_disconnect(conn_handle)
-            except Exception:
-                pass
+            # Keep the link open. We used to gap_disconnect here on the
+            # theory that the bond record was the thing the user wanted
+            # — but to the user it read as "I tried to connect and it
+            # immediately hung up." Leave the link up so the peer's
+            # GATT exchange (file transfer, etc.) can proceed, and let
+            # whichever side actually finishes its work close it.
         else:
             _set_pair_state(PAIR_FAILED, "encryption rejected")
     elif event == _IRQ_SET_SECRET:
