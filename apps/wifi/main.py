@@ -547,11 +547,18 @@ class App(oreoOS.App):
         # ── URL block ──
         y = ROW_TOP_Y
         if running:
-            url1 = hs.url()
-            url2 = hs.url_fallback()
+            url_local = hs.url()           # http://oreo.local/
+            url_ip    = hs.url_fallback()  # http://192.168.x.y/
             d.text("Open on your phone:", ROW_PAD_X, y, theme.TEXT_DIM)
-            d.text(url1, ROW_PAD_X, y + 14, theme.PRIMARY, scale=2)
-            d.text(url2, ROW_PAD_X, y + 36, theme.TEXT_DIM)
+            # Public web UI on Cloudflare Pages — primary call to
+            # action. scale=1 so the full domain fits one line; the
+            # earlier scale=2 was overflowing on long mDNS hostnames.
+            d.text("oreo.pages.dev/upload",
+                   ROW_PAD_X, y + 14, theme.PRIMARY, scale=1)
+            # Local fallbacks for offline / locked-down WiFi where
+            # the public site can't reach us.
+            d.text(url_local, ROW_PAD_X, y + 28, theme.TEXT_DIM)
+            d.text(url_ip,    ROW_PAD_X, y + 40, theme.MUTED2)
         else:
             d.text("Server offline.", ROW_PAD_X, y, theme.MUTED, scale=1)
             d.text("Connect WiFi to enable transfer.",
