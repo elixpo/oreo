@@ -394,6 +394,18 @@ def run_app(os_obj, app):
             try:
                 from oreoOS import http_server as _hs
                 _hs.tick()
+                # If a successful upload landed this tick, auto-open
+                # the matching viewer (Gallery for images, Reader for
+                # text/markdown) so the user sees their file
+                # immediately. We only do this when the receiving
+                # screen isn't already that app — avoid pointless
+                # relaunches if the user happened to be staring at
+                # Gallery when the photo arrived.
+                target = _hs.pop_pending_launch()
+                if target:
+                    if getattr(app, "name", "") not in (
+                            "Gallery" if target == "gallery" else "Reader",):
+                        os_obj.launch(target)
             except Exception:
                 pass
 

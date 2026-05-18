@@ -462,6 +462,14 @@ class App(oreoOS.App):
             self._mode = "main"
             self._dirty = True
             return
+        if btn == api.BTN_RIGHT:
+            # Refresh — sometimes the page shows "Server offline" when
+            # WiFi is actually associated but the HTTP server hasn't
+            # picked up the new IP (e.g. after a hotspot handoff).
+            # Force-reconnect WiFi if needed and rebind the listener.
+            self._refresh_transfer()
+            self._dirty = True
+            return
         hs = self._http()
         if hs is None:
             return
@@ -482,6 +490,31 @@ class App(oreoOS.App):
         else:
             return
         self._dirty = True
+
+    def _refresh_transfer(self):
+        """Reconcile the transfer page with the live network state.
+
+        Order: re-associate WiFi from saved networks (no-op if already
+        connected), then call http_server.start() which rebinds onto
+        the live IP (no-op if the IP hasn't changed). Both are cheap
+        and idempotent — we use them as a 'kick everything back to
+        life' button after a roaming WiFi event.
+        """
+        if self._wifi:
+            try:
+                if not self._wifi.is_connected():
+                    self._wifi.connect_from_config()
+            except Exception:
+                pass
+        hs = self._http()
+        if hs is not None:
+            try:
+                hs.start(self._os)
+            except Exception:
+                pass
+        # Pull a fresh snapshot so the URL line on the page repaints
+        # with the new IP if it changed.
+        self._snap = self._read()
 
     def _draw_transfer(self, d):
         widgets.draw_header(d, "SEND FILES")

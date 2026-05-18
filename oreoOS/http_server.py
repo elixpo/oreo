@@ -50,7 +50,12 @@ except ImportError:
 PORT          = 80
 MAX_BODY      = 2 * 1024 * 1024   # 2 MB hard cap — bigger than any badge asset
 READ_CHUNK    = 2048
-RECV_TIMEOUT  = 8                 # seconds — per-recv() during streaming
+RECV_TIMEOUT       = 3            # seconds — per-recv() during streaming
+HEAD_DEADLINE_MS   = 1500         # hard cap on header-read for tiny requests
+                                  # (beacons / session/new). Anything slower
+                                  # than this is almost certainly a TLS probe
+                                  # or a stuck client and would otherwise
+                                  # freeze the run loop one beacon at a time.
 
 # Session lifecycle
 SESSION_TTL_MS         = 60 * 1000   # beacon must refresh within this
@@ -76,6 +81,15 @@ _sessions = {}
 # bytes are flowing in. None when no upload is in flight.
 #   {"id": "...", "filename": "...", "received": int, "total": int}
 _progress = None
+
+# After a successful upload we surface the new file in its native
+# viewer automatically — Gallery for images, Reader for text/markdown.
+# The HTTP handler runs inside the OS run-loop tick, so it can't call
+# os.launch() directly (no os reference here, and we want the upload
+# response to flush BEFORE the screen flips). Instead the run loop
+# polls pop_pending_launch() each tick and dispatches when the queue
+# is non-empty.
+_pending_launch = None    # "gallery" | "reader" | None
 
 
 # ── routing tables ──────────────────────────────────────────────────────
@@ -276,6 +290,16 @@ def progress():
     return _progress
 
 
+def pop_pending_launch():
+    """Run-loop hook: returns and clears the queued app dir, if any.
+    Called from launcher.py after http_server.tick() so the OS can
+    auto-open Gallery / Reader once a transfer lands."""
+    global _pending_launch
+    target = _pending_launch
+    _pending_launch = None
+    return target
+
+
 def _new_session_id():
     """Generate a 6-char alphanumeric id excluding ambiguous chars
     (0/O, 1/I, l). os.urandom would be ideal but isn't always present
@@ -327,19 +351,46 @@ def tick():
 
 # ── request handling ────────────────────────────────────────────────────
 
-def _read_until(sock, sep, max_len):
+def _read_until(sock, sep, max_len, deadline_ms=None):
     """Buffered recv that returns once `sep` appears in the stream.
     Returns (head_bytes, tail_bytes_after_sep) or (None, None) on
-    timeout / overflow."""
+    timeout / overflow.
+
+    `deadline_ms` is a hard wallclock cap measured from now. We need
+    this so a TLS probe (browser ever-helpfully tries https first)
+    can't pin the run loop for the full RECV_TIMEOUT × N recvs while
+    the badge stops accepting button input.
+    """
+    try:
+        import time as _t
+        if deadline_ms is not None:
+            deadline = _t.ticks_add(_t.ticks_ms(), int(deadline_ms))
+        else:
+            deadline = None
+    except Exception:
+        deadline = None
     buf = bytearray()
     while True:
         if len(buf) > max_len:
             return None, None
+        if deadline is not None:
+            try:
+                if _t.ticks_diff(deadline, _t.ticks_ms()) <= 0:
+                    return None, None
+            except Exception:
+                pass
         try:
             chunk = sock.recv(READ_CHUNK)
         except OSError:
             return None, None
         if not chunk:
+            return None, None
+        # Cheap TLS-handshake reject: a ClientHello starts with the
+        # record-type byte 0x16. If the very first byte we ever see
+        # is that, the browser was talking HTTPS — bail immediately
+        # so we don't burn RECV_TIMEOUT waiting for header bytes
+        # that will never come.
+        if len(buf) == 0 and chunk and chunk[0] == 0x16:
             return None, None
         buf.extend(chunk)
         idx = buf.find(sep)
@@ -507,7 +558,8 @@ def _peer_addr(sock):
 
 def _handle(sock):
     """One request, one response. Closes on return."""
-    head, after_head = _read_until(sock, b"\r\n\r\n", 8 * 1024)
+    head, after_head = _read_until(sock, b"\r\n\r\n", 8 * 1024,
+                                   deadline_ms=HEAD_DEADLINE_MS)
     if head is None:
         _send_status(sock, 408, "Request Timeout", b"timeout")
         return
@@ -781,14 +833,22 @@ def _handle_upload(sock, headers, body_prefix, qs):
 
     # Surface the new file in the notification panel so the user knows
     # where it landed without having to open the Gallery or Reader.
+    target_app = "gallery" if kind == "image" else "reader"
     try:
         from oreoOS import notifications
         notifications.push("wifi",
                            "Received %s" % kind,
                            "%s · %d KB" % (fname[:18], written // 1024),
-                           target=("gallery" if kind == "image" else "reader"))
+                           target=target_app)
     except Exception:
         pass
+
+    # Queue an auto-launch of the receiving app so the user sees their
+    # photo / document the moment it arrives, no extra taps. The run
+    # loop will pick this up on the next tick — that's deliberately
+    # after we've flushed the 200 response to the phone.
+    global _pending_launch
+    _pending_launch = target_app
 
     body = (b"<!doctype html><html><head>"
             b"<meta http-equiv='refresh' content='2; url=/'>"
