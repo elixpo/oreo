@@ -11,10 +11,10 @@
  */
 
 export type AppIconId =
-  | "IdCard" | "Bird"     | "Image"      | "Worm"      | "Compass"
-  | "BookOpen"| "Car"     | "Cloud"      | "GitCommit" | "User"
-  | "Gamepad2"| "HardDrive"| "Palette"   | "PawPrint"  | "Cpu"
-  | "Wifi"    | "Bluetooth"| "RefreshCw" | "Settings";
+  | "Contact" | "Bird"     | "Image"      | "Worm"      | "Compass"
+  | "BookOpen"| "Car"      | "Cloud"      | "GitCommit" | "User"
+  | "Gamepad2"| "HardDrive"| "Palette"    | "PawPrint"  | "Cpu"
+  | "Wifi"    | "Bluetooth"| "RefreshCw"  | "Settings";
 
 export type AppEntry = {
   slug: string;
@@ -26,7 +26,7 @@ export type AppEntry = {
 };
 
 export const PRELOADED: AppEntry[] = [
-  { slug: "badge",    name: "Badge",       category: "core", tint: "primary", icon: "IdCard",
+  { slug: "badge",    name: "Badge",       category: "core", tint: "primary", icon: "Contact",
     blurb: "Conference badge with your name, role, pronouns." },
   { slug: "flappy",   name: "Flappy Oreo", category: "game", tint: "lilac",   icon: "Bird",
     blurb: "Flap the panda. Dodge pipes. High score persists." },

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  X, Github, Tag, User, IdCard, Bird, Image as ImageIcon,
+  X, Github, Tag, User, Contact, Bird, Image as ImageIcon,
   Worm, Compass, BookOpen, Car, Cloud, GitCommit, Gamepad2,
   HardDrive, Palette, PawPrint, Cpu, Wifi, Bluetooth,
   RefreshCw, Settings, type LucideIcon,
@@ -11,7 +11,7 @@ import {
 import type { AppEntry, AppIconId } from "@/data/apps";
 
 const ICONS: Record<AppIconId, LucideIcon> = {
-  IdCard, Bird, Image: ImageIcon, Worm, Compass, BookOpen, Car, Cloud,
+  Contact, Bird, Image: ImageIcon, Worm, Compass, BookOpen, Car, Cloud,
   GitCommit, User, Gamepad2, HardDrive, Palette, PawPrint, Cpu, Wifi,
   Bluetooth, RefreshCw, Settings,
 };

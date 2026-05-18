@@ -1,7 +1,8 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
+import Header         from "@/components/Header";
+import Footer         from "@/components/Footer";
+import PageTransition from "@/components/PageTransition";
 
 // SEO + social-card metadata. The og-banner.png referenced here is the
 // same artwork used as the README banner on the main repo — generated
@@ -57,13 +58,20 @@ export const metadata: Metadata = {
     description: SITE_DESCRIPTION,
     images: [OG_IMAGE],
   },
-  icons: {
-    icon:        "/logo-mark.svg",
-    shortcut:    "/favicon.ico",
-    apple:       "/apple-touch-icon.png",
-  },
-  themeColor: "#0F0C1C",
+  // Icon references are intentionally minimal until the real assets in
+  // prompts/site_assets.md get rendered + dropped into /public. Once
+  // logo-mark.svg + apple-touch-icon.png exist, re-add them here. For
+  // now Next's default favicon ships and no 404s clutter the dev log.
   formatDetection: { telephone: false, email: false, address: false },
+};
+
+// Next 14 moved themeColor / colorScheme out of `metadata` into a
+// separate `viewport` export — they're per-render rather than static.
+export const viewport: Viewport = {
+  themeColor: "#0F0C1C",
+  colorScheme: "dark",
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({
@@ -75,7 +83,9 @@ export default function RootLayout({
     <html lang="en">
       <body className="min-h-screen flex flex-col">
         <Header />
-        <main className="flex-1">{children}</main>
+        <main className="flex-1">
+          <PageTransition>{children}</PageTransition>
+        </main>
         <Footer />
       </body>
     </html>
