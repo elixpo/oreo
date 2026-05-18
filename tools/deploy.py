@@ -151,6 +151,7 @@ DEPLOY = [
     ("oreoOS/store.py",         "oreoOS/store.py"),
     ("oreoOS/notifications.py", "oreoOS/notifications.py"),
     ("oreoOS/notif_panel.py",   "oreoOS/notif_panel.py"),
+    ("oreoOS/pair_prompt.py",   "oreoOS/pair_prompt.py"),
     ("oreoOS/gestures.py",      "oreoOS/gestures.py"),
 
     # Hardware drivers
