@@ -467,7 +467,7 @@ _UPLOAD_FORM = (
     b"</div>"
     b"<form id='form' class='hide' method='POST' enctype='multipart/form-data'>"
     b"<p>&#10003; Approved &mdash; pick a file:</p>"
-    b"<input type='file' name='f' accept='.png,.jpg,.jpeg,.gif,.txt,.md' required>"
+    b"<input type='file' name='f' accept='image/*,.txt,.md' required>"
     b"<button id='go' type='submit'>Upload</button>"
     b"<div class='progress'><div class='bar' id='bar'></div></div>"
     b"</form>"
