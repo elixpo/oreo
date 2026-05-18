@@ -1009,6 +1009,75 @@ def disconnect_peer():
         return False
 
 
+def is_advertising():
+    """Best-effort introspection — MicroPython doesn't expose a direct
+    'is advertising' getter, so we infer: BLE is active AND no peer is
+    currently connected (we stop adv on connect)."""
+    try:
+        return bool(_get_ble().active()) and _conn is None
+    except Exception:
+        return False
+
+
+def force_readvertise():
+    """Stop + restart advertising. Used as a watchdog kick when a
+    bonded peer claims it can't see us — also re-applies security
+    config + service registration in case either got cleared after a
+    failed connection attempt."""
+    try:
+        ble = _get_ble()
+        if not ble.active():
+            return False
+        try:
+            ble.gap_advertise(None)
+        except Exception:
+            pass
+        _apply_security_config(ble)
+        _register_service(ble)
+        _start_advertising(ble)
+        return True
+    except Exception:
+        return False
+
+
+# ── advertising watchdog ────────────────────────────────────────────────
+# A bonded phone expects the badge to be findable whenever it's nearby.
+# In practice we've seen the badge stop advertising on a transient stack
+# glitch (failed connect attempt, RX queue overflow, etc.) and the phone
+# then just shows "paired, not connected" with no recovery. The watchdog
+# is called by the OS run loop on a slow cadence and forces a re-adv any
+# time we should be discoverable but apparently aren't.
+
+_watchdog_last_ms = 0
+_WATCHDOG_INTERVAL_MS = 30 * 1000
+
+
+def watchdog_tick():
+    """Called from the OS run loop. Cheap when nothing's wrong."""
+    global _watchdog_last_ms
+    try:
+        import time as _t
+        now = _t.ticks_ms()
+    except Exception:
+        return
+    if _t.ticks_diff(now, _watchdog_last_ms) < _WATCHDOG_INTERVAL_MS:
+        return
+    _watchdog_last_ms = now
+    # If BT is on AND nobody's connected, we MUST be advertising. There
+    # is no way for MicroPython to tell us "advertising stopped" — the
+    # only safe action is to nudge gap_advertise periodically. Cheap:
+    # calling gap_advertise with a payload identical to the running one
+    # is effectively a no-op inside NimBLE.
+    if not is_active():
+        return
+    if _conn is not None:
+        return
+    try:
+        _start_advertising(_get_ble())
+    except Exception:
+        pass
+
+
 # ── inbound pair-confirm prompt API ─────────────────────────────────────
 # Surfaces the SMP Numeric Comparison value to oreoOS.pair_prompt so it
 # can render the on-screen confirmation overlay. Three calls cover the

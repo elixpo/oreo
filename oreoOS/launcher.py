@@ -167,6 +167,12 @@ def run_app(os_obj, app):
     from oreoOS import notif_panel as _np_mod
     panel = _np_mod.get(os_obj)
 
+    # Pair-confirm overlay — sits above the notif panel and the app.
+    # While active it eats all input. Drawn after the panel so a fresh
+    # SMP prompt is never visually clobbered by a passing notification.
+    from oreoOS import pair_prompt as _pp_mod
+    pair_pp = _pp_mod.get(os_obj)
+
     # Consecutive-frame error counter. A single bad frame (transient
     # I2C glitch, momentary divide-by-zero) shouldn't kill the whole
     # OS — we count, log, and only escalate to a crash screen if the
@@ -205,6 +211,15 @@ def run_app(os_obj, app):
                 for b in api.BUTTONS:
                     if os_obj.buttons.just_pressed(b):
                         if pm: pm.note_event()
+
+                        # Pair-confirm prompt has top priority — when an
+                        # SMP numeric comparison is in flight, NOTHING
+                        # else gets the button. Eats every key including
+                        # C and HOME so the user can't accidentally
+                        # accept a stranger's pair attempt by hitting C.
+                        if pair_pp.is_active():
+                            pair_pp.handle_button(b)
+                            continue
 
                         # Global C hotkey → toggle the notification panel
                         # before anything else gets a look. Works from any
@@ -290,10 +305,32 @@ def run_app(os_obj, app):
                 except Exception:
                     pass
 
+            # Refresh the pair-confirm overlay's view of the SMP state
+            # every frame. Cheap — just one module-level dict peek.
+            pp_was_active = pair_pp.is_active()
+            try:
+                pair_pp.tick()
+            except Exception:
+                pass
+            if pp_was_active and not pair_pp.is_active():
+                # Prompt dismissed — force the underlying app to redraw
+                # because the overlay painted over its frame.
+                try:
+                    app._dirty = True
+                except Exception:
+                    pass
+
             try:
                 app.update(dt)
                 app.draw(os_obj.display)
                 panel.draw(os_obj.display)
+                # Pair prompt is the topmost layer — drawn last so the
+                # 6-digit code can never be obscured by a panel slide-in.
+                if pair_pp.is_active():
+                    try:
+                        pair_pp.draw(os_obj.display)
+                    except Exception:
+                        pass
                 os_obj.display.present()
                 frame_errs = 0
             except Exception as e:
@@ -335,6 +372,17 @@ def run_app(os_obj, app):
             # per frame on a breadboard without the IMU wired because
             # i2c.scan ran every iteration — now apps without an IMU
             # need pay nothing.
+
+            # BLE adv watchdog. Internal rate-limit means this is a
+            # ticks_diff comparison on the fast path; only every 30 s
+            # does it actually re-issue gap_advertise. Fixes the
+            # "phone says paired-but-not-connected and won't reconnect"
+            # case where adv silently stopped between sessions.
+            try:
+                from oreoWare import bt as _bt
+                _bt.watchdog_tick()
+            except Exception:
+                pass
 
             elapsed = time.ticks_diff(time.ticks_ms(), now)
             if elapsed < FRAME_MIN_MS:
