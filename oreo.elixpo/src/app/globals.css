@@ -1,0 +1,66 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Base typography + body ──────────────────────────────────────────── */
+:root {
+  color-scheme: dark;
+  --font-display: "Pixelify Sans", "JetBrains Mono", ui-sans-serif, system-ui,
+                  sans-serif;
+}
+
+html, body {
+  background: theme("colors.bg");
+  color: theme("colors.text");
+  font-family: theme("fontFamily.sans");
+  font-feature-settings: "ss01" 1, "ss02" 1, "cv11" 1;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Ambient gradient backdrop — a single fixed layer behind everything
+   instead of per-page backgrounds, so the page transitions feel
+   continuous. Subtle enough to not fight content. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(60% 50% at 25% 15%, rgba(255, 93, 104, 0.10), transparent 60%),
+    radial-gradient(50% 45% at 80% 90%, rgba(162, 155, 254, 0.08), transparent 60%),
+    radial-gradient(40% 35% at 90% 10%, rgba(61, 220, 151, 0.06), transparent 60%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* ── Selection ──────────────────────────────────────────────────────── */
+::selection {
+  background: theme("colors.primary");
+  color: theme("colors.bg");
+}
+
+/* ── Custom utilities ───────────────────────────────────────────────── */
+@layer components {
+  .container-page {
+    @apply mx-auto w-full max-w-6xl px-6 sm:px-8;
+  }
+  .btn-primary {
+    @apply inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2.5
+           font-semibold text-bg transition-colors hover:bg-primary-dim;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center gap-2 rounded-md border border-border
+           px-5 py-2.5 text-text transition-colors hover:bg-card;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-pill bg-card-sub px-2.5 py-1
+           text-xs uppercase tracking-wider text-text-dim;
+  }
+  .card-surface {
+    @apply rounded-lg border border-border bg-card transition-colors;
+  }
+}
+
+/* No-overscroll on mobile so the gradient doesn't reveal the bg colour
+   bleeding past the edge. */
+html { overscroll-behavior: none; }
