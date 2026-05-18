@@ -336,8 +336,24 @@ def start_pair(target):
     if _pair_state in (PAIR_CONNECTING, PAIR_ENCRYPTING):
         return False
 
-    addr_type = target.get("addr_type", 0)
-    addr      = target.get("addr")
+    # Pull addr_type from the live scan dict if the caller didn't
+    # pass one through — defaulting to 0 (PUBLIC) silently bricked
+    # iPhone connections because iOS uses Random Resolvable addresses
+    # (type 1). The scan IRQ stashes the correct type per-entry.
+    mac_key   = (target.get("mac") or "").upper()
+    scan_hit  = None
+    for k, v in _scan_results.items():
+        if k.upper() == mac_key:
+            scan_hit = v
+            break
+    addr_type = target.get("addr_type")
+    if addr_type is None and scan_hit is not None:
+        addr_type = scan_hit.get("addr_type", 0)
+    if addr_type is None:
+        addr_type = 0
+    addr = target.get("addr")
+    if addr is None and scan_hit is not None:
+        addr = scan_hit.get("addr")
     if addr is None:
         addr = _addr_from_mac(target.get("mac", ""))
     if addr is None:

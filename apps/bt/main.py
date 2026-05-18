@@ -95,10 +95,26 @@ class App(oreoOS.App):
         """
         rows = [("status",  self._bt and self._bt.is_active())]
 
-        # Paired section — bond store comes in slice 3. For now render
-        # a clear empty state so the user sees the placeholder.
-        rows.append(("header", "Paired (0 / 3)"))
-        rows.append(("paired_empty", None))
+        # Paired section — pulled from the persistent bond store.
+        paired = []
+        if self._bt:
+            try:
+                paired = self._bt.paired_devices() or []
+            except Exception:
+                paired = []
+        rows.append(("header", "Paired (%d)" % len(paired)))
+        if not paired:
+            rows.append(("paired_empty", None))
+        else:
+            for entry in paired:
+                # The render path is shared with "nearby" rows, which
+                # read `type` (not `kind`). Re-key to keep one renderer.
+                rows.append(("paired", {
+                    "mac":  entry.get("mac", ""),
+                    "name": entry.get("name", "(saved)"),
+                    "type": entry.get("kind", "other"),
+                    "rssi": None,
+                }))
 
         # Nearby section — fed by the live scan.
         nearby = []
@@ -123,7 +139,7 @@ class App(oreoOS.App):
 
     def _selectable(self, row):
         kind = row[0]
-        return kind in ("status", "nearby")
+        return kind in ("status", "nearby", "paired")
 
     def _sel_index(self):
         """Index in self._rows that matches self._sel_key."""
