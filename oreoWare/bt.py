@@ -62,6 +62,9 @@ _rx_state   = None    # active reassembler, if any
 _conn_started_ms = None    # ticks_ms at the last CENTRAL_CONNECT, used
                            # to log how long the link survived on a
                            # subsequent CENTRAL_DISCONNECT
+_conn_addr_type  = None    # addr_type from the live CENTRAL_CONNECT —
+                           # needed so we can bond inbound pairs
+_conn_addr_bytes = None    # raw addr bytes from the live CENTRAL_CONNECT
 
 _HEADER_LEN = 5       # type (1) + length (4)
 _CRC_LEN    = 4
@@ -336,9 +339,16 @@ def _apply_security_config(ble):
     we can render a confirm prompt. Older peers that can't do SC fall
     back to legacy pairing.
 
-    Best-effort: each kwarg is wrapped individually so the radio still
-    works in a degraded mode if an older MicroPython build is missing
-    one of the keys."""
+    Each kwarg is wrapped individually so the radio still works in a
+    degraded mode if an older MicroPython build is missing one of the
+    keys. We PRINT which kwargs actually stuck so the user can see
+    from the serial log whether the build supports Secure Connections
+    at all — if `le_secure` or `mitm` got rejected, the stack drops
+    to JustWorks pairing and the numeric-comparison prompt will never
+    fire (which was the entire point of this config).
+    """
+    accepted = []
+    rejected = []
     for kw in (
         {"bond":      True},
         {"mitm":      True},
@@ -347,8 +357,14 @@ def _apply_security_config(ble):
     ):
         try:
             ble.config(**kw)
-        except Exception:
-            pass
+            accepted.append(list(kw.keys())[0])
+        except Exception as e:
+            rejected.append("%s(%s)" % (list(kw.keys())[0], str(e)[:24]))
+    try:
+        print("[bt] security: accepted=%s rejected=%s" %
+              (",".join(accepted) or "-", ",".join(rejected) or "-"))
+    except Exception:
+        pass
 
 
 def start_pair(target):
@@ -694,6 +710,7 @@ class _RxState:
 
 def _irq(event, data):
     global _conn, _rx_state, _conn_started_ms
+    global _conn_addr_type, _conn_addr_bytes
     if event == _IRQ_CENTRAL_CONNECT:
         conn_handle, _addr_type, _addr = data
         # Single-connection policy: if we already have a peer, reject
@@ -713,6 +730,15 @@ def _irq(event, data):
             return
         _conn = conn_handle
         _rx_state = _RxState()
+        # Stash addr so a successful inbound bond can be saved into the
+        # bond store. Without this we'd only persist outbound (we-
+        # initiated) pairs, and the user would see "phone paired" on
+        # their phone but no entry in the badge's Paired list.
+        _conn_addr_type  = _addr_type
+        try:
+            _conn_addr_bytes = bytes(_addr)
+        except Exception:
+            _conn_addr_bytes = None
         try:
             import time as _t
             _conn_started_ms = _t.ticks_ms()
