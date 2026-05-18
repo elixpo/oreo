@@ -52,9 +52,30 @@ MAX_BODY      = 2 * 1024 * 1024   # 2 MB hard cap — bigger than any badge asse
 READ_CHUNK    = 2048
 RECV_TIMEOUT  = 8                 # seconds — per-recv() during streaming
 
+# Session lifecycle
+SESSION_TTL_MS         = 60 * 1000   # beacon must refresh within this
+SESSION_MAX            = 8           # never track more than this many concurrent
+SESSION_CHARSET        = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # no 0/O/1/I/l
 
-_lsock = None
-_bound_ip = None
+_lsock     = None
+_bound_ip  = None
+
+# Token state machine. Each sender registers itself by hitting /beacon
+# with a 6-char id. The badge UI lists them as pending, and the user
+# explicitly approves (or denies) before any /upload bytes are accepted.
+#
+#   _sessions[id] = {
+#       "state":     "pending" | "approved" | "denied",
+#       "last_ms":   ticks_ms of last beacon hit,
+#       "addr":      requesting peer ip (for display),
+#       "uploads":   completed upload count for this session,
+#   }
+_sessions = {}
+
+# Live upload progress so the WiFi app can render a real-time bar while
+# bytes are flowing in. None when no upload is in flight.
+#   {"id": "...", "filename": "...", "received": int, "total": int}
+_progress = None
 
 
 # ── routing tables ──────────────────────────────────────────────────────
@@ -176,8 +197,17 @@ def stop():
 
 
 def url():
-    """The address users should type on their phone — shown on-screen
-    by the BT app's Transfer row. Returns "" if we're not listening."""
+    """The address users should type on their phone. Prefers the
+    mDNS hostname (oreo.local) over the raw IP because it survives
+    DHCP-lease rotation and reads better off a tiny screen."""
+    if _bound_ip is None:
+        return ""
+    return "http://oreo.local/"
+
+
+def url_fallback():
+    """Raw-IP version, shown beneath the mDNS URL for users on networks
+    where multicast DNS doesn't work (some corporate WiFi)."""
     if _bound_ip is None:
         return ""
     return "http://%s/" % _bound_ip
@@ -185,6 +215,83 @@ def url():
 
 def is_running():
     return _lsock is not None
+
+
+# ── session state queries (UI hooks) ────────────────────────────────────
+
+def _prune_sessions():
+    """Drop sessions that haven't beaconed in SESSION_TTL_MS. Called
+    cheaply on every query so the UI never shows ghosts."""
+    try:
+        import time as _t
+        now = _t.ticks_ms()
+    except Exception:
+        return
+    stale = []
+    for sid, s in _sessions.items():
+        last = s.get("last_ms", 0)
+        try:
+            if _t.ticks_diff(now, last) > SESSION_TTL_MS:
+                stale.append(sid)
+        except Exception:
+            pass
+    for sid in stale:
+        _sessions.pop(sid, None)
+
+
+def list_sessions():
+    """Snapshot for the WiFi/Transfer UI. Returns sessions sorted by
+    last-seen so the newest beacons are on top."""
+    _prune_sessions()
+    items = []
+    for sid, s in _sessions.items():
+        items.append({
+            "id":      sid,
+            "state":   s.get("state", "pending"),
+            "addr":    s.get("addr", ""),
+            "uploads": s.get("uploads", 0),
+            "last_ms": s.get("last_ms", 0),
+        })
+    items.sort(key=lambda v: v.get("last_ms", 0), reverse=True)
+    return items
+
+
+def approve(sid):
+    """User tapped Allow on the WiFi/Transfer page."""
+    if sid in _sessions:
+        _sessions[sid]["state"] = "approved"
+        return True
+    return False
+
+
+def deny(sid):
+    if sid in _sessions:
+        _sessions[sid]["state"] = "denied"
+        return True
+    return False
+
+
+def progress():
+    """Live upload progress dict, or None if no transfer is in flight."""
+    return _progress
+
+
+def _new_session_id():
+    """Generate a 6-char alphanumeric id excluding ambiguous chars
+    (0/O, 1/I, l). os.urandom would be ideal but isn't always present
+    on MicroPython; time-mixed prand works for our scale."""
+    import time as _t
+    try:
+        import os as _o
+        seed = int.from_bytes(_o.urandom(4), "big")
+    except Exception:
+        seed = _t.ticks_ms() ^ id(_sessions)
+    out = []
+    n = len(SESSION_CHARSET)
+    for _ in range(6):
+        seed = (seed * 1103515245 + 12345) & 0x7FFFFFFF
+        out.append(SESSION_CHARSET[seed % n])
+    return "".join(out)
 
 
 def tick():
@@ -284,22 +391,118 @@ _UPLOAD_FORM = (
     b"body{font-family:-apple-system,system-ui,sans-serif;"
     b"background:#0f0c1c;color:#f5e6dc;margin:0;padding:24px;"
     b"display:flex;flex-direction:column;align-items:center;min-height:100vh}"
-    b"h1{color:#ff5d68;margin:8px 0 4px}p{color:#a89898;margin:4px 0 24px;font-size:14px}"
-    b"form{background:#1c1a2e;border:2px solid #ff5d68;border-radius:8px;"
-    b"padding:24px;width:100%;max-width:380px}"
+    b"h1{color:#ff5d68;margin:8px 0 4px}"
+    b"p{color:#a89898;margin:4px 0 16px;font-size:14px}"
+    b".card{background:#1c1a2e;border:2px solid #ff5d68;border-radius:8px;"
+    b"padding:24px;width:100%;max-width:380px;text-align:center}"
+    b".code{font-family:ui-monospace,monospace;font-size:42px;letter-spacing:8px;"
+    b"color:#ff5d68;margin:16px 0}"
+    b".pulse{display:inline-block;width:10px;height:10px;border-radius:5px;"
+    b"background:#ffd166;margin-right:8px;vertical-align:middle;"
+    b"animation:pulse 1s ease-in-out infinite}"
+    b"@keyframes pulse{0%,100%{opacity:.3}50%{opacity:1}}"
     b"input[type=file]{width:100%;color:#f5e6dc;margin-bottom:16px}"
     b"button{background:#ff5d68;color:#0f0c1c;border:0;border-radius:6px;"
     b"padding:14px 20px;font-size:16px;font-weight:bold;width:100%}"
+    b"button:disabled{background:#4a4458;color:#888;cursor:not-allowed}"
+    b".hide{display:none}"
+    b".progress{width:100%;height:8px;background:#2a2640;border-radius:4px;"
+    b"overflow:hidden;margin-top:12px}"
+    b".bar{height:100%;background:#3ddc97;width:0;transition:width .25s}"
     b".hint{margin-top:16px;color:#a89898;font-size:12px}"
     b"</style></head><body>"
     b"<h1>Send to Oreo</h1>"
-    b"<p>Photos &middot; .txt &middot; .md</p>"
-    b"<form method='POST' action='/upload' enctype='multipart/form-data'>"
+    b"<div class='card'>"
+    b"<div id='wait'>"
+    b"<p><span class='pulse'></span>Waiting for badge approval</p>"
+    b"<div class='code' id='sid'>------</div>"
+    b"<p class='hint'>Show this code on the badge to allow this device.</p>"
+    b"</div>"
+    b"<form id='form' class='hide' method='POST' enctype='multipart/form-data'>"
+    b"<p>&#10003; Approved &mdash; pick a file:</p>"
     b"<input type='file' name='f' accept='.png,.jpg,.jpeg,.gif,.txt,.md' required>"
-    b"<button type='submit'>Upload</button>"
-    b"<p class='hint'>Photos land in Gallery, text/md in Reader.</p>"
-    b"</form></body></html>"
+    b"<button id='go' type='submit'>Upload</button>"
+    b"<div class='progress'><div class='bar' id='bar'></div></div>"
+    b"</form>"
+    b"<div id='done' class='hide'><p>&#10003; Sent. Pick another?</p>"
+    b"<button onclick='location.reload()'>Send another</button></div>"
+    b"</div>"
+    b"<script>"
+    b"let sid=null,approved=false;"
+    b"async function newSession(){"
+    b"  const r=await fetch('/session/new');const j=await r.json();"
+    b"  sid=j.id;document.getElementById('sid').textContent=sid;}"
+    b"async function beacon(){"
+    b"  if(!sid)return;"
+    b"  try{const r=await fetch('/beacon?id='+sid);const j=await r.json();"
+    b"    if(j.state==='approved'&&!approved){approved=true;"
+    b"      document.getElementById('wait').classList.add('hide');"
+    b"      document.getElementById('form').classList.remove('hide');}"
+    b"    else if(j.state==='denied'){"
+    b"      document.getElementById('wait').innerHTML='<p>Denied by badge owner.</p>';}"
+    b"  }catch(e){}}"
+    b"document.addEventListener('DOMContentLoaded',async()=>{"
+    b"  await newSession();setInterval(beacon,2000);"
+    b"  document.getElementById('form').addEventListener('submit',async(e)=>{"
+    b"    e.preventDefault();"
+    b"    const fd=new FormData(e.target);"
+    b"    const xhr=new XMLHttpRequest();"
+    b"    xhr.upload.addEventListener('progress',(ev)=>{"
+    b"      if(ev.lengthComputable){"
+    b"        document.getElementById('bar').style.width=(ev.loaded/ev.total*100)+'%';}});"
+    b"    xhr.onload=()=>{if(xhr.status===200){"
+    b"      document.getElementById('form').classList.add('hide');"
+    b"      document.getElementById('done').classList.remove('hide');}"
+    b"      else{alert('Upload failed: '+xhr.status);}};"
+    b"    xhr.open('POST','/upload?token='+sid);xhr.send(fd);"
+    b"    document.getElementById('go').disabled=true;});"
+    b"});"
+    b"</script>"
+    b"</body></html>"
 )
+
+
+def _parse_query(path):
+    """Return (path_without_query, {key: value}) — minimal urlparse
+    replacement since MicroPython doesn't ship one. Decodes %xx."""
+    if "?" not in path:
+        return path, {}
+    pure, _, qs = path.partition("?")
+    out = {}
+    for part in qs.split("&"):
+        if not part:
+            continue
+        k, _, v = part.partition("=")
+        out[_pct(k)] = _pct(v)
+    return pure, out
+
+
+def _pct(s):
+    """Tiny percent-decode. Only handles the ASCII subset we expect
+    in our query params — IDs are alphanumeric, no spaces."""
+    out = []
+    i = 0
+    while i < len(s):
+        c = s[i]
+        if c == "%" and i + 2 < len(s):
+            try:
+                out.append(chr(int(s[i + 1:i + 3], 16)))
+                i += 3
+                continue
+            except ValueError:
+                pass
+        out.append(c)
+        i += 1
+    return "".join(out)
+
+
+def _peer_addr(sock):
+    """Best-effort peer address for the session log."""
+    try:
+        addr = sock.getpeername()
+        return "%s:%d" % (addr[0], addr[1])
+    except Exception:
+        return ""
 
 
 def _handle(sock):
@@ -308,7 +511,8 @@ def _handle(sock):
     if head is None:
         _send_status(sock, 408, "Request Timeout", b"timeout")
         return
-    method, path, headers = _parse_headers(head)
+    method, full_path, headers = _parse_headers(head)
+    path, qs = _parse_query(full_path)
 
     if method == "GET" and path in ("/", "/index.html"):
         _send_status(sock, 200, "OK", _UPLOAD_FORM)
@@ -316,17 +520,93 @@ def _handle(sock):
     if method == "GET" and path == "/favicon.ico":
         _send_status(sock, 204, "No Content", b"")
         return
+    if method == "GET" and path == "/beacon":
+        _handle_beacon(sock, qs, _peer_addr(sock))
+        return
+    if method == "GET" and path == "/session/new":
+        _handle_session_new(sock, _peer_addr(sock))
+        return
     if method == "POST" and path == "/upload":
-        _handle_upload(sock, headers, after_head)
+        _handle_upload(sock, headers, after_head, qs)
         return
 
     _send_status(sock, 404, "Not Found", b"not found")
 
 
-def _handle_upload(sock, headers, body_prefix):
+def _handle_session_new(sock, peer_addr):
+    """Hand the sender a freshly-minted session id so it doesn't have
+    to roll its own (saves us from collisions between two phones that
+    both picked the same client-side random)."""
+    _prune_sessions()
+    if len(_sessions) >= SESSION_MAX:
+        _send_status(sock, 503, "Service Unavailable",
+                     b'{"error":"too many active sessions"}',
+                     content_type="application/json")
+        return
+    sid = _new_session_id()
+    try:
+        import time as _t
+        now = _t.ticks_ms()
+    except Exception:
+        now = 0
+    _sessions[sid] = {"state": "pending", "last_ms": now,
+                      "addr": peer_addr, "uploads": 0}
+    body = ('{"id":"%s","state":"pending"}' % sid).encode()
+    _send_status(sock, 200, "OK", body, content_type="application/json")
+
+
+def _handle_beacon(sock, qs, peer_addr):
+    """Heartbeat from a sender's browser. Bumps last_ms so the session
+    stays alive, and reports the current state so the UI on the phone
+    can switch from 'Waiting…' to 'Ready' once the badge approves."""
+    sid = qs.get("id", "")
+    if not sid or len(sid) != 6:
+        _send_status(sock, 400, "Bad Request",
+                     b'{"error":"missing id"}',
+                     content_type="application/json")
+        return
+    _prune_sessions()
+    try:
+        import time as _t
+        now = _t.ticks_ms()
+    except Exception:
+        now = 0
+    s = _sessions.get(sid)
+    if s is None:
+        if len(_sessions) >= SESSION_MAX:
+            _send_status(sock, 503, "Service Unavailable",
+                         b'{"error":"too many sessions"}',
+                         content_type="application/json")
+            return
+        _sessions[sid] = {"state": "pending", "last_ms": now,
+                          "addr": peer_addr, "uploads": 0}
+        state = "pending"
+    else:
+        s["last_ms"] = now
+        if peer_addr:
+            s["addr"] = peer_addr
+        state = s["state"]
+    body = ('{"id":"%s","state":"%s"}' % (sid, state)).encode()
+    _send_status(sock, 200, "OK", body, content_type="application/json")
+
+
+def _handle_upload(sock, headers, body_prefix, qs):
     """Stream a single multipart part to disk. Phones POST exactly one
     file per share, so we don't try to handle multi-part bodies — we
-    extract the first file part and ignore everything after."""
+    extract the first file part and ignore everything after.
+
+    Gated on `?token=XXXXXX`: the session must exist AND be in state
+    "approved", which only happens after the user explicitly taps Allow
+    on the badge's WiFi/Transfer page. Without that the badge silently
+    accepting uploads from anyone on the LAN would be a footgun.
+    """
+    token = qs.get("token", "")
+    s = _sessions.get(token) if token else None
+    if s is None or s.get("state") != "approved":
+        _send_status(sock, 403, "Forbidden",
+                     b'{"error":"token not approved"}',
+                     content_type="application/json")
+        return
     ctype = headers.get("content-type", "")
     if "multipart/form-data" not in ctype:
         _send_status(sock, 400, "Bad Request", b"expected multipart/form-data")
@@ -434,6 +714,15 @@ def _handle_upload(sock, headers, body_prefix):
         _send_status(sock, 500, "Internal Error",
                      b"write failed (out of space?)")
         return
+
+    # Publish a live progress slot the WiFi UI polls every frame to
+    # render the progress bar. Total here is the *body length*, not
+    # the file length (we don't know the file length until we hit the
+    # closing boundary). Off by ~boundary-length bytes — good enough.
+    global _progress
+    _progress = {"id": token, "filename": fname,
+                 "received": 0, "total": clen}
+
     try:
         buf = bytearray(rest)
         body_left = clen - bytes_read  # bytes still on the wire after we filled head_buf
@@ -452,10 +741,6 @@ def _handle_upload(sock, headers, body_prefix):
                 written += cut
                 buf = buf[cut:]
             if body_left <= 0 and not buf:
-                # Body exhausted without finding boundary — write the
-                # leftover and call it done. Some phones omit the final
-                # CRLF before the boundary on truncation; we trust the
-                # Content-Length anyway.
                 f.write(bytes(buf))
                 written += len(buf)
                 break
@@ -464,12 +749,14 @@ def _handle_upload(sock, headers, body_prefix):
             except OSError:
                 break
             if not chunk:
-                # Connection closed early — write what we held back.
                 f.write(bytes(buf))
                 written += len(buf)
                 break
             body_left -= len(chunk)
             buf.extend(chunk)
+            # Live progress update — the WiFi UI samples this at 4 Hz
+            # so an O(1) dict assignment per chunk is fine.
+            _progress["received"] = written + max(0, len(buf) - tail_keep)
             if written > MAX_BODY:
                 break
     finally:
@@ -477,6 +764,7 @@ def _handle_upload(sock, headers, body_prefix):
             f.close()
         except Exception:
             pass
+        _progress = None
 
     if written <= 0:
         try:
@@ -486,11 +774,16 @@ def _handle_upload(sock, headers, body_prefix):
         _send_status(sock, 400, "Bad Request", b"empty upload")
         return
 
+    # Mark the upload on the session so the WiFi UI can show "got 2
+    # files from session ABCD12" instead of just "approved".
+    if token in _sessions:
+        _sessions[token]["uploads"] = _sessions[token].get("uploads", 0) + 1
+
     # Surface the new file in the notification panel so the user knows
     # where it landed without having to open the Gallery or Reader.
     try:
         from oreoOS import notifications
-        notifications.push("bt",
+        notifications.push("wifi",
                            "Received %s" % kind,
                            "%s · %d KB" % (fname[:18], written // 1024),
                            target=("gallery" if kind == "image" else "reader"))

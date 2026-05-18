@@ -519,13 +519,18 @@ def toggle():
 
 
 def init_from_config():
-    """Enable BT on boot when the deploy-baked secrets request it."""
-    try:
-        from secrets import BT_AUTO_ENABLE
-        if BT_AUTO_ENABLE:
-            set_active(True)
-    except Exception:
-        pass
+    """No-op on boot.
+
+    Bluetooth is currently a Coming Soon feature — the BT settings
+    page renders a placeholder and file transfer runs over WiFi
+    (see oreoOS.http_server). Leaving the radio off at boot saves
+    flash, RAM, and ~3-4 mA standby; the user can still flip BT on
+    manually via a future settings toggle. When we wire the radio
+    back into a real user flow (peer presence, IR-Quest assist, etc.)
+    this function will read a `bt_enable` setting from oreoOS
+    settings instead of the build-time .env flag.
+    """
+    return
 
 
 # ─── service registration ────────────────────────────────────────────────

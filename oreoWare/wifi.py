@@ -77,9 +77,40 @@ def _apply_power_cap(wlan):
         pass
 
 
+MDNS_HOSTNAME = "oreo"
+
+
+def _apply_hostname(wlan):
+    """Set the WiFi hostname so the ESP-IDF mDNS responder advertises
+    `oreo.local` to the LAN. MicroPython builds vary in which kwarg key
+    actually takes effect (`hostname` vs `dhcp_hostname`) so we try both.
+
+    On most ESP32 IDF builds this is enough — IDF auto-spins up an mDNS
+    responder for the configured hostname. Older builds that don't have
+    the responder enabled will silently ignore this and `oreo.local`
+    won't resolve; the badge will still be reachable by IP.
+    """
+    for key in ("hostname", "dhcp_hostname"):
+        try:
+            wlan.config(**{key: MDNS_HOSTNAME})
+        except Exception:
+            pass
+    # Some forks expose a top-level mdns start. Best-effort.
+    try:
+        import network as _net
+        if hasattr(_net, "hostname"):
+            _net.hostname(MDNS_HOSTNAME)
+    except Exception:
+        pass
+
+
 def connect(ssid, password, timeout_ms=12000):
     wlan = _get_wlan()
     wlan.active(True)
+    # Hostname must be set BEFORE associate — the DHCP REQUEST carries
+    # the hostname as Option 12 and the IDF mDNS service uses the same
+    # name. Setting it after gets ignored by some routers.
+    _apply_hostname(wlan)
     _apply_power_cap(wlan)
     if wlan.isconnected() and wlan.config("essid") == ssid:
         return True
@@ -89,9 +120,11 @@ def connect(ssid, password, timeout_ms=12000):
         if time.ticks_diff(time.ticks_ms(), start) > timeout_ms:
             return False
         time.sleep_ms(200)
-    # Re-apply power-save AFTER association — some IDF versions reset PM
-    # state on connect and need it set again to actually take effect.
+    # Re-apply power-save + hostname AFTER association — some IDF
+    # versions reset PM/hostname state on connect and need it set
+    # again to actually take effect for the live link.
     _apply_power_cap(wlan)
+    _apply_hostname(wlan)
     return True
 
 
