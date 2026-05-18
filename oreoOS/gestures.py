@@ -61,22 +61,35 @@ POLL_DT_MS          = 20         # 50 Hz when actively sampling
 
 def get(os_obj):
     """Singleton accessor. Lazily detects the IMU. Returns None if no
-    chip on the bus — caller treats absence as "gestures disabled"."""
+    chip on the bus — caller treats absence as "gestures disabled".
+
+    CRITICAL: a negative detect (no IMU on bus) MUST be cached. The OS
+    run loop calls this every frame; without the negative cache,
+    `_imu_mod.detect()` re-runs a full `i2c.scan()` (~50-100 ms blocking
+    on 100 kHz) every frame, pinning the CPU and starving the UI/
+    network. On a breadboard build without the MPU6050 wired, that's
+    the whole boot suddenly feeling like molasses.
+    """
     g = getattr(os_obj, "_gestures", None)
     if g is not None:
         return g
-    imu = getattr(os_obj, "_imu", None)
-    if imu is None:
+    # _imu can be:
+    #   missing attr       → never tried
+    #   None               → tried, no IMU (negative cache; don't retry)
+    #   <MPU6050 instance> → tried, present
+    if hasattr(os_obj, "_imu"):
+        imu = os_obj._imu
+    else:
         try:
             from oreoWare import imu as _imu_mod
             imu = _imu_mod.detect()
         except Exception:
             imu = None
-        if imu is not None:
-            try:
-                os_obj._imu = imu
-            except Exception:
-                pass
+        # Cache the result either way so we don't re-probe the bus.
+        try:
+            os_obj._imu = imu
+        except Exception:
+            pass
     if imu is None:
         return None
     g = Gestures(os_obj, imu)

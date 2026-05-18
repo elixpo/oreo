@@ -257,6 +257,23 @@ _SMALL_ICON_CACHE = {}    # dir → (data_native, w, h)
 _LABEL_CACHE      = {}    # dir → list[str] (pre-wrapped lines)
 _ICON_CACHE_KEY   = None  # (apps_tuple, ICON_SZ) signature to invalidate
 
+# Apps-list cache. list_apps() opens 20+ manifest.json files from flash
+# every time the drawer opens (~1-2 s on a busy filesystem) — pointless
+# when the on-disk roster hasn't changed since the last open. We bust
+# this cache when the Store installs/uninstalls; the drawer's on_enter
+# just reads the snapshot. Set to None to force a re-scan on next open.
+_APPS_CACHE       = None
+_CATEGORIES_CACHE = None  # (apps_tuple, mode) → [(name, icon, idxs)…]
+
+
+def invalidate_apps_cache():
+    """Hook for the Store + Updates apps to drop the cached app list
+    after an install / uninstall lands. Without this the launcher would
+    keep showing the pre-install roster until reboot."""
+    global _APPS_CACHE, _CATEGORIES_CACHE
+    _APPS_CACHE       = None
+    _CATEGORIES_CACHE = None
+
 
 def _rounded_outline(d, x, y, w, h, color, r=CORNER_R):
     """Outline-only rounded rect with a small chamfered corner."""
@@ -287,26 +304,50 @@ class App(oreoOS.App):
     SHOW_LOADING = True      # ~80 ms upscaling 12 icons from 32→64 at on_enter
 
     def on_enter(self, os):
+        # Segment-timed on_enter — each `_lap()` call prints how many
+        # milliseconds the previous segment took. Lets us pinpoint which
+        # piece of the drawer-open path is actually slow on a real boot
+        # (manifest scan? icon upscale? settings read?) instead of
+        # guessing from a single "total" number.
         try:
             import time as _t
-            _t0 = _t.ticks_ms()
+            _t0  = _t.ticks_ms()
+            _seg = _t0
+            def _lap(label, last=[_seg]):
+                # MicroPython's str has no .ljust; manual pad instead.
+                pad = label if len(label) >= 18 else label + " " * (18 - len(label))
+                now = _t.ticks_ms()
+                print("[launcher]   %s  %d ms" %
+                      (pad, _t.ticks_diff(now, last[0])))
+                last[0] = now
         except Exception:
             _t0 = None
+            def _lap(label):
+                pass
         self._os = os
-        from oreoOS.launcher import list_apps
-        # bt + wifi are surfaced through Settings rather than as their
-        # own drawer tiles — Settings has dedicated rows that launch
-        # those screens, so a separate tile would just be duplication.
         DRAWER_HIDDEN = ("launcher", "bt", "wifi", "gestures", "updates")
-        self._apps = [a for a in list_apps() if a["dir"] not in DRAWER_HIDDEN]
+
+        # Apps-list cache. list_apps() opens every manifest.json from
+        # flash — ~50-100 ms per file on a busy FS, so 20+ apps was
+        # the biggest single cost in on_enter. The Store + Updates apps
+        # call invalidate_apps_cache() when they mutate the roster.
+        global _APPS_CACHE
+        if _APPS_CACHE is None:
+            from oreoOS.launcher import list_apps
+            _APPS_CACHE = list_apps()
+            _lap("list_apps (cold)")
+        else:
+            _lap("list_apps (warm)")
+        self._apps = [a for a in _APPS_CACHE if a["dir"] not in DRAWER_HIDDEN]
 
         # Icon cache lives at module scope (see _ICON_CACHE above). We
         # invalidate on (apps_tuple, ICON_SZ) change — adding or removing
         # an app rebuilds, but re-entering the launcher with the same
         # roster is instant.
         global _ICON_CACHE_KEY
-        cache_key = (tuple(a["dir"] for a in self._apps), ICON_SZ)
-        if _ICON_CACHE_KEY != cache_key:
+        cache_key  = (tuple(a["dir"] for a in self._apps), ICON_SZ)
+        icon_cache_hit = (_ICON_CACHE_KEY == cache_key)
+        if not icon_cache_hit:
             _ICON_CACHE.clear()
             _SMALL_ICON_CACHE.clear()
             _LABEL_CACHE.clear()
@@ -329,6 +370,9 @@ class App(oreoOS.App):
 
             for a in self._apps:
                 _LABEL_CACHE[a["dir"]] = _wrap_label(a["name"])
+            _lap("icons (cold)")
+        else:
+            _lap("icons (warm)")
 
         # Per-instance views into the module cache — keeps the rest of
         # the draw code untouched.
@@ -342,11 +386,25 @@ class App(oreoOS.App):
         # Persisted on the OS settings dict via the Settings app.
         self._mode = "categories" if (
             os.settings_get("app_view", "grid") == "categories") else "grid"
+        _lap("settings_get")
 
         # Category-mode state machine:
         #   _cat_level 0 = picker (5 vertical tiles)
         #   _cat_level 1 = grid of apps inside the selected category
-        self._categories = self._build_categories() if self._mode == "categories" else []
+        # Categories are pure-Python and derive from self._apps — cache
+        # them keyed by the apps roster so they only rebuild when the
+        # roster actually changes.
+        global _CATEGORIES_CACHE
+        if self._mode == "categories":
+            roster_key = tuple(a["dir"] for a in self._apps)
+            if _CATEGORIES_CACHE is not None and _CATEGORIES_CACHE[0] == roster_key:
+                self._categories = _CATEGORIES_CACHE[1]
+            else:
+                self._categories = self._build_categories()
+                _CATEGORIES_CACHE = (roster_key, self._categories)
+        else:
+            self._categories = []
+        _lap("categories")
         self._cat_level  = 0
         self._cat_sel    = 0          # picker selection (in level 0)
 
@@ -365,12 +423,13 @@ class App(oreoOS.App):
         # app brought us back here. Done last so it overrides the
         # fresh-state defaults set above.
         self._try_restore_resume_ctx()
+        _lap("resume_ctx")
 
         try:
             if _t0 is not None:
-                print("[launcher] on_enter done in %d ms (cached=%s)"
+                print("[launcher] on_enter TOTAL %d ms (icons_cache_hit=%s)"
                       % (_t.ticks_diff(_t.ticks_ms(), _t0),
-                         _ICON_CACHE_KEY is not None and len(_ICON_CACHE) > 0))
+                         icon_cache_hit))
         except Exception:
             pass
 

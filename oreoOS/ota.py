@@ -108,7 +108,12 @@ T_FILE         = 25        # individual file download (user-triggered)
 # settle, lets the user open the home screen / press a button without
 # eating a synchronous HTTP round-trip. Manual "Check Update" from
 # Settings is unaffected: it calls check() directly.
-_OTA_BOOT_GRACE_S = 60
+_OTA_BOOT_GRACE_S = 15 * 60   # 15 min — boot finishes in seconds, but
+                              # the user wants a clean post-boot
+                              # experience without a probe-driven spike
+                              # for at least one drink-of-water window.
+                              # Manual "Check Update" from Settings is
+                              # unaffected.
 
 
 # ── helpers ─────────────────────────────────────────────────────────────────
@@ -569,11 +574,19 @@ def background_check(os_obj, min_interval_s=6 * 3600):
         return False
 
     # Only probe when there's a working network connection — silently
-    # skips when offline so the boot is never gated on DNS.
+    # skips when offline so the boot is never gated on DNS. Also skip
+    # entirely when the current SSID is flagged metered in /wifi.json,
+    # so a phone hotspot or tethered connection isn't billed for
+    # background traffic.
     try:
         from oreoWare import wifi
         if not wifi.is_connected():
             return False
+        try:
+            if wifi.is_metered():
+                return False
+        except Exception:
+            pass
     except Exception:
         return False
 
