@@ -578,16 +578,45 @@ class App(oreoOS.App):
             list_y = prog_y
 
         # ── pending sender list ──
-        sessions = hs.list_sessions() if hs else []
+        # Denied sessions are hidden from the on-badge list: the badge
+        # has already made its decision, and surfacing rejected
+        # devices is just visual noise. The phone-side page still
+        # gets the "denied" verdict from its next beacon poll so the
+        # user there can hit refresh and try again with a fresh ID.
+        sessions_all = hs.list_sessions() if hs else []
+        sessions = [s for s in sessions_all if s.get("state") != "denied"]
+        # Clamp the cursor in case a session disappeared between ticks.
+        if self._trans_sel >= len(sessions):
+            self._trans_sel = max(0, len(sessions) - 1)
+
         d.rect(ROW_PAD_X, list_y, SW - 2 * ROW_PAD_X, 1, theme.MUTED2, fill=True)
         list_y += 6
         if not sessions:
             d.text("no senders connected",
                    ROW_PAD_X + 2, list_y, theme.MUTED2)
             return
+
+        # State -> dot colour. RGB tuples instead of theme constants
+        # because we need a clean green, and the theme palette doesn't
+        # ship one — primary is pink-red, teal is too cyan.
+        dot_color = {
+            "pending":  api.rgb(255, 209, 102),    # yellow
+            "approved": api.rgb( 61, 220, 151),    # green
+            "denied":   api.rgb(255,  93, 104),    # red — visible only
+                                                   # in the brief window
+                                                   # before the row is
+                                                   # filtered out
+        }
+        DOT_SIZE   = 8
+        DOT_RIGHT  = ROW_PAD_X + 2   # pad from the right edge
+        BAR_PAD    = 8               # gap on either side of the bar
+        ROW_INNER  = ROW_H - 4
+
+        prog = hs.progress() if hs else None
+
         for i, s in enumerate(sessions[:5]):
             row_y = list_y + i * ROW_H
-            sel = (i == self._trans_sel)
+            sel   = (i == self._trans_sel)
             if sel:
                 d.rect(4, row_y - 2, SW - 8, ROW_H - 1,
                        theme.DOCK_SEL, fill=True)
@@ -596,16 +625,32 @@ class App(oreoOS.App):
                        theme.SEL_BORDER, fill=True)
             sid   = s.get("id", "------")
             state = s.get("state", "pending")
-            d.text(sid, ROW_PAD_X, row_y + 4, theme.TEXT_BRIGHT, scale=2)
-            # State badge on the right.
-            label_color = {
-                "pending":  theme.GOLD,
-                "approved": theme.PRIMARY,
-                "denied":   theme.MUTED,
-            }.get(state, theme.MUTED)
-            d.text(state.upper(), VALUE_X, row_y + 4, label_color)
-            # Upload count below ID.
-            ups = int(s.get("uploads", 0))
-            if ups:
-                d.text("%d files" % ups, ROW_PAD_X, row_y + 14,
-                       theme.TEXT_DIM)
+
+            # ID at scale=1 (smaller than before — the page got too
+            # busy with the old scale=2 codes once we added a progress
+            # bar and a status dot to the same row).
+            d.text(sid, ROW_PAD_X, row_y + 6, theme.TEXT_BRIGHT, scale=1)
+
+            # Status dot, right side, vertically centred in the row.
+            dx = SW - DOT_RIGHT - DOT_SIZE
+            dy = row_y + (ROW_INNER - DOT_SIZE) // 2 + 2
+            d.rect(dx, dy, DOT_SIZE, DOT_SIZE,
+                   dot_color.get(state, theme.MUTED), fill=True)
+
+            # Mid-row progress bar — only when THIS session is the one
+            # currently receiving. Spans the area between the ID text
+            # and the status dot.
+            if prog and prog.get("id") == sid:
+                # Approximate where the SID text ends. Codes are 6
+                # chars × 8 px at scale=1 = 48 px.
+                bar_x = ROW_PAD_X + 6 * 8 + BAR_PAD
+                bar_w = dx - BAR_PAD - bar_x
+                if bar_w > 8:
+                    total = max(1, int(prog.get("total", 0)))
+                    done  = min(total, int(prog.get("received", 0)))
+                    pct_w = int(bar_w * done / total)
+                    bar_y = row_y + (ROW_INNER - 4) // 2 + 2
+                    d.rect(bar_x, bar_y, bar_w, 4,
+                           theme.MUTED2, fill=True)
+                    d.rect(bar_x, bar_y, pct_w, 4,
+                           theme.PRIMARY, fill=True)
