@@ -328,24 +328,13 @@ def run_app(os_obj, app):
             except Exception:
                 pass
 
-            # Gesture engine — early-exits when all toggles are off, so
-            # the cost on the disabled path is one dict lookup per frame.
-            # When events fire we dispatch them globally: HARD_SHAKE
-            # paints a mascot splash, FLIP_UP runs the user's chosen
-            # quick action, TAP / DOUBLE_TAP route to the current app's
-            # `on_gesture` hook if it has one.
-            try:
-                from oreoOS import gestures as _g
-                gs = _g.get(os_obj)
-                if gs:
-                    gs.tick()
-                    while True:
-                        ev = gs.pop_event()
-                        if not ev:
-                            break
-                        _dispatch_gesture(os_obj, app, ev)
-            except Exception:
-                pass
+            # Gestures are NOT polled in the OS run loop. The IMU is
+            # opt-in per app: an app that wants tilt / tap / shake
+            # imports oreoOS.gestures itself and ticks the engine on
+            # its own update(). Polling here previously cost ~50-100 ms
+            # per frame on a breadboard without the IMU wired because
+            # i2c.scan ran every iteration — now apps without an IMU
+            # need pay nothing.
 
             elapsed = time.ticks_diff(time.ticks_ms(), now)
             if elapsed < FRAME_MIN_MS:
@@ -353,61 +342,6 @@ def run_app(os_obj, app):
     finally:
         app.on_exit()
         gc.collect()
-
-
-# ── gesture dispatch ──────────────────────────────────────────────────────────
-
-def _dispatch_gesture(os_obj, app, ev):
-    """Route a gesture event from oreoOS.gestures into the right surface.
-
-    Global-effect gestures (HARD_SHAKE, FLIP_UP) are handled here at the
-    OS layer so any app inherits them. App-local gestures (TAP,
-    DOUBLE_TAP) are forwarded to the current app's on_gesture(kind)
-    hook if one exists; absent hook = silent ignore.
-    """
-    kind = ev.get("kind", "")
-    if kind == "hard_shake":
-        try:
-            from oreoOS.splash import show_shake_mascot
-            show_shake_mascot(os_obj)
-        except Exception:
-            pass
-        # Force a full repaint of the current app so the splash
-        # doesn't leave its frame behind.
-        try:
-            app._dirty = True
-        except Exception:
-            pass
-        return
-    if kind == "flip_up":
-        action = ev.get("action", "drawer")
-        try:
-            if action == "drawer":
-                os_obj.launch("__appmenu__")
-            elif action == "notifs":
-                from oreoOS import notif_panel as _np
-                _np.get(os_obj).toggle()
-            elif action == "wifi":
-                from oreoWare import wifi as _w
-                if _w.is_connected():
-                    _w.disconnect()
-                else:
-                    _w.connect_from_config()
-            elif action == "bt":
-                from oreoWare import bt as _b
-                _b.set_active(not _b.is_active())
-            # "camera" left as a reserved placeholder until we wire IR
-            # quest capture in. Silent no-op for now.
-        except Exception:
-            pass
-        return
-    # TAP / DOUBLE_TAP — hand to the current app's gesture hook.
-    hook = getattr(app, "on_gesture", None)
-    if hook is not None:
-        try:
-            hook(kind)
-        except Exception:
-            pass
 
 
 # ── crash screen ──────────────────────────────────────────────────────────────
@@ -617,14 +551,9 @@ def boot():
     except Exception:
         os_obj._boot_ts_s = 0
 
-    # Seed gesture-related Settings keys so the Settings rows display
-    # sensible values on first boot. Pure dictionary writes — no IMU
-    # touch yet, so this is cheap.
-    try:
-        from oreoOS import gestures as _g
-        _g.push_default_settings(os_obj)
-    except Exception:
-        pass
+    # Gestures intentionally NOT seeded at the OS layer — the IMU stack
+    # is opt-in per app now. The Gestures settings page (`apps/gestures`)
+    # imports oreoOS.gestures itself when the user opens it.
 
     _bc("checking pending OTA")
     applied = _maybe_apply_ota(os_obj)
