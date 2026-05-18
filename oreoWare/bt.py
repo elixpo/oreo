@@ -784,6 +784,8 @@ def _irq(event, data):
         _conn = None
         _rx_state = None
         _conn_started_ms = None
+        _conn_addr_type  = None
+        _conn_addr_bytes = None
         # Restart advertising so the next peer can find us.
         try:
             _start_advertising(_get_ble())
@@ -893,20 +895,36 @@ def _irq(event, data):
             conn_handle, encrypted, _auth, bonded, _ks = data
         except (ValueError, TypeError):
             return
-        if _pair_target is None:
-            return
         if encrypted:
-            # Persist the bond record (separate from BLE secrets, which
-            # arrive via _IRQ_SET_SECRET as their own events).
-            try:
-                from oreoOS import bonds
-                bonds.add(_pair_target["mac"],
-                          _pair_target.get("name", ""),
-                          _pair_target.get("kind", "other"))
-            except Exception:
-                pass
-            _set_pair_state(PAIR_DONE,
-                            "paired" + (" + bonded" if bonded else ""))
+            if _pair_target is not None:
+                # OUTBOUND pair (we initiated via start_pair). The
+                # target dict already holds the friendly name / kind
+                # from the scan result, so the bond record is rich.
+                try:
+                    from oreoOS import bonds
+                    bonds.add(_pair_target["mac"],
+                              _pair_target.get("name", ""),
+                              _pair_target.get("kind", "other"))
+                except Exception:
+                    pass
+                _set_pair_state(PAIR_DONE,
+                                "paired" + (" + bonded" if bonded else ""))
+            elif _conn_addr_bytes is not None:
+                # INBOUND pair (phone initiated). We don't know the
+                # peer's friendly name — we never scanned it — so the
+                # bond entry gets a MAC-derived placeholder name that
+                # the user can rename later. This is what fixes the
+                # "phone says paired but Paired list is empty" bug.
+                try:
+                    from oreoOS import bonds
+                    mac = _mac_str(_conn_addr_bytes)
+                    bonds.add(mac, "BT peer " + mac[-5:], "other")
+                    print("[bt] inbound bond saved: %s" % mac)
+                except Exception as e:
+                    try:
+                        print("[bt] inbound bond save failed: %s" % e)
+                    except Exception:
+                        pass
             # Keep the link open. We used to gap_disconnect here on the
             # theory that the bond record was the thing the user wanted
             # — but to the user it read as "I tried to connect and it
@@ -914,7 +932,8 @@ def _irq(event, data):
             # GATT exchange (file transfer, etc.) can proceed, and let
             # whichever side actually finishes its work close it.
         else:
-            _set_pair_state(PAIR_FAILED, "encryption rejected")
+            if _pair_target is not None:
+                _set_pair_state(PAIR_FAILED, "encryption rejected")
     elif event == _IRQ_PASSKEY_ACTION:
         # data = (conn_handle, action, passkey)
         # Fired during inbound pairing when the SMP method needs user

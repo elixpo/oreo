@@ -384,6 +384,19 @@ def run_app(os_obj, app):
             except Exception:
                 pass
 
+            # LAN HTTP upload server tick. Non-blocking accept on the
+            # listening socket — costs one syscall per frame on the
+            # idle path. Handles one request synchronously when a
+            # phone POSTs, which briefly stalls the UI for the
+            # duration of the upload (fine for sub-second photo
+            # transfers; we'll move to a background worker later if
+            # uploads ever grow above a few hundred KB).
+            try:
+                from oreoOS import http_server as _hs
+                _hs.tick()
+            except Exception:
+                pass
+
             elapsed = time.ticks_diff(time.ticks_ms(), now)
             if elapsed < FRAME_MIN_MS:
                 time.sleep_ms(FRAME_MIN_MS - elapsed)
@@ -663,6 +676,14 @@ def boot():
             _bc("wifi.connect_from_config begin")
             wifi.connect_from_config()
             _bc("wifi.connect_from_config done")
+            # Bring up the LAN file-upload server now that we have an
+            # IP. Listener is non-blocking + idempotent; the run-loop
+            # tick handles accept(). No-op if WiFi failed.
+            try:
+                from oreoOS import http_server as _hs
+                _hs.start(os_obj)
+            except Exception:
+                pass
         else:
             _bc("wifi skipped")
         _bc("bt.init_from_config begin")

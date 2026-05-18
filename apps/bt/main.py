@@ -95,6 +95,18 @@ class App(oreoOS.App):
         """
         rows = [("status",  self._bt and self._bt.is_active())]
 
+        # Transfer row — surfaces the LAN upload URL so the user can
+        # type it on their phone. Only render when the HTTP server is
+        # actually listening (i.e. WiFi associated AND start() succeeded).
+        try:
+            from oreoOS import http_server as _hs
+            u = _hs.url() if _hs.is_running() else ""
+        except Exception:
+            u = ""
+        if u:
+            rows.append(("header", "Send files"))
+            rows.append(("transfer", u))
+
         # Paired section — pulled from the persistent bond store.
         paired = []
         if self._bt:
@@ -393,6 +405,13 @@ class App(oreoOS.App):
         if kind == "nearby_empty":
             msg = "scan to discover (B)"
             d.text(msg, PAD_X + 6, y + 2, theme.MUTED2, scale=1)
+            return
+        if kind == "transfer":
+            # Two-line readout: URL on top, fine-print hint below.
+            d.text(str(payload)[:28], PAD_X + 6, y + 2,
+                   theme.PRIMARY, scale=1)
+            d.text("open on phone to upload", PAD_X + 6, y + 12,
+                   theme.MUTED2, scale=1)
             return
 
         # ── nearby device row ─────────────────────────────────────────
