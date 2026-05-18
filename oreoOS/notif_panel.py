@@ -448,7 +448,24 @@ class NotifPanel:
             from oreoWare import bt
             active = bt.is_active()
             out[1]["on"]  = bool(active)
-            out[1]["sub"] = "on" if active else "off"
+            # Blink "transferring" while a peer is connected. The panel
+            # samples this dict every frame the panel is open, so just
+            # alternating the sublabel is enough to make the BT chip
+            # visibly pulse without a dedicated animator. ticks_ms / 500
+            # gives a ~2 Hz cadence.
+            try:
+                busy = bt.is_busy()
+            except Exception:
+                busy = False
+            if busy:
+                try:
+                    import time as _t
+                    phase = (_t.ticks_ms() // 500) & 1
+                except Exception:
+                    phase = 0
+                out[1]["sub"] = "transfer…" if phase else "transferring"
+            else:
+                out[1]["sub"] = "on" if active else "off"
         except Exception:
             pass
         return out

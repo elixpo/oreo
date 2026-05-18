@@ -60,9 +60,11 @@ class App(oreoOS.App):
 
     # Logical row indices — keeps cycle code readable when we re-order.
     (ROW_STATUS, ROW_SSID, ROW_IP, ROW_RSSI, ROW_POWER,
-     ROW_NETS, ROW_SPEED, ROW_PING, ROW_AUTOCONNECT) = range(9)
+     ROW_NETS, ROW_SPEED, ROW_PING, ROW_TRANSFER,
+     ROW_AUTOCONNECT) = range(10)
     ROWS = (ROW_STATUS, ROW_SSID, ROW_IP, ROW_RSSI, ROW_POWER,
-            ROW_NETS, ROW_SPEED, ROW_PING, ROW_AUTOCONNECT)
+            ROW_NETS, ROW_SPEED, ROW_PING, ROW_TRANSFER,
+            ROW_AUTOCONNECT)
 
     def on_enter(self, os_):
         super().on_enter(os_)
@@ -83,7 +85,9 @@ class App(oreoOS.App):
         self._snap    = self._read()
 
         # Sub-page state
-        self._mode    = "main"          # "main" | "nets"
+        self._mode    = "main"          # "main" | "nets" | "transfer"
+        # Cached cursor inside the transfer-page sender list.
+        self._trans_sel = 0
         self._nets    = []              # cached saved-networks list
         self._nets_sel = 0
 
@@ -129,6 +133,8 @@ class App(oreoOS.App):
     def on_button_press(self, btn):
         if self._mode == "nets":
             return self._on_button_nets(btn)
+        if self._mode == "transfer":
+            return self._on_button_transfer(btn)
         return self._on_button_main(btn)
 
     def _on_button_main(self, btn):
@@ -211,6 +217,9 @@ class App(oreoOS.App):
             self._reload_nets()
             self._nets_sel = 0
             self._mode     = "nets"
+        elif r == self.ROW_TRANSFER:
+            self._trans_sel = 0
+            self._mode      = "transfer"
         elif r == self.ROW_SPEED:
             self._run_speed_test()
         elif r == self.ROW_PING:
@@ -234,12 +243,33 @@ class App(oreoOS.App):
             return
         self._speed_label = "testing…"
         self._paint_busy("speed")
+
+        # Cooperative pump — runs between every recv() inside
+        # speed_test. Re-reads the button matrix so a keypress can
+        # both keep the OS feeling alive AND abort the test (any
+        # press cancels). Also redraws the screen so the user
+        # actually SEES the "testing..." label instead of the last
+        # pre-test frame.
+        cancel = [False]
+        def _pump():
+            try:
+                self._os.buttons.update()
+                for b_ in api.BUTTONS:
+                    if self._os.buttons.just_pressed(b_):
+                        cancel[0] = True
+                        return True
+            except Exception:
+                pass
+            return False
+
         try:
-            ok, kbps, ms = self._wifi.speed_test()
+            ok, kbps, ms = self._wifi.speed_test(pump_cb=_pump)
         except Exception:
             ok, kbps, ms = (False, 0, 0)
         self._busy = ""
-        if not ok or kbps <= 0:
+        if cancel[0]:
+            self._speed_label = "cancelled"
+        elif not ok or kbps <= 0:
             self._speed_label = "failed"
         elif kbps >= 1000:
             self._speed_label = "%.1f Mbps · %d ms" % (kbps / 1000.0, ms)
@@ -318,6 +348,16 @@ class App(oreoOS.App):
         if fresh != self._snap:
             self._snap = fresh
             self._dirty = True
+        # While the Transfer page is on screen, repaint every tick so
+        # the progress bar + pending-sender list stay live without the
+        # user having to nudge a button. The cost is negligible
+        # because the page is mostly text — but we only mark _dirty
+        # when there's actually something to refresh.
+        if self._mode == "transfer":
+            hs = self._http()
+            if hs is not None:
+                if hs.progress() is not None or hs.list_sessions():
+                    self._dirty = True
 
     # ── render ──────────────────────────────────────────────────────────
     def draw(self, d):
@@ -327,6 +367,9 @@ class App(oreoOS.App):
         d.clear(theme.BG)
         if self._mode == "nets":
             self._draw_nets(d)
+            return
+        if self._mode == "transfer":
+            self._draw_transfer(d)
             return
         widgets.draw_header(d, "WIFI")
         widgets.draw_hint(d, "A=select  HOME=back")
@@ -344,6 +387,7 @@ class App(oreoOS.App):
             ("Networks",     self._nets_summary(),          theme.TEXT_BRIGHT),
             ("Speed",        self._speed_label or "—",      theme.TEAL),
             ("Ping",         self._ping_label  or "—",      theme.TEAL),
+            ("Send files",   self._transfer_summary(),      theme.PRIMARY),
             ("Auto-connect", "ON" if self._autoconnect() else "OFF",
                              theme.TEXT_BRIGHT),
         ]
@@ -410,3 +454,203 @@ class App(oreoOS.App):
         if rssi is None:
             return "—"
         return "%d dBm %s" % (rssi, _bars(rssi))
+
+    # ── file-transfer sub-page ──────────────────────────────────────────
+    def _http(self):
+        try:
+            from oreoOS import http_server as _hs
+            return _hs
+        except Exception:
+            return None
+
+    def _transfer_summary(self):
+        """Compact value text for the main-page row: either the live
+        sender count, or the URL when idle. Reads the http_server's
+        cached state — no network call."""
+        hs = self._http()
+        if hs is None or not hs.is_running():
+            return "off"
+        try:
+            n = len(hs.list_sessions())
+        except Exception:
+            n = 0
+        if n:
+            return "%d active" % n
+        return "ready"
+
+    def _on_button_transfer(self, btn):
+        if btn in (api.BTN_HOME, api.BTN_B):
+            self._mode = "main"
+            self._dirty = True
+            return
+        if btn == api.BTN_RIGHT:
+            # Refresh — sometimes the page shows "Server offline" when
+            # WiFi is actually associated but the HTTP server hasn't
+            # picked up the new IP (e.g. after a hotspot handoff).
+            # Force-reconnect WiFi if needed and rebind the listener.
+            self._refresh_transfer()
+            self._dirty = True
+            return
+        hs = self._http()
+        if hs is None:
+            return
+        sessions = hs.list_sessions()
+        n = len(sessions)
+        if btn == api.BTN_UP and n:
+            self._trans_sel = (self._trans_sel - 1) % n
+        elif btn == api.BTN_DOWN and n:
+            self._trans_sel = (self._trans_sel + 1) % n
+        elif btn == api.BTN_A and n:
+            sid = sessions[self._trans_sel].get("id", "")
+            if sid:
+                hs.approve(sid)
+        elif btn == api.BTN_LEFT and n:
+            sid = sessions[self._trans_sel].get("id", "")
+            if sid:
+                hs.deny(sid)
+        else:
+            return
+        self._dirty = True
+
+    def _refresh_transfer(self):
+        """Reconcile the transfer page with the live network state.
+
+        Order: re-associate WiFi from saved networks (no-op if already
+        connected), then call http_server.start() which rebinds onto
+        the live IP (no-op if the IP hasn't changed). Both are cheap
+        and idempotent — we use them as a 'kick everything back to
+        life' button after a roaming WiFi event.
+        """
+        if self._wifi:
+            try:
+                if not self._wifi.is_connected():
+                    self._wifi.connect_from_config()
+            except Exception:
+                pass
+        hs = self._http()
+        if hs is not None:
+            try:
+                hs.start(self._os)
+            except Exception:
+                pass
+        # Pull a fresh snapshot so the URL line on the page repaints
+        # with the new IP if it changed.
+        self._snap = self._read()
+
+    def _draw_transfer(self, d):
+        widgets.draw_header(d, "SEND FILES")
+        widgets.draw_hint(d, "A=allow  L=deny  R=refresh  B=back")
+
+        hs = self._http()
+        running = bool(hs and hs.is_running())
+
+        # ── URL block ──
+        y = ROW_TOP_Y
+        if running:
+            url1 = hs.url()
+            url2 = hs.url_fallback()
+            d.text("Open on your phone:", ROW_PAD_X, y, theme.TEXT_DIM)
+            d.text(url1, ROW_PAD_X, y + 14, theme.PRIMARY, scale=2)
+            d.text(url2, ROW_PAD_X, y + 36, theme.TEXT_DIM)
+        else:
+            d.text("Server offline.", ROW_PAD_X, y, theme.MUTED, scale=1)
+            d.text("Connect WiFi to enable transfer.",
+                   ROW_PAD_X, y + 14, theme.MUTED2, scale=1)
+
+        # ── live transfer progress bar ──
+        prog = hs.progress() if hs else None
+        prog_y = y + 56
+        if prog:
+            total = max(1, int(prog.get("total", 0)))
+            done  = min(total, int(prog.get("received", 0)))
+            pct   = int((done * 100) // total)
+            d.text("Receiving %s" % (prog.get("filename", "")[:22] or "?"),
+                   ROW_PAD_X, prog_y, theme.TEAL)
+            # bar
+            bar_x, bar_y, bar_w, bar_h = ROW_PAD_X, prog_y + 14, SW - 2 * ROW_PAD_X, 8
+            d.rect(bar_x, bar_y, bar_w, bar_h, theme.MUTED2, fill=True)
+            fill_w = int(bar_w * pct / 100)
+            d.rect(bar_x, bar_y, fill_w, bar_h, theme.PRIMARY, fill=True)
+            d.text("%d%%  %d / %d KB" % (pct, done // 1024, total // 1024),
+                   ROW_PAD_X, bar_y + 12, theme.TEXT_DIM)
+            list_y = bar_y + 28
+        else:
+            list_y = prog_y
+
+        # ── pending sender list ──
+        # Denied sessions are hidden from the on-badge list: the badge
+        # has already made its decision, and surfacing rejected
+        # devices is just visual noise. The phone-side page still
+        # gets the "denied" verdict from its next beacon poll so the
+        # user there can hit refresh and try again with a fresh ID.
+        sessions_all = hs.list_sessions() if hs else []
+        sessions = [s for s in sessions_all if s.get("state") != "denied"]
+        # Clamp the cursor in case a session disappeared between ticks.
+        if self._trans_sel >= len(sessions):
+            self._trans_sel = max(0, len(sessions) - 1)
+
+        d.rect(ROW_PAD_X, list_y, SW - 2 * ROW_PAD_X, 1, theme.MUTED2, fill=True)
+        list_y += 6
+        if not sessions:
+            d.text("no senders connected",
+                   ROW_PAD_X + 2, list_y, theme.MUTED2)
+            return
+
+        # State -> dot colour. RGB tuples instead of theme constants
+        # because we need a clean green, and the theme palette doesn't
+        # ship one — primary is pink-red, teal is too cyan.
+        dot_color = {
+            "pending":  api.rgb(255, 209, 102),    # yellow
+            "approved": api.rgb( 61, 220, 151),    # green
+            "denied":   api.rgb(255,  93, 104),    # red — visible only
+                                                   # in the brief window
+                                                   # before the row is
+                                                   # filtered out
+        }
+        DOT_SIZE   = 8
+        DOT_RIGHT  = ROW_PAD_X + 2   # pad from the right edge
+        BAR_PAD    = 8               # gap on either side of the bar
+        ROW_INNER  = ROW_H - 4
+
+        prog = hs.progress() if hs else None
+
+        for i, s in enumerate(sessions[:5]):
+            row_y = list_y + i * ROW_H
+            sel   = (i == self._trans_sel)
+            if sel:
+                d.rect(4, row_y - 2, SW - 8, ROW_H - 1,
+                       theme.DOCK_SEL, fill=True)
+                d.rect(4, row_y - 2, SW - 8, 1, theme.SEL_BORDER, fill=True)
+                d.rect(4, row_y + ROW_H - 4, SW - 8, 1,
+                       theme.SEL_BORDER, fill=True)
+            sid   = s.get("id", "------")
+            state = s.get("state", "pending")
+
+            # ID at scale=1 (smaller than before — the page got too
+            # busy with the old scale=2 codes once we added a progress
+            # bar and a status dot to the same row).
+            d.text(sid, ROW_PAD_X, row_y + 6, theme.TEXT_BRIGHT, scale=1)
+
+            # Status dot, right side, vertically centred in the row.
+            dx = SW - DOT_RIGHT - DOT_SIZE
+            dy = row_y + (ROW_INNER - DOT_SIZE) // 2 + 2
+            d.rect(dx, dy, DOT_SIZE, DOT_SIZE,
+                   dot_color.get(state, theme.MUTED), fill=True)
+
+            # Mid-row progress bar — only when THIS session is the one
+            # currently receiving. Spans the area between the ID text
+            # and the status dot.
+            if prog and prog.get("id") == sid:
+                # Approximate where the SID text ends. Codes are 6
+                # chars × 8 px at scale=1 = 48 px.
+                bar_x = ROW_PAD_X + 6 * 8 + BAR_PAD
+                bar_w = dx - BAR_PAD - bar_x
+                if bar_w > 8:
+                    total = max(1, int(prog.get("total", 0)))
+                    done  = min(total, int(prog.get("received", 0)))
+                    pct_w = int(bar_w * done / total)
+                    bar_y = row_y + (ROW_INNER - 4) // 2 + 2
+                    d.rect(bar_x, bar_y, bar_w, 4,
+                           theme.MUTED2, fill=True)
+                    d.rect(bar_x, bar_y, pct_w, 4,
+                           theme.PRIMARY, fill=True)

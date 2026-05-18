@@ -20,24 +20,62 @@ SW = api.SCREEN_W
 SH = api.SCREEN_H
 
 
+_GALLERY_DIR = "apps/gallery/assets/optimized"
+
+
 def _list_photos():
+    """Both formats land here:
+      .py    — laptop-optimised, baked at deploy time
+      .r565  — uploaded over WiFi, written by oreoOS.http_server in the
+               on-device-renderable binary format defined below.
+    Returned names include their extension so _load_photo can dispatch."""
     try:
-        names = []
-        for f in _os.listdir("apps/gallery/assets/optimized"):
-            if f.endswith(".py") and not f.startswith("_"):
-                names.append(f[:-3])
-        names.sort()
-        return names
+        out = []
+        for f in _os.listdir(_GALLERY_DIR):
+            if f.startswith("_"):
+                continue
+            if f.endswith(".py") or f.endswith(".r565"):
+                out.append(f)
+        out.sort()
+        return out
     except OSError:
         return []
 
 
 def _load_photo(name):
+    """name is the full filename ('sunset.py' / 'upload_1234.r565').
+    Dispatch on extension."""
+    if name.endswith(".r565"):
+        return _load_r565(_GALLERY_DIR + "/" + name)
+    if name.endswith(".py"):
+        stem = name[:-3]
+        try:
+            mod = __import__("apps.gallery.assets.optimized." + stem,
+                             None, None, ["DATA", "W", "H"])
+            return (bytearray(mod.DATA), mod.W, mod.H)
+        except (ImportError, AttributeError):
+            return None
+    return None
+
+
+def _load_r565(path):
+    """Read a 6-byte header (magic + W + H, little-endian) and the
+    following W*H*2 bytes of RGB565 pixel data. Mirrors the binary
+    format the upload page produces in the browser canvas pipeline."""
     try:
-        mod = __import__("apps.gallery.assets.optimized." + name,
-                         None, None, ["DATA", "W", "H"])
-        return (bytearray(mod.DATA), mod.W, mod.H)
-    except (ImportError, AttributeError):
+        with open(path, "rb") as f:
+            head = f.read(6)
+            if len(head) < 6 or head[0] != 0x52 or head[1] != 0x35:
+                return None
+            w = head[2] | (head[3] << 8)
+            h = head[4] | (head[5] << 8)
+            if w <= 0 or h <= 0 or w > 320 or h > 320:
+                return None
+            data = f.read(w * h * 2)
+        if len(data) < w * h * 2:
+            return None
+        return (bytearray(data), w, h)
+    except Exception:
         return None
 
 
