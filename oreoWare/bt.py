@@ -328,16 +328,22 @@ def _addr_from_mac(mac_str):
 
 
 def _apply_security_config(ble):
-    """Enable bonding + LE Secure Connections with JustWorks IO caps.
+    """Enable bonding + LE Secure Connections with DISPLAY_YESNO IO caps.
 
-    Best-effort: older MicroPython builds may not support every kwarg,
-    so each is wrapped individually so the radio still works in a
-    degraded mode (no bonding) if a build is missing one."""
+    DISPLAY_YESNO + mitm=True asks the stack to negotiate the strongest
+    method available with the peer; with a modern phone that's
+    Numeric Comparison, which fires _IRQ_PASSKEY_ACTION on the badge so
+    we can render a confirm prompt. Older peers that can't do SC fall
+    back to legacy pairing.
+
+    Best-effort: each kwarg is wrapped individually so the radio still
+    works in a degraded mode if an older MicroPython build is missing
+    one of the keys."""
     for kw in (
         {"bond":      True},
-        {"mitm":      False},
+        {"mitm":      True},
         {"le_secure": True},
-        {"io":        _IO_NO_INPUT_NO_OUTPUT},
+        {"io":        _IO_DISPLAY_YESNO},
     ):
         try:
             ble.config(**kw)
@@ -648,10 +654,32 @@ _pair_state   = PAIR_IDLE
 _pair_target  = None     # {"mac", "name", "kind", "addr_type", "addr", "conn"}
 _pair_message = ""
 
-# Security config — JustWorks pairing (no passkey UI). The on-badge "do
-# you want to pair with X?" confirmation popup is the consent step; once
-# the user accepts on the badge, the BLE handshake completes silently.
-_IO_NO_INPUT_NO_OUTPUT = 3
+# Security config — LE Secure Connections with Numeric Comparison.
+# Both the badge (DISPLAY_YESNO IO caps) and a modern phone (also
+# DISPLAY_YESNO) end up running the SMP "numeric comparison" method:
+# the stack hands us a 6-digit confirmation value, the phone shows the
+# same one, the user taps YES on both sides. This is the strongest
+# pairing method available on consumer BLE and the only one that gives
+# us a real on-badge consent prompt.
+#
+# Older phones / odd peers that can't negotiate Secure Connections fall
+# back to legacy pairing; we keep mitm=True so the stack picks the most
+# secure method available rather than silently dropping to JustWorks.
+_IO_DISPLAY_YESNO       = 1
+_IO_NO_INPUT_NO_OUTPUT  = 3
+
+# Passkey-action codes the stack hands back in _IRQ_PASSKEY_ACTION.
+_PASSKEY_ACTION_NONE    = 0
+_PASSKEY_ACTION_INPUT   = 1     # peer-side: we'd need a keyboard
+_PASSKEY_ACTION_DISP    = 2     # legacy: display passkey, peer enters
+_PASSKEY_ACTION_NUMCMP  = 4     # Secure-Connections numeric comparison
+
+_IRQ_PASSKEY_ACTION     = 31
+
+# Inbound pair-prompt state. Populated by _IRQ_PASSKEY_ACTION and
+# polled by oreoOS.pair_prompt to drive the on-screen confirmation
+# overlay. Cleared by accept_pair_prompt() / reject_pair_prompt().
+_pair_prompt = None      # {"conn", "action", "passkey", "name", "mac"}
 
 
 class _RxState:
@@ -861,6 +889,47 @@ def _irq(event, data):
             # whichever side actually finishes its work close it.
         else:
             _set_pair_state(PAIR_FAILED, "encryption rejected")
+    elif event == _IRQ_PASSKEY_ACTION:
+        # data = (conn_handle, action, passkey)
+        # Fired during inbound pairing when the SMP method needs user
+        # interaction. We only handle NUMCMP (the path Secure Connections
+        # takes when both sides are DISPLAY_YESNO) — for DISP we'd need
+        # to render a 6-digit code and have the user type it on the
+        # phone, which we can support later; for now we treat anything
+        # other than NUMCMP as a silent accept so legacy pairing still
+        # completes for older peers.
+        try:
+            conn_handle, action, passkey = data
+        except (ValueError, TypeError):
+            return
+        if action == _PASSKEY_ACTION_NUMCMP:
+            global _pair_prompt
+            # Resolve a friendly name for the prompt — _scan_results is
+            # keyed by MAC, but we don't actually know the MAC of an
+            # inbound connection at this point. Best we can do is show
+            # the conn handle alongside the number; the BT app's
+            # connect notification already surfaced the MAC.
+            _pair_prompt = {
+                "conn":    conn_handle,
+                "action":  action,
+                "passkey": int(passkey),
+                "name":    "BT peer",
+                "mac":     "",
+            }
+            try:
+                print("[bt] pair prompt passkey=%06d conn=%d" %
+                      (int(passkey), conn_handle))
+            except Exception:
+                pass
+        else:
+            # Legacy / unsupported action — silently approve so we
+            # don't strand the peer. They'll either succeed via legacy
+            # JustWorks-ish fallback or the encryption update will
+            # later flag failure.
+            try:
+                _get_ble().gap_passkey(conn_handle, action, passkey)
+            except Exception:
+                pass
     elif event == _IRQ_SET_SECRET:
         sec_type, key, value = data
         try:
@@ -935,6 +1004,50 @@ def disconnect_peer():
         return False
     try:
         _get_ble().gap_disconnect(_conn)
+        return True
+    except Exception:
+        return False
+
+
+# ── inbound pair-confirm prompt API ─────────────────────────────────────
+# Surfaces the SMP Numeric Comparison value to oreoOS.pair_prompt so it
+# can render the on-screen confirmation overlay. Three calls cover the
+# state machine: peek to read the live prompt, accept to confirm, reject
+# to refuse.
+
+def peek_pair_prompt():
+    """Return the live pair-prompt dict, or None if no prompt is
+    pending. Caller MUST NOT mutate the returned dict."""
+    return _pair_prompt
+
+
+def accept_pair_prompt():
+    """User tapped YES on the confirm overlay. Pass our agreement back
+    to the SMP layer; encryption completes asynchronously and
+    _IRQ_ENCRYPTION_UPDATE fires when it's done."""
+    global _pair_prompt
+    p = _pair_prompt
+    _pair_prompt = None
+    if p is None:
+        return False
+    try:
+        _get_ble().gap_passkey(p["conn"], p["action"], p["passkey"])
+        return True
+    except Exception:
+        return False
+
+
+def reject_pair_prompt():
+    """User tapped NO. Drop the link — SMP will tear itself down once
+    the connection's gone, and the peer sees an explicit refusal
+    instead of a silent timeout."""
+    global _pair_prompt
+    p = _pair_prompt
+    _pair_prompt = None
+    if p is None:
+        return False
+    try:
+        _get_ble().gap_disconnect(p["conn"])
         return True
     except Exception:
         return False
