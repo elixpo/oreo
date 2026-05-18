@@ -489,28 +489,86 @@ def _register_service(ble):
 
 # ─── advertising ─────────────────────────────────────────────────────────
 
+# Generic-tag appearance value — tells scanning phones to render us with
+# a "generic" icon rather than "unknown peripheral". 0x0000 is the safest
+# value across iOS / Android — it reads as "Unknown" but still passes
+# their "advertiser must declare an Appearance" filters. If we ever ship
+# a watch form factor, 0x00C0 (Generic Watch) would be a better fit.
+_APPEARANCE_GENERIC = 0x0000
+
+
 def _adv_payload(name):
-    """Build a minimal connectable adv payload: Flags (LE general disc) +
-    Complete Local Name. Stays well under the 31-byte limit."""
+    """Connectable adv payload: Flags + Appearance + Complete Local Name.
+
+    iOS and recent Android scanners often hide or de-prioritise devices
+    that don't declare an Appearance, so we always include one. Total
+    payload stays under the 31-byte cap for typical badge names — we
+    truncate the name itself if needed and rely on the scan response
+    to carry the full string."""
     name_bytes = name.encode("utf-8")
-    return (b"\x02\x01\x06"
-            + bytes((len(name_bytes) + 1, 0x09)) + name_bytes)
+    # 2-byte appearance (LE)
+    appearance = bytes((3, _AD_APPEARANCE,
+                        _APPEARANCE_GENERIC & 0xFF,
+                        (_APPEARANCE_GENERIC >> 8) & 0xFF))
+    # Truncate name so Flags(3) + Appearance(4) + NameHdr(2) + name <= 31.
+    max_name = 31 - 3 - 4 - 2
+    if len(name_bytes) > max_name:
+        name_bytes = name_bytes[:max_name]
+    return (b"\x02\x01\x06"                              # Flags
+            + appearance
+            + bytes((len(name_bytes) + 1, 0x09))         # Complete Local Name
+            + name_bytes)
+
+
+def _scan_resp_payload(name):
+    """Scan-response payload returned to active scanners. Carries the
+    full untruncated name (so phones running active scans see "Oreo
+    Badge" cleanly) plus the 128-bit service UUID so apps that filter
+    by service can find us."""
+    import bluetooth
+    name_bytes = name.encode("utf-8")
+    name_ad = bytes((len(name_bytes) + 1, 0x09)) + name_bytes
+    # 128-bit Complete Service UUID list. Endianness is little-endian
+    # on the wire (Core Spec Vol 3 Part C 18.2). The constant matches
+    # the UUID registered in _register_service.
+    svc_bytes = bytes(reversed(bytes(
+        bluetooth.UUID("6f72656f-0000-1000-8000-00805f9b34fb"))))
+    svc_ad = bytes((len(svc_bytes) + 1, 0x07)) + svc_bytes  # 0x07 = Complete 128-bit UUIDs
+    return name_ad + svc_ad
 
 
 def _start_advertising(ble):
-    """Set the GAP name and start advertising at the configured interval."""
+    """Set the GAP name and start advertising. Default 200 ms interval
+    so phones (which scan in short bursts) reliably see us within one
+    scan window. Override via secrets.BT_ADV_INTERVAL_MS."""
     try:
         ble.config(gap_name=DEVICE_NAME)
     except Exception:
         pass
-    interval_us = 500_000
+    interval_us = 200_000   # was 500_000 — too slow for iOS opportunistic scans
     try:
         from secrets import BT_ADV_INTERVAL_MS
         interval_us = int(BT_ADV_INTERVAL_MS) * 1000
     except Exception:
         pass
+    adv  = _adv_payload(DEVICE_NAME)
     try:
-        ble.gap_advertise(interval_us, adv_data=_adv_payload(DEVICE_NAME))
+        resp = _scan_resp_payload(DEVICE_NAME)
+    except Exception:
+        resp = None
+    # Try the resp_data kwarg first; older MicroPython builds without it
+    # fall back silently to adv-only.
+    try:
+        if resp is not None:
+            ble.gap_advertise(interval_us, adv_data=adv, resp_data=resp)
+        else:
+            ble.gap_advertise(interval_us, adv_data=adv)
+    except TypeError:
+        # Build doesn't accept resp_data — keep going with adv only.
+        try:
+            ble.gap_advertise(interval_us, adv_data=adv)
+        except Exception:
+            pass
     except Exception:
         pass
 
@@ -586,8 +644,16 @@ def _irq(event, data):
         # merge into the dict so the most recent RSSI + any newly
         # discovered name wins. bytes(addr) copies out of the IRQ-scoped
         # buffer so we can keep the dict entry around.
-        mac  = _mac_str(bytes(addr))
-        name, appearance, services = _parse_adv(bytes(adv_data))
+        mac = _mac_str(bytes(addr))
+        name, appearance, services, mfr_id = _parse_adv(bytes(adv_data))
+        # Best-effort label when the peer suppresses its name (common
+        # on iOS, where the GAP name is hidden until pairing). The
+        # Apple "iPhone" string is the most useful fallback for the
+        # in-hall conference scenario.
+        if not name and mfr_id is not None:
+            tag = _MFR_TAGS.get(mfr_id)
+            if tag:
+                name = tag + " device"
         cur = _scan_results.get(mac)
         if cur is None:
             cur = {"mac":         mac,
@@ -595,17 +661,33 @@ def _irq(event, data):
                    "rssi":        rssi,
                    "appearance":  appearance,
                    "services":    services,
-                   "type":        _classify_appearance(appearance)}
+                   "type":        _classify_appearance(appearance),
+                   # Capture addr_type so start_pair() can pass the
+                   # correct type to gap_connect — defaulting to 0
+                   # (PUBLIC) was breaking every iPhone connection
+                   # because iOS uses Random Resolvable addresses.
+                   "addr_type":   addr_type,
+                   "addr":        bytes(addr),
+                   "mfr_id":      mfr_id}
             _scan_results[mac] = cur
         else:
-            cur["rssi"] = rssi
-            if name and (cur["name"] == "(unknown)" or len(name) > len(cur["name"])):
+            cur["rssi"]      = rssi
+            cur["addr_type"] = addr_type
+            cur["addr"]      = bytes(addr)
+            # Names from active scan responses are usually more complete
+            # than the ones in the initial adv. Prefer longer.
+            if name and (cur["name"] == "(unknown)" or
+                         (cur["name"].endswith("device") and
+                          not name.endswith("device")) or
+                         len(name) > len(cur["name"])):
                 cur["name"] = name
             if appearance and not cur["appearance"]:
                 cur["appearance"] = appearance
                 cur["type"]       = _classify_appearance(appearance)
             if services:
                 cur["services"] = services
+            if mfr_id and not cur.get("mfr_id"):
+                cur["mfr_id"] = mfr_id
     elif event == _IRQ_SCAN_DONE:
         global _scan_active
         _scan_active = False
