@@ -518,7 +518,7 @@ class App(oreoOS.App):
 
     def _draw_transfer(self, d):
         widgets.draw_header(d, "SEND FILES")
-        widgets.draw_hint(d, "A=allow  LEFT=deny  B=back")
+        widgets.draw_hint(d, "A=allow  L=deny  R=refresh  B=back")
 
         hs = self._http()
         running = bool(hs and hs.is_running())

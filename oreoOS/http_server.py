@@ -82,14 +82,6 @@ _sessions = {}
 #   {"id": "...", "filename": "...", "received": int, "total": int}
 _progress = None
 
-# After a successful upload we surface the new file in its native
-# viewer automatically — Gallery for images, Reader for text/markdown.
-# The HTTP handler runs inside the OS run-loop tick, so it can't call
-# os.launch() directly (no os reference here, and we want the upload
-# response to flush BEFORE the screen flips). Instead the run loop
-# polls pop_pending_launch() each tick and dispatches when the queue
-# is non-empty.
-_pending_launch = None    # "gallery" | "reader" | None
 
 
 # ── routing tables ──────────────────────────────────────────────────────
@@ -290,14 +282,6 @@ def progress():
     return _progress
 
 
-def pop_pending_launch():
-    """Run-loop hook: returns and clears the queued app dir, if any.
-    Called from launcher.py after http_server.tick() so the OS can
-    auto-open Gallery / Reader once a transfer lands."""
-    global _pending_launch
-    target = _pending_launch
-    _pending_launch = None
-    return target
 
 
 def _new_session_id():
@@ -843,12 +827,10 @@ def _handle_upload(sock, headers, body_prefix, qs):
     except Exception:
         pass
 
-    # Queue an auto-launch of the receiving app so the user sees their
-    # photo / document the moment it arrives, no extra taps. The run
-    # loop will pick this up on the next tick — that's deliberately
-    # after we've flushed the 200 response to the phone.
-    global _pending_launch
-    _pending_launch = target_app
+    # We deliberately DON'T auto-launch the receiving app — the file
+    # is already on flash and Gallery / Reader will pick it up the
+    # next time the user opens those apps. The notification above is
+    # the "your file arrived" cue.
 
     body = (b"<!doctype html><html><head>"
             b"<meta http-equiv='refresh' content='2; url=/'>"
