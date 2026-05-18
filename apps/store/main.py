@@ -140,6 +140,15 @@ class App(oreoOS.App):
         else:
             ok = store.install(name_dir)
             self._msg = "Installed" if ok else "Install failed"
+        # The drawer caches its app list at module scope — invalidate
+        # it so the newly-installed (or just-removed) app shows up on
+        # the next drawer open instead of waiting for a reboot.
+        if ok:
+            try:
+                from apps.launcher.main import invalidate_apps_cache
+                invalidate_apps_cache()
+            except Exception:
+                pass
         self._busy = None
         self._dirty = True
 
