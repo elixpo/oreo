@@ -314,9 +314,11 @@ class App(oreoOS.App):
             _t0  = _t.ticks_ms()
             _seg = _t0
             def _lap(label, last=[_seg]):
+                # MicroPython's str has no .ljust; manual pad instead.
+                pad = label if len(label) >= 18 else label + " " * (18 - len(label))
                 now = _t.ticks_ms()
                 print("[launcher]   %s  %d ms" %
-                      (label.ljust(18), _t.ticks_diff(now, last[0])))
+                      (pad, _t.ticks_diff(now, last[0])))
                 last[0] = now
         except Exception:
             _t0 = None
