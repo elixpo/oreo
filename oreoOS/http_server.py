@@ -86,10 +86,22 @@ _progress = None
 
 # ── routing tables ──────────────────────────────────────────────────────
 
-_GALLERY_DIR  = "apps/gallery/assets/raw"
+_GALLERY_DIR  = "apps/gallery/assets/optimized"   # was /raw — Gallery
+                                                  # only reads optimized/
+                                                  # at runtime, so raw
+                                                  # uploads were invisible
+                                                  # until a laptop deploy
+                                                  # re-ran the optimiser.
+                                                  # We now upload pre-
+                                                  # converted .r565 binaries
+                                                  # straight into here.
 _DOCS_DIR     = "documents"
 
-_IMG_EXTS = (".png", ".jpg", ".jpeg", ".gif")
+# .r565 is our on-device-renderable image format: 6-byte header
+# (magic 'R5' + width LE16 + height LE16), then W*H 2-byte RGB565
+# pixels. The browser does the conversion before upload — see the
+# canvas pipeline in _UPLOAD_FORM below.
+_IMG_EXTS = (".r565",)
 _DOC_EXTS = (".md", ".txt")
 
 
@@ -479,11 +491,44 @@ _UPLOAD_FORM = (
     b"<button onclick=\"location.reload()\">Try again</button>';"
     b"      throw new Error('denied');}"
     b"  }catch(e){}}"
+    b"const MAX_DIM=240;"
+    b"async function imgToR565(file){"
+    b"  const img=new Image();"
+    b"  img.src=URL.createObjectURL(file);"
+    b"  await new Promise((r,j)=>{img.onload=r;img.onerror=j;});"
+    b"  const sc=Math.min(1,MAX_DIM/Math.max(img.width,img.height));"
+    b"  const w=Math.max(1,Math.round(img.width*sc)),"
+    b"        h=Math.max(1,Math.round(img.height*sc));"
+    b"  const c=document.createElement('canvas');c.width=w;c.height=h;"
+    b"  const ctx=c.getContext('2d');"
+    b"  ctx.fillStyle='#000';ctx.fillRect(0,0,w,h);"
+    b"  ctx.drawImage(img,0,0,w,h);"
+    b"  const px=ctx.getImageData(0,0,w,h).data;"
+    b"  const out=new Uint8Array(6+w*h*2);"
+    b"  out[0]=0x52;out[1]=0x35;"
+    b"  out[2]=w&0xff;out[3]=(w>>8)&0xff;"
+    b"  out[4]=h&0xff;out[5]=(h>>8)&0xff;"
+    b"  let o=6;"
+    b"  for(let i=0;i<px.length;i+=4){"
+    b"    const r=px[i]>>3,g=px[i+1]>>2,b=px[i+2]>>3;"
+    b"    const v=(r<<11)|(g<<5)|b;"
+    b"    out[o++]=(v>>8)&0xff;out[o++]=v&0xff;}"
+    b"  return new Blob([out],{type:'application/octet-stream'});"
+    b"}"
     b"document.addEventListener('DOMContentLoaded',async()=>{"
     b"  await newSession();setInterval(beacon,2000);"
     b"  document.getElementById('form').addEventListener('submit',async(e)=>{"
     b"    e.preventDefault();"
-    b"    const fd=new FormData(e.target);"
+    b"    const inp=e.target.querySelector('input[type=file]');"
+    b"    const f=inp.files[0];if(!f){return;}"
+    b"    document.getElementById('go').disabled=true;"
+    b"    let payload=f,name=f.name;"
+    b"    if(f.type.startsWith('image/')){"
+    b"      try{payload=await imgToR565(f);"
+    b"           name=name.replace(/\\.[^.]+$/,'')+'.r565';}"
+    b"      catch(err){alert('Image decode failed: '+err);"
+    b"                 document.getElementById('go').disabled=false;return;}}"
+    b"    const fd=new FormData();fd.append('f',payload,name);"
     b"    const xhr=new XMLHttpRequest();"
     b"    xhr.upload.addEventListener('progress',(ev)=>{"
     b"      if(ev.lengthComputable){"
@@ -491,9 +536,9 @@ _UPLOAD_FORM = (
     b"    xhr.onload=()=>{if(xhr.status===200){"
     b"      document.getElementById('form').classList.add('hide');"
     b"      document.getElementById('done').classList.remove('hide');}"
-    b"      else{alert('Upload failed: '+xhr.status);}};"
-    b"    xhr.open('POST','/upload?token='+sid);xhr.send(fd);"
-    b"    document.getElementById('go').disabled=true;});"
+    b"      else{alert('Upload failed: '+xhr.status);"
+    b"            document.getElementById('go').disabled=false;}};"
+    b"    xhr.open('POST','/upload?token='+sid);xhr.send(fd);});"
     b"});"
     b"</script>"
     b"</body></html>"
