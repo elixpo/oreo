@@ -125,18 +125,38 @@ _AD_INCOMPLETE_UUID16  = 0x02
 _AD_COMPLETE_UUID16    = 0x03
 _AD_SHORT_NAME         = 0x08
 _AD_COMPLETE_NAME      = 0x09
+_AD_TX_POWER           = 0x0A
 _AD_APPEARANCE         = 0x19
+_AD_MANUFACTURER       = 0xFF
+
+# Company IDs we'll surface as "label hints" when a peer omits its name
+# (common on iOS, which suppresses the GAP name until pairing). The full
+# Bluetooth SIG assigned-numbers list is huge; we cover the brands the
+# user is most likely to see in a conference hall.
+_MFR_TAGS = {
+    0x004C: "Apple",         # iPhone, iPad, Mac, AirPods
+    0x0006: "Microsoft",     # Surface, Xbox
+    0x00E0: "Google",        # Pixel, Chromebook
+    0x0075: "Samsung",
+    0x038F: "Xiaomi",
+    0x0157: "Anker",
+    0x012D: "Sony",
+    0x0001: "Ericsson",
+    0x0059: "Nordic",        # nRF dev boards
+}
 
 
 def _parse_adv(adv_data):
-    """Walk AD structures. Returns (name_or_None, appearance_or_None,
-    [uuid16, ...]). Tolerates malformed payloads — we never trust a peer
-    advertiser to be conformant."""
+    """Walk AD structures. Returns (name, appearance, [uuid16…], mfr_id).
+    Tolerates malformed payloads — we never trust a peer advertiser to
+    be conformant. mfr_id is the first 16-bit Company Identifier from
+    a manufacturer-specific data record (AD type 0xFF), or None."""
     name       = None
     appearance = None
     services   = []
+    mfr_id     = None
     if not adv_data:
-        return name, appearance, services
+        return name, appearance, services, mfr_id
     i = 0
     n = len(adv_data)
     while i < n:
@@ -152,7 +172,11 @@ def _parse_adv(adv_data):
         payload = adv_data[i + 2 : i + 1 + ln]
         if ad_type in (_AD_COMPLETE_NAME, _AD_SHORT_NAME):
             try:
-                name = bytes(payload).decode("utf-8")
+                # Strip embedded NULs and trailing whitespace — iOS
+                # sometimes pads short names with NUL.
+                name = bytes(payload).decode("utf-8").rstrip("\x00").strip()
+                if not name:
+                    name = None
             except Exception:
                 name = None
         elif ad_type == _AD_APPEARANCE and len(payload) >= 2:
@@ -161,8 +185,13 @@ def _parse_adv(adv_data):
             for j in range(0, len(payload), 2):
                 if j + 1 < len(payload):
                     services.append(payload[j] | (payload[j + 1] << 8))
+        elif ad_type == _AD_MANUFACTURER and len(payload) >= 2:
+            # First two bytes are the little-endian Company ID; the rest
+            # is vendor-specific. We only keep the Company ID — that's
+            # enough to label "Apple" / "Samsung" / etc in the UI.
+            mfr_id = payload[0] | (payload[1] << 8)
         i += 1 + ln
-    return name, appearance, services
+    return name, appearance, services, mfr_id
 
 
 def _mac_str(addr_bytes):
