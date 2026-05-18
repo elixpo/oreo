@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Github, Heart } from "lucide-react";
+import { Github, Heart, Star, GitFork } from "lucide-react";
 
 const COLUMNS = [
   {
@@ -8,6 +8,8 @@ const COLUMNS = [
       { label: "Get Started", href: "/get-started/" },
       { label: "Badge",       href: "/badge/" },
       { label: "Apps",        href: "/apps/" },
+      { label: "Hacks",       href: "/hacks/" },
+      { label: "Contribute",  href: "/contribute/" },
       { label: "Upload",      href: "/upload/" },
     ],
   },
@@ -51,10 +53,19 @@ export default function Footer() {
             <a
               href="https://github.com/elixpo/oreo"
               target="_blank" rel="noreferrer"
-              className="mt-5 inline-flex items-center gap-2 text-sm text-muted
-                         transition-colors hover:text-text"
+              className="mt-5 inline-flex items-center gap-3 rounded-md
+                         border border-border bg-bg-raised/60 px-3 py-2 text-xs
+                         text-text-dim transition-colors
+                         hover:border-primary/60 hover:text-text"
             >
-              <Github className="h-4 w-4" /> elixpo/oreo
+              <Github className="h-4 w-4" />
+              <span className="flex flex-col leading-tight">
+                <span className="font-semibold text-text">elixpo/oreo</span>
+                <span className="flex items-center gap-2 text-muted">
+                  <Star className="h-3 w-3" /> 446
+                  <GitFork className="h-3 w-3" /> 140
+                </span>
+              </span>
             </a>
           </div>
 

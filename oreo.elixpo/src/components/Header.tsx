@@ -7,10 +7,11 @@ import { Github, Star, GitFork } from "lucide-react";
 
 const NAV = [
   { href: "/",            label: "Home" },
+  { href: "/get-started/",label: "Get Started" },
   { href: "/badge/",      label: "Badge" },
   { href: "/apps/",       label: "Apps" },
-  { href: "/upload/",     label: "Upload" },
-  { href: "/get-started/",label: "Get Started" },
+  { href: "/hacks/",      label: "Hacks" },
+  { href: "/contribute/", label: "Contribute" },
 ];
 
 export default function Header() {

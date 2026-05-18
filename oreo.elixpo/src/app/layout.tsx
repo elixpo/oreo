@@ -3,21 +3,67 @@ import "./globals.css";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 
+// SEO + social-card metadata. The og-banner.png referenced here is the
+// same artwork used as the README banner on the main repo — generated
+// from `prompts/site_assets.md` and dropped into /public/og-banner.png.
+// Keeping a single image for both surfaces means a contributor only
+// has to refresh one file when the brand shifts.
+
+const SITE_TITLE       = "OreoOS — a Python OS in a pocket-sized badge";
+const SITE_DESCRIPTION =
+  "Open hardware. Open firmware. 20+ apps, on-device store, OTA over " +
+  "WiFi, AirDrop-style file transfer. MicroPython on ESP32-S3.";
+const SITE_URL  = "https://oreo.pages.dev";
+const OG_IMAGE  = "/og-banner.png";
+
 export const metadata: Metadata = {
-  title: "Oreo — a Python OS for the Elixpo Badge",
-  description:
-    "Conference badge running OreoOS — Python-native on MicroPython. " +
-    "App store, OTA updates, AirDrop-style WiFi transfer, IR quests.",
-  metadataBase: new URL("https://oreo.pages.dev"),
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default:  SITE_TITLE,
+    template: "%s · Oreo",
+  },
+  description: SITE_DESCRIPTION,
+  applicationName: "OreoOS",
+  authors: [{ name: "Elixpo", url: "https://github.com/elixpo" }],
+  generator: "Next.js",
+  keywords: [
+    "OreoOS", "Elixpo Badge", "conference badge", "MicroPython",
+    "ESP32-S3", "open hardware", "open source OS", "app store",
+    "file transfer", "BLE", "WiFi", "IR quest",
+  ],
+  // Per-route titles override `default` via Next's metadata API;
+  // robots gets allow-everywhere here because the site is fully public.
+  robots: {
+    index: true, follow: true,
+    googleBot: { index: true, follow: true, "max-image-preview": "large" },
+  },
   openGraph: {
-    title: "Oreo Badge",
-    description:
-      "A Python OS for a pocket-sized open-hardware conference badge.",
-    url: "https://oreo.pages.dev",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    url: SITE_URL,
     siteName: "Oreo",
     type: "website",
+    locale: "en_US",
+    images: [{
+      url:     OG_IMAGE,
+      width:   1200,
+      height:  630,
+      alt:     "Oreo Badge — a Python OS in a pocket-sized conference badge",
+    }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    images: [OG_IMAGE],
+  },
+  icons: {
+    icon:        "/logo-mark.svg",
+    shortcut:    "/favicon.ico",
+    apple:       "/apple-touch-icon.png",
   },
   themeColor: "#0F0C1C",
+  formatDetection: { telephone: false, email: false, address: false },
 };
 
 export default function RootLayout({
