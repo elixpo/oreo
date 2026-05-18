@@ -149,7 +149,7 @@ class App(oreoOS.App):
                 continue
             if kind == "status":
                 return i
-            if kind == "nearby":
+            if kind in ("nearby", "paired"):
                 payload = r[1]
                 if payload and payload.get("mac") == ident:
                     return i
@@ -173,9 +173,9 @@ class App(oreoOS.App):
         kind = row[0]
         if kind == "status":
             self._sel_key = ("status", 0)
-        elif kind == "nearby":
+        elif kind in ("nearby", "paired"):
             payload = row[1]
-            self._sel_key = ("nearby", payload.get("mac"))
+            self._sel_key = (kind, payload.get("mac"))
 
     # ── lifecycle ──────────────────────────────────────────────────────
     def update(self, dt):
@@ -280,6 +280,19 @@ class App(oreoOS.App):
             except Exception:
                 pass
             self._dirty = True
+        elif kind == "paired":
+            # Paired-row A: forget the bond. Re-connecting a bonded
+            # device is the peer's job (it'll reconnect when it sees
+            # our adv). The badge's role here is purely "manage the
+            # list" — exposes a fast forget path so a user can rotate
+            # bonds without scrolling through Settings.
+            mac = payload.get("mac", "")
+            if self._bt and mac:
+                try:
+                    self._bt.forget(mac)
+                except Exception:
+                    pass
+                self._dirty = True
 
     # ── render ──────────────────────────────────────────────────────────
     def draw(self, d):
@@ -293,6 +306,8 @@ class App(oreoOS.App):
         # "select" so the user knows the next tap kicks off a pair.
         if self._sel_key[0] == "nearby":
             widgets.draw_hint(d, "A=Connect  B=scan  HOME=back")
+        elif self._sel_key[0] == "paired":
+            widgets.draw_hint(d, "A=Forget  B=scan  HOME=back")
         else:
             widgets.draw_hint(d, "A=toggle  B=scan  HOME=back")
 
