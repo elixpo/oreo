@@ -59,6 +59,9 @@ _rx_handle  = None
 _tx_handle  = None
 _conn       = None    # current central connection handle
 _rx_state   = None    # active reassembler, if any
+_conn_started_ms = None    # ticks_ms at the last CENTRAL_CONNECT, used
+                           # to log how long the link survived on a
+                           # subsequent CENTRAL_DISCONNECT
 
 _HEADER_LEN = 5       # type (1) + length (4)
 _CRC_LEN    = 4
@@ -450,11 +453,21 @@ def is_active():
 
 def set_active(on):
     """Bring the radio up or down. On up, also registers the transfer
-    service and starts advertising as 'Oreo'."""
+    service, applies JustWorks security so inbound pair attempts from
+    phones don't fail on IO-capability mismatch, and starts advertising.
+
+    The security config has to land BEFORE the first inbound connection
+    or the stack will default to KEYBOARD_DISPLAY IO caps. When a phone
+    then initiates bonding, our peripheral side claims it can show a
+    passkey, the phone asks for one, the badge has nothing to give, and
+    the link is dropped. With JustWorks (NO_INPUT_NO_OUTPUT) the pair
+    completes silently.
+    """
     try:
         ble = _get_ble()
         ble.active(on)
         if on:
+            _apply_security_config(ble)
             _register_service(ble)
             _start_advertising(ble)
         else:
@@ -640,14 +653,39 @@ class _RxState:
 
 
 def _irq(event, data):
-    global _conn, _rx_state
+    global _conn, _rx_state, _conn_started_ms
     if event == _IRQ_CENTRAL_CONNECT:
         conn_handle, _addr_type, _addr = data
         _conn = conn_handle
         _rx_state = _RxState()
+        try:
+            import time as _t
+            _conn_started_ms = _t.ticks_ms()
+            print("[bt] central connect handle=%d type=%d" %
+                  (conn_handle, _addr_type))
+        except Exception:
+            _conn_started_ms = None
+        # Try to push a larger MTU. Phones almost always request one;
+        # missing this exchange has caused some stacks to drop the link
+        # after the first GATT read returns an undersized ATT response.
+        try:
+            _get_ble().gattc_exchange_mtu(conn_handle)
+        except Exception:
+            # Older MicroPython builds don't expose gattc_exchange_mtu
+            # from the peripheral side — silently fine, the central
+            # drives MTU negotiation in that case.
+            pass
     elif event == _IRQ_CENTRAL_DISCONNECT:
+        try:
+            import time as _t
+            held = _t.ticks_diff(_t.ticks_ms(), _conn_started_ms) \
+                   if _conn_started_ms else -1
+            print("[bt] central disconnect held=%d ms" % held)
+        except Exception:
+            pass
         _conn = None
         _rx_state = None
+        _conn_started_ms = None
         # Restart advertising so the next peer can find us.
         try:
             _start_advertising(_get_ble())
