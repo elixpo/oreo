@@ -243,12 +243,33 @@ class App(oreoOS.App):
             return
         self._speed_label = "testing…"
         self._paint_busy("speed")
+
+        # Cooperative pump — runs between every recv() inside
+        # speed_test. Re-reads the button matrix so a keypress can
+        # both keep the OS feeling alive AND abort the test (any
+        # press cancels). Also redraws the screen so the user
+        # actually SEES the "testing..." label instead of the last
+        # pre-test frame.
+        cancel = [False]
+        def _pump():
+            try:
+                self._os.buttons.update()
+                for b_ in api.BUTTONS:
+                    if self._os.buttons.just_pressed(b_):
+                        cancel[0] = True
+                        return True
+            except Exception:
+                pass
+            return False
+
         try:
-            ok, kbps, ms = self._wifi.speed_test()
+            ok, kbps, ms = self._wifi.speed_test(pump_cb=_pump)
         except Exception:
             ok, kbps, ms = (False, 0, 0)
         self._busy = ""
-        if not ok or kbps <= 0:
+        if cancel[0]:
+            self._speed_label = "cancelled"
+        elif not ok or kbps <= 0:
             self._speed_label = "failed"
         elif kbps >= 1000:
             self._speed_label = "%.1f Mbps · %d ms" % (kbps / 1000.0, ms)

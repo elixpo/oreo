@@ -354,15 +354,23 @@ def ping(host="8.8.8.8", port=53, timeout_s=2):
             pass
 
 
-def speed_test(bytes_=500_000, timeout_s=15):
+def speed_test(bytes_=200_000, timeout_s=10, pump_cb=None):
     """Throughput probe: download `bytes_` from speed.cloudflare.com
-    and report observed kbps. Cloudflare's __down endpoint serves an
-    arbitrary number of bytes without auth and is geo-routed.
+    and report observed kbps.
 
-    Returns (ok, kbps, elapsed_ms). On failure, (False, 0, elapsed).
-    Default size is 500 KB — enough to amortise SSL handshake on
-    typical home WiFi, small enough to finish in seconds on EDGE/3G
-    tethering.
+    `pump_cb` is called between every recv() so the caller can keep
+    the OS run loop alive — typically passes a closure that re-reads
+    the button matrix and bumps the screen. The socket is set to a
+    50-ms recv timeout so each blocked read can't freeze the UI for
+    more than that. If pump_cb returns True the test aborts cleanly
+    (used by the WiFi app's "cancel by any keypress" UX).
+
+    Default size dropped from 500 KB → 200 KB. The handshake is
+    still amortised but the test finishes in ~1–2 s on home WiFi
+    and ~5 s on weak links, both well within user attention span.
+
+    Returns (ok, kbps, elapsed_ms). On failure or cancel,
+    (False, 0, elapsed).
     """
     try:
         import socket as _s
@@ -377,19 +385,38 @@ def speed_test(bytes_=500_000, timeout_s=15):
         addr = _s.getaddrinfo(host, 443)[0][-1]
     except Exception:
         return (False, 0, 0)
+
     raw = None
     s   = None
     deadline = time.ticks_add(time.ticks_ms(), int(timeout_s * 1000))
     t0 = time.ticks_ms()
     received = 0
     body_started = False
+    cancelled = False
+
+    # 50 ms recv timeout caps each blocking read so the run loop
+    # can resume between reads. This is the difference between
+    # "buttons frozen for 5 s" and "buttons responsive throughout".
+    PER_READ_S = 0.05
+
+    def _pump():
+        """Run the caller's pump callback if any; flag cancel."""
+        nonlocal cancelled
+        if pump_cb is None:
+            return
+        try:
+            if pump_cb():
+                cancelled = True
+        except Exception:
+            pass
+
     try:
         raw = _s.socket()
-        try: raw.settimeout(timeout_s)
+        try: raw.settimeout(timeout_s)   # connect can take a while
         except Exception: pass
         raw.connect(addr)
         s = _ssl.wrap_socket(raw, server_hostname=host)
-        try: s.settimeout(timeout_s)
+        try: s.settimeout(PER_READ_S)
         except Exception: pass
         req = ("GET %s HTTP/1.1\r\nHost: %s\r\n"
                "User-Agent: OreoBadge-Speed\r\n"
@@ -397,13 +424,19 @@ def speed_test(bytes_=500_000, timeout_s=15):
                "Connection: close\r\n\r\n") % (path, host)
         s.write(req.encode())
         head = b""
-        # Read headers — we don't care about chunked decoding for the
-        # bytes-counted speed metric; raw byte volume is what matters.
+        # Read headers. With the short PER_READ_S timeout each recv
+        # bails fast on no-data; we loop until the separator arrives
+        # or the overall deadline blows.
         while b"\r\n\r\n" not in head:
+            if cancelled:
+                break
             if time.ticks_diff(deadline, time.ticks_ms()) <= 0:
                 break
             try:
                 chunk = s.read(2048)
+            except OSError:
+                _pump()
+                continue
             except Exception:
                 break
             if not chunk:
@@ -411,22 +444,28 @@ def speed_test(bytes_=500_000, timeout_s=15):
             head += chunk
             if len(head) > 16 * 1024:
                 break
-        # Count any payload bytes that arrived alongside the headers.
+            _pump()
         sep = head.find(b"\r\n\r\n")
         if sep >= 0:
             body_started = True
-            received     = len(head) - (sep + 4)
-        # Drain the rest of the body counting bytes.
+            received = len(head) - (sep + 4)
+        # Drain the body.
         while body_started:
+            if cancelled:
+                break
             if time.ticks_diff(deadline, time.ticks_ms()) <= 0:
                 break
             try:
                 chunk = s.read(4096)
+            except OSError:
+                _pump()
+                continue
             except Exception:
                 break
             if not chunk:
                 break
             received += len(chunk)
+            _pump()
             if received >= bytes_:
                 break
     except Exception:
@@ -439,6 +478,8 @@ def speed_test(bytes_=500_000, timeout_s=15):
             except Exception:
                 pass
     elapsed = max(1, time.ticks_diff(time.ticks_ms(), t0))
+    if cancelled:
+        return (False, 0, elapsed)
     if received <= 0:
         return (False, 0, elapsed)
     kbps = int((received * 8) // elapsed)   # bytes*8 / ms = kbps
