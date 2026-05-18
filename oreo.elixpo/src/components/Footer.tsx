@@ -1,5 +1,15 @@
+"use client";
+
 import Link from "next/link";
 import { Github, Heart, Star, GitFork } from "lucide-react";
+import { useGithubStats } from "@/lib/useGithubStats";
+
+function fmtCount(n: number | null): string {
+  if (n === null) return "–";
+  if (n >= 10_000) return (n / 1000).toFixed(1) + "k";
+  if (n >= 1000)   return (n / 1000).toFixed(1).replace(/\.0$/, "") + "k";
+  return String(n);
+}
 
 const COLUMNS = [
   {
@@ -34,6 +44,7 @@ const COLUMNS = [
 ];
 
 export default function Footer() {
+  const { stars, forks } = useGithubStats();
   return (
     <footer className="mt-32 border-t border-border/60 bg-bg-raised/40">
       <div className="container-page py-16">
@@ -62,8 +73,8 @@ export default function Footer() {
               <span className="flex flex-col leading-tight">
                 <span className="font-semibold text-text">elixpo/oreo</span>
                 <span className="flex items-center gap-2 text-muted">
-                  <Star className="h-3 w-3" /> 446
-                  <GitFork className="h-3 w-3" /> 140
+                  <Star    className="h-3 w-3" /> {fmtCount(stars)}
+                  <GitFork className="h-3 w-3" /> {fmtCount(forks)}
                 </span>
               </span>
             </a>

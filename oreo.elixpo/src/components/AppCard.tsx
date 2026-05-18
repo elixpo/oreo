@@ -2,8 +2,19 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Github, Tag, User } from "lucide-react";
-import type { AppEntry } from "@/data/apps";
+import {
+  X, Github, Tag, User, IdCard, Bird, Image as ImageIcon,
+  Worm, Compass, BookOpen, Car, Cloud, GitCommit, Gamepad2,
+  HardDrive, Palette, PawPrint, Cpu, Wifi, Bluetooth,
+  RefreshCw, Settings, type LucideIcon,
+} from "lucide-react";
+import type { AppEntry, AppIconId } from "@/data/apps";
+
+const ICONS: Record<AppIconId, LucideIcon> = {
+  IdCard, Bird, Image: ImageIcon, Worm, Compass, BookOpen, Car, Cloud,
+  GitCommit, User, Gamepad2, HardDrive, Palette, PawPrint, Cpu, Wifi,
+  Bluetooth, RefreshCw, Settings,
+};
 
 const TINT: Record<AppEntry["tint"], { ring: string; glow: string; text: string }> = {
   primary: { ring: "ring-primary/40", glow: "shadow-[0_0_36px_rgba(255,93,104,0.22)]", text: "text-primary" },
@@ -20,7 +31,9 @@ export default function AppCard({
   index?: number;
 }) {
   const [open, setOpen] = useState(false);
-  const t = TINT[app.tint] ?? TINT.primary;
+  const t    = TINT[app.tint] ?? TINT.primary;
+  const Icon = ICONS[app.icon] ?? Cpu;
+
   return (
     <>
       <motion.button
@@ -40,18 +53,15 @@ export default function AppCard({
       >
         <div className="flex items-start gap-4">
           <div className={`grid h-14 w-14 shrink-0 place-items-center rounded-md
-                           bg-card-sub ring-2 ring-inset ${t.ring}
-                           font-display text-2xl ${t.text}`}>
-            {app.glyph}
+                           bg-card-sub ring-2 ring-inset ${t.ring} ${t.text}`}>
+            <Icon className="h-6 w-6" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center justify-between gap-2">
               <h3 className={`truncate font-display text-lg ${t.text}`}>{app.name}</h3>
               <span className="chip">{app.category}</span>
             </div>
-            <p className="mt-1 text-sm leading-relaxed text-text-dim">
-              {app.blurb}
-            </p>
+            <p className="mt-1 text-sm leading-relaxed text-text-dim">{app.blurb}</p>
           </div>
         </div>
         <motion.div
@@ -63,9 +73,6 @@ export default function AppCard({
         />
       </motion.button>
 
-      {/* Expanded detail modal — pulls "manifest" info from the same
-          AppEntry. When we wire a real apps.json this is the place
-          that grows. */}
       <AnimatePresence>
         {open && (
           <motion.div
@@ -83,7 +90,8 @@ export default function AppCard({
               exit={{    scale: 0.96, opacity: 0, y: 8 }}
               transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
               onClick={(e) => e.stopPropagation()}
-              className="card-surface relative w-full max-w-lg overflow-hidden p-8"
+              className="card-surface ring-glow relative w-full max-w-lg
+                         overflow-hidden p-8"
             >
               <button
                 onClick={() => setOpen(false)}
@@ -96,25 +104,20 @@ export default function AppCard({
 
               <div className="flex items-center gap-5">
                 <div className={`grid h-20 w-20 shrink-0 place-items-center
-                                 rounded-md bg-card-sub ring-2 ring-inset ${t.ring}
-                                 font-display text-4xl ${t.text}`}>
-                  {app.glyph}
+                                 rounded-md bg-card-sub ring-2 ring-inset ${t.ring} ${t.text}`}>
+                  <Icon className="h-10 w-10" />
                 </div>
                 <div>
                   <h2 className={`font-display text-3xl ${t.text}`}>{app.name}</h2>
-                  <p className="mt-1 text-sm text-muted">
-                    apps/{app.slug}/
-                  </p>
+                  <p className="mt-1 text-sm text-muted">apps/{app.slug}/</p>
                 </div>
               </div>
 
-              <p className="mt-6 leading-relaxed text-text-dim">
-                {app.blurb}
-              </p>
+              <p className="mt-6 leading-relaxed text-text-dim">{app.blurb}</p>
 
               <div className="mt-6 grid grid-cols-2 gap-3 text-sm">
-                <Meta k={<Tag className="h-3.5 w-3.5" />}    v={app.category} label="Category" />
-                <Meta k={<User className="h-3.5 w-3.5" />}   v="@Circuit-Overtime"  label="Author" />
+                <Meta k={<Tag className="h-3.5 w-3.5" />}  v={app.category}      label="Category" />
+                <Meta k={<User className="h-3.5 w-3.5" />} v="@Circuit-Overtime" label="Author" />
               </div>
 
               <div className="mt-7 flex flex-wrap gap-3">
@@ -123,8 +126,7 @@ export default function AppCard({
                   target="_blank" rel="noreferrer"
                   className="btn-primary"
                 >
-                  <Github className="h-4 w-4" />
-                  View source
+                  <Github className="h-4 w-4" /> View source
                 </a>
                 <a
                   href={`https://github.com/elixpo/oreo/blob/main/apps/${encodeURIComponent(app.slug)}/manifest.json`}
@@ -145,8 +147,7 @@ export default function AppCard({
 function Meta({ k, v, label }: { k: React.ReactNode; v: string; label: string }) {
   return (
     <div className="rounded-md border border-border/60 bg-bg-raised/50 px-3 py-2.5">
-      <p className="flex items-center gap-1.5 text-xs uppercase tracking-widest
-                    text-muted">
+      <p className="flex items-center gap-1.5 text-xs uppercase tracking-widest text-muted">
         {k} {label}
       </p>
       <p className="mt-1 truncate text-text">{v}</p>

@@ -11,6 +11,7 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // Brand-token utilities (hand-written components use these)
         bg:           theme.colors.bg,
         "bg-raised":  theme.colors.bgRaised,
         card:         theme.colors.card,
@@ -25,6 +26,25 @@ const config: Config = {
         "text-dim":   theme.colors.textDim,
         muted:        theme.colors.muted,
         "muted-deep": theme.colors.mutedDeep,
+
+        // shadcn-compatible semantic aliases (drop-in components use
+        // these). They're CSS-var-backed so the dark-mode toggle
+        // story works the day we add one.
+        background:           "var(--background)",
+        foreground:           "var(--foreground)",
+        "card-bg":            "var(--card)",
+        "card-foreground":    "var(--card-foreground)",
+        "popover":            "var(--popover)",
+        "popover-foreground": "var(--popover-foreground)",
+        "primary-foreground": "var(--primary-foreground)",
+        "secondary":          "var(--secondary)",
+        "secondary-foreground":"var(--secondary-foreground)",
+        "accent":             "var(--accent)",
+        "accent-foreground":  "var(--accent-foreground)",
+        "destructive":        "var(--destructive)",
+        "destructive-foreground":"var(--destructive-foreground)",
+        "input":              "var(--input)",
+        "ring":               "var(--ring)",
       },
       borderRadius: {
         sm:   theme.radius.sm,
