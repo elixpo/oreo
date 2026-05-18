@@ -281,17 +281,24 @@ class App(oreoOS.App):
                 pass
             self._dirty = True
         elif kind == "paired":
-            # Paired-row A: forget the bond. Re-connecting a bonded
-            # device is the peer's job (it'll reconnect when it sees
-            # our adv). The badge's role here is purely "manage the
-            # list" — exposes a fast forget path so a user can rotate
-            # bonds without scrolling through Settings.
+            # Paired-row A:
+            #   - if a peer is currently connected → disconnect it first
+            #     (this row maps to the active link; forgetting an
+            #      active bond without a disconnect leaves the radio
+            #      held open with stale auth)
+            #   - then forget the bond record.
             mac = payload.get("mac", "")
-            if self._bt and mac:
+            if self._bt:
                 try:
-                    self._bt.forget(mac)
+                    if self._bt.is_busy():
+                        self._bt.disconnect_peer()
                 except Exception:
                     pass
+                if mac:
+                    try:
+                        self._bt.forget(mac)
+                    except Exception:
+                        pass
                 self._dirty = True
 
     # ── render ──────────────────────────────────────────────────────────

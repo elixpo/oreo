@@ -264,20 +264,32 @@ def scan_is_active():
 
 
 def scan_results():
-    """Filtered, RSSI-sorted snapshot of discovered devices.
+    """Name-deduped, RSSI-sorted snapshot of discovered BLE devices.
 
-    Filtering deliberately uses the *Appearance* field only — earbuds,
-    speakers, and hearing aids all declare an audio appearance, so this
-    cleanly removes them. We used to also blocklist devices that
-    advertised audio service UUIDs (A2DP / AVRCP) but that was hiding
-    phones too: many Android handsets advertise A2DP-source capability
-    in their adv payload, so the badge was silently dropping them.
+    No filtering. The earlier appearance/service blocklists hid phones
+    and useful peripherals along with audio gear, and the trade wasn't
+    worth it — the user wants to see *everything* the radio sees.
+
+    iOS and recent Android phones rotate their Resolvable Private
+    Address every ~15 min, so the same physical phone keeps showing
+    up under fresh MACs. We collapse all entries that share a real
+    (non-MAC-tail-fallback) name into one row, picking the strongest
+    RSSI as the representative. Anonymous "device EE:FF" entries stay
+    individual because we can't tell them apart.
     """
-    out = []
+    by_name = {}
+    anon    = []
     for v in _scan_results.values():
-        if _is_audio_appearance(v.get("appearance")):
-            continue
-        out.append(v)
+        nm = v.get("name") or ""
+        if nm and not nm.startswith("device "):
+            cur = by_name.get(nm)
+            # Pick the entry with the better RSSI as the live one — its
+            # mac/addr_type are the ones we'll try to connect to.
+            if cur is None or (v.get("rssi", -999) > cur.get("rssi", -999)):
+                by_name[nm] = v
+        else:
+            anon.append(v)
+    out = list(by_name.values()) + anon
     out.sort(key=lambda d: d.get("rssi", -999), reverse=True)
     return out
 
@@ -656,6 +668,21 @@ def _irq(event, data):
     global _conn, _rx_state, _conn_started_ms
     if event == _IRQ_CENTRAL_CONNECT:
         conn_handle, _addr_type, _addr = data
+        # Single-connection policy: if we already have a peer, reject
+        # the second one by disconnecting it immediately. MicroPython
+        # is compiled with MAX_CONNECTIONS=3, but the UX we want is
+        # "one badge ↔ one peer at a time" so the user doesn't get a
+        # rats' nest of half-connected phones. (A true firmware change
+        # would set CONFIG_BT_NIMBLE_MAX_CONNECTIONS=1, but that
+        # requires recompiling the MicroPython port.)
+        if _conn is not None and conn_handle != _conn:
+            try:
+                _get_ble().gap_disconnect(conn_handle)
+                print("[bt] rejected 2nd connect handle=%d (busy with %d)" %
+                      (conn_handle, _conn))
+            except Exception:
+                pass
+            return
         _conn = conn_handle
         _rx_state = _RxState()
         try:
@@ -665,6 +692,23 @@ def _irq(event, data):
                   (conn_handle, _addr_type))
         except Exception:
             _conn_started_ms = None
+        # Surface the new peer in the notification panel so the user
+        # knows something connected even if they're not on the BT
+        # page. Best-effort: notifications module may not be importable
+        # in the IRQ context on some builds, so swallow errors.
+        try:
+            mac = _mac_str(bytes(_addr))
+            from oreoOS import notifications as _n
+            _n.push("bt", "BT connected", mac, target=None)
+        except Exception:
+            pass
+        # Stop advertising while a peer is connected. With single-
+        # connection policy in force, continuing to advertise just
+        # invites failed connects from other devices.
+        try:
+            _get_ble().gap_advertise(None)
+        except Exception:
+            pass
         # Try to push a larger MTU. Phones almost always request one;
         # missing this exchange has caused some stacks to drop the link
         # after the first GATT read returns an undersized ATT response.
@@ -845,6 +889,57 @@ def _notify(status_byte):
         pass
 
 
+# ── transfer-progress notification (throttled) ──────────────────────────
+# Emits "BT receiving 30%" notifications during a long file transfer so
+# the notification panel reflects live progress. Updates fire at most
+# every PROGRESS_STEP_BYTES of fresh payload to keep the LCD redraw cost
+# bounded (the panel ticks the BT icon as a side effect of the push).
+PROGRESS_STEP_BYTES = 64 * 1024
+_last_progress_bytes = 0
+
+
+def _emit_progress(received, total, type_byte):
+    global _last_progress_bytes
+    if total <= 0:
+        return
+    if received == total:
+        _last_progress_bytes = 0
+        return
+    if (received - _last_progress_bytes) < PROGRESS_STEP_BYTES:
+        return
+    _last_progress_bytes = received
+    pct = int((received * 100) // total)
+    kind = "image" if type_byte == b"I" else \
+           "text"  if type_byte == b"T" else \
+           "markdown" if type_byte == b"M" else "file"
+    try:
+        from oreoOS import notifications as _n
+        _n.push("bt",
+                "Receiving %s" % kind,
+                "%d%% · %d/%d KB" % (pct, received // 1024, total // 1024),
+                target=None)
+    except Exception:
+        pass
+
+
+def is_busy():
+    """True iff a peer is currently connected. Used by the notif panel
+    to drive the blinking BT icon while a transfer is live."""
+    return _conn is not None
+
+
+def disconnect_peer():
+    """Force-disconnect the currently connected peer, if any. Called
+    by the BT app's "Disconnect" action on a paired-but-active row."""
+    if _conn is None:
+        return False
+    try:
+        _get_ble().gap_disconnect(_conn)
+        return True
+    except Exception:
+        return False
+
+
 def _feed(chunk):
     """Push bytes into the active reassembler. May complete one transfer
     per call (or part of one — we resume across chunks)."""
@@ -905,6 +1000,14 @@ def _feed(chunk):
         take = chunk[pos:pos + remaining]
         st.buf.extend(take)
         pos += len(take)
+        # Progress hook — best-effort throttled notification update so
+        # the user can watch a large image come in. We post at most
+        # every ~64 KB of fresh data; finer granularity would spam the
+        # notification panel and the SPI bus the LCD uses.
+        try:
+            _emit_progress(len(st.buf), st.length, st.type_byte)
+        except Exception:
+            pass
         if len(st.buf) < st.length:
             return
 
