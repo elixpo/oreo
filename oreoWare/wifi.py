@@ -41,11 +41,12 @@ except ImportError:
 _wlan = None
 
 _SAVED_PATH       = "/wifi.json"
-_PER_NET_TIMEOUT  = 12000    # ms — per-SSID cap. 12 s is the sweet spot:
-                             # long enough that a real router with a
-                             # cold DHCP lease can complete, short
-                             # enough that a wrong-password entry
-                             # doesn't stall the boot.
+_PER_NET_TIMEOUT  = 10000    # ms — per-SSID cap. 10 s comfortably
+                             # covers a cold DHCP lease on most home
+                             # routers. The wait loop pumps a
+                             # caller-supplied pump_cb every ~80 ms,
+                             # so the UI is never frozen for the full
+                             # duration — a keypress cancels instantly.
 
 
 def _get_wlan():
@@ -153,16 +154,25 @@ def is_radio_on():
         return False
 
 
-def connect(ssid, password, timeout_ms=12000):
+def connect(ssid, password, timeout_ms=6000, pump_cb=None):
+    """Initiate a WiFi association and wait (up to `timeout_ms`) for it
+    to complete.
+
+    `pump_cb` is the escape-hatch from the "badge looks frozen during
+    SEARCH" trap: the wait loop calls it ~12 times per second and
+    bails immediately if it returns truthy. Callers pass a pump that:
+      1. Re-reads the button matrix.
+      2. Returns True on any keypress so the user can abort.
+    Boot-time auto-connect leaves pump_cb=None — the OS run loop
+    isn't running yet there's nothing to keep alive — and just relies
+    on the shorter timeout to bound the freeze.
+    """
     wlan = _get_wlan()
     try:
         wlan.active(True)
     except Exception as e:
         print("[wifi] active(True) raised:", e)
         return False
-    # Hostname set best-effort BEFORE associate so DHCP carries it as
-    # Option 12. Wrapped: any unexpected failure here can't take the
-    # whole connect path down.
     try:
         _apply_hostname(wlan)
     except Exception:
@@ -185,9 +195,18 @@ def connect(ssid, password, timeout_ms=12000):
     while not wlan.isconnected():
         if time.ticks_diff(time.ticks_ms(), start) > timeout_ms:
             return False
-        time.sleep_ms(200)
-    # Re-apply power-save AFTER association — some IDF versions reset
-    # PM state on connect and need it set again to actually take effect.
+        # Pump first so the very-first frame of "searching..." can be
+        # cancelled. Sleep duration is intentionally short (~80 ms) so
+        # button-to-cancel feels instant, but long enough that we don't
+        # eat all the CPU we're trying to keep available.
+        if pump_cb:
+            try:
+                if pump_cb():
+                    print("[wifi] connect cancelled by pump_cb")
+                    return False
+            except Exception:
+                pass
+        time.sleep_ms(80)
     try:
         _apply_power_cap(wlan)
     except Exception:
@@ -320,7 +339,7 @@ def is_metered():
     return False
 
 
-def connect_from_config():
+def connect_from_config(pump_cb=None):
     """Try each saved network in priority order until one associates.
 
     Three-tier fallback so a freshly-flashed badge with an empty (or
@@ -358,7 +377,9 @@ def connect_from_config():
                     pass
                 ok = False
                 try:
-                    ok = connect(ssid_, pw, timeout_ms=_PER_NET_TIMEOUT)
+                    ok = connect(ssid_, pw,
+                                 timeout_ms=_PER_NET_TIMEOUT,
+                                 pump_cb=pump_cb)
                 except Exception:
                     pass
                 return ok
@@ -374,13 +395,26 @@ def connect_from_config():
         try:
             print("[wifi] try %s (p=%s)" %
                   (ssid_, n.get("priority", "?")))
-            ok = connect(ssid_, pw, timeout_ms=_PER_NET_TIMEOUT)
+            ok = connect(ssid_, pw,
+                         timeout_ms=_PER_NET_TIMEOUT,
+                         pump_cb=pump_cb)
         except Exception as e:
             print("[wifi] connect raised:", e)
             ok = False
         if ok:
             print("[wifi] associated:", ssid_)
             return True
+        # If the user cancelled mid-search, stop trying further
+        # networks — they explicitly asked us to give up. Without
+        # this we'd plough through every saved entry honouring their
+        # individual timeouts.
+        if pump_cb is not None:
+            try:
+                if pump_cb():
+                    print("[wifi] connect_from_config cancelled")
+                    return False
+            except Exception:
+                pass
     print("[wifi] all %d saved networks failed" % len(nets))
     return False
 

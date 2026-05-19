@@ -336,9 +336,30 @@ class NotifPanel:
             else:
                 if hasattr(wifi, "radio_on"):
                     wifi.radio_on()
-                wifi.connect_from_config()
+                # Pump button input through the wait so the panel can
+                # still react if the user changes their mind. Older
+                # wifi.py without pump_cb support falls through to the
+                # plain blocking call.
+                try:
+                    wifi.connect_from_config(pump_cb=self._wifi_cancel_pump)
+                except TypeError:
+                    wifi.connect_from_config()
         except Exception:
             pass
+
+    def _wifi_cancel_pump(self):
+        """Called from inside wifi.connect_from_config's wait loop.
+        Returns True on any keypress so the user can cancel the
+        in-flight 'searching…' attempt without waiting for the
+        per-network timeout."""
+        try:
+            self._os.buttons.update()
+            for b_ in api.BUTTONS:
+                if self._os.buttons.just_pressed(b_):
+                    return True
+        except Exception:
+            pass
+        return False
 
     def _toggle_bt(self):
         try:
@@ -459,27 +480,22 @@ class NotifPanel:
         ]
         try:
             from oreoWare import wifi
-            # Chip "on" tracks the RADIO, not the association — that's
-            # what the user just toggled. Sub-label surfaces the
-            # association state: connected → SSID, on-but-searching →
-            # "searching…", off → "off".
-            try:
-                on = bool(wifi.is_radio_on())
-            except Exception:
-                on = bool(wifi.is_connected())
+            # Two-state chip: connected → ON (with SSID in the sub),
+            # everything else → OFF. We deliberately don't surface
+            # a "searching" tier — the credentials are known up-front
+            # via secrets / wifi.json, so a connect either resolves
+            # in a couple of seconds or it doesn't.
             connected = False
             try:
                 connected = bool(wifi.is_connected())
             except Exception:
                 pass
-            out[0]["on"] = on
+            out[0]["on"] = connected
             if connected:
                 cur = ""
                 try: cur = wifi.ssid() or ""
                 except Exception: pass
-                out[0]["sub"] = (cur[:10] if cur else "connected")
-            elif on:
-                out[0]["sub"] = "searching…"
+                out[0]["sub"] = (cur[:10] if cur else "on")
             else:
                 out[0]["sub"] = "off"
         except Exception:

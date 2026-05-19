@@ -208,6 +208,11 @@ class App(oreoOS.App):
                 except Exception:
                     pass
             else:
+                # The credentials live in secrets.py / wifi.json — we
+                # don't need a "searching" UX. Bring the radio up
+                # then call connect_from_config; the pump keeps the
+                # run loop responsive so a stuck attempt doesn't hang
+                # the badge. Result lands in the next _snap refresh.
                 try:
                     radio_on = getattr(self._wifi, "radio_on", None)
                     if radio_on:
@@ -215,9 +220,24 @@ class App(oreoOS.App):
                 except Exception:
                     pass
                 try:
-                    self._wifi.connect_from_config()
+                    self._wifi.connect_from_config(pump_cb=self._cancel_pump)
+                except TypeError:
+                    try:
+                        self._wifi.connect_from_config()
+                    except Exception:
+                        pass
                 except Exception:
                     pass
+                # NOTE: we deliberately do NOT drop the radio when
+                # connect_from_config returns False. The previous
+                # version did, which silently powered the MAC down on
+                # any slow association — the user would tap the
+                # toggle, nothing visible would happen, and the next
+                # tap would just repeat the same failure. Leaving the
+                # radio up means: a tap that doesn't immediately
+                # associate at least *stays* "trying", and a later
+                # tap to explicitly turn WiFi off still works via
+                # the ON-path branch above.
             self._snap = self._read()
         elif r == self.ROW_POWER:
             modes = self._wifi.POWER_MODES
@@ -400,16 +420,14 @@ class App(oreoOS.App):
         widgets.draw_hint(d, "A=select  HOME=back")
 
         snap = self._snap
-        # Three-state status: connected → ON (primary), radio-on-but-
-        # searching → SEARCH (gold), radio off → OFF (muted). This
-        # mirrors the notif-panel chip so the two surfaces never
-        # disagree.
-        if snap.get("connected"):
-            _stat_label, _stat_color = "ON",     theme.PRIMARY
-        elif snap.get("radio_on"):
-            _stat_label, _stat_color = "SEARCH", theme.GOLD
-        else:
-            _stat_label, _stat_color = "OFF",    theme.MUTED
+        # Two-state status only: connected → ON, anything else → OFF.
+        # The credentials are baked in (secrets.py / wifi.json), so
+        # there's no genuine "searching" — the connect either lands
+        # in a couple of seconds or it doesn't, and exposing an
+        # intermediate state to the user is more noise than signal.
+        _stat_connected = bool(snap.get("connected"))
+        _stat_label = "ON"          if _stat_connected else "OFF"
+        _stat_color = theme.PRIMARY if _stat_connected else theme.MUTED
         rows = [
             ("Status",       _stat_label, _stat_color),
             ("SSID",         snap.get("ssid") or "—",       theme.TEXT_BRIGHT),
@@ -489,6 +507,21 @@ class App(oreoOS.App):
         return "%d dBm %s" % (rssi, _bars(rssi))
 
     # ── file-transfer sub-page ──────────────────────────────────────────
+    def _cancel_pump(self):
+        """Passed to wifi.connect_from_config(). Called ~12 Hz from
+        inside the wait loop — re-reads the button matrix and returns
+        True on any press so the user can abort 'SEARCH' instantly.
+        Without this the run loop is frozen for up to 6 s per saved
+        network and the badge looks crashed."""
+        try:
+            self._os.buttons.update()
+            for b_ in api.BUTTONS:
+                if self._os.buttons.just_pressed(b_):
+                    return True
+        except Exception:
+            pass
+        return False
+
     def _http(self):
         try:
             from oreoOS import http_server as _hs
