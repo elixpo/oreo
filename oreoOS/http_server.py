@@ -62,24 +62,49 @@ SESSION_TTL_MS         = 60 * 1000   # beacon must refresh within this
 SESSION_MAX            = 8           # never track more than this many concurrent
 SESSION_CHARSET        = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # no 0/O/1/I/l
 
+# Badge code — a 6-char alphanumeric value displayed on the badge's
+# Send Files page that senders must type into the upload page to
+# authenticate. Rotates every BADGE_CODE_TTL_MS (5 min) so a leaked
+# code self-expires, and the badge owner can also force a rotation
+# via `refresh_code()` from the UI.
+BADGE_CODE_TTL_MS      = 5 * 60 * 1000
+
 _lsock     = None
 _bound_ip  = None
+_os_obj    = None     # captured from start(os_obj) so we can persist
+                      # `transfer_enabled` across reboots via settings_set
 
-# Token state machine. Each sender registers itself by hitting /beacon
-# with a 6-char id. The badge UI lists them as pending, and the user
-# explicitly approves (or denies) before any /upload bytes are accepted.
+# Badge code state — rotated on demand or by TTL. We refresh lazily
+# (whenever someone asks for the current code or hits an endpoint) so
+# the rotation doesn't need its own background tick.
+_badge_code      = ""
+_badge_code_ts   = 0       # ticks_ms when current code was minted
+
+# Master kill switch — when False, every HTTP endpoint returns 503
+# with a "transfer disabled" page. Persisted to OS settings so a
+# user-flipped-off state survives reboot. Default ON; the badge
+# owner toggles via long-press LEFT on the Send Files page.
+_transfer_enabled = True
+
+# Session state machine, code-gated:
 #
-#   _sessions[id] = {
-#       "state":     "pending" | "approved" | "denied",
+#   _sessions[device_id] = {
+#       "state":     "authed" | "approved" | "denied",
 #       "last_ms":   ticks_ms of last beacon hit,
 #       "addr":      requesting peer ip (for display),
 #       "uploads":   completed upload count for this session,
+#       "authed_at": ticks_ms when /auth was accepted,
 #   }
+#
+# Senders that haven't yet hit /auth with the correct code never
+# enter this dict — they're invisible to the badge. After auth,
+# they're "authed" (yellow on the badge). After the badge owner
+# taps A on their row, "approved" (green). After they finish or get
+# denied, they're pruned.
 _sessions = {}
 
 # Live upload progress so the WiFi app can render a real-time bar while
 # bytes are flowing in. None when no upload is in flight.
-#   {"id": "...", "filename": "...", "received": int, "total": int}
 _progress = None
 
 
@@ -156,6 +181,23 @@ def _safe_filename(raw):
 # ── server lifecycle ────────────────────────────────────────────────────
 
 def start(os_obj=None):
+    """Open the listening socket. Also captures `os_obj` for the
+    transfer-enabled toggle (we persist that to OS settings)."""
+    global _os_obj
+    if os_obj is not None:
+        _os_obj = os_obj
+        # Hydrate the kill switch from settings on first start. Default
+        # True so a fresh badge has transfer working out of the box.
+        try:
+            global _transfer_enabled
+            _transfer_enabled = bool(
+                os_obj.settings_get("transfer_enabled", True))
+        except Exception:
+            pass
+    return _start_listener()
+
+
+def _start_listener():
     """Open the listening socket on the current WiFi IP. Safe to call
     multiple times — re-binds if WiFi reconnected to a different IP."""
     global _lsock, _bound_ip
@@ -259,16 +301,28 @@ def _prune_sessions():
 
 def list_sessions():
     """Snapshot for the WiFi/Transfer UI. Returns sessions sorted by
-    last-seen so the newest beacons are on top."""
+    last-seen so the newest beacons are on top.
+
+    Only `authed` and `approved` sessions are returned — denied ones
+    are filtered out because the badge owner already made that call,
+    and seeing them again would just be noise. Senders that haven't
+    typed the correct code never enter _sessions in the first place,
+    so they're naturally invisible here.
+    """
     _prune_sessions()
     items = []
     for sid, s in _sessions.items():
+        state = s.get("state", "authed")
+        if state == "denied":
+            continue
         items.append({
-            "id":      sid,
-            "state":   s.get("state", "pending"),
-            "addr":    s.get("addr", ""),
-            "uploads": s.get("uploads", 0),
-            "last_ms": s.get("last_ms", 0),
+            "id":         sid,
+            "device_id":  sid,                       # alias for the UI
+            "state":      state,
+            "addr":       s.get("addr", ""),
+            "uploads":    s.get("uploads", 0),
+            "last_ms":    s.get("last_ms", 0),
+            "authed_at":  s.get("authed_at", 0),
         })
     items.sort(key=lambda v: v.get("last_ms", 0), reverse=True)
     return items
@@ -292,6 +346,106 @@ def deny(sid):
 def progress():
     """Live upload progress dict, or None if no transfer is in flight."""
     return _progress
+
+
+# ── badge-code rotation ─────────────────────────────────────────────────
+#
+# `current_code()` is the single source of truth. It rotates the cached
+# code if the TTL has elapsed; callers (WiFi UI, /auth endpoint) just
+# call it and get the live value. `refresh_code()` forces a rotation
+# now — wired to the "R = refresh code" button on the Send Files page.
+
+def _gen_code(n=6):
+    """Six-char alphanumeric code excluding ambiguous shapes."""
+    try:
+        import time as _t
+        seed = _t.ticks_ms() ^ id(_sessions)
+    except Exception:
+        seed = 1
+    out = []
+    cs = SESSION_CHARSET
+    for _ in range(n):
+        seed = (seed * 1103515245 + 12345) & 0x7FFFFFFF
+        out.append(cs[seed % len(cs)])
+    return "".join(out)
+
+
+def current_code():
+    """Return the live 6-char badge code, rotating if the TTL has
+    elapsed since the last mint. UI calls this on every paint."""
+    global _badge_code, _badge_code_ts
+    try:
+        import time as _t
+        now = _t.ticks_ms()
+    except Exception:
+        now = 0
+    if not _badge_code:
+        _badge_code = _gen_code()
+        _badge_code_ts = now
+        return _badge_code
+    try:
+        if _t.ticks_diff(now, _badge_code_ts) > BADGE_CODE_TTL_MS:
+            _badge_code = _gen_code()
+            _badge_code_ts = now
+    except Exception:
+        pass
+    return _badge_code
+
+
+def refresh_code():
+    """Force-mint a new code now. UI calls this when the user taps
+    R = refresh code on the Send Files page."""
+    global _badge_code, _badge_code_ts
+    _badge_code = _gen_code()
+    try:
+        import time as _t
+        _badge_code_ts = _t.ticks_ms()
+    except Exception:
+        _badge_code_ts = 0
+    # Existing authed sessions stay valid — they authed under the OLD
+    # code but their own TTL governs how long they last. Mid-transfer
+    # senders aren't kicked by a rotation. Once their TTL expires
+    # they'll need to re-auth with the new code.
+    return _badge_code
+
+
+def code_remaining_ms():
+    """Milliseconds until the current code rotates. Used by the UI
+    for the live countdown — returns 0 if already expired (next paint
+    will mint a fresh one)."""
+    if not _badge_code:
+        return 0
+    try:
+        import time as _t
+        elapsed = _t.ticks_diff(_t.ticks_ms(), _badge_code_ts)
+        return max(0, BADGE_CODE_TTL_MS - elapsed)
+    except Exception:
+        return BADGE_CODE_TTL_MS
+
+
+# ── master transfer-enabled toggle ──────────────────────────────────────
+
+def is_transfer_enabled():
+    return bool(_transfer_enabled)
+
+
+def set_transfer_enabled(on):
+    """Master kill switch. Persisted to OS settings so a user-toggled
+    state survives reboot. UI calls this from the long-press LEFT
+    binding on the Send Files page."""
+    global _transfer_enabled
+    _transfer_enabled = bool(on)
+    if _os_obj is not None:
+        try:
+            _os_obj.settings_set("transfer_enabled", _transfer_enabled)
+        except Exception:
+            pass
+    # When the owner kills transfer, clear out any pending sessions —
+    # they can't do anything anyway and shouldn't linger after a
+    # turn-back-on.
+    if not _transfer_enabled:
+        _sessions.clear()
+    return _transfer_enabled
 
 
 
@@ -456,14 +610,21 @@ _UPLOAD_FORM = (
     b".pad{padding:24px}"
     b"h2{margin:0 0 6px;font-size:18px;font-weight:600}"
     b".sub{margin:0;color:var(--dim);font-size:13px;line-height:1.55}"
-    b".code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:34px;"
-    b"letter-spacing:.32em;color:var(--pri);margin:12px 0 6px;"
-    b"text-shadow:0 0 30px rgba(255,93,104,.35)}"
+    b".chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;"
+    b"font-size:11px;text-transform:uppercase;letter-spacing:.12em;background:var(--cardb);color:var(--dim)}"
     b".pulse{display:inline-block;width:8px;height:8px;border-radius:5px;background:var(--gold);"
     b"margin-right:8px;vertical-align:middle;animation:p 1.4s ease-in-out infinite}"
     b"@keyframes p{0%,100%{opacity:.25;transform:scale(.85)}50%{opacity:1;transform:scale(1)}}"
-    b".chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;"
-    b"font-size:11px;text-transform:uppercase;letter-spacing:.12em;background:var(--cardb);color:var(--dim)}"
+    # Code-input row — 6 separate slots so the user can't fat-finger
+    # more than one char per box. Letter-spacing is fake-monospace.
+    b".code-row{display:flex;gap:8px;justify-content:center;margin:14px 0 4px}"
+    b".code-row input{width:46px;height:58px;border-radius:8px;border:1px solid var(--bord);"
+    b"background:var(--bg);color:var(--pri);text-align:center;font-size:30px;font-weight:600;"
+    b"font-family:ui-monospace,SFMono-Regular,Menlo,monospace;text-transform:uppercase;outline:none}"
+    b".code-row input:focus{border-color:var(--pri);box-shadow:0 0 0 3px rgba(255,93,104,.22)}"
+    b".did{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:30px;"
+    b"letter-spacing:.32em;color:var(--teal);margin:14px 0 4px;text-align:center;"
+    b"text-shadow:0 0 30px rgba(61,220,151,.35)}"
     b".drop{border:2px dashed var(--bord);border-radius:10px;padding:22px;text-align:center;"
     b"cursor:pointer;transition:.2s border-color,.2s background;background:rgba(38,33,62,.4)}"
     b".drop:hover,.drop.over{border-color:var(--pri);background:rgba(255,93,104,.06)}"
@@ -492,6 +653,7 @@ _UPLOAD_FORM = (
     b".status.live .dot{background:var(--gold);animation:p 1.4s ease-in-out infinite}"
     b".status.ok .dot{background:var(--teal)}"
     b".status.err .dot{background:var(--pri)}"
+    b".err-msg{color:var(--pri);font-size:13px;text-align:center;margin:6px 0 0;min-height:18px}"
     b".progress{height:6px;background:var(--bord);border-radius:4px;overflow:hidden;margin-top:14px}"
     b".bar{height:100%;background:linear-gradient(90deg,var(--pri),var(--lilac));"
     b"width:0;transition:width .15s ease-out}"
@@ -503,17 +665,38 @@ _UPLOAD_FORM = (
     b"</style></head><body>"
     b"<div class='brand'><div class='mark'>o</div><h1>Send to Oreo</h1></div>"
     b"<div class='panel'>"
-    b"<div id='wait' class='pad stack'>"
-    b"<span class='chip'><span class='pulse'></span>waiting for badge</span>"
-    b"<h2>Show this code on the badge</h2>"
-    b"<p class='sub'>Open <b>Settings &rsaquo; WiFi &rsaquo; Send files</b> "
-    b"and tap <b>A</b> on the matching code to approve.</p>"
-    b"<div class='code' id='sid'>------</div>"
+    # ── Stage 1: enter the badge code ──
+    b"<div id='auth' class='pad stack'>"
+    b"<span class='chip'>step 1 of 3</span>"
+    b"<h2>Type the code shown on the badge</h2>"
+    b"<p class='sub'>Open <b>Settings &rsaquo; WiFi &rsaquo; Send Files</b> "
+    b"on the badge. A 6-character code is shown there. It rotates every 5 minutes.</p>"
+    b"<div class='code-row'>"
+    b"<input id='c0' maxlength='1' inputmode='text' autocomplete='off' spellcheck='false'>"
+    b"<input id='c1' maxlength='1' inputmode='text' autocomplete='off' spellcheck='false'>"
+    b"<input id='c2' maxlength='1' inputmode='text' autocomplete='off' spellcheck='false'>"
+    b"<input id='c3' maxlength='1' inputmode='text' autocomplete='off' spellcheck='false'>"
+    b"<input id='c4' maxlength='1' inputmode='text' autocomplete='off' spellcheck='false'>"
+    b"<input id='c5' maxlength='1' inputmode='text' autocomplete='off' spellcheck='false'>"
+    b"</div>"
+    b"<p class='err-msg' id='autherr'></p>"
+    b"<button id='authgo' class='btn' disabled>Submit code</button>"
+    b"</div>"
+    # ── Stage 2: wait for badge owner to approve this device ──
+    b"<div id='wait' class='pad stack hide'>"
+    b"<span class='chip'>step 2 of 3</span>"
+    b"<h2>Waiting for badge owner</h2>"
+    b"<p class='sub'>Your code matched. Your device ID is shown below — "
+    b"it appears on the badge owner's screen too. They have to tap "
+    b"<b>A</b> on the matching row to let you send a file.</p>"
+    b"<div class='did' id='did'>------</div>"
     b"<div class='status live' id='wstat'><span class='dot'></span>"
-    b"<span id='wmsg'>pinging badge…</span></div></div>"
+    b"<span id='wmsg'>waiting for approval…</span></div>"
+    b"</div>"
+    # ── Stage 3: approved, pick a file ──
     b"<div id='form' class='pad stack hide'>"
     b"<span class='chip' style='background:rgba(61,220,151,.15);color:var(--teal)'>"
-    b"approved as <span id='okid' style='font-family:ui-monospace,monospace'></span></span>"
+    b"approved &middot; <span id='okid' style='font-family:ui-monospace,monospace'></span></span>"
     b"<h2>Pick a file to send</h2>"
     b"<p class='sub'>Images convert to RGB565 in your browser before upload "
     b"(max 240&times;240). Text and Markdown land in Reader.</p>"
@@ -530,36 +713,79 @@ _UPLOAD_FORM = (
     b"<div class='progress'><div class='bar' id='bar'></div></div>"
     b"<div class='pct hide' id='pct'><span id='pctn'>0%</span>"
     b"<span id='pctb'>0 / 0 KB</span></div></div>"
+    # ── Stage 4: done ──
     b"<div id='done' class='pad stack hide' style='text-align:center'>"
     b"<div style='font-size:42px;color:var(--teal);line-height:1'>&#10003;</div>"
     b"<h2>Sent!</h2><p class='sub'>Open the matching app on your badge to view it.</p>"
     b"<button class='btn' onclick='location.reload()'>Send another</button></div>"
     b"</div>"
-    b"<div class='foot'>Peer-to-peer on your local network. "
+    b"<div class='foot'>Peer-to-peer on your local network &middot; "
     b"Powered by <a href='https://oreo.pages.dev' target='_blank'>oreo.pages.dev</a></div>"
     b"<script>"
     b"const $=id=>document.getElementById(id);"
     b"const MAX_DIM=240;"
-    b"let sid=null,approved=false,beaconTimer=null,picked=null;"
-    b"const urlPrefill=(()=>{try{return new URL(location.href).searchParams.get('prefill')||'';}"
-    b"catch(e){return '';}})();"
+    b"const CHARSET=/^[A-HJ-NP-Z2-9]$/i;"          # excludes 0/O/1/I/L
+    b"let did=null,approved=false,beaconTimer=null,picked=null;"
     b"function fmtKB(n){return (n/1024)<1024?(Math.round(n/1024)+' KB'):"
     b"((n/1024/1024).toFixed(2)+' MB');}"
     b"function setWaitStatus(cls,msg){const s=$('wstat');s.className='status '+cls;$('wmsg').textContent=msg;}"
-    b"async function bootSession(){"
-    b"  if(urlPrefill&&urlPrefill.length===6){sid=urlPrefill.toUpperCase();$('sid').textContent=sid;return;}"
-    b"  try{const r=await fetch('/session/new');const j=await r.json();sid=j.id;$('sid').textContent=sid;}"
-    b"  catch(e){setWaitStatus('err','badge unreachable');}}"
+    # ── code-input cell handlers — auto-advance + paste full code ──
+    b"function readCode(){let s='';for(let i=0;i<6;i++){s+=($('c'+i).value||'').toUpperCase();}return s;}"
+    b"function checkComplete(){"
+    b"  const code=readCode();"
+    b"  $('authgo').disabled=(code.length!==6);"
+    b"  $('autherr').textContent='';}"
+    b"function setupCodeInputs(){"
+    b"  for(let i=0;i<6;i++){const el=$('c'+i);"
+    b"    el.addEventListener('input',e=>{"
+    b"      let v=(e.target.value||'').toUpperCase();"
+    b"      if(v.length>1){"          # paste — distribute across cells
+    b"        const parts=v.replace(/[^A-Z0-9]/g,'').split('');"
+    b"        for(let j=0;j<6;j++){$('c'+j).value=parts[j]||'';}"
+    b"        const last=Math.min(5,parts.length-1);"
+    b"        if(last>=0)$('c'+last).focus();"
+    b"      }else if(v&&!CHARSET.test(v)){e.target.value='';}"
+    b"      else{e.target.value=v;if(v&&i<5)$('c'+(i+1)).focus();}"
+    b"      checkComplete();});"
+    b"    el.addEventListener('keydown',e=>{"
+    b"      if(e.key==='Backspace'&&!el.value&&i>0)$('c'+(i-1)).focus();"
+    b"      if(e.key==='ArrowLeft' &&i>0)$('c'+(i-1)).focus();"
+    b"      if(e.key==='ArrowRight'&&i<5)$('c'+(i+1)).focus();});}"
+    b"  $('c0').focus();}"
+    # ── /auth handshake ──
+    b"async function submitAuth(){"
+    b"  const code=readCode();if(code.length!==6)return;"
+    b"  $('authgo').disabled=true;$('autherr').textContent='';"
+    b"  try{const r=await fetch('/auth?code='+encodeURIComponent(code),{method:'POST'});"
+    b"      if(r.status===401){$('autherr').textContent='Wrong code. Check the badge and try again.';"
+    b"        $('authgo').disabled=false;return;}"
+    b"      if(!r.ok){$('autherr').textContent='Server error '+r.status;"
+    b"        $('authgo').disabled=false;return;}"
+    b"      const j=await r.json();did=j.device_id;"
+    b"      $('did').textContent=did;$('okid').textContent=did;"
+    b"      $('auth').classList.add('hide');$('wait').classList.remove('hide');"
+    b"      beaconTimer=setInterval(beacon,2000);beacon();}"
+    b"  catch(e){$('autherr').textContent='Network error - check WiFi.';$('authgo').disabled=false;}}"
+    # ── beacon poll for approval ──
     b"async function beacon(){"
-    b"  if(!sid||approved)return;"
-    b"  try{const r=await fetch('/beacon?id='+sid);const j=await r.json();"
+    b"  if(!did||approved)return;"
+    b"  try{const r=await fetch('/beacon?id='+did);"
+    b"      if(r.status===410){"           # session expired server-side
+    b"        clearInterval(beaconTimer);"
+    b"        $('wait').innerHTML=\"<h2>Session expired</h2><p class='sub'>The "
+    b"code rotated or the badge owner closed transfer. "
+    b"<button class='btn ghost' onclick='location.reload()'>Try again</button>\";"
+    b"        return;}"
+    b"      const j=await r.json();"
     b"      if(j.state==='approved'){approved=true;clearInterval(beaconTimer);"
-    b"        $('wait').classList.add('hide');$('form').classList.remove('hide');$('okid').textContent=sid;}"
+    b"        $('wait').classList.add('hide');$('form').classList.remove('hide');}"
     b"      else if(j.state==='denied'){clearInterval(beaconTimer);"
-    b"        $('wait').innerHTML=\"<h2>Denied</h2><p class='sub'>The badge owner rejected this session.</p>"
+    b"        $('wait').innerHTML=\"<h2>Denied</h2><p class='sub'>The badge "
+    b"owner rejected this device.</p>"
     b"<button class='btn ghost' onclick='location.reload()'>Try again</button>\";}"
-    b"      else{setWaitStatus('live','waiting for tap on badge…');}}"
+    b"      else{setWaitStatus('live','waiting for approval on badge…');}}"
     b"  catch(e){setWaitStatus('err','badge unreachable - check WiFi');}}"
+    # ── file picker / preview / upload (unchanged from previous version) ──
     b"function onFile(file){"
     b"  if(!file)return;picked=file;"
     b"  $('preview').style.display='flex';$('drop').style.display='none';"
@@ -588,7 +814,7 @@ _UPLOAD_FORM = (
     b"    const v=(r<<11)|(g<<5)|b;out[o++]=(v>>8)&0xff;out[o++]=v&0xff;}"
     b"  return new Blob([out],{type:'application/octet-stream'});}"
     b"async function send(){"
-    b"  if(!picked||!sid)return;$('go').disabled=true;$('pct').classList.remove('hide');"
+    b"  if(!picked||!did)return;$('go').disabled=true;$('pct').classList.remove('hide');"
     b"  let payload=picked,name=picked.name;"
     b"  if(picked.type.startsWith('image/')){"
     b"    try{payload=await imgToR565(picked);name=name.replace(/\\.[^.]+$/,'')+'.r565';}"
@@ -602,12 +828,14 @@ _UPLOAD_FORM = (
     b"      $('pctb').textContent=fmtKB(ev.loaded)+' / '+fmtKB(ev.total);}});"
     b"  xhr.onload=()=>{if(xhr.status===200){"
     b"    $('form').classList.add('hide');$('done').classList.remove('hide');}"
+    b"    else if(xhr.status===403){alert('This device is no longer approved.');"
+    b"      $('go').disabled=false;}"
     b"    else{alert('Upload failed: '+xhr.status);$('go').disabled=false;}};"
     b"  xhr.onerror=()=>{alert('Network error - check WiFi.');$('go').disabled=false;};"
-    b"  xhr.open('POST','/upload?token='+sid);xhr.send(fd);}"
-    b"document.addEventListener('DOMContentLoaded',async()=>{"
-    b"  await bootSession();setWaitStatus('live','waiting for tap on badge…');"
-    b"  beaconTimer=setInterval(beacon,2000);beacon();"
+    b"  xhr.open('POST','/upload?token='+did);xhr.send(fd);}"
+    b"document.addEventListener('DOMContentLoaded',()=>{"
+    b"  setupCodeInputs();"
+    b"  $('authgo').addEventListener('click',submitAuth);"
     b"  $('file').addEventListener('change',e=>onFile(e.target.files[0]));"
     b"  const dz=$('drop');"
     b"  ['dragenter','dragover'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add('over');}));"
@@ -615,6 +843,31 @@ _UPLOAD_FORM = (
     b"  dz.addEventListener('drop',e=>{if(e.dataTransfer.files[0])onFile(e.dataTransfer.files[0]);});"
     b"  $('go').addEventListener('click',send);});"
     b"</script></body></html>"
+)
+
+
+# Served by every endpoint when `transfer_enabled` is False. The
+# badge owner long-pressed LEFT on Send Files to close the subsystem
+# — show them a friendly explanation instead of a bare 503.
+_DISABLED_PAGE = (
+    b"<!doctype html><html><head>"
+    b"<meta name='viewport' content='width=device-width,initial-scale=1'>"
+    b"<meta name='theme-color' content='#0F0C1C'>"
+    b"<title>Transfer disabled</title>"
+    b"<style>body{margin:0;padding:48px 24px;background:#0F0C1C;color:#F5E6DC;"
+    b"font-family:-apple-system,system-ui,sans-serif;text-align:center}"
+    b"h1{color:#FF5D68;font-size:24px;margin:0 0 12px}"
+    b"p{color:#C8B8B0;font-size:14px;line-height:1.6;max-width:380px;margin:0 auto}"
+    b".mark{display:inline-block;width:38px;height:38px;border-radius:8px;"
+    b"border:1px solid rgba(255,93,104,.4);color:#FF5D68;font-weight:700;"
+    b"display:grid;place-items:center;margin:0 auto 18px;font-size:20px}"
+    b"</style></head><body>"
+    b"<div class='mark'>o</div>"
+    b"<h1>Transfer is disabled</h1>"
+    b"<p>The badge owner has closed file transfer for safety. "
+    b"Ask them to re-enable it from the badge's "
+    b"<b>Settings &rsaquo; WiFi &rsaquo; Send Files</b> page.</p>"
+    b"</body></html>"
 )
 
 
@@ -671,6 +924,19 @@ def _handle(sock):
     method, full_path, headers = _parse_headers(head)
     path, qs = _parse_query(full_path)
 
+    # ── master kill switch ──
+    # When the badge owner has flipped the transfer off (long-press
+    # LEFT on Send Files), every endpoint returns 503 with a tiny
+    # branded page. We DO still serve /favicon.ico as 204 so the
+    # browser tab doesn't show a broken icon.
+    if not _transfer_enabled:
+        if method == "GET" and path == "/favicon.ico":
+            _send_status(sock, 204, "No Content", b"")
+            return
+        _send_status(sock, 503, "Service Unavailable",
+                     _DISABLED_PAGE)
+        return
+
     if method == "GET" and path in ("/", "/index.html"):
         _send_status(sock, 200, "OK", _UPLOAD_FORM)
         return
@@ -680,8 +946,8 @@ def _handle(sock):
     if method == "GET" and path == "/beacon":
         _handle_beacon(sock, qs, _peer_addr(sock))
         return
-    if method == "GET" and path == "/session/new":
-        _handle_session_new(sock, _peer_addr(sock))
+    if method == "POST" and path == "/auth":
+        _handle_auth(sock, headers, after_head, qs, _peer_addr(sock))
         return
     if method == "POST" and path == "/upload":
         _handle_upload(sock, headers, after_head, qs)
@@ -690,32 +956,85 @@ def _handle(sock):
     _send_status(sock, 404, "Not Found", b"not found")
 
 
-def _handle_session_new(sock, peer_addr):
-    """Hand the sender a freshly-minted session id so it doesn't have
-    to roll its own (saves us from collisions between two phones that
-    both picked the same client-side random)."""
+def _handle_auth(sock, headers, body_prefix, qs, peer_addr):
+    """Code-gated auth handshake.
+
+    The sender's browser POSTs the 6-char code the user typed off the
+    badge screen. We compare against `current_code()` (which rotates
+    automatically every 5 min). On success we mint a device_id and
+    register the session as 'authed' — that's the first state in
+    which the sender is even visible to the badge UI. On failure
+    we return 401 and DON'T create a session, so a wrong-code
+    attempt never appears in the badge's list.
+
+    Accepts the code either as form-encoded body (`code=ABCDEF`) or
+    as a query param (`?code=ABCDEF`) to keep the client side
+    flexible.
+    """
+    # Try query first, then body.
+    submitted = (qs.get("code", "") or "").upper()
+    if not submitted:
+        # Body may have already been partly read into body_prefix. We
+        # only need a few bytes — content-length is small for an auth
+        # POST. Read up to 256 bytes total.
+        try:
+            clen = int(headers.get("content-length", "0"))
+        except ValueError:
+            clen = 0
+        buf = bytearray(body_prefix or b"")
+        while len(buf) < min(clen, 256):
+            try: chunk = sock.recv(64)
+            except OSError: break
+            if not chunk: break
+            buf.extend(chunk)
+        text = buf.decode("utf-8", "ignore")
+        for part in text.split("&"):
+            k, _, v = part.partition("=")
+            if k.strip() == "code":
+                submitted = _pct(v.strip()).upper()
+                break
+
+    if len(submitted) != 6 or not all(c in SESSION_CHARSET for c in submitted):
+        _send_status(sock, 400, "Bad Request",
+                     b'{"error":"bad code format"}',
+                     content_type="application/json")
+        return
+
+    live = current_code()
+    if submitted != live:
+        _send_status(sock, 401, "Unauthorized",
+                     b'{"error":"wrong code"}',
+                     content_type="application/json")
+        return
+
+    # Code matched — register the session.
     _prune_sessions()
     if len(_sessions) >= SESSION_MAX:
         _send_status(sock, 503, "Service Unavailable",
                      b'{"error":"too many active sessions"}',
                      content_type="application/json")
         return
-    sid = _new_session_id()
+    device_id = _new_session_id()
     try:
         import time as _t
         now = _t.ticks_ms()
     except Exception:
         now = 0
-    _sessions[sid] = {"state": "pending", "last_ms": now,
-                      "addr": peer_addr, "uploads": 0}
-    body = ('{"id":"%s","state":"pending"}' % sid).encode()
+    _sessions[device_id] = {
+        "state":     "authed",
+        "last_ms":   now,
+        "addr":      peer_addr,
+        "uploads":   0,
+        "authed_at": now,
+    }
+    body = ('{"device_id":"%s","state":"authed"}' % device_id).encode()
     _send_status(sock, 200, "OK", body, content_type="application/json")
 
 
 def _handle_beacon(sock, qs, peer_addr):
-    """Heartbeat from a sender's browser. Bumps last_ms so the session
-    stays alive, and reports the current state so the UI on the phone
-    can switch from 'Waiting…' to 'Ready' once the badge approves."""
+    """Heartbeat from an authed sender's browser. Only refreshes
+    sessions already in the dict — never creates new ones. A sender
+    that hasn't /auth'd is invisible and stays invisible."""
     sid = qs.get("id", "")
     if not sid or len(sid) != 6:
         _send_status(sock, 400, "Bad Request",
@@ -723,27 +1042,23 @@ def _handle_beacon(sock, qs, peer_addr):
                      content_type="application/json")
         return
     _prune_sessions()
-    try:
-        import time as _t
-        now = _t.ticks_ms()
-    except Exception:
-        now = 0
     s = _sessions.get(sid)
     if s is None:
-        if len(_sessions) >= SESSION_MAX:
-            _send_status(sock, 503, "Service Unavailable",
-                         b'{"error":"too many sessions"}',
-                         content_type="application/json")
-            return
-        _sessions[sid] = {"state": "pending", "last_ms": now,
-                          "addr": peer_addr, "uploads": 0}
-        state = "pending"
-    else:
-        s["last_ms"] = now
-        if peer_addr:
-            s["addr"] = peer_addr
-        state = s["state"]
-    body = ('{"id":"%s","state":"%s"}' % (sid, state)).encode()
+        # Session expired or was denied — tell the client so it can
+        # re-prompt for the code. We deliberately do NOT auto-create
+        # the session here (that's the inverted protocol).
+        _send_status(sock, 410, "Gone",
+                     b'{"error":"session expired","state":"gone"}',
+                     content_type="application/json")
+        return
+    try:
+        import time as _t
+        s["last_ms"] = _t.ticks_ms()
+    except Exception:
+        pass
+    if peer_addr:
+        s["addr"] = peer_addr
+    body = ('{"device_id":"%s","state":"%s"}' % (sid, s["state"])).encode()
     _send_status(sock, 200, "OK", body, content_type="application/json")
 
 

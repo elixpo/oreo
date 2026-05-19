@@ -8,58 +8,108 @@ import {
 import { Reveal } from "@/components/MotionWrap";
 
 /* The /upload route is the public on-ramp to the badge's local file
- * transfer flow. It does NOT itself transfer bytes — modern browsers
- * block HTTPS → HTTP fetches (mixed content), and the badge speaks
- * HTTP only. So the page collects the 6-character code shown on the
- * badge screen, validates the shape client-side, and hands the user
- * off to http://oreo.local/?prefill=<code> in a new tab. The badge's
- * own upload page picks up the prefill and continues the gated
- * handshake from there.
+ * transfer flow. Browsers block HTTPS → HTTP fetches (mixed content),
+ * and the badge speaks HTTP only — so this page collects the 6-char
+ * code shown on the badge, then hands the user off to
+ * http://oreo.local/?prefill=<code> in a new tab where the badge's
+ * own gated upload page picks up from there.
  *
- * Why have this page at all?
- *   1. Discoverability — a typed URL on the badge is hard to read;
- *      a fancy gradient page with the wordmark feels like a product.
- *   2. Pre-validation — we reject obviously-wrong codes (length,
- *      ambiguous chars) before the user is on the local-only page.
- *   3. Network coaching — we tell the user "be on the same WiFi"
- *      before they encounter the inevitable "can't reach" error.
+ * The UI mirrors the badge's local page: six independent code cells
+ * with auto-advance, paste-friendly behaviour, and ambiguous-character
+ * filtering. The Open button sits below the cells (not beside them)
+ * so the card stays balanced at every viewport width.
  */
 
 const CODE_LEN     = 6;
-const CODE_CHARSET = /^[A-HJ-NP-Z2-9]+$/i;  // excludes 0/O/1/I/l
+const CODE_CELL_OK = /^[A-HJ-NP-Z2-9]$/i;   // single char accepted into a cell
+
+// mDNS on ESP32 MicroPython is unreliable in the wild (depends on IDF
+// build flags, router multicast forwarding, and the client OS's
+// happiness with multicast DNS). We default the badge address to
+// `oreo.local` for the lucky case but let the user type the raw IP
+// the badge prints on its own Send Files screen as a fallback.
+const DEFAULT_HOST = "oreo.local";
+
+// Accept hostnames OR bare IPv4 addresses with an optional port.
+// Examples that match: `oreo.local`, `192.168.1.42`, `192.168.1.42:80`.
+const ADDR_OK = /^[A-Za-z0-9.-]+(:\d{1,5})?$/;
 
 export default function UploadPage() {
-  const [code, setCode]       = useState("");
-  const [error, setError]     = useState<string>("");
-  const [phase, setPhase]     = useState<"enter" | "handoff">("enter");
-  const inputRef              = useRef<HTMLInputElement>(null);
+  const [cells, setCells] = useState<string[]>(() => Array(CODE_LEN).fill(""));
+  const [error, setError] = useState("");
+  const [phase, setPhase] = useState<"enter" | "handoff">("enter");
+  const [host,  setHost]  = useState<string>(DEFAULT_HOST);
+  const refs = useRef<Array<HTMLInputElement | null>>([]);
+  refs.current = refs.current.slice(0, CODE_LEN);
 
-  // Auto-focus the code input on first render — the user came here
-  // to do exactly one thing.
-  useEffect(() => { inputRef.current?.focus(); }, []);
+  // Pull a last-used host from localStorage on first render so a
+  // returning user doesn't have to re-type their badge's IP every
+  // session. Only restored on the client; SSR sees DEFAULT_HOST.
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("oreo-badge-host");
+      if (saved) setHost(saved);
+    } catch { /* private mode — fine */ }
+  }, []);
 
-  // Normalise as the user types: uppercase + strip non-charset chars.
-  function onCodeChange(v: string) {
-    const clean = v.toUpperCase().replace(/[^A-HJ-NP-Z2-9]/gi, "");
-    setCode(clean.slice(0, CODE_LEN));
-    if (error) setError("");
+  const code = cells.join("").toUpperCase();
+  const complete = code.length === CODE_LEN;
+  const hostValid = ADDR_OK.test(host.trim());
+
+  // Focus the first cell on mount.
+  useEffect(() => { refs.current[0]?.focus(); }, []);
+
+  function setCell(i: number, raw: string) {
+    const v = (raw || "").toUpperCase();
+
+    // Paste of multiple chars — distribute across cells starting at i.
+    if (v.length > 1) {
+      const parts = v.replace(/[^A-HJ-NP-Z2-9]/g, "").split("").slice(0, CODE_LEN - i);
+      const next = [...cells];
+      parts.forEach((c, k) => { next[i + k] = c; });
+      setCells(next);
+      const last = Math.min(CODE_LEN - 1, i + parts.length);
+      refs.current[last]?.focus();
+      setError("");
+      return;
+    }
+
+    // Single char — filter then auto-advance.
+    if (v && !CODE_CELL_OK.test(v)) return;
+    const next = [...cells];
+    next[i] = v;
+    setCells(next);
+    if (v && i < CODE_LEN - 1) refs.current[i + 1]?.focus();
+    setError("");
+  }
+
+  function onKeyDown(i: number, e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Backspace" && !cells[i] && i > 0) refs.current[i - 1]?.focus();
+    if (e.key === "ArrowLeft"  && i > 0)             refs.current[i - 1]?.focus();
+    if (e.key === "ArrowRight" && i < CODE_LEN - 1)  refs.current[i + 1]?.focus();
+    if (e.key === "Enter" && complete) handoff();
   }
 
   function handoff() {
-    if (code.length !== CODE_LEN) {
+    if (!complete) {
       setError(`Code must be ${CODE_LEN} characters.`);
-      inputRef.current?.focus();
       return;
     }
-    if (!CODE_CHARSET.test(code)) {
-      setError("Code uses letters A–Z (minus O/I) and digits 2–9.");
+    const h = host.trim() || DEFAULT_HOST;
+    if (!ADDR_OK.test(h)) {
+      setError(`"${h}" isn't a valid hostname or IP.`);
       return;
     }
+    // Persist the host so the user doesn't retype the IP on every
+    // session. Only saves on a successful handoff so a typo doesn't
+    // get cached.
+    try { localStorage.setItem("oreo-badge-host", h); } catch {}
     setPhase("handoff");
-    // Small delay so the success state is visible before the redirect.
     setTimeout(() => {
-      const url = `http://oreo.local/?prefill=${encodeURIComponent(code)}`;
-      window.open(url, "_blank", "noopener,noreferrer");
+      window.open(
+        `http://${h}/?prefill=${encodeURIComponent(code)}`,
+        "_blank", "noopener,noreferrer",
+      );
     }, 700);
   }
 
@@ -95,54 +145,108 @@ export default function UploadPage() {
               onSubmit={(e) => { e.preventDefault(); handoff(); }}
               className="card-surface p-8 sm:p-10"
             >
-              <label className="block text-xs uppercase tracking-widest text-muted">
+              <label className="block text-center text-xs uppercase tracking-widest
+                                text-muted">
                 Badge code
               </label>
 
-              <div className="mt-3 flex items-center gap-3">
-                <input
-                  ref={inputRef}
-                  value={code}
-                  onChange={(e) => onCodeChange(e.target.value)}
-                  placeholder="ABCDE2"
-                  maxLength={CODE_LEN}
-                  spellCheck={false}
-                  autoComplete="off"
-                  inputMode="text"
-                  className="flex-1 rounded-md border border-border bg-bg
-                             px-4 py-4 font-mono text-3xl uppercase tracking-[0.45em]
-                             text-text outline-none transition-colors
-                             placeholder:text-muted-deep
-                             focus:border-primary/70"
-                />
-                <button
-                  type="submit"
-                  disabled={code.length !== CODE_LEN}
-                  className="btn-primary h-14 px-5 disabled:cursor-not-allowed
-                             disabled:opacity-50"
-                >
-                  Open <ArrowRight className="h-4 w-4" />
-                </button>
+              {/* Six code cells — independent inputs so the user can't
+                  fat-finger more than one char per slot. Auto-advance
+                  + paste-distribute logic lives in setCell(). */}
+              <div className="mt-4 flex flex-wrap justify-center gap-2 sm:gap-3">
+                {cells.map((v, i) => (
+                  <input
+                    key={i}
+                    ref={(el) => { refs.current[i] = el; }}
+                    value={v}
+                    onChange={(e) => setCell(i, e.target.value)}
+                    onKeyDown={(e) => onKeyDown(i, e)}
+                    onFocus={(e) => e.target.select()}
+                    maxLength={2}
+                    inputMode="text"
+                    autoComplete="off"
+                    spellCheck={false}
+                    aria-label={`Code character ${i + 1}`}
+                    className="h-16 w-12 rounded-md border border-border bg-bg
+                               text-center font-mono text-3xl font-semibold uppercase
+                               text-primary outline-none transition-colors
+                               placeholder:text-muted-deep
+                               focus:border-primary focus:ring-2 focus:ring-primary/30
+                               sm:h-20 sm:w-14 sm:text-4xl"
+                  />
+                ))}
               </div>
 
-              {error ? (
-                <motion.p
-                  initial={{ opacity: 0, y: -4 }}
-                  animate={{ opacity: 1, y:  0 }}
-                  className="mt-3 text-sm text-primary"
-                >
-                  {error}
-                </motion.p>
-              ) : (
-                <p className="mt-3 text-xs text-muted-deep">
-                  Six characters. Skips ambiguous shapes (no 0/O/1/I/L).
-                </p>
-              )}
+              {/* Helper / error line — fixed-height so the layout
+                  doesn't jump as the message changes. */}
+              <div className="mt-4 min-h-[20px] text-center text-xs">
+                {error ? (
+                  <motion.span
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y:  0 }}
+                    className="text-primary"
+                  >
+                    {error}
+                  </motion.span>
+                ) : (
+                  <span className="text-muted-deep">
+                    Six characters · skips ambiguous shapes (no 0/O/1/I/L)
+                  </span>
+                )}
+              </div>
 
+              {/* Badge address. Default `oreo.local` works on networks
+                  where multicast DNS resolves; otherwise the user
+                  types the IP printed on the badge's Send Files page. */}
+              <div className="mt-6">
+                <label htmlFor="badge-host"
+                       className="block text-center text-xs uppercase
+                                  tracking-widest text-muted">
+                  Badge address
+                </label>
+                <input
+                  id="badge-host"
+                  value={host}
+                  onChange={(e) => { setHost(e.target.value); setError(""); }}
+                  spellCheck={false}
+                  autoComplete="off"
+                  autoCapitalize="off"
+                  inputMode="url"
+                  placeholder="oreo.local"
+                  className={`mx-auto mt-2 block w-full max-w-xs rounded-md
+                              border bg-bg px-3 py-2.5 text-center
+                              font-mono text-base text-text outline-none
+                              transition-colors placeholder:text-muted-deep
+                              ${hostValid
+                                  ? "border-border focus:border-primary/70"
+                                  : "border-primary/50 focus:border-primary"}`}
+                />
+                <p className="mt-2 text-center text-xs text-muted-deep">
+                  Default <span className="text-muted">oreo.local</span> works
+                  on networks where mDNS resolves. Otherwise type the IP
+                  shown on the badge's Send Files page (e.g.{" "}
+                  <span className="text-muted">192.168.1.42</span>).
+                </p>
+              </div>
+
+              <button
+                type="submit"
+                disabled={!complete || !hostValid}
+                className="btn-primary mt-6 w-full justify-center
+                           disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Open transfer <ArrowRight className="h-4 w-4" />
+              </button>
+
+              {/* Three info tiles below — explain the model without
+                  making the user read paragraphs. */}
               <div className="mt-8 grid gap-3 sm:grid-cols-3">
-                <Tile icon={<Wifi className="h-4 w-4" />}        title="Same WiFi"     body="Phone and badge on one network."/>
-                <Tile icon={<ShieldCheck className="h-4 w-4" />} title="Tap to allow"  body="Each session waits for badge approval."/>
-                <Tile icon={<RefreshCw className="h-4 w-4" />}   title="Auto cleanup"  body="Codes expire in 60 s."/>
+                <Tile Icon={Wifi}        title="Same WiFi"
+                      body="Phone and badge on one network." />
+                <Tile Icon={ShieldCheck} title="Tap to allow"
+                      body="Each session waits for badge approval." />
+                <Tile Icon={RefreshCw}   title="Auto cleanup"
+                      body="Codes expire in 5 min." />
               </div>
             </motion.form>
           ) : (
@@ -164,12 +268,18 @@ export default function UploadPage() {
                 <span className="text-primary">{code}</span>…
               </h2>
               <p className="max-w-md text-sm text-text-dim">
-                A new tab is opening to <code className="text-text">http://oreo.local</code>.
+                A new tab is opening to{" "}
+                <code className="text-text">http://{host || DEFAULT_HOST}</code>.
                 Make sure your device is on the same WiFi as the badge,
                 approve the session on the badge, and pick a file.
               </p>
+              <p className="max-w-md text-xs text-muted-deep">
+                If the new tab can't reach the badge, go back and
+                replace <code className="text-muted">oreo.local</code>{" "}
+                with the IP printed on the badge's Send Files page.
+              </p>
               <button
-                onClick={() => setPhase("enter")}
+                onClick={() => { setPhase("enter"); setCells(Array(CODE_LEN).fill("")); }}
                 className="btn-ghost mt-4"
               >
                 Use a different code
@@ -196,10 +306,16 @@ export default function UploadPage() {
   );
 }
 
-function Tile({ icon, title, body }: { icon: React.ReactNode; title: string; body: string }) {
+function Tile({
+  Icon, title, body,
+}: {
+  Icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  body: string;
+}) {
   return (
     <div className="rounded-md border border-border bg-bg-raised/50 p-4">
-      <div className="mb-2 text-primary">{icon}</div>
+      <Icon className="mb-2 h-4 w-4 text-primary" />
       <p className="text-sm font-semibold text-text">{title}</p>
       <p className="mt-1 text-xs text-text-dim">{body}</p>
     </div>

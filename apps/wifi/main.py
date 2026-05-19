@@ -16,6 +16,8 @@ boot via the wifi module's bootstrap path.
 """
 
 import oreoOS
+import time
+
 from oreoOS import api, theme, widgets
 
 
@@ -88,6 +90,10 @@ class App(oreoOS.App):
         self._mode    = "main"          # "main" | "nets" | "transfer"
         # Cached cursor inside the transfer-page sender list.
         self._trans_sel = 0
+        # LEFT press-timestamp on the Transfer page — used to
+        # distinguish tap (deny) from hold (toggle master kill switch).
+        # 0 means "not currently pressed."
+        self._lp_left_press_ms = 0
         self._nets    = []              # cached saved-networks list
         self._nets_sel = 0
 
@@ -538,22 +544,48 @@ class App(oreoOS.App):
             return "%d active" % n
         return "ready"
 
+    # ── long-press LEFT tracking ──
+    # Pressing LEFT once = deny the selected sender. Holding LEFT for
+    # LP_HOLD_MS = toggle the transfer-disabled master kill switch.
+    # We track the press timestamp on key-down and decide on key-up.
+    LP_HOLD_MS = 800
+
     def _on_button_transfer(self, btn):
         if btn in (api.BTN_HOME, api.BTN_B):
             self._mode = "main"
             self._dirty = True
             return
-        if btn == api.BTN_RIGHT:
-            # Refresh — sometimes the page shows "Server offline" when
-            # WiFi is actually associated but the HTTP server hasn't
-            # picked up the new IP (e.g. after a hotspot handoff).
-            # Force-reconnect WiFi if needed and rebind the listener.
-            self._refresh_transfer()
-            self._dirty = True
-            return
         hs = self._http()
         if hs is None:
             return
+
+        # Master kill switch on — only `A = re-enable` works in this state.
+        try:
+            disabled = (hasattr(hs, "is_transfer_enabled")
+                        and not hs.is_transfer_enabled())
+        except Exception:
+            disabled = False
+        if disabled:
+            if btn == api.BTN_A:
+                try: hs.set_transfer_enabled(True)
+                except Exception: pass
+                self._dirty = True
+            return
+
+        if btn == api.BTN_RIGHT:
+            # R = refresh the badge code. We deliberately overload R
+            # to ALSO retry the WiFi/HTTP reconnect (the previous
+            # behaviour) — both are "kick things back into shape"
+            # actions and combining them keeps the button budget low.
+            try:
+                if hasattr(hs, "refresh_code"):
+                    hs.refresh_code()
+            except Exception:
+                pass
+            self._refresh_transfer()
+            self._dirty = True
+            return
+
         sessions = hs.list_sessions()
         n = len(sessions)
         if btn == api.BTN_UP and n:
@@ -564,12 +596,54 @@ class App(oreoOS.App):
             sid = sessions[self._trans_sel].get("id", "")
             if sid:
                 hs.approve(sid)
-        elif btn == api.BTN_LEFT and n:
-            sid = sessions[self._trans_sel].get("id", "")
-            if sid:
-                hs.deny(sid)
+        elif btn == api.BTN_LEFT:
+            # Mark the press-start time on first-press only. Subsequent
+            # auto-repeat events skip this branch via the != 0 guard,
+            # so a long hold keeps the original timestamp and we can
+            # measure full duration in on_button_release. The actual
+            # tap-vs-hold decision happens there — firing both deny
+            # and toggle on a single press would be confusing.
+            if self._lp_left_press_ms == 0:
+                self._lp_left_press_ms = time.ticks_ms()
+            return     # don't mark dirty — visual state hasn't changed yet
         else:
             return
+        self._dirty = True
+
+    def on_button_release(self, btn):
+        # LEFT released on the Transfer page — decide tap vs hold and
+        # fire exactly one action. The press-start timestamp was
+        # captured in _on_button_transfer.
+        if self._mode != "transfer" or btn != api.BTN_LEFT:
+            return
+        start = self._lp_left_press_ms
+        self._lp_left_press_ms = 0
+        if start == 0:
+            return
+        held = time.ticks_diff(time.ticks_ms(), start)
+        hs = self._http()
+        if hs is None:
+            return
+        if held >= self.LP_HOLD_MS:
+            # Long press → toggle the master kill switch.
+            try:
+                cur = (hs.is_transfer_enabled()
+                       if hasattr(hs, "is_transfer_enabled") else True)
+                hs.set_transfer_enabled(not cur)
+            except Exception:
+                pass
+        else:
+            # Short tap → deny the focused sender, if any.
+            sessions = []
+            try:
+                sessions = hs.list_sessions()
+            except Exception:
+                pass
+            if sessions and 0 <= self._trans_sel < len(sessions):
+                sid = sessions[self._trans_sel].get("id", "")
+                if sid:
+                    try: hs.deny(sid)
+                    except Exception: pass
         self._dirty = True
 
     def _refresh_transfer(self):
@@ -599,34 +673,80 @@ class App(oreoOS.App):
 
     def _draw_transfer(self, d):
         widgets.draw_header(d, "SEND FILES")
-        widgets.draw_hint(d, "A=allow  L=deny  R=refresh  B=back")
 
         hs = self._http()
         running = bool(hs and hs.is_running())
 
-        # ── URL block ──
+        # ── Master kill switch state — entire screen flips to a
+        # ── single "Transfer closed" panel.
+        try:
+            disabled = (running
+                        and hasattr(hs, "is_transfer_enabled")
+                        and not hs.is_transfer_enabled())
+        except Exception:
+            disabled = False
+        if disabled:
+            widgets.draw_hint(d, "A=re-enable  B=back")
+            y = ROW_TOP_Y + 40
+            label = "TRANSFER CLOSED"
+            d.text(label, (SW - len(label) * 16) // 2, y,
+                   theme.PRIMARY, scale=2)
+            sub = "File transfer disabled by you."
+            d.text(sub, (SW - len(sub) * 8) // 2, y + 28,
+                   theme.TEXT_DIM)
+            cta = "Tap A to re-enable."
+            d.text(cta, (SW - len(cta) * 8) // 2, y + 44,
+                   theme.MUTED)
+            return
+
+        widgets.draw_hint(d, "A=allow  L=deny  hold-L=close  R=refresh")
+
+        # ── Code header — big 6-char display + TTL countdown ──
         y = ROW_TOP_Y
         if running:
-            url_local = hs.url()           # http://oreo.local/
-            url_ip    = hs.url_fallback()  # http://192.168.x.y/
-            d.text("Open on your phone:", ROW_PAD_X, y, theme.TEXT_DIM)
-            # Public web UI on Cloudflare Pages — primary call to
-            # action. scale=1 so the full domain fits one line; the
-            # earlier scale=2 was overflowing on long mDNS hostnames.
-            d.text("oreo.pages.dev/upload",
-                   ROW_PAD_X, y + 14, theme.PRIMARY, scale=1)
-            # Local fallbacks for offline / locked-down WiFi where
-            # the public site can't reach us.
-            d.text(url_local, ROW_PAD_X, y + 28, theme.TEXT_DIM)
-            d.text(url_ip,    ROW_PAD_X, y + 40, theme.MUTED2)
+            try:
+                code = hs.current_code()
+            except Exception:
+                code = "------"
+            try:
+                remain_ms = hs.code_remaining_ms()
+            except Exception:
+                remain_ms = 0
+            # "rotates in 4:32"
+            secs = max(0, remain_ms // 1000)
+            mins, ss = divmod(secs, 60)
+            label = "Type this code in the sender's browser:"
+            d.text(label, ROW_PAD_X, y, theme.TEXT_DIM)
+            # Big code — scale=3 so it dominates the page.
+            code_w = len(code) * 8 * 3
+            d.text(code, (SW - code_w) // 2, y + 14,
+                   theme.PRIMARY, scale=3)
+            # Tiny TTL countdown below the code, centred.
+            ttl = "rotates in %d:%02d" % (mins, ss)
+            d.text(ttl, (SW - len(ttl) * 8) // 2, y + 14 + 24 + 4,
+                   theme.GOLD if remain_ms > 30_000 else theme.PRIMARY)
+            # URL hints below the countdown. We show BOTH the mDNS
+            # form and the raw IP because multicast DNS is unreliable
+            # in the wild — on most networks oreo.local works, but
+            # the IP is the universal fallback the user can type into
+            # the website's address field.
+            url_local = hs.url()
+            url_ip    = hs.url_fallback()
+            d.text(url_local, ROW_PAD_X, y + 14 + 24 + 18,
+                   theme.TEXT_DIM)
+            d.text(url_ip,    ROW_PAD_X, y + 14 + 24 + 32,
+                   theme.MUTED)
         else:
             d.text("Server offline.", ROW_PAD_X, y, theme.MUTED, scale=1)
             d.text("Connect WiFi to enable transfer.",
                    ROW_PAD_X, y + 14, theme.MUTED2, scale=1)
 
         # ── live transfer progress bar ──
+        # Header now spans: label (14) + code at scale=3 (~26) + TTL
+        # (12) + url_local (12) + url_ip (12). Push the body start
+        # past that block.
         prog = hs.progress() if hs else None
-        prog_y = y + 56
+        prog_y = y + 92
         if prog:
             total = max(1, int(prog.get("total", 0)))
             done  = min(total, int(prog.get("received", 0)))
@@ -666,13 +786,17 @@ class App(oreoOS.App):
         # State -> dot colour. RGB tuples instead of theme constants
         # because we need a clean green, and the theme palette doesn't
         # ship one — primary is pink-red, teal is too cyan.
+        # State → dot colour. State names changed in the new server
+        # protocol — "authed" = correct code typed but badge owner
+        # hasn't approved yet (yellow); "approved" = green; "denied"
+        # is filtered upstream so it shouldn't normally appear.
         dot_color = {
-            "pending":  api.rgb(255, 209, 102),    # yellow
+            "authed":   api.rgb(255, 209, 102),    # yellow
             "approved": api.rgb( 61, 220, 151),    # green
-            "denied":   api.rgb(255,  93, 104),    # red — visible only
-                                                   # in the brief window
-                                                   # before the row is
-                                                   # filtered out
+            "denied":   api.rgb(255,  93, 104),    # red (filtered)
+            # Legacy fallback for the old "pending" state name —
+            # remove once every device is on the new protocol.
+            "pending":  api.rgb(255, 209, 102),
         }
         DOT_SIZE   = 8
         DOT_RIGHT  = ROW_PAD_X + 2   # pad from the right edge
