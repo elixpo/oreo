@@ -56,9 +56,18 @@ export default function Footer() {
           {/* Brand block */}
           <div>
             <div className="mb-3 flex items-center gap-2">
-              <div className="grid h-8 w-8 place-items-center rounded-md
-                              border border-primary/40 bg-bg
-                              font-display text-primary">o</div>
+              <div className="relative h-8 w-8 overflow-hidden rounded-md
+                              border border-primary/40 bg-bg-raised">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/mascot.png"
+                  alt="Oreo mascot"
+                  className="absolute inset-0 h-full w-full object-contain p-0.5"
+                  style={{ imageRendering: "pixelated" }}
+                  loading="lazy"
+                  decoding="async"
+                />
+              </div>
               <span className="font-display text-xl">Oreo</span>
             </div>
             <p className="text-sm leading-relaxed text-text-dim">

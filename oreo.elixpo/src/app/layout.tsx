@@ -58,10 +58,15 @@ export const metadata: Metadata = {
     description: SITE_DESCRIPTION,
     images: [OG_IMAGE],
   },
-  // Icon references are intentionally minimal until the real assets in
-  // prompts/site_assets.md get rendered + dropped into /public. Once
-  // logo-mark.svg + apple-touch-icon.png exist, re-add them here. For
-  // now Next's default favicon ships and no 404s clutter the dev log.
+  // Icons — pulled from the same mascot.png the header + footer use,
+  // so the favicon/apple-touch-icon look identical to the in-page
+  // wordmark. Pixel-art works at every favicon size; Cloudflare Pages
+  // serves the file verbatim from /public.
+  icons: {
+    icon:     [{ url: "/favicon.png", type: "image/png" }],
+    shortcut: "/favicon.png",
+    apple:    "/favicon.png",
+  },
   formatDetection: { telephone: false, email: false, address: false },
 };
 
