@@ -75,8 +75,17 @@ export default function WavesHero() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    let animationId: number;
+    /* Visibility-driven RAF gating. The hero is the most CPU-hungry
+     * thing on the site (canvas + 5 wave passes per frame at 60 fps).
+     * Whenever it scrolls off-screen we cancel the RAF and let the
+     * browser reclaim the GPU/CPU; IntersectionObserver restarts it
+     * when the user scrolls back. document.hidden also pauses on tab
+     * background. Together these drop the idle-tab cost to ~0%. */
+    let animationId: number = 0;
     let time = 0;
+    let isVisible    = true;
+    let docHidden    = false;
+    const running    = () => isVisible && !docHidden;
 
     /* Pull live colour values off the CSS variables we set in
        globals.css. Re-runs on theme mutation. */
@@ -194,6 +203,7 @@ export default function WavesHero() {
     };
 
     const animate = () => {
+      if (!running()) { animationId = 0; return; }   // paused — leave loop
       time += 1;
       mouseRef.current.x += (targetMouseRef.current.x - mouseRef.current.x) * smoothing;
       mouseRef.current.y += (targetMouseRef.current.y - mouseRef.current.y) * smoothing;
@@ -210,12 +220,36 @@ export default function WavesHero() {
 
       animationId = window.requestAnimationFrame(animate);
     };
-    animationId = window.requestAnimationFrame(animate);
+    const kick = () => {
+      if (!animationId && running()) {
+        animationId = window.requestAnimationFrame(animate);
+      }
+    };
+    kick();
+
+    // Pause when off-screen.
+    const io = new IntersectionObserver(
+      (entries) => {
+        isVisible = !!entries[0]?.isIntersecting;
+        kick();
+      },
+      { threshold: 0.01 },
+    );
+    io.observe(canvas);
+
+    // Pause when tab is backgrounded.
+    const onVisibility = () => {
+      docHidden = document.hidden;
+      kick();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
       window.removeEventListener("resize", handleResize);
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseleave", handleMouseLeave);
+      document.removeEventListener("visibilitychange", onVisibility);
+      io.disconnect();
       cancelAnimationFrame(animationId);
       observer.disconnect();
     };
@@ -268,8 +302,13 @@ export default function WavesHero() {
                        tracking-tight text-foreground md:text-6xl lg:text-7xl"
           >
             A python operating system,{" "}
-            <span className="bg-gradient-to-r from-primary via-primary/60 to-foreground/80
-                             bg-clip-text text-transparent">
+            {/* Gradient stops are now warm-on-warm — primary →
+                gold → lilac, all on the bright side of the palette
+                — so the second half of the headline never dissolves
+                into the page background. */}
+            <span className="bg-gradient-to-r from-primary via-gold to-lilac
+                             bg-clip-text text-transparent
+                             drop-shadow-[0_0_30px_rgba(255,93,104,0.35)]">
               in a pocket-sized badge.
             </span>
           </motion.h1>

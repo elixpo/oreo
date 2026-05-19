@@ -16,12 +16,53 @@ const ICONS: Record<AppIconId, LucideIcon> = {
   Bluetooth, RefreshCw, Settings,
 };
 
-const TINT: Record<AppEntry["tint"], { ring: string; glow: string; text: string }> = {
+type Tint = { ring: string; glow: string; text: string };
+
+const TINT: Record<AppEntry["tint"], Tint> = {
   primary: { ring: "ring-primary/40", glow: "shadow-[0_0_36px_rgba(255,93,104,0.22)]", text: "text-primary" },
   teal:    { ring: "ring-teal/40",    glow: "shadow-[0_0_36px_rgba(61,220,151,0.20)]", text: "text-teal" },
   gold:    { ring: "ring-gold/40",    glow: "shadow-[0_0_36px_rgba(255,209,102,0.18)]",text: "text-gold" },
   lilac:   { ring: "ring-lilac/40",   glow: "shadow-[0_0_36px_rgba(162,155,254,0.20)]",text: "text-lilac" },
 };
+
+/* The icon tile is its own component so the grid card and the
+ * detail modal share the "real PNG with Lucide fallback" logic.
+ * `image-rendering: pixelated` keeps the chunky badge pixel art
+ * crisp at every zoom level. */
+function IconTile({
+  app, tint, Icon, size = "md",
+}: {
+  app: AppEntry;
+  tint: Tint;
+  Icon: LucideIcon;
+  size?: "md" | "lg";
+}) {
+  const [pngOk, setPngOk] = useState(true);
+  const dim    = size === "lg" ? "h-20 w-20" : "h-14 w-14";
+  const iconSz = size === "lg" ? "h-10 w-10" : "h-6 w-6";
+  const pad    = size === "lg" ? "p-3"       : "p-2";
+  return (
+    <div className={`grid ${dim} shrink-0 place-items-center rounded-md
+                     overflow-hidden bg-card-sub ring-2 ring-inset
+                     ${tint.ring} ${tint.text} ${pad}`}>
+      {app.pngIcon && pngOk ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={app.pngIcon}
+          alt=""
+          aria-hidden="true"
+          onError={() => setPngOk(false)}
+          className="h-full w-full object-contain"
+          style={{ imageRendering: "pixelated" }}
+          loading="lazy"
+          decoding="async"
+        />
+      ) : (
+        <Icon className={iconSz} />
+      )}
+    </div>
+  );
+}
 
 export default function AppCard({
   app,
@@ -31,7 +72,7 @@ export default function AppCard({
   index?: number;
 }) {
   const [open, setOpen] = useState(false);
-  const t    = TINT[app.tint] ?? TINT.primary;
+  const tint = TINT[app.tint] ?? TINT.primary;
   const Icon = ICONS[app.icon] ?? Cpu;
 
   return (
@@ -49,19 +90,20 @@ export default function AppCard({
         }}
         whileHover={{ y: -4 }}
         className={`card-surface group relative w-full overflow-hidden p-5
-                    text-left hover:border-text/30 ${t.glow}`}
+                    text-left hover:border-text/30 ${tint.glow}`}
       >
         <div className="flex items-start gap-4">
-          <div className={`grid h-14 w-14 shrink-0 place-items-center rounded-md
-                           bg-card-sub ring-2 ring-inset ${t.ring} ${t.text}`}>
-            <Icon className="h-6 w-6" />
-          </div>
+          <IconTile app={app} tint={tint} Icon={Icon} size="md" />
           <div className="min-w-0 flex-1">
             <div className="flex items-center justify-between gap-2">
-              <h3 className={`truncate font-display text-lg ${t.text}`}>{app.name}</h3>
+              <h3 className={`truncate font-display text-lg ${tint.text}`}>
+                {app.name}
+              </h3>
               <span className="chip">{app.category}</span>
             </div>
-            <p className="mt-1 text-sm leading-relaxed text-text-dim">{app.blurb}</p>
+            <p className="mt-1 text-sm leading-relaxed text-text-dim">
+              {app.blurb}
+            </p>
           </div>
         </div>
         <motion.div
@@ -103,12 +145,11 @@ export default function AppCard({
               </button>
 
               <div className="flex items-center gap-5">
-                <div className={`grid h-20 w-20 shrink-0 place-items-center
-                                 rounded-md bg-card-sub ring-2 ring-inset ${t.ring} ${t.text}`}>
-                  <Icon className="h-10 w-10" />
-                </div>
+                <IconTile app={app} tint={tint} Icon={Icon} size="lg" />
                 <div>
-                  <h2 className={`font-display text-3xl ${t.text}`}>{app.name}</h2>
+                  <h2 className={`font-display text-3xl ${tint.text}`}>
+                    {app.name}
+                  </h2>
                   <p className="mt-1 text-sm text-muted">apps/{app.slug}/</p>
                 </div>
               </div>

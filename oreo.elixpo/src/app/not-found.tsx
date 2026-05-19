@@ -31,8 +31,11 @@ export default function NotFound() {
         </p>
         <h1 className="mt-4 font-display text-7xl leading-[1.05] tracking-tight
                        sm:text-8xl">
-          <span className="bg-gradient-to-r from-primary via-primary/60 to-foreground/80
-                           bg-clip-text text-transparent">Off the map.</span>
+          <span className="bg-gradient-to-r from-primary via-gold to-lilac
+                           bg-clip-text text-transparent
+                           drop-shadow-[0_0_30px_rgba(255,93,104,0.35)]">
+            Off the map.
+          </span>
         </h1>
         <p className="mt-6 max-w-xl text-text-dim">
           The route you tapped doesn't exist on this build of the site.

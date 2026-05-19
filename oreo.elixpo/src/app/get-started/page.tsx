@@ -14,15 +14,24 @@ const STEPS = [
 
 export default function GetStartedPage() {
   return (
-    <div className="container-page pt-16 pb-28">
+    <div className="relative">
+      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[520px] overflow-hidden">
+        <div className="absolute left-1/4 top-0  h-[400px] w-[400px] rounded-full bg-primary/[0.10] blur-[140px]" />
+        <div className="absolute right-1/3 top-40 h-[260px] w-[260px] rounded-full bg-teal/[0.10]    blur-[120px]" />
+      </div>
+      <div className="container-page pt-16 pb-28">
       <motion.div initial="hidden" animate="visible" variants={staggerContainer}>
         <motion.span variants={fadeUp} className="chip mb-6">~15 minutes · USB-C + a computer</motion.span>
         <motion.h1
           variants={fadeUp}
           className="font-display text-4xl leading-[1.05] tracking-tight sm:text-5xl"
         >
-          From box to badge,
-          <br /><span className="text-primary">in four steps.</span>
+          From box to badge,{" "}
+          <span className="bg-gradient-to-r from-primary via-gold to-lilac
+                           bg-clip-text text-transparent
+                           drop-shadow-[0_0_30px_rgba(255,93,104,0.35)]">
+            in four steps.
+          </span>
         </motion.h1>
         <motion.p variants={fadeUp} className="mt-5 max-w-2xl text-text-dim">
           The deploy script handles version bumps, hash-cache pruning,
@@ -79,6 +88,7 @@ export default function GetStartedPage() {
           </p>
         </div>
       </Reveal>
+      </div>
     </div>
   );
 }
