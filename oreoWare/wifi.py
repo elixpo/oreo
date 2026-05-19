@@ -256,12 +256,48 @@ def is_metered():
 def connect_from_config():
     """Try each saved network in priority order until one associates.
 
+    Three-tier fallback so a freshly-flashed badge with an empty (or
+    missing) /wifi.json still comes up online:
+
+      1. /wifi.json — the user-managed list, edited via Settings → WiFi.
+      2. secrets.py — the deploy-time single-network bootstrap. Used
+         when /wifi.json exists but is empty (the user wiped it) AND
+         when /wifi.json never existed and the on-flash migration in
+         list_saved() didn't catch the gap.
+      3. Otherwise: return False, radio stays off.
+
     Per-network timeout is short (_PER_NET_TIMEOUT) so a stale entry
-    doesn't stall the boot. Returns True iff we associated to *any*
-    saved SSID; False if the list is empty or every entry failed.
+    doesn't stall the boot.
     """
     nets = list_saved()
     if not nets:
+        # Last-ditch: try the deploy-time secret directly. Without this
+        # an empty /wifi.json silently disabled WiFi forever on freshly
+        # flashed badges — the toggle on the Status row would call
+        # connect_from_config(), find no saved nets, and bail without
+        # ever bringing the radio up.
+        try:
+            import secrets
+            ssid_ = getattr(secrets, "WIFI_SSID", "")
+            pw    = getattr(secrets, "WIFI_PASSWORD", "")
+            if ssid_:
+                print("[wifi] no saved nets, falling back to secrets bootstrap")
+                # Persist as the new "priority 1" entry so this branch
+                # only fires once per device — subsequent connects use
+                # the normal path.
+                try:
+                    add_saved(ssid_, pw, priority=1, metered=False)
+                except Exception:
+                    pass
+                ok = False
+                try:
+                    ok = connect(ssid_, pw, timeout_ms=_PER_NET_TIMEOUT)
+                except Exception:
+                    pass
+                return ok
+        except Exception as e:
+            print("[wifi] secrets bootstrap failed:", e)
+        print("[wifi] no networks configured")
         return False
     for n in nets:
         ssid_ = n.get("ssid") or ""
@@ -269,11 +305,16 @@ def connect_from_config():
             continue
         pw = n.get("password") or ""
         try:
+            print("[wifi] try %s (p=%s)" %
+                  (ssid_, n.get("priority", "?")))
             ok = connect(ssid_, pw, timeout_ms=_PER_NET_TIMEOUT)
-        except Exception:
+        except Exception as e:
+            print("[wifi] connect raised:", e)
             ok = False
         if ok:
+            print("[wifi] associated:", ssid_)
             return True
+    print("[wifi] all %d saved networks failed" % len(nets))
     return False
 
 
