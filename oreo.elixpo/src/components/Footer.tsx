@@ -11,7 +11,11 @@ function fmtCount(n: number | null): string {
   return String(n);
 }
 
-const COLUMNS = [
+// One column row. `external` is optional; absent → internal Link.
+type FooterLink = { label: string; href: string; external?: boolean };
+type FooterColumn = { title: string; links: FooterLink[] };
+
+const COLUMNS: FooterColumn[] = [
   {
     title: "Project",
     links: [
