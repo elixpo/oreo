@@ -1,18 +1,5 @@
 # Contributing to Oreo Badge
 
-<div align="center">
-<img src="docs/images/mascot_small.png" alt="Panda mascot" width="120">
-<br><em>Hi! Thanks for poking around.</em>
-</div>
-
-We love that you're here. The Oreo Badge is small, weird, and welcoming
-on purpose. Whatever skill level you're showing up with — first PR,
-twentieth — we want it to feel easy to land changes.
-
-This document is the short version. Read it once, then jump in.
-
----
-
 ## Quick map
 
 - **🐛 Bug?** → open an issue with the badge model, firmware version
