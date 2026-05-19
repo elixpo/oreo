@@ -183,21 +183,15 @@ class App(oreoOS.App):
             return
         r = self._sel
         if r == self.ROW_STATUS:
-            # Toggle drives the radio state, not just association. If
-            # the radio is up, this turns it OFF (releases the link +
-            # powers the MAC down). If the radio is off, it goes UP and
-            # we *try* to associate — but the toggle stays "on" even
-            # if association fails, so a second tap reads as "off" not
-            # "try again the same way."
-            on_now = False
-            try:
-                is_radio_on = getattr(self._wifi, "is_radio_on", None)
-                if is_radio_on:
-                    on_now = bool(is_radio_on())
-                else:
-                    on_now = bool(self._snap.get("connected"))
-            except Exception:
-                on_now = bool(self._snap.get("connected"))
+            # Toggle's "on" state is whatever the label shows —
+            # `is_connected()`. The earlier version checked
+            # `is_radio_on()`, which got out of sync with the label
+            # any time a boot-time connect failed: radio left up,
+            # label OFF, but the toggle treated the next tap as
+            # "turn off" instead of "retry." Now it just mirrors
+            # the label: tap when label is ON → disconnect; tap when
+            # label is OFF → try to connect.
+            on_now = bool(self._snap.get("connected"))
             if on_now:
                 try:
                     radio_off = getattr(self._wifi, "radio_off", None)
