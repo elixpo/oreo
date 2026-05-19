@@ -183,18 +183,31 @@ class App(oreoOS.App):
             return
         r = self._sel
         if r == self.ROW_STATUS:
-            if self._snap.get("connected"):
+            # Toggle drives the radio state, not just association. If
+            # the radio is up, this turns it OFF (releases the link +
+            # powers the MAC down). If the radio is off, it goes UP and
+            # we *try* to associate — but the toggle stays "on" even
+            # if association fails, so a second tap reads as "off" not
+            # "try again the same way."
+            on_now = False
+            try:
+                is_radio_on = getattr(self._wifi, "is_radio_on", None)
+                if is_radio_on:
+                    on_now = bool(is_radio_on())
+                else:
+                    on_now = bool(self._snap.get("connected"))
+            except Exception:
+                on_now = bool(self._snap.get("connected"))
+            if on_now:
                 try:
-                    self._wifi.disconnect()
+                    radio_off = getattr(self._wifi, "radio_off", None)
+                    if radio_off:
+                        radio_off()
+                    else:
+                        self._wifi.disconnect()
                 except Exception:
                     pass
             else:
-                # Two-step turn-on so the toggle is never a no-op:
-                #   1. Power up the radio unconditionally — that's
-                #      what "Status: ON" really means.
-                #   2. Try to auto-associate. If no networks reach,
-                #      the radio stays up and the user can pick one
-                #      via the Networks sub-page.
                 try:
                     radio_on = getattr(self._wifi, "radio_on", None)
                     if radio_on:
@@ -387,10 +400,18 @@ class App(oreoOS.App):
         widgets.draw_hint(d, "A=select  HOME=back")
 
         snap = self._snap
+        # Three-state status: connected → ON (primary), radio-on-but-
+        # searching → SEARCH (gold), radio off → OFF (muted). This
+        # mirrors the notif-panel chip so the two surfaces never
+        # disagree.
+        if snap.get("connected"):
+            _stat_label, _stat_color = "ON",     theme.PRIMARY
+        elif snap.get("radio_on"):
+            _stat_label, _stat_color = "SEARCH", theme.GOLD
+        else:
+            _stat_label, _stat_color = "OFF",    theme.MUTED
         rows = [
-            ("Status",       "ON" if snap.get("connected") else "OFF",
-                             theme.PRIMARY if snap.get("connected")
-                                            else theme.MUTED),
+            ("Status",       _stat_label, _stat_color),
             ("SSID",         snap.get("ssid") or "—",       theme.TEXT_BRIGHT),
             ("IP",           snap.get("ip") or "—",         theme.TEXT_DIM),
             ("RSSI",         self._rssi_value(snap),        theme.TEXT_DIM),

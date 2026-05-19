@@ -127,6 +127,32 @@ def radio_on():
         return False
 
 
+def radio_off():
+    """Power the radio fully down. Releases any active connection
+    cleanly and saves the ~70 mA the WiFi MAC pulls in idle. Pairs
+    with `radio_on()` so a UI toggle has a real on/off semantic."""
+    try:
+        wlan = _get_wlan()
+        try: wlan.disconnect()
+        except Exception: pass
+        try: wlan.active(False)
+        except Exception: pass
+        return True
+    except Exception:
+        return False
+
+
+def is_radio_on():
+    """True iff the WiFi MAC is powered up. Distinct from
+    `is_connected()`, which only flips true after a full association.
+    UI 'WiFi: ON/OFF' should track this — association state is a
+    sub-label on the same row."""
+    try:
+        return bool(_get_wlan().active())
+    except Exception:
+        return False
+
+
 def connect(ssid, password, timeout_ms=12000):
     wlan = _get_wlan()
     try:
@@ -574,11 +600,16 @@ def info():
     Returns a dict with `connected`, `ssid`, `ip`, `subnet`, `gateway`,
     `dns`, and `rssi`. Missing fields are None — the UI fills with '—'.
     """
-    out = {"connected": False, "ssid": None,    "ip": None,
+    out = {"connected": False, "radio_on": False,
+           "ssid": None,    "ip": None,
            "subnet":   None,  "gateway": None, "dns": None,
            "rssi":     None}
     try:
         wlan = _get_wlan()
+        try:
+            out["radio_on"] = bool(wlan.active())
+        except Exception:
+            pass
         out["connected"] = bool(wlan.isconnected())
         if out["connected"]:
             cfg = wlan.ifconfig()    # (ip, subnet, gateway, dns)

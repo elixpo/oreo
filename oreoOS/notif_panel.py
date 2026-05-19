@@ -311,11 +311,31 @@ class NotifPanel:
 
     # ── quick-setting actions ───────────────────────────────────────────
     def _toggle_wifi(self):
+        """Drive the WiFi RADIO state, not the association state.
+
+        The old behaviour was: "if connected → disconnect; else →
+        connect_from_config". That made the chip look like a no-op
+        any time auto-association failed: tap → radio up → can't
+        associate → is_connected() stays False → chip still reads
+        "OFF" → next tap thinks it's currently off and tries the same
+        thing again. Now the chip tracks radio_on(): one tap powers
+        the MAC up (and *tries* to associate), another tap powers it
+        fully down. Association status surfaces as the sub-label.
+        """
         try:
             from oreoWare import wifi
-            if wifi.is_connected():
-                wifi.disconnect()
+            on_now = False
+            try:
+                on_now = bool(wifi.is_radio_on())
+            except Exception:
+                # Old build without is_radio_on — fall back to the
+                # association check (no worse than before).
+                on_now = bool(wifi.is_connected())
+            if on_now:
+                wifi.radio_off() if hasattr(wifi, "radio_off") else wifi.disconnect()
             else:
+                if hasattr(wifi, "radio_on"):
+                    wifi.radio_on()
                 wifi.connect_from_config()
         except Exception:
             pass
@@ -439,9 +459,29 @@ class NotifPanel:
         ]
         try:
             from oreoWare import wifi
-            connected = wifi.is_connected()
-            out[0]["on"]  = bool(connected)
-            out[0]["sub"] = "on" if connected else "off"
+            # Chip "on" tracks the RADIO, not the association — that's
+            # what the user just toggled. Sub-label surfaces the
+            # association state: connected → SSID, on-but-searching →
+            # "searching…", off → "off".
+            try:
+                on = bool(wifi.is_radio_on())
+            except Exception:
+                on = bool(wifi.is_connected())
+            connected = False
+            try:
+                connected = bool(wifi.is_connected())
+            except Exception:
+                pass
+            out[0]["on"] = on
+            if connected:
+                cur = ""
+                try: cur = wifi.ssid() or ""
+                except Exception: pass
+                out[0]["sub"] = (cur[:10] if cur else "connected")
+            elif on:
+                out[0]["sub"] = "searching…"
+            else:
+                out[0]["sub"] = "off"
         except Exception:
             pass
         try:
