@@ -189,6 +189,18 @@ class App(oreoOS.App):
                 except Exception:
                     pass
             else:
+                # Two-step turn-on so the toggle is never a no-op:
+                #   1. Power up the radio unconditionally — that's
+                #      what "Status: ON" really means.
+                #   2. Try to auto-associate. If no networks reach,
+                #      the radio stays up and the user can pick one
+                #      via the Networks sub-page.
+                try:
+                    radio_on = getattr(self._wifi, "radio_on", None)
+                    if radio_on:
+                        radio_on()
+                except Exception:
+                    pass
                 try:
                     self._wifi.connect_from_config()
                 except Exception:

@@ -41,7 +41,11 @@ except ImportError:
 _wlan = None
 
 _SAVED_PATH       = "/wifi.json"
-_PER_NET_TIMEOUT  = 8000     # ms — per-SSID cap so a wrong network is skipped fast
+_PER_NET_TIMEOUT  = 12000    # ms — per-SSID cap. 12 s is the sweet spot:
+                             # long enough that a real router with a
+                             # cold DHCP lease can complete, short
+                             # enough that a wrong-password entry
+                             # doesn't stall the boot.
 
 
 def _get_wlan():
@@ -80,51 +84,88 @@ def _apply_power_cap(wlan):
 MDNS_HOSTNAME = "oreo"
 
 
+_hostname_applied = False
+
 def _apply_hostname(wlan):
     """Set the WiFi hostname so the ESP-IDF mDNS responder advertises
     `oreo.local` to the LAN. MicroPython builds vary in which kwarg key
     actually takes effect (`hostname` vs `dhcp_hostname`) so we try both.
 
-    On most ESP32 IDF builds this is enough — IDF auto-spins up an mDNS
-    responder for the configured hostname. Older builds that don't have
-    the responder enabled will silently ignore this and `oreo.local`
-    won't resolve; the badge will still be reachable by IP.
+    Idempotent + best-effort: a previous call's success means we never
+    re-touch the radio configuration, and any failure is silent. We
+    deliberately do NOT call `network.hostname()` here — that
+    top-level setter exists on some ESP32 builds but has been
+    observed to leave the radio in a half-initialised state when
+    called between `active(True)` and `connect(...)`, which then
+    makes every subsequent connect attempt fail. The per-WLAN
+    `wlan.config()` form is enough for IDF's mDNS responder to pick
+    up the hostname.
     """
+    global _hostname_applied
+    if _hostname_applied:
+        return
     for key in ("hostname", "dhcp_hostname"):
         try:
             wlan.config(**{key: MDNS_HOSTNAME})
+            _hostname_applied = True
         except Exception:
+            # Build doesn't support this key, or radio rejected it.
+            # Move on quietly.
             pass
-    # Some forks expose a top-level mdns start. Best-effort.
+
+
+def radio_on():
+    """Power up the radio without trying to associate. Lets the user
+    flip WiFi 'on' from the Settings page even when no saved network
+    is reachable — keeps the toggle from feeling broken when the
+    badge is somewhere with no known WiFi nearby."""
     try:
-        import network as _net
-        if hasattr(_net, "hostname"):
-            _net.hostname(MDNS_HOSTNAME)
+        wlan = _get_wlan()
+        wlan.active(True)
+        return True
     except Exception:
-        pass
+        return False
 
 
 def connect(ssid, password, timeout_ms=12000):
     wlan = _get_wlan()
-    wlan.active(True)
-    # Hostname must be set BEFORE associate — the DHCP REQUEST carries
-    # the hostname as Option 12 and the IDF mDNS service uses the same
-    # name. Setting it after gets ignored by some routers.
-    _apply_hostname(wlan)
-    _apply_power_cap(wlan)
-    if wlan.isconnected() and wlan.config("essid") == ssid:
-        return True
-    wlan.connect(ssid, password)
+    try:
+        wlan.active(True)
+    except Exception as e:
+        print("[wifi] active(True) raised:", e)
+        return False
+    # Hostname set best-effort BEFORE associate so DHCP carries it as
+    # Option 12. Wrapped: any unexpected failure here can't take the
+    # whole connect path down.
+    try:
+        _apply_hostname(wlan)
+    except Exception:
+        pass
+    try:
+        _apply_power_cap(wlan)
+    except Exception:
+        pass
+    try:
+        if wlan.isconnected() and wlan.config("essid") == ssid:
+            return True
+    except Exception:
+        pass
+    try:
+        wlan.connect(ssid, password)
+    except Exception as e:
+        print("[wifi] wlan.connect raised:", e)
+        return False
     start = time.ticks_ms()
     while not wlan.isconnected():
         if time.ticks_diff(time.ticks_ms(), start) > timeout_ms:
             return False
         time.sleep_ms(200)
-    # Re-apply power-save + hostname AFTER association — some IDF
-    # versions reset PM/hostname state on connect and need it set
-    # again to actually take effect for the live link.
-    _apply_power_cap(wlan)
-    _apply_hostname(wlan)
+    # Re-apply power-save AFTER association — some IDF versions reset
+    # PM state on connect and need it set again to actually take effect.
+    try:
+        _apply_power_cap(wlan)
+    except Exception:
+        pass
     return True
 
 
