@@ -120,9 +120,9 @@ export default function UploadPage() {
   // ALSO points at the live URL — that way if window.open is
   // blocked, the user can right-click → "open in new tab" on the
   // anchor we render.
-  const targetUrl = `http://${
-    (host.trim() || DEFAULT_HOST)
-  }/?prefill=${encodeURIComponent(hash)}`;
+  const rawHost = host.trim();
+  const safeHost = ADDR_OK.test(rawHost) ? rawHost : DEFAULT_HOST;
+  const targetUrl = `http://${safeHost}/?prefill=${encodeURIComponent(hash)}`;
 
   function handoff(e?: React.SyntheticEvent) {
     // Prevent the default form submit so the page doesn't reload
@@ -146,16 +146,26 @@ export default function UploadPage() {
     }
     try { localStorage.setItem("oreo-badge-host", h); } catch {}
 
+    // Canonicalize the destination URL from a strictly validated host.
+    const normalizedHost = host.trim().toLowerCase();
+    if (!ADDR_OK.test(normalizedHost)) {
+      setError("Enter a valid badge address (hostname or IPv4, optional :port).");
+      return;
+    }
+    const url = new URL(`http://${normalizedHost}/`);
+    url.searchParams.set("prefill", hashHex);
+    const safeTargetUrl = url.toString();
+
     // ── Fire window.open SYNCHRONOUSLY inside the user gesture ──
     // Wrapping it in setTimeout (even with a tiny delay) makes
     // browsers treat the call as scripted and block the popup. We
     // open the new tab first; the "loading" UI is rendered after.
-    const opened = window.open(targetUrl, "_blank", "noopener,noreferrer");
+    const opened = window.open(safeTargetUrl, "_blank", "noopener,noreferrer");
     if (!opened) {
       // Popup blocked anyway. Fall back to a top-level navigation —
       // this loses the website tab but at least gets the user to
       // the badge. They can use the browser's back button to return.
-      window.location.href = targetUrl;
+      window.location.href = safeTargetUrl;
       return;
     }
     // Show the loading state while the new tab is spinning up the
