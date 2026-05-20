@@ -16,6 +16,8 @@ boot via the wifi module's bootstrap path.
 """
 
 import oreoOS
+import time
+
 from oreoOS import api, theme, widgets
 
 
@@ -88,6 +90,10 @@ class App(oreoOS.App):
         self._mode    = "main"          # "main" | "nets" | "transfer"
         # Cached cursor inside the transfer-page sender list.
         self._trans_sel = 0
+        # LEFT press-timestamp on the Transfer page — used to
+        # distinguish tap (deny) from hold (toggle master kill switch).
+        # 0 means "not currently pressed."
+        self._lp_left_press_ms = 0
         self._nets    = []              # cached saved-networks list
         self._nets_sel = 0
 
@@ -183,16 +189,55 @@ class App(oreoOS.App):
             return
         r = self._sel
         if r == self.ROW_STATUS:
-            if self._snap.get("connected"):
+            # Toggle's "on" state is whatever the label shows —
+            # `is_connected()`. The earlier version checked
+            # `is_radio_on()`, which got out of sync with the label
+            # any time a boot-time connect failed: radio left up,
+            # label OFF, but the toggle treated the next tap as
+            # "turn off" instead of "retry." Now it just mirrors
+            # the label: tap when label is ON → disconnect; tap when
+            # label is OFF → try to connect.
+            on_now = bool(self._snap.get("connected"))
+            if on_now:
                 try:
-                    self._wifi.disconnect()
+                    radio_off = getattr(self._wifi, "radio_off", None)
+                    if radio_off:
+                        radio_off()
+                    else:
+                        self._wifi.disconnect()
                 except Exception:
                     pass
             else:
+                # The credentials live in secrets.py / wifi.json — we
+                # don't need a "searching" UX. Bring the radio up
+                # then call connect_from_config; the pump keeps the
+                # run loop responsive so a stuck attempt doesn't hang
+                # the badge. Result lands in the next _snap refresh.
                 try:
-                    self._wifi.connect_from_config()
+                    radio_on = getattr(self._wifi, "radio_on", None)
+                    if radio_on:
+                        radio_on()
                 except Exception:
                     pass
+                try:
+                    self._wifi.connect_from_config(pump_cb=self._cancel_pump)
+                except TypeError:
+                    try:
+                        self._wifi.connect_from_config()
+                    except Exception:
+                        pass
+                except Exception:
+                    pass
+                # NOTE: we deliberately do NOT drop the radio when
+                # connect_from_config returns False. The previous
+                # version did, which silently powered the MAC down on
+                # any slow association — the user would tap the
+                # toggle, nothing visible would happen, and the next
+                # tap would just repeat the same failure. Leaving the
+                # radio up means: a tap that doesn't immediately
+                # associate at least *stays* "trying", and a later
+                # tap to explicitly turn WiFi off still works via
+                # the ON-path branch above.
             self._snap = self._read()
         elif r == self.ROW_POWER:
             modes = self._wifi.POWER_MODES
@@ -375,10 +420,16 @@ class App(oreoOS.App):
         widgets.draw_hint(d, "A=select  HOME=back")
 
         snap = self._snap
+        # Two-state status only: connected → ON, anything else → OFF.
+        # The credentials are baked in (secrets.py / wifi.json), so
+        # there's no genuine "searching" — the connect either lands
+        # in a couple of seconds or it doesn't, and exposing an
+        # intermediate state to the user is more noise than signal.
+        _stat_connected = bool(snap.get("connected"))
+        _stat_label = "ON"          if _stat_connected else "OFF"
+        _stat_color = theme.PRIMARY if _stat_connected else theme.MUTED
         rows = [
-            ("Status",       "ON" if snap.get("connected") else "OFF",
-                             theme.PRIMARY if snap.get("connected")
-                                            else theme.MUTED),
+            ("Status",       _stat_label, _stat_color),
             ("SSID",         snap.get("ssid") or "—",       theme.TEXT_BRIGHT),
             ("IP",           snap.get("ip") or "—",         theme.TEXT_DIM),
             ("RSSI",         self._rssi_value(snap),        theme.TEXT_DIM),
@@ -456,6 +507,21 @@ class App(oreoOS.App):
         return "%d dBm %s" % (rssi, _bars(rssi))
 
     # ── file-transfer sub-page ──────────────────────────────────────────
+    def _cancel_pump(self):
+        """Passed to wifi.connect_from_config(). Called ~12 Hz from
+        inside the wait loop — re-reads the button matrix and returns
+        True on any press so the user can abort 'SEARCH' instantly.
+        Without this the run loop is frozen for up to 6 s per saved
+        network and the badge looks crashed."""
+        try:
+            self._os.buttons.update()
+            for b_ in api.BUTTONS:
+                if self._os.buttons.just_pressed(b_):
+                    return True
+        except Exception:
+            pass
+        return False
+
     def _http(self):
         try:
             from oreoOS import http_server as _hs
@@ -478,22 +544,48 @@ class App(oreoOS.App):
             return "%d active" % n
         return "ready"
 
+    # ── long-press LEFT tracking ──
+    # Pressing LEFT once = deny the selected sender. Holding LEFT for
+    # LP_HOLD_MS = toggle the transfer-disabled master kill switch.
+    # We track the press timestamp on key-down and decide on key-up.
+    LP_HOLD_MS = 800
+
     def _on_button_transfer(self, btn):
         if btn in (api.BTN_HOME, api.BTN_B):
             self._mode = "main"
             self._dirty = True
             return
-        if btn == api.BTN_RIGHT:
-            # Refresh — sometimes the page shows "Server offline" when
-            # WiFi is actually associated but the HTTP server hasn't
-            # picked up the new IP (e.g. after a hotspot handoff).
-            # Force-reconnect WiFi if needed and rebind the listener.
-            self._refresh_transfer()
-            self._dirty = True
-            return
         hs = self._http()
         if hs is None:
             return
+
+        # Master kill switch on — only `A = re-enable` works in this state.
+        try:
+            disabled = (hasattr(hs, "is_transfer_enabled")
+                        and not hs.is_transfer_enabled())
+        except Exception:
+            disabled = False
+        if disabled:
+            if btn == api.BTN_A:
+                try: hs.set_transfer_enabled(True)
+                except Exception: pass
+                self._dirty = True
+            return
+
+        if btn == api.BTN_RIGHT:
+            # R = refresh the badge code. We deliberately overload R
+            # to ALSO retry the WiFi/HTTP reconnect (the previous
+            # behaviour) — both are "kick things back into shape"
+            # actions and combining them keeps the button budget low.
+            try:
+                if hasattr(hs, "refresh_code"):
+                    hs.refresh_code()
+            except Exception:
+                pass
+            self._refresh_transfer()
+            self._dirty = True
+            return
+
         sessions = hs.list_sessions()
         n = len(sessions)
         if btn == api.BTN_UP and n:
@@ -504,12 +596,54 @@ class App(oreoOS.App):
             sid = sessions[self._trans_sel].get("id", "")
             if sid:
                 hs.approve(sid)
-        elif btn == api.BTN_LEFT and n:
-            sid = sessions[self._trans_sel].get("id", "")
-            if sid:
-                hs.deny(sid)
+        elif btn == api.BTN_LEFT:
+            # Mark the press-start time on first-press only. Subsequent
+            # auto-repeat events skip this branch via the != 0 guard,
+            # so a long hold keeps the original timestamp and we can
+            # measure full duration in on_button_release. The actual
+            # tap-vs-hold decision happens there — firing both deny
+            # and toggle on a single press would be confusing.
+            if self._lp_left_press_ms == 0:
+                self._lp_left_press_ms = time.ticks_ms()
+            return     # don't mark dirty — visual state hasn't changed yet
         else:
             return
+        self._dirty = True
+
+    def on_button_release(self, btn):
+        # LEFT released on the Transfer page — decide tap vs hold and
+        # fire exactly one action. The press-start timestamp was
+        # captured in _on_button_transfer.
+        if self._mode != "transfer" or btn != api.BTN_LEFT:
+            return
+        start = self._lp_left_press_ms
+        self._lp_left_press_ms = 0
+        if start == 0:
+            return
+        held = time.ticks_diff(time.ticks_ms(), start)
+        hs = self._http()
+        if hs is None:
+            return
+        if held >= self.LP_HOLD_MS:
+            # Long press → toggle the master kill switch.
+            try:
+                cur = (hs.is_transfer_enabled()
+                       if hasattr(hs, "is_transfer_enabled") else True)
+                hs.set_transfer_enabled(not cur)
+            except Exception:
+                pass
+        else:
+            # Short tap → deny the focused sender, if any.
+            sessions = []
+            try:
+                sessions = hs.list_sessions()
+            except Exception:
+                pass
+            if sessions and 0 <= self._trans_sel < len(sessions):
+                sid = sessions[self._trans_sel].get("id", "")
+                if sid:
+                    try: hs.deny(sid)
+                    except Exception: pass
         self._dirty = True
 
     def _refresh_transfer(self):
@@ -539,27 +673,80 @@ class App(oreoOS.App):
 
     def _draw_transfer(self, d):
         widgets.draw_header(d, "SEND FILES")
-        widgets.draw_hint(d, "A=allow  L=deny  R=refresh  B=back")
 
         hs = self._http()
         running = bool(hs and hs.is_running())
 
-        # ── URL block ──
+        # ── Master kill switch state — entire screen flips to a
+        # ── single "Transfer closed" panel.
+        try:
+            disabled = (running
+                        and hasattr(hs, "is_transfer_enabled")
+                        and not hs.is_transfer_enabled())
+        except Exception:
+            disabled = False
+        if disabled:
+            widgets.draw_hint(d, "A=re-enable  B=back")
+            y = ROW_TOP_Y + 40
+            label = "TRANSFER CLOSED"
+            d.text(label, (SW - len(label) * 16) // 2, y,
+                   theme.PRIMARY, scale=2)
+            sub = "File transfer disabled by you."
+            d.text(sub, (SW - len(sub) * 8) // 2, y + 28,
+                   theme.TEXT_DIM)
+            cta = "Tap A to re-enable."
+            d.text(cta, (SW - len(cta) * 8) // 2, y + 44,
+                   theme.MUTED)
+            return
+
+        widgets.draw_hint(d, "A=allow  L=deny  hold-L=close  R=refresh")
+
+        # ── Code header — big 6-char display + TTL countdown ──
         y = ROW_TOP_Y
         if running:
-            url1 = hs.url()
-            url2 = hs.url_fallback()
-            d.text("Open on your phone:", ROW_PAD_X, y, theme.TEXT_DIM)
-            d.text(url1, ROW_PAD_X, y + 14, theme.PRIMARY, scale=2)
-            d.text(url2, ROW_PAD_X, y + 36, theme.TEXT_DIM)
+            try:
+                code = hs.current_code()
+            except Exception:
+                code = "------"
+            try:
+                remain_ms = hs.code_remaining_ms()
+            except Exception:
+                remain_ms = 0
+            # "rotates in 4:32"
+            secs = max(0, remain_ms // 1000)
+            mins, ss = divmod(secs, 60)
+            label = "Type this code in the sender's browser:"
+            d.text(label, ROW_PAD_X, y, theme.TEXT_DIM)
+            # Big code — scale=3 so it dominates the page.
+            code_w = len(code) * 8 * 3
+            d.text(code, (SW - code_w) // 2, y + 14,
+                   theme.PRIMARY, scale=3)
+            # Tiny TTL countdown below the code, centred.
+            ttl = "rotates in %d:%02d" % (mins, ss)
+            d.text(ttl, (SW - len(ttl) * 8) // 2, y + 14 + 24 + 4,
+                   theme.GOLD if remain_ms > 30_000 else theme.PRIMARY)
+            # URL hints below the countdown. We show BOTH the mDNS
+            # form and the raw IP because multicast DNS is unreliable
+            # in the wild — on most networks oreo.local works, but
+            # the IP is the universal fallback the user can type into
+            # the website's address field.
+            url_local = hs.url()
+            url_ip    = hs.url_fallback()
+            d.text(url_local, ROW_PAD_X, y + 14 + 24 + 18,
+                   theme.TEXT_DIM)
+            d.text(url_ip,    ROW_PAD_X, y + 14 + 24 + 32,
+                   theme.MUTED)
         else:
             d.text("Server offline.", ROW_PAD_X, y, theme.MUTED, scale=1)
             d.text("Connect WiFi to enable transfer.",
                    ROW_PAD_X, y + 14, theme.MUTED2, scale=1)
 
         # ── live transfer progress bar ──
+        # Header now spans: label (14) + code at scale=3 (~26) + TTL
+        # (12) + url_local (12) + url_ip (12). Push the body start
+        # past that block.
         prog = hs.progress() if hs else None
-        prog_y = y + 56
+        prog_y = y + 92
         if prog:
             total = max(1, int(prog.get("total", 0)))
             done  = min(total, int(prog.get("received", 0)))
@@ -599,13 +786,17 @@ class App(oreoOS.App):
         # State -> dot colour. RGB tuples instead of theme constants
         # because we need a clean green, and the theme palette doesn't
         # ship one — primary is pink-red, teal is too cyan.
+        # State → dot colour. State names changed in the new server
+        # protocol — "authed" = correct code typed but badge owner
+        # hasn't approved yet (yellow); "approved" = green; "denied"
+        # is filtered upstream so it shouldn't normally appear.
         dot_color = {
-            "pending":  api.rgb(255, 209, 102),    # yellow
+            "authed":   api.rgb(255, 209, 102),    # yellow
             "approved": api.rgb( 61, 220, 151),    # green
-            "denied":   api.rgb(255,  93, 104),    # red — visible only
-                                                   # in the brief window
-                                                   # before the row is
-                                                   # filtered out
+            "denied":   api.rgb(255,  93, 104),    # red (filtered)
+            # Legacy fallback for the old "pending" state name —
+            # remove once every device is on the new protocol.
+            "pending":  api.rgb(255, 209, 102),
         }
         DOT_SIZE   = 8
         DOT_RIGHT  = ROW_PAD_X + 2   # pad from the right edge

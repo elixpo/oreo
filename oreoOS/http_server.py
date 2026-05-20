@@ -59,27 +59,56 @@ HEAD_DEADLINE_MS   = 1500         # hard cap on header-read for tiny requests
 
 # Session lifecycle
 SESSION_TTL_MS         = 60 * 1000   # beacon must refresh within this
+SESSION_HARD_TTL_MS    = 60 * 60 * 1000  # 60 min absolute cap from authed_at,
+                                         # even if the client keeps beaconing.
+                                         # Stops stale tabs left open from
+                                         # holding a slot forever.
 SESSION_MAX            = 8           # never track more than this many concurrent
 SESSION_CHARSET        = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # no 0/O/1/I/l
 
+# Badge code — a 6-char alphanumeric value displayed on the badge's
+# Send Files page that senders must type into the upload page to
+# authenticate. Rotates every BADGE_CODE_TTL_MS (5 min) so a leaked
+# code self-expires, and the badge owner can also force a rotation
+# via `refresh_code()` from the UI.
+BADGE_CODE_TTL_MS      = 5 * 60 * 1000
+
 _lsock     = None
 _bound_ip  = None
+_os_obj    = None     # captured from start(os_obj) so we can persist
+                      # `transfer_enabled` across reboots via settings_set
 
-# Token state machine. Each sender registers itself by hitting /beacon
-# with a 6-char id. The badge UI lists them as pending, and the user
-# explicitly approves (or denies) before any /upload bytes are accepted.
+# Badge code state — rotated on demand or by TTL. We refresh lazily
+# (whenever someone asks for the current code or hits an endpoint) so
+# the rotation doesn't need its own background tick.
+_badge_code      = ""
+_badge_code_ts   = 0       # ticks_ms when current code was minted
+
+# Master kill switch — when False, every HTTP endpoint returns 503
+# with a "transfer disabled" page. Persisted to OS settings so a
+# user-flipped-off state survives reboot. Default ON; the badge
+# owner toggles via long-press LEFT on the Send Files page.
+_transfer_enabled = True
+
+# Session state machine, code-gated:
 #
-#   _sessions[id] = {
-#       "state":     "pending" | "approved" | "denied",
+#   _sessions[device_id] = {
+#       "state":     "authed" | "approved" | "denied",
 #       "last_ms":   ticks_ms of last beacon hit,
 #       "addr":      requesting peer ip (for display),
 #       "uploads":   completed upload count for this session,
+#       "authed_at": ticks_ms when /auth was accepted,
 #   }
+#
+# Senders that haven't yet hit /auth with the correct code never
+# enter this dict — they're invisible to the badge. After auth,
+# they're "authed" (yellow on the badge). After the badge owner
+# taps A on their row, "approved" (green). After they finish or get
+# denied, they're pruned.
 _sessions = {}
 
 # Live upload progress so the WiFi app can render a real-time bar while
 # bytes are flowing in. None when no upload is in flight.
-#   {"id": "...", "filename": "...", "received": int, "total": int}
 _progress = None
 
 
@@ -156,6 +185,23 @@ def _safe_filename(raw):
 # ── server lifecycle ────────────────────────────────────────────────────
 
 def start(os_obj=None):
+    """Open the listening socket. Also captures `os_obj` for the
+    transfer-enabled toggle (we persist that to OS settings)."""
+    global _os_obj
+    if os_obj is not None:
+        _os_obj = os_obj
+        # Hydrate the kill switch from settings on first start. Default
+        # True so a fresh badge has transfer working out of the box.
+        try:
+            global _transfer_enabled
+            _transfer_enabled = bool(
+                os_obj.settings_get("transfer_enabled", True))
+        except Exception:
+            pass
+    return _start_listener()
+
+
+def _start_listener():
     """Open the listening socket on the current WiFi IP. Safe to call
     multiple times — re-binds if WiFi reconnected to a different IP."""
     global _lsock, _bound_ip
@@ -248,8 +294,18 @@ def _prune_sessions():
     stale = []
     for sid, s in _sessions.items():
         last = s.get("last_ms", 0)
+        authed_at = s.get("authed_at", 0)
         try:
+            # Beacon idle (no heartbeat within SESSION_TTL_MS) — the
+            # usual reason sessions go away.
             if _t.ticks_diff(now, last) > SESSION_TTL_MS:
+                stale.append(sid)
+                continue
+            # Hard cap: even if the client is faithfully beaconing, a
+            # session older than SESSION_HARD_TTL_MS (60 min) gets
+            # evicted. Forces a re-handshake so a forgotten tab
+            # can't camp on a device slot indefinitely.
+            if _t.ticks_diff(now, authed_at) > SESSION_HARD_TTL_MS:
                 stale.append(sid)
         except Exception:
             pass
@@ -259,18 +315,36 @@ def _prune_sessions():
 
 def list_sessions():
     """Snapshot for the WiFi/Transfer UI. Returns sessions sorted by
-    last-seen so the newest beacons are on top."""
+    last-seen so the newest beacons are on top.
+
+    Only `authed` and `approved` sessions are returned — denied ones
+    are filtered out because the badge owner already made that call,
+    and seeing them again would just be noise. Senders that haven't
+    typed the correct code never enter _sessions in the first place,
+    so they're naturally invisible here.
+    """
     _prune_sessions()
     items = []
     for sid, s in _sessions.items():
+        state = s.get("state", "authed")
+        if state == "denied":
+            continue
         items.append({
-            "id":      sid,
-            "state":   s.get("state", "pending"),
-            "addr":    s.get("addr", ""),
-            "uploads": s.get("uploads", 0),
-            "last_ms": s.get("last_ms", 0),
+            "id":         sid,
+            "device_id":  sid,                       # alias for the UI
+            "state":      state,
+            "addr":       s.get("addr", ""),
+            "uploads":    s.get("uploads", 0),
+            "last_ms":    s.get("last_ms", 0),
+            "authed_at":  s.get("authed_at", 0),
         })
-    items.sort(key=lambda v: v.get("last_ms", 0), reverse=True)
+    # Sort by authed_at (stable insertion order) — NOT last_ms.
+    # last_ms ticks every ~2 s as each client beacons, which made the
+    # rows shuffle visibly every refresh and broke cursor stability
+    # (the row under the user's cursor would slide away mid-tap).
+    # authed_at is fixed for the lifetime of the session, so the
+    # newest-first ordering stays stable until a session expires.
+    items.sort(key=lambda v: v.get("authed_at", 0), reverse=True)
     return items
 
 
@@ -292,6 +366,133 @@ def deny(sid):
 def progress():
     """Live upload progress dict, or None if no transfer is in flight."""
     return _progress
+
+
+# ── badge-code rotation ─────────────────────────────────────────────────
+#
+# `current_code()` is the single source of truth. It rotates the cached
+# code if the TTL has elapsed; callers (WiFi UI, /auth endpoint) just
+# call it and get the live value. `refresh_code()` forces a rotation
+# now — wired to the "R = refresh code" button on the Send Files page.
+
+def _gen_code(n=6):
+    """Six-char alphanumeric code excluding ambiguous shapes."""
+    try:
+        import time as _t
+        seed = _t.ticks_ms() ^ id(_sessions)
+    except Exception:
+        seed = 1
+    out = []
+    cs = SESSION_CHARSET
+    for _ in range(n):
+        seed = (seed * 1103515245 + 12345) & 0x7FFFFFFF
+        out.append(cs[seed % len(cs)])
+    return "".join(out)
+
+
+def current_code():
+    """Return the live 6-char badge code, rotating if the TTL has
+    elapsed since the last mint. UI calls this on every paint."""
+    global _badge_code, _badge_code_ts
+    try:
+        import time as _t
+        now = _t.ticks_ms()
+    except Exception:
+        now = 0
+    if not _badge_code:
+        _badge_code = _gen_code()
+        _badge_code_ts = now
+        return _badge_code
+    try:
+        if _t.ticks_diff(now, _badge_code_ts) > BADGE_CODE_TTL_MS:
+            _badge_code = _gen_code()
+            _badge_code_ts = now
+    except Exception:
+        pass
+    return _badge_code
+
+
+def refresh_code():
+    """Force-mint a new code now. UI calls this when the user taps
+    R = refresh code on the Send Files page."""
+    global _badge_code, _badge_code_ts
+    _badge_code = _gen_code()
+    try:
+        import time as _t
+        _badge_code_ts = _t.ticks_ms()
+    except Exception:
+        _badge_code_ts = 0
+    # Existing authed sessions stay valid — they authed under the OLD
+    # code but their own TTL governs how long they last. Mid-transfer
+    # senders aren't kicked by a rotation. Once their TTL expires
+    # they'll need to re-auth with the new code.
+    return _badge_code
+
+
+def code_hash():
+    """Return the 8-hex-char prefill hash of the current badge code.
+
+    SHA-256 of the live code, truncated to its first 4 bytes (8 hex
+    chars). The website hashes the user-typed code with the same
+    function and passes it in `?prefill=<HASH>` when handing off to
+    the badge — so the cleartext code never travels in the URL
+    (which would otherwise appear in browser history). Matches are
+    case-insensitive hex.
+    """
+    try:
+        import uhashlib, binascii
+        h = uhashlib.sha256(current_code().encode()).digest()
+        return binascii.hexlify(h[:4]).decode()
+    except Exception:
+        # Best-effort fallback if uhashlib is unavailable: a much
+        # weaker mixing function. Same length, same charset so URL
+        # validation still works; the security argument is moot
+        # since anyone on the LAN can read the code off the badge
+        # anyway.
+        s = current_code()
+        x = 0
+        for ch in s:
+            x = ((x << 5) - x + ord(ch)) & 0xFFFFFFFF
+        return "%08x" % x
+
+
+def code_remaining_ms():
+    """Milliseconds until the current code rotates. Used by the UI
+    for the live countdown — returns 0 if already expired (next paint
+    will mint a fresh one)."""
+    if not _badge_code:
+        return 0
+    try:
+        import time as _t
+        elapsed = _t.ticks_diff(_t.ticks_ms(), _badge_code_ts)
+        return max(0, BADGE_CODE_TTL_MS - elapsed)
+    except Exception:
+        return BADGE_CODE_TTL_MS
+
+
+# ── master transfer-enabled toggle ──────────────────────────────────────
+
+def is_transfer_enabled():
+    return bool(_transfer_enabled)
+
+
+def set_transfer_enabled(on):
+    """Master kill switch. Persisted to OS settings so a user-toggled
+    state survives reboot. UI calls this from the long-press LEFT
+    binding on the Send Files page."""
+    global _transfer_enabled
+    _transfer_enabled = bool(on)
+    if _os_obj is not None:
+        try:
+            _os_obj.settings_set("transfer_enabled", _transfer_enabled)
+        except Exception:
+            pass
+    # When the owner kills transfer, clear out any pending sessions —
+    # they can't do anything anyway and shouldn't linger after a
+    # turn-back-on.
+    if not _transfer_enabled:
+        _sessions.clear()
+    return _transfer_enabled
 
 
 
@@ -431,78 +632,257 @@ def _send_status(sock, code, reason, body=b"", content_type="text/html; charset=
 
 
 _UPLOAD_FORM = (
-    b"<!doctype html><html><head>"
+    b"<!doctype html><html lang='en'><head>"
     b"<meta name='viewport' content='width=device-width,initial-scale=1'>"
+    b"<meta name='theme-color' content='#0F0C1C'>"
     b"<title>Send to Oreo</title>"
     b"<style>"
-    b"body{font-family:-apple-system,system-ui,sans-serif;"
-    b"background:#0f0c1c;color:#f5e6dc;margin:0;padding:24px;"
-    b"display:flex;flex-direction:column;align-items:center;min-height:100vh}"
-    b"h1{color:#ff5d68;margin:8px 0 4px}"
-    b"p{color:#a89898;margin:4px 0 16px;font-size:14px}"
-    b".card{background:#1c1a2e;border:2px solid #ff5d68;border-radius:8px;"
-    b"padding:24px;width:100%;max-width:380px;text-align:center}"
-    b".code{font-family:ui-monospace,monospace;font-size:42px;letter-spacing:8px;"
-    b"color:#ff5d68;margin:16px 0}"
-    b".pulse{display:inline-block;width:10px;height:10px;border-radius:5px;"
-    b"background:#ffd166;margin-right:8px;vertical-align:middle;"
-    b"animation:pulse 1s ease-in-out infinite}"
-    b"@keyframes pulse{0%,100%{opacity:.3}50%{opacity:1}}"
-    b"input[type=file]{width:100%;color:#f5e6dc;margin-bottom:16px}"
-    b"button{background:#ff5d68;color:#0f0c1c;border:0;border-radius:6px;"
-    b"padding:14px 20px;font-size:16px;font-weight:bold;width:100%}"
-    b"button:disabled{background:#4a4458;color:#888;cursor:not-allowed}"
-    b".hide{display:none}"
-    b".progress{width:100%;height:8px;background:#2a2640;border-radius:4px;"
-    b"overflow:hidden;margin-top:12px}"
-    b".bar{height:100%;background:#3ddc97;width:0;transition:width .25s}"
-    b".hint{margin-top:16px;color:#a89898;font-size:12px}"
+    b":root{--bg:#0F0C1C;--card:#1C1A2E;--cardb:#26213E;--bord:#2A2640;"
+    b"--ink:#F5E6DC;--dim:#C8B8B0;--mute:#8A8294;--pri:#FF5D68;"
+    b"--gold:#FFD166;--teal:#3DDC97;--lilac:#A29BFE}"
+    b"*{box-sizing:border-box}"
+    b"html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);"
+    b"font-family:-apple-system,system-ui,Segoe UI,Roboto,sans-serif;"
+    b"-webkit-font-smoothing:antialiased;min-height:100vh}"
+    # Fully centred — the previous version was top-aligned which left
+    # the panel floating in the upper third on tall phones. Now the
+    # body is a flex column that vertical-centres the panel and
+    # horizontal-centres everything inside it.
+    b"body{display:flex;flex-direction:column;align-items:center;"
+    b"justify-content:center;padding:32px 16px;"
+    b"background-image:radial-gradient(60% 50% at 20% 0%,rgba(255,93,104,.12),transparent 60%),"
+    b"radial-gradient(50% 45% at 85% 100%,rgba(162,155,254,.08),transparent 60%)}"
+    b".brand{display:flex;flex-direction:column;align-items:center;gap:10px;margin-bottom:18px}"
+    # Mascot — pulled from the public website over HTTPS. Browsers
+    # allow HTTPS subresources on an HTTP page (the reverse is what's
+    # blocked), so this renders fine on the badge-served HTTP page
+    # without baking the PNG into firmware.
+    b".brand .mascot{width:84px;height:84px;border-radius:18px;"
+    b"background:var(--card);border:1px solid rgba(255,93,104,.4);"
+    b"padding:6px;box-shadow:0 0 30px rgba(255,93,104,.25);object-fit:contain}"
+    b".brand h1{margin:0;font-size:22px;font-weight:600;letter-spacing:-.01em}"
+    b".panel{width:100%;max-width:440px;background:var(--card);border:1px solid var(--bord);"
+    b"border-radius:14px;overflow:hidden}"
+    b".pad{padding:24px}"
+    b"h2{margin:0 0 6px;font-size:18px;font-weight:600}"
+    b".sub{margin:0;color:var(--dim);font-size:13px;line-height:1.55}"
+    b".chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;"
+    b"font-size:11px;text-transform:uppercase;letter-spacing:.12em;background:var(--cardb);color:var(--dim)}"
+    b".pulse{display:inline-block;width:8px;height:8px;border-radius:5px;background:var(--gold);"
+    b"margin-right:8px;vertical-align:middle;animation:p 1.4s ease-in-out infinite}"
+    b"@keyframes p{0%,100%{opacity:.25;transform:scale(.85)}50%{opacity:1;transform:scale(1)}}"
+    # Code-input row — 6 separate slots so the user can't fat-finger
+    # more than one char per box. Letter-spacing is fake-monospace.
+    b".code-row{display:flex;gap:8px;justify-content:center;margin:14px 0 4px}"
+    b".code-row input{width:46px;height:58px;border-radius:8px;border:1px solid var(--bord);"
+    b"background:var(--bg);color:var(--pri);text-align:center;font-size:30px;font-weight:600;"
+    b"font-family:ui-monospace,SFMono-Regular,Menlo,monospace;text-transform:uppercase;outline:none}"
+    b".code-row input:focus{border-color:var(--pri);box-shadow:0 0 0 3px rgba(255,93,104,.22)}"
+    b".did{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:30px;"
+    b"letter-spacing:.32em;color:var(--teal);margin:14px 0 4px;text-align:center;"
+    b"text-shadow:0 0 30px rgba(61,220,151,.35)}"
+    # `.drop` is a <label>, which is inline by default — without an
+    # explicit display:block the dashed border collapses to a thin
+    # sliver around the (hidden) <input>, and the icon/labels float
+    # outside the box. Force block layout so the dashed rectangle
+    # spans the panel width as intended.
+    b".drop{display:block;width:100%;border:2px dashed var(--bord);border-radius:10px;"
+    b"padding:22px 18px;text-align:center;box-sizing:border-box;"
+    b"cursor:pointer;transition:.2s border-color,.2s background;background:rgba(38,33,62,.4)}"
+    b".drop:hover,.drop.over{border-color:var(--pri);background:rgba(255,93,104,.06)}"
+    b".drop input{display:none}"
+    b".drop .icon{font-size:30px;color:var(--pri);margin-bottom:4px;line-height:1}"
+    b".drop .l1{font-weight:600;margin:6px 0 2px;font-size:14px}"
+    b".drop .l2{margin:0;color:var(--mute);font-size:12px}"
+    b".preview{display:none;align-items:center;gap:12px;background:var(--cardb);"
+    b"border:1px solid var(--bord);border-radius:10px;padding:12px 14px}"
+    b".thumb{width:60px;height:60px;border-radius:6px;background:var(--bg);flex-shrink:0;"
+    b"display:grid;place-items:center;font-size:20px;color:var(--mute);overflow:hidden}"
+    b".thumb img{width:100%;height:100%;object-fit:cover}"
+    b".pmeta{flex:1;min-width:0}"
+    b".pmeta .n{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}"
+    b".pmeta .s{font-size:12px;color:var(--mute);margin-top:2px}"
+    b".btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;"
+    b"background:var(--pri);color:var(--bg);border:0;border-radius:8px;padding:13px 18px;"
+    b"font-size:15px;font-weight:600;width:100%;cursor:pointer;transition:.15s background}"
+    b".btn:hover{background:#C8434C}"
+    b".btn:disabled{background:#4A4458;color:var(--mute);cursor:not-allowed}"
+    b".btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--bord)}"
+    b".btn.ghost:hover{background:var(--cardb)}"
+    b".status{display:flex;align-items:center;gap:10px;padding:11px 13px;border-radius:8px;"
+    b"background:var(--cardb);font-size:13px;color:var(--dim)}"
+    b".status .dot{width:8px;height:8px;border-radius:5px;background:var(--mute)}"
+    b".status.live .dot{background:var(--gold);animation:p 1.4s ease-in-out infinite}"
+    b".status.ok .dot{background:var(--teal)}"
+    b".status.err .dot{background:var(--pri)}"
+    b".err-msg{color:var(--pri);font-size:13px;text-align:center;margin:6px 0 0;min-height:18px}"
+    b".progress{height:6px;background:var(--bord);border-radius:4px;overflow:hidden;margin-top:14px}"
+    b".bar{height:100%;background:linear-gradient(90deg,var(--pri),var(--lilac));"
+    b"width:0;transition:width .15s ease-out}"
+    b".pct{margin-top:8px;font-size:12px;color:var(--mute);display:flex;justify-content:space-between}"
+    b".stack>*+*{margin-top:14px}"
+    b".hide{display:none!important}"
+    b".foot{margin-top:18px;font-size:11px;color:var(--mute);text-align:center;max-width:440px}"
+    b".foot a{color:var(--dim);text-decoration:none;border-bottom:1px dashed var(--bord)}"
+    # Custom modal — replaces native alert() which (a) breaks the
+    # branding and (b) on iOS Safari freezes the page until dismissed
+    # AND shows the bare URL. The modal is always in the DOM, hidden
+    # by default; show() flips .open on the backdrop.
+    b".mdl{position:fixed;inset:0;background:rgba(15,12,28,.78);"
+    b"backdrop-filter:blur(6px);display:none;align-items:center;"
+    b"justify-content:center;padding:24px;z-index:50}"
+    b".mdl.open{display:flex}"
+    b".mdl .box{background:var(--card);border:1px solid var(--bord);"
+    b"border-radius:14px;max-width:380px;width:100%;padding:22px;"
+    b"box-shadow:0 30px 60px rgba(0,0,0,.5)}"
+    b".mdl .ic{width:42px;height:42px;border-radius:10px;"
+    b"display:grid;place-items:center;font-size:22px;margin-bottom:12px;"
+    b"background:rgba(255,93,104,.15);color:var(--pri)}"
+    b".mdl.ok .ic{background:rgba(61,220,151,.15);color:var(--teal)}"
+    b".mdl h3{margin:0 0 6px;font-size:17px;font-weight:600}"
+    b".mdl p{margin:0 0 16px;color:var(--dim);font-size:13px;line-height:1.55}"
+    b".mdl .acts{display:flex;gap:8px}"
+    b".mdl .acts .btn{flex:1;padding:11px 14px;font-size:14px}"
+    # Reset row — pinned at the bottom of the panel so the user always
+    # has a way out, even mid-upload. .reset is a low-key text button
+    # so it doesn't compete with the primary action.
+    b".reset{margin-top:14px;text-align:center}"
+    b".reset button{background:transparent;border:0;color:var(--mute);"
+    b"font-size:12px;cursor:pointer;text-decoration:underline;"
+    b"text-decoration-color:var(--bord);text-underline-offset:3px}"
+    b".reset button:hover{color:var(--ink)}"
     b"</style></head><body>"
-    b"<h1>Send to Oreo</h1>"
-    b"<div class='card'>"
-    b"<div id='wait'>"
-    b"<p><span class='pulse'></span>Waiting for badge approval</p>"
-    b"<div class='code' id='sid'>------</div>"
-    b"<p class='hint'>Show this code on the badge to allow this device.</p>"
+    b"<div class='brand'>"
+    b"<img class='mascot' src='/mascot.png' alt='Oreo'>"
+    b"<h1>Send to Oreo</h1></div>"
+    b"<div class='panel'>"
+    # ── Stage 1: wait for badge owner to approve this device.
+    # ── (The code-entry step is gone — by the time you land on this
+    # ── page, the prefill hash has already auto-authed you, so we
+    # ── just need the badge owner to tap A on the matching row.)
+    b"<div id='wait' class='pad stack'>"
+    b"<span class='chip'>step 1 of 2</span>"
+    b"<h2>Waiting for badge owner</h2>"
+    b"<p class='sub'>Your device ID is shown below &mdash; "
+    b"it appears on the badge owner's screen too. "
+    b"They have to tap <b>A</b> on the matching row to let you send a file.</p>"
+    b"<div class='did' id='did'>__DEVICE_ID__</div>"
+    b"<div class='status live' id='wstat'><span class='dot'></span>"
+    b"<span id='wmsg'>waiting for approval&hellip;</span></div>"
+    b"<div class='reset'><button type='button' onclick='resetAll()'>"
+    b"Reset transaction</button></div>"
     b"</div>"
-    b"<form id='form' class='hide' method='POST' enctype='multipart/form-data'>"
-    b"<p>&#10003; Approved &mdash; pick a file:</p>"
-    b"<input type='file' name='f' accept='image/*,.txt,.md' required>"
-    b"<button id='go' type='submit'>Upload</button>"
+    # ── Stage 2: approved, pick a file ──
+    b"<div id='form' class='pad stack hide'>"
+    b"<span class='chip' style='background:rgba(61,220,151,.15);color:var(--teal)'>"
+    b"approved &middot; <span id='okid' style='font-family:ui-monospace,monospace'>__DEVICE_ID__</span></span>"
+    b"<h2>Pick a file to send</h2>"
+    b"<p class='sub'>Images convert to RGB565 in your browser before upload "
+    b"(max 240&times;240). Text and Markdown land in Reader.</p>"
+    b"<label class='drop' id='drop'>"
+    b"<input id='file' type='file' accept='image/*,.txt,.md'>"
+    b"<div class='icon'>&uarr;</div>"
+    b"<p class='l1'>Tap to choose or drop here</p>"
+    b"<p class='l2'>PNG &middot; JPG &middot; GIF &middot; TXT &middot; MD</p></label>"
+    b"<div class='preview' id='preview'>"
+    b"<div class='thumb' id='thumb'>?</div>"
+    b"<div class='pmeta'><div class='n' id='pname'>&mdash;</div>"
+    b"<div class='s' id='psize'>&mdash;</div></div></div>"
+    b"<button id='go' class='btn' disabled>Send to badge</button>"
     b"<div class='progress'><div class='bar' id='bar'></div></div>"
-    b"</form>"
-    b"<div id='done' class='hide'><p>&#10003; Sent. Pick another?</p>"
-    b"<button onclick='location.reload()'>Send another</button></div>"
+    b"<div class='pct hide' id='pct'><span id='pctn'>0%</span>"
+    b"<span id='pctb'>0 / 0 KB</span></div>"
+    b"<div class='reset'><button type='button' onclick='resetAll()'>"
+    b"Reset transaction</button></div></div>"
+    # ── Stage 4: done ──
+    b"<div id='done' class='pad stack hide' style='text-align:center'>"
+    b"<div style='font-size:42px;color:var(--teal);line-height:1'>&#10003;</div>"
+    b"<h2>Sent!</h2><p class='sub'>Open the matching app on your badge to view it.</p>"
+    b"<button class='btn' onclick='location.reload()'>Send another</button></div>"
     b"</div>"
+    # ── Custom modal — hidden until showModal() flips .open. ──
+    b"<div class='mdl' id='mdl'><div class='box'>"
+    b"<div class='ic' id='mdlIc'>!</div>"
+    b"<h3 id='mdlT'>Something went wrong</h3>"
+    b"<p id='mdlM'>&mdash;</p>"
+    b"<div class='acts'>"
+    b"<button class='btn ghost' id='mdlNo' onclick='closeModal()'>Dismiss</button>"
+    b"<button class='btn' id='mdlYes' onclick='resetAll()'>Reset</button>"
+    b"</div></div></div>"
+    b"<div class='foot'>Peer-to-peer on your local network &middot; "
+    b"Powered by <a href='https://oreo.elixpo.com' target='_blank'>oreo.elixpo.com</a></div>"
     b"<script>"
-    b"let sid=null,approved=false;"
-    b"async function newSession(){"
-    b"  const r=await fetch('/session/new');const j=await r.json();"
-    b"  sid=j.id;document.getElementById('sid').textContent=sid;}"
-    b"async function beacon(){"
-    b"  if(!sid)return;"
-    b"  try{const r=await fetch('/beacon?id='+sid);const j=await r.json();"
-    b"    if(j.state==='approved'&&!approved){approved=true;"
-    b"      document.getElementById('wait').classList.add('hide');"
-    b"      document.getElementById('form').classList.remove('hide');}"
-    b"    else if(j.state==='denied'){"
-    b"      document.getElementById('wait').innerHTML="
-    b"        '<p>Denied by badge owner.</p>"
-    b"<button onclick=\"location.reload()\">Try again</button>';"
-    b"      throw new Error('denied');}"
-    b"  }catch(e){}}"
+    b"const $=id=>document.getElementById(id);"
     b"const MAX_DIM=240;"
+    # The server inlined our device_id into the markup as
+    # __DEVICE_ID__ before sending the page, so we just read it off
+    # the DOM rather than running an auth handshake.
+    b"const did=$('did').textContent.trim();"
+    b"let approved=false,beaconTimer=null,picked=null,activeXhr=null;"
+    b"function fmtKB(n){return (n/1024)<1024?(Math.round(n/1024)+' KB'):"
+    b"((n/1024/1024).toFixed(2)+' MB');}"
+    b"function setWaitStatus(cls,msg){const s=$('wstat');s.className='status '+cls;$('wmsg').textContent=msg;}"
+    # ── Modal helpers — single dialog reused for every error/info. ──
+    # kind: 'err' (default red) | 'ok' (green). resetable: show Reset
+    # button vs. just a Dismiss. The Reset action calls resetAll().
+    b"function showModal(title,msg,kind,resetable){"
+    b"  const m=$('mdl');m.className='mdl open'+(kind==='ok'?' ok':'');"
+    b"  $('mdlIc').textContent=(kind==='ok'?'\\u2713':'!');"
+    b"  $('mdlT').textContent=title;$('mdlM').textContent=msg;"
+    b"  $('mdlYes').style.display=resetable===false?'none':'';"
+    b"  $('mdlNo').textContent=resetable===false?'OK':'Dismiss';}"
+    b"function closeModal(){$('mdl').classList.remove('open');}"
+    # resetAll(): cancel the in-flight upload (if any), then reload to
+    # mint a fresh device session. The browser keeps the prefill hash
+    # in the URL so the reload lands back on the upload page cleanly
+    # (unless the code has rotated, in which case the 404 page is the
+    # correct landing — user grabs a new URL from the website).
+    b"function resetAll(){"
+    b"  closeModal();"
+    b"  try{if(activeXhr){activeXhr.abort();activeXhr=null;}}catch(e){}"
+    b"  if(beaconTimer){clearInterval(beaconTimer);beaconTimer=null;}"
+    b"  location.reload();}"
+    # ── beacon poll for approval ──
+    b"async function beacon(){"
+    b"  if(!did||approved)return;"
+    b"  try{const r=await fetch('/beacon?id='+did);"
+    b"      if(r.status===410){"           # session expired server-side
+    b"        clearInterval(beaconTimer);"
+    b"        $('wait').innerHTML=\"<h2>Session expired</h2><p class='sub'>The "
+    b"code rotated or the badge owner closed transfer. "
+    b"<button class='btn ghost' onclick='location.reload()'>Try again</button>\";"
+    b"        return;}"
+    b"      const j=await r.json();"
+    b"      if(j.state==='approved'){approved=true;clearInterval(beaconTimer);"
+    b"        $('wait').classList.add('hide');$('form').classList.remove('hide');}"
+    b"      else if(j.state==='denied'){clearInterval(beaconTimer);"
+    b"        $('wait').innerHTML=\"<h2>Denied</h2><p class='sub'>The badge "
+    b"owner rejected this device.</p>"
+    b"<button class='btn ghost' onclick='location.reload()'>Try again</button>\";}"
+    b"      else{setWaitStatus('live','waiting for approval on badge\\u2026');}}"
+    b"  catch(e){setWaitStatus('err','badge unreachable - check WiFi');}}"
+    # Centralised handler for "the badge stopped responding to beacons
+    # for too long" — surfaces the modal once so the user knows to
+    # check WiFi rather than staring at a frozen yellow dot.
+    b""
+    # ── file picker / preview / upload (unchanged from previous version) ──
+    b"function onFile(file){"
+    b"  if(!file)return;picked=file;"
+    b"  $('preview').style.display='flex';$('drop').style.display='none';"
+    b"  $('pname').textContent=file.name;$('psize').textContent=fmtKB(file.size);"
+    b"  const th=$('thumb');th.innerHTML='';"
+    b"  if(file.type.startsWith('image/')){"
+    b"    const im=document.createElement('img');im.src=URL.createObjectURL(file);th.appendChild(im);}"
+    b"  else{th.textContent=file.name.split('.').pop().toUpperCase();}"
+    b"  $('go').disabled=false;}"
     b"async function imgToR565(file){"
-    b"  const img=new Image();"
-    b"  img.src=URL.createObjectURL(file);"
+    b"  const img=new Image();img.src=URL.createObjectURL(file);"
     b"  await new Promise((r,j)=>{img.onload=r;img.onerror=j;});"
     b"  const sc=Math.min(1,MAX_DIM/Math.max(img.width,img.height));"
-    b"  const w=Math.max(1,Math.round(img.width*sc)),"
-    b"        h=Math.max(1,Math.round(img.height*sc));"
+    b"  const w=Math.max(1,Math.round(img.width*sc)),h=Math.max(1,Math.round(img.height*sc));"
     b"  const c=document.createElement('canvas');c.width=w;c.height=h;"
     b"  const ctx=c.getContext('2d');"
-    b"  ctx.fillStyle='#000';ctx.fillRect(0,0,w,h);"
-    b"  ctx.drawImage(img,0,0,w,h);"
+    b"  ctx.fillStyle='#000';ctx.fillRect(0,0,w,h);ctx.drawImage(img,0,0,w,h);"
     b"  const px=ctx.getImageData(0,0,w,h).data;"
     b"  const out=new Uint8Array(6+w*h*2);"
     b"  out[0]=0x52;out[1]=0x35;"
@@ -511,36 +891,128 @@ _UPLOAD_FORM = (
     b"  let o=6;"
     b"  for(let i=0;i<px.length;i+=4){"
     b"    const r=px[i]>>3,g=px[i+1]>>2,b=px[i+2]>>3;"
-    b"    const v=(r<<11)|(g<<5)|b;"
-    b"    out[o++]=(v>>8)&0xff;out[o++]=v&0xff;}"
-    b"  return new Blob([out],{type:'application/octet-stream'});"
-    b"}"
-    b"document.addEventListener('DOMContentLoaded',async()=>{"
-    b"  await newSession();setInterval(beacon,2000);"
-    b"  document.getElementById('form').addEventListener('submit',async(e)=>{"
-    b"    e.preventDefault();"
-    b"    const inp=e.target.querySelector('input[type=file]');"
-    b"    const f=inp.files[0];if(!f){return;}"
-    b"    document.getElementById('go').disabled=true;"
-    b"    let payload=f,name=f.name;"
-    b"    if(f.type.startsWith('image/')){"
-    b"      try{payload=await imgToR565(f);"
-    b"           name=name.replace(/\\.[^.]+$/,'')+'.r565';}"
-    b"      catch(err){alert('Image decode failed: '+err);"
-    b"                 document.getElementById('go').disabled=false;return;}}"
-    b"    const fd=new FormData();fd.append('f',payload,name);"
-    b"    const xhr=new XMLHttpRequest();"
-    b"    xhr.upload.addEventListener('progress',(ev)=>{"
-    b"      if(ev.lengthComputable){"
-    b"        document.getElementById('bar').style.width=(ev.loaded/ev.total*100)+'%';}});"
-    b"    xhr.onload=()=>{if(xhr.status===200){"
-    b"      document.getElementById('form').classList.add('hide');"
-    b"      document.getElementById('done').classList.remove('hide');}"
-    b"      else{alert('Upload failed: '+xhr.status);"
-    b"            document.getElementById('go').disabled=false;}};"
-    b"    xhr.open('POST','/upload?token='+sid);xhr.send(fd);});"
-    b"});"
-    b"</script>"
+    b"    const v=(r<<11)|(g<<5)|b;out[o++]=(v>>8)&0xff;out[o++]=v&0xff;}"
+    b"  return new Blob([out],{type:'application/octet-stream'});}"
+    b"async function send(){"
+    b"  if(!picked||!did)return;$('go').disabled=true;$('pct').classList.remove('hide');"
+    b"  let payload=picked,name=picked.name;"
+    b"  if(picked.type.startsWith('image/')){"
+    b"    try{payload=await imgToR565(picked);name=name.replace(/\\.[^.]+$/,'')+'.r565';}"
+    b"    catch(err){"
+    b"      showModal('Image decode failed',String(err),'err',true);"
+    b"      $('go').disabled=false;return;}}"
+    b"  const fd=new FormData();fd.append('f',payload,name);"
+    b"  const xhr=new XMLHttpRequest();activeXhr=xhr;"
+    b"  xhr.upload.addEventListener('progress',(ev)=>{"
+    b"    if(ev.lengthComputable){const p=ev.loaded/ev.total;"
+    b"      $('bar').style.width=(p*100)+'%';"
+    b"      $('pctn').textContent=Math.round(p*100)+'%';"
+    b"      $('pctb').textContent=fmtKB(ev.loaded)+' / '+fmtKB(ev.total);}});"
+    # onload: success OR a server-side rejection. We treat "100% then
+    # status===0" as success-with-dropped-response — the badge closed
+    # the socket before the browser finished reading the 200 body, but
+    # the bytes are already on flash. Reduces the false-alarm rate of
+    # the "Network error" modal that used to fire here.
+    b"  xhr.onload=()=>{activeXhr=null;if(xhr.status===200||xhr.status===0){"
+    b"    $('form').classList.add('hide');$('done').classList.remove('hide');}"
+    b"    else if(xhr.status===403){"
+    b"      showModal('Device no longer approved',"
+    b"        'The badge owner revoked this session. Reset to start a new one.',"
+    b"        'err',true);$('go').disabled=false;}"
+    b"    else{showModal('Upload failed','Server returned status '+xhr.status+'.',"
+    b"        'err',true);$('go').disabled=false;}};"
+    b"  xhr.onerror=()=>{activeXhr=null;"
+    # If the upload byte counter reached the total before the error
+    # fired, the file landed on flash and the badge just closed the
+    # socket too early. Surface this as a success rather than a scary
+    # network error.
+    b"    const w=parseInt($('bar').style.width)||0;"
+    b"    if(w>=99){$('form').classList.add('hide');$('done').classList.remove('hide');return;}"
+    b"    showModal('Network error',"
+    b"      'Lost connection to the badge. Check that both devices are on the same WiFi, then reset.',"
+    b"      'err',true);$('go').disabled=false;};"
+    b"  xhr.open('POST','/upload?token='+did);xhr.send(fd);}"
+    b"document.addEventListener('DOMContentLoaded',()=>{"
+    # No code-entry step any more — start the beacon poll
+    # immediately so the page tracks approval state from the moment
+    # it loads.
+    b"  beaconTimer=setInterval(beacon,2000);beacon();"
+    b"  $('file').addEventListener('change',e=>onFile(e.target.files[0]));"
+    b"  const dz=$('drop');"
+    b"  ['dragenter','dragover'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add('over');}));"
+    b"  ['dragleave','drop'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove('over');}));"
+    b"  dz.addEventListener('drop',e=>{if(e.dataTransfer.files[0])onFile(e.dataTransfer.files[0]);});"
+    b"  $('go').addEventListener('click',send);});"
+    b"</script></body></html>"
+)
+
+
+# Served by every endpoint when `transfer_enabled` is False. The
+# badge owner long-pressed LEFT on Send Files to close the subsystem
+# — show them a friendly explanation instead of a bare 503.
+_DISABLED_PAGE = (
+    b"<!doctype html><html><head>"
+    b"<meta name='viewport' content='width=device-width,initial-scale=1'>"
+    b"<meta name='theme-color' content='#0F0C1C'>"
+    b"<title>Transfer disabled</title>"
+    b"<style>body{margin:0;padding:48px 24px;background:#0F0C1C;color:#F5E6DC;"
+    b"font-family:-apple-system,system-ui,sans-serif;text-align:center}"
+    b"h1{color:#FF5D68;font-size:24px;margin:0 0 12px}"
+    b"p{color:#C8B8B0;font-size:14px;line-height:1.6;max-width:380px;margin:0 auto}"
+    b".mark{display:inline-block;width:38px;height:38px;border-radius:8px;"
+    b"border:1px solid rgba(255,93,104,.4);color:#FF5D68;font-weight:700;"
+    b"display:grid;place-items:center;margin:0 auto 18px;font-size:20px}"
+    b"</style></head><body>"
+    b"<div class='mark'>o</div>"
+    b"<h1>Transfer is disabled</h1>"
+    b"<p>The badge owner has closed file transfer for safety. "
+    b"Ask them to re-enable it from the badge's "
+    b"<b>Settings &rsaquo; WiFi &rsaquo; Send Files</b> page.</p>"
+    b"</body></html>"
+)
+
+
+# Served when GET / arrives without a valid `?prefill=<hash>` —
+# either no query string at all, or a stale prefill from a prior
+# code that has since rotated. No code-entry form is exposed here
+# (that would let any LAN scanner brute-force the code), just a
+# direct pointer back to oreo.elixpo.com/upload where they can
+# re-grab a fresh URL.
+_NOT_FOUND_PAGE = (
+    b"<!doctype html><html lang='en'><head>"
+    b"<meta name='viewport' content='width=device-width,initial-scale=1'>"
+    b"<meta name='theme-color' content='#0F0C1C'>"
+    b"<title>Bad code &middot; Oreo</title>"
+    b"<style>"
+    b":root{--bg:#0F0C1C;--card:#1C1A2E;--bord:#2A2640;"
+    b"--ink:#F5E6DC;--dim:#C8B8B0;--mute:#8A8294;--pri:#FF5D68}"
+    b"*{box-sizing:border-box}"
+    b"html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);"
+    b"font-family:-apple-system,system-ui,sans-serif;min-height:100vh}"
+    b"body{display:flex;flex-direction:column;align-items:center;"
+    b"justify-content:center;padding:24px;text-align:center;"
+    b"background-image:radial-gradient(60% 50% at 20% 0%,rgba(255,93,104,.12),transparent 60%),"
+    b"radial-gradient(50% 45% at 85% 100%,rgba(162,155,254,.08),transparent 60%)}"
+    b".mark{width:48px;height:48px;border-radius:10px;border:1px solid rgba(255,93,104,.4);"
+    b"background:var(--card);display:grid;place-items:center;font-weight:700;"
+    b"color:var(--pri);font-size:22px;margin-bottom:18px;"
+    b"box-shadow:0 0 30px rgba(255,93,104,.25)}"
+    b".code{font-size:60px;font-weight:700;color:var(--pri);margin:0 0 6px;"
+    b"line-height:1;letter-spacing:-.02em}"
+    b"h1{font-size:22px;margin:8px 0 8px;font-weight:600}"
+    b"p{color:var(--dim);font-size:14px;line-height:1.55;max-width:380px;margin:0 0 18px}"
+    b".btn{display:inline-flex;align-items:center;gap:8px;background:var(--pri);"
+    b"color:var(--bg);border:0;border-radius:8px;padding:12px 20px;"
+    b"font-size:14px;font-weight:600;text-decoration:none}"
+    b"</style></head><body>"
+    b"<div class='mark'>o</div>"
+    b"<p class='code'>404</p>"
+    b"<h1>Bad or expired code</h1>"
+    b"<p>This page only opens when launched from "
+    b"<b>oreo.elixpo.com/upload</b> with the current 6-character "
+    b"code shown on the badge. The code rotates every 5 minutes "
+    b"&mdash; head back and grab a fresh one.</p>"
+    b"<a class='btn' href='https://oreo.elixpo.com/upload'>Open oreo.elixpo.com/upload</a>"
     b"</body></html>"
 )
 
@@ -598,51 +1070,127 @@ def _handle(sock):
     method, full_path, headers = _parse_headers(head)
     path, qs = _parse_query(full_path)
 
+    # ── master kill switch ──
+    # When the badge owner has flipped the transfer off (long-press
+    # LEFT on Send Files), every endpoint returns 503 with a tiny
+    # branded page. We DO still serve /favicon.ico as 204 so the
+    # browser tab doesn't show a broken icon.
+    if not _transfer_enabled:
+        if method == "GET" and path == "/favicon.ico":
+            _send_status(sock, 204, "No Content", b"")
+            return
+        _send_status(sock, 503, "Service Unavailable",
+                     _DISABLED_PAGE)
+        return
+
     if method == "GET" and path in ("/", "/index.html"):
-        _send_status(sock, 200, "OK", _UPLOAD_FORM)
+        # The page is gated on `?prefill=<hash>` matching the live
+        # code's hash. No prefill, wrong prefill, or expired prefill
+        # all serve the 404 page — no code-entry form, no surface
+        # area for a guesser to brute-force from the LAN.
+        _handle_root(sock, qs, _peer_addr(sock))
         return
     if method == "GET" and path == "/favicon.ico":
         _send_status(sock, 204, "No Content", b"")
         return
+    if method == "GET" and path == "/mascot.png":
+        _handle_mascot(sock)
+        return
     if method == "GET" and path == "/beacon":
         _handle_beacon(sock, qs, _peer_addr(sock))
-        return
-    if method == "GET" and path == "/session/new":
-        _handle_session_new(sock, _peer_addr(sock))
         return
     if method == "POST" and path == "/upload":
         _handle_upload(sock, headers, after_head, qs)
         return
 
-    _send_status(sock, 404, "Not Found", b"not found")
+    _send_status(sock, 404, "Not Found", _NOT_FOUND_PAGE)
 
 
-def _handle_session_new(sock, peer_addr):
-    """Hand the sender a freshly-minted session id so it doesn't have
-    to roll its own (saves us from collisions between two phones that
-    both picked the same client-side random)."""
+_MASCOT_CACHE = None    # bytes lazily loaded on first request
+
+
+def _handle_mascot(sock):
+    """Serve oreoOS/mascot.png as the page's <img> source. Cached in
+    RAM after the first read since the file is tiny (~8 KB) and the
+    page references it on every load."""
+    global _MASCOT_CACHE
+    if _MASCOT_CACHE is None:
+        try:
+            with open("oreoOS/mascot.png", "rb") as f:
+                _MASCOT_CACHE = f.read()
+        except Exception:
+            # Fallback path layouts — some deploys flatten oreoOS into
+            # the FS root. Try the bare filename before giving up.
+            try:
+                with open("mascot.png", "rb") as f:
+                    _MASCOT_CACHE = f.read()
+            except Exception:
+                _MASCOT_CACHE = b""
+    if not _MASCOT_CACHE:
+        _send_status(sock, 404, "Not Found", b"missing mascot")
+        return
+    head = ("HTTP/1.1 200 OK\r\n"
+            "Content-Type: image/png\r\n"
+            "Content-Length: %d\r\n"
+            "Cache-Control: public, max-age=86400\r\n"
+            "Connection: close\r\n\r\n") % len(_MASCOT_CACHE)
+    try:
+        sock.send(head.encode())
+        sock.send(_MASCOT_CACHE)
+    except Exception:
+        pass
+
+
+def _handle_root(sock, qs, peer_addr):
+    """GET / — entry point. Auto-authenticates against the prefill
+    hash and renders the upload page with the device_id inlined.
+    Wrong / missing prefill renders the branded 404 page so no
+    randomly-crawled URL ever lands on a working form."""
+    prefill = (qs.get("prefill", "") or "").lower()
+    expected = code_hash().lower()
+    if not prefill or prefill != expected:
+        # Two reasons we land here: the URL was hit without a prefill,
+        # or the prefill was correct ~minutes ago but the code has
+        # since rotated. Same response either way — direct the user
+        # back to the website to grab a fresh code.
+        _send_status(sock, 404, "Not Found", _NOT_FOUND_PAGE)
+        return
+
+    # Prefill matched → mint a device session for this client.
     _prune_sessions()
     if len(_sessions) >= SESSION_MAX:
-        _send_status(sock, 503, "Service Unavailable",
-                     b'{"error":"too many active sessions"}',
-                     content_type="application/json")
+        _send_status(sock, 503, "Service Unavailable", _DISABLED_PAGE)
         return
-    sid = _new_session_id()
+    device_id = _new_session_id()
     try:
         import time as _t
         now = _t.ticks_ms()
     except Exception:
         now = 0
-    _sessions[sid] = {"state": "pending", "last_ms": now,
-                      "addr": peer_addr, "uploads": 0}
-    body = ('{"id":"%s","state":"pending"}' % sid).encode()
-    _send_status(sock, 200, "OK", body, content_type="application/json")
+    _sessions[device_id] = {
+        "state":     "authed",
+        "last_ms":   now,
+        "addr":      peer_addr,
+        "uploads":   0,
+        "authed_at": now,
+    }
+    try:
+        print("[http] auto-authed via prefill: device_id=%s" % device_id)
+    except Exception:
+        pass
+
+    # Inline the device_id into the served page by replacing a
+    # placeholder. Done as a one-pass bytes.replace so we keep the
+    # form as a compile-time constant and pay the substitution cost
+    # only on the (rare) success path.
+    body = _UPLOAD_FORM.replace(b"__DEVICE_ID__", device_id.encode())
+    _send_status(sock, 200, "OK", body)
 
 
 def _handle_beacon(sock, qs, peer_addr):
-    """Heartbeat from a sender's browser. Bumps last_ms so the session
-    stays alive, and reports the current state so the UI on the phone
-    can switch from 'Waiting…' to 'Ready' once the badge approves."""
+    """Heartbeat from an authed sender's browser. Only refreshes
+    sessions already in the dict — never creates new ones. A sender
+    that hasn't /auth'd is invisible and stays invisible."""
     sid = qs.get("id", "")
     if not sid or len(sid) != 6:
         _send_status(sock, 400, "Bad Request",
@@ -650,27 +1198,23 @@ def _handle_beacon(sock, qs, peer_addr):
                      content_type="application/json")
         return
     _prune_sessions()
-    try:
-        import time as _t
-        now = _t.ticks_ms()
-    except Exception:
-        now = 0
     s = _sessions.get(sid)
     if s is None:
-        if len(_sessions) >= SESSION_MAX:
-            _send_status(sock, 503, "Service Unavailable",
-                         b'{"error":"too many sessions"}',
-                         content_type="application/json")
-            return
-        _sessions[sid] = {"state": "pending", "last_ms": now,
-                          "addr": peer_addr, "uploads": 0}
-        state = "pending"
-    else:
-        s["last_ms"] = now
-        if peer_addr:
-            s["addr"] = peer_addr
-        state = s["state"]
-    body = ('{"id":"%s","state":"%s"}' % (sid, state)).encode()
+        # Session expired or was denied — tell the client so it can
+        # re-prompt for the code. We deliberately do NOT auto-create
+        # the session here (that's the inverted protocol).
+        _send_status(sock, 410, "Gone",
+                     b'{"error":"session expired","state":"gone"}',
+                     content_type="application/json")
+        return
+    try:
+        import time as _t
+        s["last_ms"] = _t.ticks_ms()
+    except Exception:
+        pass
+    if peer_addr:
+        s["addr"] = peer_addr
+    body = ('{"device_id":"%s","state":"%s"}' % (sid, s["state"])).encode()
     _send_status(sock, 200, "OK", body, content_type="application/json")
 
 
@@ -849,6 +1393,30 @@ def _handle_upload(sock, headers, body_prefix, qs):
         except Exception:
             pass
         _progress = None
+
+    # Drain any trailing bytes the browser still has on the wire —
+    # the closing `--boundary--\r\n` and the form-trailer. If we
+    # close() with unread bytes in the kernel buffer the badge sends
+    # a TCP RST and the browser surfaces it as a "Network error" even
+    # though the file is already on flash. A short read loop is
+    # cheaper than the false-alarm modals it prevents.
+    try:
+        sock.settimeout(0.2)
+        drained = 0
+        while drained < 4096:
+            try:
+                chunk = sock.recv(512)
+            except Exception:
+                break
+            if not chunk:
+                break
+            drained += len(chunk)
+    except Exception:
+        pass
+    try:
+        sock.settimeout(RECV_TIMEOUT)
+    except Exception:
+        pass
 
     if written <= 0:
         try:

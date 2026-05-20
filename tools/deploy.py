@@ -426,8 +426,13 @@ def write_secrets_local():
 
     fields = (
         # name              python repr formatter
+        # WIFI_SSID / WIFI_PASSWORD remain (as the FIRST entry from
+        # the .env CSV) so older code paths that read them still
+        # work. WIFI_NETWORKS is the canonical list that wifi.py
+        # merges into /wifi.json at boot.
         ("WIFI_SSID",        "%r"),
         ("WIFI_PASSWORD",    "%r"),
+        ("WIFI_NETWORKS",    "%r"),
         ("WIFI_AUTO_CONNECT","%r"),
         ("BT_AUTO_ENABLE",   "%r"),
         ("GITHUB_USER",      "%r"),

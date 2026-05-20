@@ -311,14 +311,55 @@ class NotifPanel:
 
     # ── quick-setting actions ───────────────────────────────────────────
     def _toggle_wifi(self):
+        """Drive the WiFi RADIO state, not the association state.
+
+        The old behaviour was: "if connected → disconnect; else →
+        connect_from_config". That made the chip look like a no-op
+        any time auto-association failed: tap → radio up → can't
+        associate → is_connected() stays False → chip still reads
+        "OFF" → next tap thinks it's currently off and tries the same
+        thing again. Now the chip tracks radio_on(): one tap powers
+        the MAC up (and *tries* to associate), another tap powers it
+        fully down. Association status surfaces as the sub-label.
+        """
         try:
             from oreoWare import wifi
-            if wifi.is_connected():
-                wifi.disconnect()
+            on_now = False
+            try:
+                on_now = bool(wifi.is_radio_on())
+            except Exception:
+                # Old build without is_radio_on — fall back to the
+                # association check (no worse than before).
+                on_now = bool(wifi.is_connected())
+            if on_now:
+                wifi.radio_off() if hasattr(wifi, "radio_off") else wifi.disconnect()
             else:
-                wifi.connect_from_config()
+                if hasattr(wifi, "radio_on"):
+                    wifi.radio_on()
+                # Pump button input through the wait so the panel can
+                # still react if the user changes their mind. Older
+                # wifi.py without pump_cb support falls through to the
+                # plain blocking call.
+                try:
+                    wifi.connect_from_config(pump_cb=self._wifi_cancel_pump)
+                except TypeError:
+                    wifi.connect_from_config()
         except Exception:
             pass
+
+    def _wifi_cancel_pump(self):
+        """Called from inside wifi.connect_from_config's wait loop.
+        Returns True on any keypress so the user can cancel the
+        in-flight 'searching…' attempt without waiting for the
+        per-network timeout."""
+        try:
+            self._os.buttons.update()
+            for b_ in api.BUTTONS:
+                if self._os.buttons.just_pressed(b_):
+                    return True
+        except Exception:
+            pass
+        return False
 
     def _toggle_bt(self):
         try:
@@ -439,9 +480,24 @@ class NotifPanel:
         ]
         try:
             from oreoWare import wifi
-            connected = wifi.is_connected()
-            out[0]["on"]  = bool(connected)
-            out[0]["sub"] = "on" if connected else "off"
+            # Two-state chip: connected → ON (with SSID in the sub),
+            # everything else → OFF. We deliberately don't surface
+            # a "searching" tier — the credentials are known up-front
+            # via secrets / wifi.json, so a connect either resolves
+            # in a couple of seconds or it doesn't.
+            connected = False
+            try:
+                connected = bool(wifi.is_connected())
+            except Exception:
+                pass
+            out[0]["on"] = connected
+            if connected:
+                cur = ""
+                try: cur = wifi.ssid() or ""
+                except Exception: pass
+                out[0]["sub"] = (cur[:10] if cur else "on")
+            else:
+                out[0]["sub"] = "off"
         except Exception:
             pass
         try:
