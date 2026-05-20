@@ -153,7 +153,7 @@ export default function UploadPage() {
       return;
     }
     const url = new URL(`http://${normalizedHost}/`);
-    url.searchParams.set("prefill", hashHex);
+    url.searchParams.set("prefill", hash);
     const safeTargetUrl = url.toString();
 
     // ── Fire window.open SYNCHRONOUSLY inside the user gesture ──

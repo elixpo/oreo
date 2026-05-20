@@ -10,12 +10,11 @@ import PageTransition from "@/components/PageTransition";
 // Keeping a single image for both surfaces means a contributor only
 // has to refresh one file when the brand shifts.
 
-const SITE_TITLE       = "OreoOS — a Python OS in a pocket-sized badge";
+const SITE_TITLE       = "OreoOS — an open-source OS in a pocket-sized badge";
 const SITE_DESCRIPTION =
-  "Open hardware. Open firmware. 20+ apps, on-device store, OTA over " +
-  "WiFi, AirDrop-style file transfer. MicroPython on ESP32-S3.";
+  "OreoOS - Micropython inside your pocket";
 const SITE_URL  = "https://oreo.elixpo.com";
-const OG_IMAGE  = "/og-banner.png";
+const OG_IMAGE  = "/og-banner.jpg";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -49,7 +48,7 @@ export const metadata: Metadata = {
       url:     OG_IMAGE,
       width:   1200,
       height:  630,
-      alt:     "Oreo Badge — a Python OS in a pocket-sized conference badge",
+      alt:     "Oreo Badge, with your favourite mascot and a stylish lanyard!"
     }],
   },
   twitter: {

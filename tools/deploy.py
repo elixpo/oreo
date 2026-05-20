@@ -4,6 +4,12 @@ Usage:
     python tools/deploy.py                          # auto-detect port
     python tools/deploy.py /dev/ttyACM0
     python tools/deploy.py --clean                  # wipe device first
+    python tools/deploy.py --website                # build + ship the
+                                                    # Cloudflare Pages site
+                                                    # in oreo.elixpo/ (no
+                                                    # badge interaction)
+    python tools/deploy.py --website --preview      # deploy to branch alias
+                                                    # instead of production
     python tools/deploy.py --override=gallery,reader
         # before the push, wipe the named app dirs on device (and force
         # any of their files in our hash cache to re-push). Use this when
@@ -469,9 +475,62 @@ for local, remote in DEPLOY:
 remote_dirs = sorted(remote_dirs, key=lambda p: p.count("/"))
 
 
+# ── website deploy ───────────────────────────────────────────────────────────
+
+WEBSITE_DIR    = Path("oreo.elixpo")
+WEBSITE_PROJECT = "oreo"        # Cloudflare Pages project name
+
+def deploy_website():
+    """Build the Next.js static export and push it to Cloudflare Pages.
+    Production by default; pass `--preview` for a branch-alias deploy.
+
+    The site lives in oreo.elixpo/ and exports to oreo.elixpo/out/. We
+    shell out to the project's own `next build` + `wrangler pages
+    deploy` so behaviour stays identical whether the user runs this
+    helper or the package.json `deploy` script directly.
+    """
+    if not WEBSITE_DIR.is_dir():
+        print("Cannot find website directory: %s/" % WEBSITE_DIR)
+        sys.exit(1)
+    preview = "--preview" in sys.argv
+
+    print("Building Next.js static export in %s/..." % WEBSITE_DIR)
+    rc = subprocess.call(["npx", "next", "build"], cwd=str(WEBSITE_DIR))
+    if rc != 0:
+        print("next build failed (exit %d)" % rc)
+        sys.exit(rc)
+
+    out_dir = WEBSITE_DIR / "out"
+    if not out_dir.is_dir():
+        print("Build did not produce %s/" % out_dir)
+        sys.exit(1)
+
+    # `--branch=main` pins the deploy to the production alias so the
+    # custom domain (oreo.elixpo.com) actually serves the new bytes.
+    # Without it wrangler defaults to the current git branch, which
+    # only updates the branch-alias preview URL.
+    cmd = ["npx", "wrangler", "pages", "deploy", "out",
+           "--project-name=" + WEBSITE_PROJECT]
+    if not preview:
+        cmd.append("--branch=main")
+    print("Deploying to Cloudflare Pages (%s)..." %
+          ("preview" if preview else "production"))
+    rc = subprocess.call(cmd, cwd=str(WEBSITE_DIR))
+    if rc != 0:
+        print("wrangler deploy failed (exit %d)" % rc)
+        sys.exit(rc)
+    print("Website deploy complete.")
+
+
 # ── main ──────────────────────────────────────────────────────────────────────
 
 def main():
+    # Website-only path — short-circuits everything ESP-related so the
+    # user can ship the site without a badge attached.
+    if "--website" in sys.argv:
+        deploy_website()
+        return
+
     import time as _t
     t0 = _t.time()
     if "--no-bump" not in sys.argv:
