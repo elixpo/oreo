@@ -92,33 +92,56 @@ def _apply_power_cap(wlan):
 MDNS_HOSTNAME = "oreo"
 
 
-_hostname_applied = False
+_hostname_applied        = False     # per-WLAN dhcp_hostname / hostname
+_global_hostname_applied = False     # network.hostname() (mDNS)
+
+
+def _apply_global_hostname():
+    """Set the global network hostname BEFORE `wlan.active(True)`.
+
+    This is the one that actually drives the ESP-IDF mDNS responder
+    — once `network.hostname("oreo")` is set and the interface comes
+    up, IDF auto-advertises `oreo.local` to the LAN. Setting it
+    AFTER active(True) is a no-op on most builds because the mDNS
+    service is already configured by then.
+
+    The earlier worry that this call leaves the radio in a half-
+    initialised state was misplaced — the actual culprit was IDF
+    auto-connecting from cached NVS credentials, which we now
+    cancel with wlan.disconnect() in connect(). Calling
+    network.hostname() before any radio activity is safe.
+    """
+    global _global_hostname_applied
+    if _global_hostname_applied:
+        return
+    try:
+        import network as _net
+        if hasattr(_net, "hostname"):
+            _net.hostname(MDNS_HOSTNAME)
+            _global_hostname_applied = True
+    except Exception as e:
+        # Older build without network.hostname() — fall through; the
+        # per-WLAN dhcp_hostname applied later still gets us into the
+        # router's DHCP-snooping resolver on most home gateways.
+        try: print("[wifi] network.hostname() failed:", e)
+        except Exception: pass
+
 
 def _apply_hostname(wlan):
-    """Set the WiFi hostname so the ESP-IDF mDNS responder advertises
-    `oreo.local` to the LAN. MicroPython builds vary in which kwarg key
-    actually takes effect (`hostname` vs `dhcp_hostname`) so we try both.
-
-    Idempotent + best-effort: a previous call's success means we never
-    re-touch the radio configuration, and any failure is silent. We
-    deliberately do NOT call `network.hostname()` here — that
-    top-level setter exists on some ESP32 builds but has been
-    observed to leave the radio in a half-initialised state when
-    called between `active(True)` and `connect(...)`, which then
-    makes every subsequent connect attempt fail. The per-WLAN
-    `wlan.config()` form is enough for IDF's mDNS responder to pick
-    up the hostname.
+    """Per-WLAN hostname config (`dhcp_hostname` / `hostname`).
+    Called AFTER active+disconnect so the radio is stable. The
+    global mDNS broadcast was already configured by
+    `_apply_global_hostname()` before active(True) — this is the
+    secondary "tell the router via DHCP Option 12" path.
     """
     global _hostname_applied
     if _hostname_applied:
         return
-    for key in ("hostname", "dhcp_hostname"):
+    for key in ("dhcp_hostname", "hostname"):
         try:
             wlan.config(**{key: MDNS_HOSTNAME})
             _hostname_applied = True
         except Exception:
-            # Build doesn't support this key, or radio rejected it.
-            # Move on quietly.
             pass
 
 
@@ -178,6 +201,12 @@ def connect(ssid, password, timeout_ms=6000, pump_cb=None):
     bails immediately if it returns truthy.
     """
     wlan = _get_wlan()
+    # Set the global hostname BEFORE bringing the radio up. The mDNS
+    # responder in ESP-IDF reads it during interface init; setting
+    # it later doesn't change the already-broadcast service record.
+    # This is the single most important line for `oreo.local` to
+    # actually resolve on the LAN.
+    _apply_global_hostname()
     try:
         wlan.active(True)
     except Exception as e:

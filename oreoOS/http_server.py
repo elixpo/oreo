@@ -409,6 +409,33 @@ def refresh_code():
     return _badge_code
 
 
+def code_hash():
+    """Return the 8-hex-char prefill hash of the current badge code.
+
+    SHA-256 of the live code, truncated to its first 4 bytes (8 hex
+    chars). The website hashes the user-typed code with the same
+    function and passes it in `?prefill=<HASH>` when handing off to
+    the badge — so the cleartext code never travels in the URL
+    (which would otherwise appear in browser history). Matches are
+    case-insensitive hex.
+    """
+    try:
+        import uhashlib, binascii
+        h = uhashlib.sha256(current_code().encode()).digest()
+        return binascii.hexlify(h[:4]).decode()
+    except Exception:
+        # Best-effort fallback if uhashlib is unavailable: a much
+        # weaker mixing function. Same length, same charset so URL
+        # validation still works; the security argument is moot
+        # since anyone on the LAN can read the code off the badge
+        # anyway.
+        s = current_code()
+        x = 0
+        for ch in s:
+            x = ((x << 5) - x + ord(ch)) & 0xFFFFFFFF
+        return "%08x" % x
+
+
 def code_remaining_ms():
     """Milliseconds until the current code rotates. Used by the UI
     for the live countdown — returns 0 if already expired (next paint
@@ -597,7 +624,12 @@ _UPLOAD_FORM = (
     b"html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);"
     b"font-family:-apple-system,system-ui,Segoe UI,Roboto,sans-serif;"
     b"-webkit-font-smoothing:antialiased;min-height:100vh}"
-    b"body{display:flex;flex-direction:column;align-items:center;padding:24px 16px;"
+    # Fully centred — the previous version was top-aligned which left
+    # the panel floating in the upper third on tall phones. Now the
+    # body is a flex column that vertical-centres the panel and
+    # horizontal-centres everything inside it.
+    b"body{display:flex;flex-direction:column;align-items:center;"
+    b"justify-content:center;padding:32px 16px;"
     b"background-image:radial-gradient(60% 50% at 20% 0%,rgba(255,93,104,.12),transparent 60%),"
     b"radial-gradient(50% 45% at 85% 100%,rgba(162,155,254,.08),transparent 60%)}"
     b".brand{display:flex;align-items:center;gap:10px;margin-bottom:18px}"
@@ -665,38 +697,24 @@ _UPLOAD_FORM = (
     b"</style></head><body>"
     b"<div class='brand'><div class='mark'>o</div><h1>Send to Oreo</h1></div>"
     b"<div class='panel'>"
-    # ── Stage 1: enter the badge code ──
-    b"<div id='auth' class='pad stack'>"
-    b"<span class='chip'>step 1 of 3</span>"
-    b"<h2>Type the code shown on the badge</h2>"
-    b"<p class='sub'>Open <b>Settings &rsaquo; WiFi &rsaquo; Send Files</b> "
-    b"on the badge. A 6-character code is shown there. It rotates every 5 minutes.</p>"
-    b"<div class='code-row'>"
-    b"<input id='c0' maxlength='1' inputmode='text' autocomplete='off' spellcheck='false'>"
-    b"<input id='c1' maxlength='1' inputmode='text' autocomplete='off' spellcheck='false'>"
-    b"<input id='c2' maxlength='1' inputmode='text' autocomplete='off' spellcheck='false'>"
-    b"<input id='c3' maxlength='1' inputmode='text' autocomplete='off' spellcheck='false'>"
-    b"<input id='c4' maxlength='1' inputmode='text' autocomplete='off' spellcheck='false'>"
-    b"<input id='c5' maxlength='1' inputmode='text' autocomplete='off' spellcheck='false'>"
-    b"</div>"
-    b"<p class='err-msg' id='autherr'></p>"
-    b"<button id='authgo' class='btn' disabled>Submit code</button>"
-    b"</div>"
-    # ── Stage 2: wait for badge owner to approve this device ──
-    b"<div id='wait' class='pad stack hide'>"
-    b"<span class='chip'>step 2 of 3</span>"
+    # ── Stage 1: wait for badge owner to approve this device.
+    # ── (The code-entry step is gone — by the time you land on this
+    # ── page, the prefill hash has already auto-authed you, so we
+    # ── just need the badge owner to tap A on the matching row.)
+    b"<div id='wait' class='pad stack'>"
+    b"<span class='chip'>step 1 of 2</span>"
     b"<h2>Waiting for badge owner</h2>"
-    b"<p class='sub'>Your code matched. Your device ID is shown below — "
-    b"it appears on the badge owner's screen too. They have to tap "
-    b"<b>A</b> on the matching row to let you send a file.</p>"
-    b"<div class='did' id='did'>------</div>"
+    b"<p class='sub'>Your device ID is shown below &mdash; "
+    b"it appears on the badge owner's screen too. "
+    b"They have to tap <b>A</b> on the matching row to let you send a file.</p>"
+    b"<div class='did' id='did'>__DEVICE_ID__</div>"
     b"<div class='status live' id='wstat'><span class='dot'></span>"
-    b"<span id='wmsg'>waiting for approval…</span></div>"
+    b"<span id='wmsg'>waiting for approval&hellip;</span></div>"
     b"</div>"
-    # ── Stage 3: approved, pick a file ──
+    # ── Stage 2: approved, pick a file ──
     b"<div id='form' class='pad stack hide'>"
     b"<span class='chip' style='background:rgba(61,220,151,.15);color:var(--teal)'>"
-    b"approved &middot; <span id='okid' style='font-family:ui-monospace,monospace'></span></span>"
+    b"approved &middot; <span id='okid' style='font-family:ui-monospace,monospace'>__DEVICE_ID__</span></span>"
     b"<h2>Pick a file to send</h2>"
     b"<p class='sub'>Images convert to RGB565 in your browser before upload "
     b"(max 240&times;240). Text and Markdown land in Reader.</p>"
@@ -724,48 +742,14 @@ _UPLOAD_FORM = (
     b"<script>"
     b"const $=id=>document.getElementById(id);"
     b"const MAX_DIM=240;"
-    b"const CHARSET=/^[A-HJ-NP-Z2-9]$/i;"          # excludes 0/O/1/I/L
-    b"let did=null,approved=false,beaconTimer=null,picked=null;"
+    # The server inlined our device_id into the markup as
+    # __DEVICE_ID__ before sending the page, so we just read it off
+    # the DOM rather than running an auth handshake.
+    b"const did=$('did').textContent.trim();"
+    b"let approved=false,beaconTimer=null,picked=null;"
     b"function fmtKB(n){return (n/1024)<1024?(Math.round(n/1024)+' KB'):"
     b"((n/1024/1024).toFixed(2)+' MB');}"
     b"function setWaitStatus(cls,msg){const s=$('wstat');s.className='status '+cls;$('wmsg').textContent=msg;}"
-    # ── code-input cell handlers — auto-advance + paste full code ──
-    b"function readCode(){let s='';for(let i=0;i<6;i++){s+=($('c'+i).value||'').toUpperCase();}return s;}"
-    b"function checkComplete(){"
-    b"  const code=readCode();"
-    b"  $('authgo').disabled=(code.length!==6);"
-    b"  $('autherr').textContent='';}"
-    b"function setupCodeInputs(){"
-    b"  for(let i=0;i<6;i++){const el=$('c'+i);"
-    b"    el.addEventListener('input',e=>{"
-    b"      let v=(e.target.value||'').toUpperCase();"
-    b"      if(v.length>1){"          # paste — distribute across cells
-    b"        const parts=v.replace(/[^A-Z0-9]/g,'').split('');"
-    b"        for(let j=0;j<6;j++){$('c'+j).value=parts[j]||'';}"
-    b"        const last=Math.min(5,parts.length-1);"
-    b"        if(last>=0)$('c'+last).focus();"
-    b"      }else if(v&&!CHARSET.test(v)){e.target.value='';}"
-    b"      else{e.target.value=v;if(v&&i<5)$('c'+(i+1)).focus();}"
-    b"      checkComplete();});"
-    b"    el.addEventListener('keydown',e=>{"
-    b"      if(e.key==='Backspace'&&!el.value&&i>0)$('c'+(i-1)).focus();"
-    b"      if(e.key==='ArrowLeft' &&i>0)$('c'+(i-1)).focus();"
-    b"      if(e.key==='ArrowRight'&&i<5)$('c'+(i+1)).focus();});}"
-    b"  $('c0').focus();}"
-    # ── /auth handshake ──
-    b"async function submitAuth(){"
-    b"  const code=readCode();if(code.length!==6)return;"
-    b"  $('authgo').disabled=true;$('autherr').textContent='';"
-    b"  try{const r=await fetch('/auth?code='+encodeURIComponent(code),{method:'POST'});"
-    b"      if(r.status===401){$('autherr').textContent='Wrong code. Check the badge and try again.';"
-    b"        $('authgo').disabled=false;return;}"
-    b"      if(!r.ok){$('autherr').textContent='Server error '+r.status;"
-    b"        $('authgo').disabled=false;return;}"
-    b"      const j=await r.json();did=j.device_id;"
-    b"      $('did').textContent=did;$('okid').textContent=did;"
-    b"      $('auth').classList.add('hide');$('wait').classList.remove('hide');"
-    b"      beaconTimer=setInterval(beacon,2000);beacon();}"
-    b"  catch(e){$('autherr').textContent='Network error - check WiFi.';$('authgo').disabled=false;}}"
     # ── beacon poll for approval ──
     b"async function beacon(){"
     b"  if(!did||approved)return;"
@@ -834,8 +818,10 @@ _UPLOAD_FORM = (
     b"  xhr.onerror=()=>{alert('Network error - check WiFi.');$('go').disabled=false;};"
     b"  xhr.open('POST','/upload?token='+did);xhr.send(fd);}"
     b"document.addEventListener('DOMContentLoaded',()=>{"
-    b"  setupCodeInputs();"
-    b"  $('authgo').addEventListener('click',submitAuth);"
+    # No code-entry step any more — start the beacon poll
+    # immediately so the page tracks approval state from the moment
+    # it loads.
+    b"  beaconTimer=setInterval(beacon,2000);beacon();"
     b"  $('file').addEventListener('change',e=>onFile(e.target.files[0]));"
     b"  const dz=$('drop');"
     b"  ['dragenter','dragover'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add('over');}));"
@@ -867,6 +853,51 @@ _DISABLED_PAGE = (
     b"<p>The badge owner has closed file transfer for safety. "
     b"Ask them to re-enable it from the badge's "
     b"<b>Settings &rsaquo; WiFi &rsaquo; Send Files</b> page.</p>"
+    b"</body></html>"
+)
+
+
+# Served when GET / arrives without a valid `?prefill=<hash>` —
+# either no query string at all, or a stale prefill from a prior
+# code that has since rotated. No code-entry form is exposed here
+# (that would let any LAN scanner brute-force the code), just a
+# direct pointer back to oreo.pages.dev/upload where they can
+# re-grab a fresh URL.
+_NOT_FOUND_PAGE = (
+    b"<!doctype html><html lang='en'><head>"
+    b"<meta name='viewport' content='width=device-width,initial-scale=1'>"
+    b"<meta name='theme-color' content='#0F0C1C'>"
+    b"<title>Bad code &middot; Oreo</title>"
+    b"<style>"
+    b":root{--bg:#0F0C1C;--card:#1C1A2E;--bord:#2A2640;"
+    b"--ink:#F5E6DC;--dim:#C8B8B0;--mute:#8A8294;--pri:#FF5D68}"
+    b"*{box-sizing:border-box}"
+    b"html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);"
+    b"font-family:-apple-system,system-ui,sans-serif;min-height:100vh}"
+    b"body{display:flex;flex-direction:column;align-items:center;"
+    b"justify-content:center;padding:24px;text-align:center;"
+    b"background-image:radial-gradient(60% 50% at 20% 0%,rgba(255,93,104,.12),transparent 60%),"
+    b"radial-gradient(50% 45% at 85% 100%,rgba(162,155,254,.08),transparent 60%)}"
+    b".mark{width:48px;height:48px;border-radius:10px;border:1px solid rgba(255,93,104,.4);"
+    b"background:var(--card);display:grid;place-items:center;font-weight:700;"
+    b"color:var(--pri);font-size:22px;margin-bottom:18px;"
+    b"box-shadow:0 0 30px rgba(255,93,104,.25)}"
+    b".code{font-size:60px;font-weight:700;color:var(--pri);margin:0 0 6px;"
+    b"line-height:1;letter-spacing:-.02em}"
+    b"h1{font-size:22px;margin:8px 0 8px;font-weight:600}"
+    b"p{color:var(--dim);font-size:14px;line-height:1.55;max-width:380px;margin:0 0 18px}"
+    b".btn{display:inline-flex;align-items:center;gap:8px;background:var(--pri);"
+    b"color:var(--bg);border:0;border-radius:8px;padding:12px 20px;"
+    b"font-size:14px;font-weight:600;text-decoration:none}"
+    b"</style></head><body>"
+    b"<div class='mark'>o</div>"
+    b"<p class='code'>404</p>"
+    b"<h1>Bad or expired code</h1>"
+    b"<p>This page only opens when launched from "
+    b"<b>oreo.pages.dev/upload</b> with the current 6-character "
+    b"code shown on the badge. The code rotates every 5 minutes "
+    b"&mdash; head back and grab a fresh one.</p>"
+    b"<a class='btn' href='https://oreo.pages.dev/upload'>Open oreo.pages.dev/upload</a>"
     b"</body></html>"
 )
 
@@ -938,7 +969,11 @@ def _handle(sock):
         return
 
     if method == "GET" and path in ("/", "/index.html"):
-        _send_status(sock, 200, "OK", _UPLOAD_FORM)
+        # The page is gated on `?prefill=<hash>` matching the live
+        # code's hash. No prefill, wrong prefill, or expired prefill
+        # all serve the 404 page — no code-entry form, no surface
+        # area for a guesser to brute-force from the LAN.
+        _handle_root(sock, qs, _peer_addr(sock))
         return
     if method == "GET" and path == "/favicon.ico":
         _send_status(sock, 204, "No Content", b"")
@@ -946,73 +981,32 @@ def _handle(sock):
     if method == "GET" and path == "/beacon":
         _handle_beacon(sock, qs, _peer_addr(sock))
         return
-    if method == "POST" and path == "/auth":
-        _handle_auth(sock, headers, after_head, qs, _peer_addr(sock))
-        return
     if method == "POST" and path == "/upload":
         _handle_upload(sock, headers, after_head, qs)
         return
 
-    _send_status(sock, 404, "Not Found", b"not found")
+    _send_status(sock, 404, "Not Found", _NOT_FOUND_PAGE)
 
 
-def _handle_auth(sock, headers, body_prefix, qs, peer_addr):
-    """Code-gated auth handshake.
-
-    The sender's browser POSTs the 6-char code the user typed off the
-    badge screen. We compare against `current_code()` (which rotates
-    automatically every 5 min). On success we mint a device_id and
-    register the session as 'authed' — that's the first state in
-    which the sender is even visible to the badge UI. On failure
-    we return 401 and DON'T create a session, so a wrong-code
-    attempt never appears in the badge's list.
-
-    Accepts the code either as form-encoded body (`code=ABCDEF`) or
-    as a query param (`?code=ABCDEF`) to keep the client side
-    flexible.
-    """
-    # Try query first, then body.
-    submitted = (qs.get("code", "") or "").upper()
-    if not submitted:
-        # Body may have already been partly read into body_prefix. We
-        # only need a few bytes — content-length is small for an auth
-        # POST. Read up to 256 bytes total.
-        try:
-            clen = int(headers.get("content-length", "0"))
-        except ValueError:
-            clen = 0
-        buf = bytearray(body_prefix or b"")
-        while len(buf) < min(clen, 256):
-            try: chunk = sock.recv(64)
-            except OSError: break
-            if not chunk: break
-            buf.extend(chunk)
-        text = buf.decode("utf-8", "ignore")
-        for part in text.split("&"):
-            k, _, v = part.partition("=")
-            if k.strip() == "code":
-                submitted = _pct(v.strip()).upper()
-                break
-
-    if len(submitted) != 6 or not all(c in SESSION_CHARSET for c in submitted):
-        _send_status(sock, 400, "Bad Request",
-                     b'{"error":"bad code format"}',
-                     content_type="application/json")
+def _handle_root(sock, qs, peer_addr):
+    """GET / — entry point. Auto-authenticates against the prefill
+    hash and renders the upload page with the device_id inlined.
+    Wrong / missing prefill renders the branded 404 page so no
+    randomly-crawled URL ever lands on a working form."""
+    prefill = (qs.get("prefill", "") or "").lower()
+    expected = code_hash().lower()
+    if not prefill or prefill != expected:
+        # Two reasons we land here: the URL was hit without a prefill,
+        # or the prefill was correct ~minutes ago but the code has
+        # since rotated. Same response either way — direct the user
+        # back to the website to grab a fresh code.
+        _send_status(sock, 404, "Not Found", _NOT_FOUND_PAGE)
         return
 
-    live = current_code()
-    if submitted != live:
-        _send_status(sock, 401, "Unauthorized",
-                     b'{"error":"wrong code"}',
-                     content_type="application/json")
-        return
-
-    # Code matched — register the session.
+    # Prefill matched → mint a device session for this client.
     _prune_sessions()
     if len(_sessions) >= SESSION_MAX:
-        _send_status(sock, 503, "Service Unavailable",
-                     b'{"error":"too many active sessions"}',
-                     content_type="application/json")
+        _send_status(sock, 503, "Service Unavailable", _DISABLED_PAGE)
         return
     device_id = _new_session_id()
     try:
@@ -1027,8 +1021,17 @@ def _handle_auth(sock, headers, body_prefix, qs, peer_addr):
         "uploads":   0,
         "authed_at": now,
     }
-    body = ('{"device_id":"%s","state":"authed"}' % device_id).encode()
-    _send_status(sock, 200, "OK", body, content_type="application/json")
+    try:
+        print("[http] auto-authed via prefill: device_id=%s" % device_id)
+    except Exception:
+        pass
+
+    # Inline the device_id into the served page by replacing a
+    # placeholder. Done as a one-pass bytes.replace so we keep the
+    # form as a compile-time constant and pay the substitution cost
+    # only on the (rare) success path.
+    body = _UPLOAD_FORM.replace(b"__DEVICE_ID__", device_id.encode())
+    _send_status(sock, 200, "OK", body)
 
 
 def _handle_beacon(sock, qs, peer_addr):

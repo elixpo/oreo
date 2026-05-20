@@ -34,11 +34,26 @@ const DEFAULT_HOST = "oreo.local";
 // Examples that match: `oreo.local`, `192.168.1.42`, `192.168.1.42:80`.
 const ADDR_OK = /^[A-Za-z0-9.-]+(:\d{1,5})?$/;
 
+// The badge derives a short hash from its current rotating code and
+// expects `?prefill=<hash>` (NOT the raw code) on the local page.
+// Keeping the raw code out of the URL means it never lands in browser
+// history, referer headers, or shared screenshots. The hash is the
+// first 4 bytes of SHA-256(code.toUpperCase()), hex-encoded — matches
+// `code_hash()` in oreoOS/http_server.py exactly.
+async function codeHash(code: string): Promise<string> {
+  const buf = new TextEncoder().encode(code.toUpperCase());
+  const hash = await crypto.subtle.digest("SHA-256", buf);
+  return Array.from(new Uint8Array(hash).slice(0, 4))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 export default function UploadPage() {
   const [cells, setCells] = useState<string[]>(() => Array(CODE_LEN).fill(""));
   const [error, setError] = useState("");
   const [phase, setPhase] = useState<"enter" | "handoff">("enter");
   const [host,  setHost]  = useState<string>(DEFAULT_HOST);
+  const [hash,  setHash]  = useState<string>("");
   const refs = useRef<Array<HTMLInputElement | null>>([]);
   refs.current = refs.current.slice(0, CODE_LEN);
 
@@ -58,6 +73,17 @@ export default function UploadPage() {
 
   // Focus the first cell on mount.
   useEffect(() => { refs.current[0]?.focus(); }, []);
+
+  // Pre-compute the hash whenever the code is complete so the click
+  // handler can use it synchronously — crypto.subtle.digest is async,
+  // and awaiting it inside handoff() would break the user-gesture
+  // flag that popup blockers rely on.
+  useEffect(() => {
+    if (!complete) { setHash(""); return; }
+    let cancelled = false;
+    codeHash(code).then((h) => { if (!cancelled) setHash(h); });
+    return () => { cancelled = true; };
+  }, [code, complete]);
 
   function setCell(i: number, raw: string) {
     const v = (raw || "").toUpperCase();
@@ -90,9 +116,27 @@ export default function UploadPage() {
     if (e.key === "Enter" && complete) handoff();
   }
 
-  function handoff() {
+  // Computed once per render so the visible "Open transfer" link
+  // ALSO points at the live URL — that way if window.open is
+  // blocked, the user can right-click → "open in new tab" on the
+  // anchor we render.
+  const targetUrl = `http://${
+    (host.trim() || DEFAULT_HOST)
+  }/?prefill=${encodeURIComponent(hash)}`;
+
+  function handoff(e?: React.SyntheticEvent) {
+    // Prevent the default form submit so the page doesn't reload
+    // (which would otherwise wipe our state mid-handoff).
+    e?.preventDefault();
     if (!complete) {
       setError(`Code must be ${CODE_LEN} characters.`);
+      return;
+    }
+    if (!hash) {
+      // Hash hasn't finished computing yet — extremely unlikely since
+      // SHA-256 of 6 bytes is sub-millisecond, but guard anyway so we
+      // never open a URL with an empty prefill.
+      setError("Hashing code… try again.");
       return;
     }
     const h = host.trim() || DEFAULT_HOST;
@@ -100,17 +144,21 @@ export default function UploadPage() {
       setError(`"${h}" isn't a valid hostname or IP.`);
       return;
     }
-    // Persist the host so the user doesn't retype the IP on every
-    // session. Only saves on a successful handoff so a typo doesn't
-    // get cached.
     try { localStorage.setItem("oreo-badge-host", h); } catch {}
+
+    // ── Fire window.open SYNCHRONOUSLY inside the user gesture ──
+    // Wrapping it in setTimeout (even with a tiny delay) makes
+    // browsers treat the call as scripted and block the popup. We
+    // open the new tab first; the "opening…" UI is updated after.
+    const opened = window.open(targetUrl, "_blank", "noopener,noreferrer");
+    if (!opened) {
+      // Popup blocked anyway. Fall back to a top-level navigation —
+      // this loses the website tab but at least gets the user to
+      // the badge. They can use the browser's back button to return.
+      window.location.href = targetUrl;
+      return;
+    }
     setPhase("handoff");
-    setTimeout(() => {
-      window.open(
-        `http://${h}/?prefill=${encodeURIComponent(code)}`,
-        "_blank", "noopener,noreferrer",
-      );
-    }, 700);
   }
 
   return (
@@ -142,7 +190,7 @@ export default function UploadPage() {
               animate={{ opacity: 1, y: 0  }}
               exit={{    opacity: 0, y:-10 }}
               transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-              onSubmit={(e) => { e.preventDefault(); handoff(); }}
+              onSubmit={handoff}
               className="card-surface p-8 sm:p-10"
             >
               <label className="block text-center text-xs uppercase tracking-widest
@@ -231,12 +279,32 @@ export default function UploadPage() {
 
               <button
                 type="submit"
-                disabled={!complete || !hostValid}
+                disabled={!complete || !hostValid || !hash}
                 className="btn-primary mt-6 w-full justify-center
                            disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Open transfer <ArrowRight className="h-4 w-4" />
               </button>
+
+              {/* Backup link — visible only after the form is valid.
+                  Lets the user right-click → "open in new tab" if the
+                  Submit button's window.open got blocked by their
+                  browser (most common on iOS Safari + Firefox
+                  strict-popup-blocking modes). */}
+              {complete && hostValid && hash && (
+                <p className="mt-3 text-center text-xs text-muted">
+                  Button blocked?{" "}
+                  <a
+                    href={targetUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-primary underline decoration-primary/40
+                               underline-offset-2 hover:decoration-primary"
+                  >
+                    Open this link manually
+                  </a>.
+                </p>
+              )}
 
               {/* Three info tiles below — explain the model without
                   making the user read paragraphs. */}
