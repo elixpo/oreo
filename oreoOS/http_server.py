@@ -59,6 +59,10 @@ HEAD_DEADLINE_MS   = 1500         # hard cap on header-read for tiny requests
 
 # Session lifecycle
 SESSION_TTL_MS         = 60 * 1000   # beacon must refresh within this
+SESSION_HARD_TTL_MS    = 60 * 60 * 1000  # 60 min absolute cap from authed_at,
+                                         # even if the client keeps beaconing.
+                                         # Stops stale tabs left open from
+                                         # holding a slot forever.
 SESSION_MAX            = 8           # never track more than this many concurrent
 SESSION_CHARSET        = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # no 0/O/1/I/l
 
@@ -290,8 +294,18 @@ def _prune_sessions():
     stale = []
     for sid, s in _sessions.items():
         last = s.get("last_ms", 0)
+        authed_at = s.get("authed_at", 0)
         try:
+            # Beacon idle (no heartbeat within SESSION_TTL_MS) — the
+            # usual reason sessions go away.
             if _t.ticks_diff(now, last) > SESSION_TTL_MS:
+                stale.append(sid)
+                continue
+            # Hard cap: even if the client is faithfully beaconing, a
+            # session older than SESSION_HARD_TTL_MS (60 min) gets
+            # evicted. Forces a re-handshake so a forgotten tab
+            # can't camp on a device slot indefinitely.
+            if _t.ticks_diff(now, authed_at) > SESSION_HARD_TTL_MS:
                 stale.append(sid)
         except Exception:
             pass
@@ -324,7 +338,13 @@ def list_sessions():
             "last_ms":    s.get("last_ms", 0),
             "authed_at":  s.get("authed_at", 0),
         })
-    items.sort(key=lambda v: v.get("last_ms", 0), reverse=True)
+    # Sort by authed_at (stable insertion order) — NOT last_ms.
+    # last_ms ticks every ~2 s as each client beacons, which made the
+    # rows shuffle visibly every refresh and broke cursor stability
+    # (the row under the user's cursor would slide away mid-tap).
+    # authed_at is fixed for the lifetime of the session, so the
+    # newest-first ordering stays stable until a session expires.
+    items.sort(key=lambda v: v.get("authed_at", 0), reverse=True)
     return items
 
 
@@ -632,10 +652,14 @@ _UPLOAD_FORM = (
     b"justify-content:center;padding:32px 16px;"
     b"background-image:radial-gradient(60% 50% at 20% 0%,rgba(255,93,104,.12),transparent 60%),"
     b"radial-gradient(50% 45% at 85% 100%,rgba(162,155,254,.08),transparent 60%)}"
-    b".brand{display:flex;align-items:center;gap:10px;margin-bottom:18px}"
-    b".brand .mark{width:32px;height:32px;border-radius:6px;border:1px solid rgba(255,93,104,.4);"
-    b"background:var(--card);display:grid;place-items:center;font-weight:700;color:var(--pri);"
-    b"box-shadow:0 0 24px rgba(255,93,104,.2)}"
+    b".brand{display:flex;flex-direction:column;align-items:center;gap:10px;margin-bottom:18px}"
+    # Mascot — pulled from the public website over HTTPS. Browsers
+    # allow HTTPS subresources on an HTTP page (the reverse is what's
+    # blocked), so this renders fine on the badge-served HTTP page
+    # without baking the PNG into firmware.
+    b".brand .mascot{width:84px;height:84px;border-radius:18px;"
+    b"background:var(--card);border:1px solid rgba(255,93,104,.4);"
+    b"padding:6px;box-shadow:0 0 30px rgba(255,93,104,.25);object-fit:contain}"
     b".brand h1{margin:0;font-size:22px;font-weight:600;letter-spacing:-.01em}"
     b".panel{width:100%;max-width:440px;background:var(--card);border:1px solid var(--bord);"
     b"border-radius:14px;overflow:hidden}"
@@ -657,7 +681,13 @@ _UPLOAD_FORM = (
     b".did{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:30px;"
     b"letter-spacing:.32em;color:var(--teal);margin:14px 0 4px;text-align:center;"
     b"text-shadow:0 0 30px rgba(61,220,151,.35)}"
-    b".drop{border:2px dashed var(--bord);border-radius:10px;padding:22px;text-align:center;"
+    # `.drop` is a <label>, which is inline by default — without an
+    # explicit display:block the dashed border collapses to a thin
+    # sliver around the (hidden) <input>, and the icon/labels float
+    # outside the box. Force block layout so the dashed rectangle
+    # spans the panel width as intended.
+    b".drop{display:block;width:100%;border:2px dashed var(--bord);border-radius:10px;"
+    b"padding:22px 18px;text-align:center;box-sizing:border-box;"
     b"cursor:pointer;transition:.2s border-color,.2s background;background:rgba(38,33,62,.4)}"
     b".drop:hover,.drop.over{border-color:var(--pri);background:rgba(255,93,104,.06)}"
     b".drop input{display:none}"
@@ -694,8 +724,37 @@ _UPLOAD_FORM = (
     b".hide{display:none!important}"
     b".foot{margin-top:18px;font-size:11px;color:var(--mute);text-align:center;max-width:440px}"
     b".foot a{color:var(--dim);text-decoration:none;border-bottom:1px dashed var(--bord)}"
+    # Custom modal — replaces native alert() which (a) breaks the
+    # branding and (b) on iOS Safari freezes the page until dismissed
+    # AND shows the bare URL. The modal is always in the DOM, hidden
+    # by default; show() flips .open on the backdrop.
+    b".mdl{position:fixed;inset:0;background:rgba(15,12,28,.78);"
+    b"backdrop-filter:blur(6px);display:none;align-items:center;"
+    b"justify-content:center;padding:24px;z-index:50}"
+    b".mdl.open{display:flex}"
+    b".mdl .box{background:var(--card);border:1px solid var(--bord);"
+    b"border-radius:14px;max-width:380px;width:100%;padding:22px;"
+    b"box-shadow:0 30px 60px rgba(0,0,0,.5)}"
+    b".mdl .ic{width:42px;height:42px;border-radius:10px;"
+    b"display:grid;place-items:center;font-size:22px;margin-bottom:12px;"
+    b"background:rgba(255,93,104,.15);color:var(--pri)}"
+    b".mdl.ok .ic{background:rgba(61,220,151,.15);color:var(--teal)}"
+    b".mdl h3{margin:0 0 6px;font-size:17px;font-weight:600}"
+    b".mdl p{margin:0 0 16px;color:var(--dim);font-size:13px;line-height:1.55}"
+    b".mdl .acts{display:flex;gap:8px}"
+    b".mdl .acts .btn{flex:1;padding:11px 14px;font-size:14px}"
+    # Reset row — pinned at the bottom of the panel so the user always
+    # has a way out, even mid-upload. .reset is a low-key text button
+    # so it doesn't compete with the primary action.
+    b".reset{margin-top:14px;text-align:center}"
+    b".reset button{background:transparent;border:0;color:var(--mute);"
+    b"font-size:12px;cursor:pointer;text-decoration:underline;"
+    b"text-decoration-color:var(--bord);text-underline-offset:3px}"
+    b".reset button:hover{color:var(--ink)}"
     b"</style></head><body>"
-    b"<div class='brand'><div class='mark'>o</div><h1>Send to Oreo</h1></div>"
+    b"<div class='brand'>"
+    b"<img class='mascot' src='https://oreo.pages.dev/mascot.png' alt='Oreo'>"
+    b"<h1>Send to Oreo</h1></div>"
     b"<div class='panel'>"
     # ── Stage 1: wait for badge owner to approve this device.
     # ── (The code-entry step is gone — by the time you land on this
@@ -710,6 +769,8 @@ _UPLOAD_FORM = (
     b"<div class='did' id='did'>__DEVICE_ID__</div>"
     b"<div class='status live' id='wstat'><span class='dot'></span>"
     b"<span id='wmsg'>waiting for approval&hellip;</span></div>"
+    b"<div class='reset'><button type='button' onclick='resetAll()'>"
+    b"Reset transaction</button></div>"
     b"</div>"
     # ── Stage 2: approved, pick a file ──
     b"<div id='form' class='pad stack hide'>"
@@ -730,13 +791,24 @@ _UPLOAD_FORM = (
     b"<button id='go' class='btn' disabled>Send to badge</button>"
     b"<div class='progress'><div class='bar' id='bar'></div></div>"
     b"<div class='pct hide' id='pct'><span id='pctn'>0%</span>"
-    b"<span id='pctb'>0 / 0 KB</span></div></div>"
+    b"<span id='pctb'>0 / 0 KB</span></div>"
+    b"<div class='reset'><button type='button' onclick='resetAll()'>"
+    b"Reset transaction</button></div></div>"
     # ── Stage 4: done ──
     b"<div id='done' class='pad stack hide' style='text-align:center'>"
     b"<div style='font-size:42px;color:var(--teal);line-height:1'>&#10003;</div>"
     b"<h2>Sent!</h2><p class='sub'>Open the matching app on your badge to view it.</p>"
     b"<button class='btn' onclick='location.reload()'>Send another</button></div>"
     b"</div>"
+    # ── Custom modal — hidden until showModal() flips .open. ──
+    b"<div class='mdl' id='mdl'><div class='box'>"
+    b"<div class='ic' id='mdlIc'>!</div>"
+    b"<h3 id='mdlT'>Something went wrong</h3>"
+    b"<p id='mdlM'>&mdash;</p>"
+    b"<div class='acts'>"
+    b"<button class='btn ghost' id='mdlNo' onclick='closeModal()'>Dismiss</button>"
+    b"<button class='btn' id='mdlYes' onclick='resetAll()'>Reset</button>"
+    b"</div></div></div>"
     b"<div class='foot'>Peer-to-peer on your local network &middot; "
     b"Powered by <a href='https://oreo.pages.dev' target='_blank'>oreo.pages.dev</a></div>"
     b"<script>"
