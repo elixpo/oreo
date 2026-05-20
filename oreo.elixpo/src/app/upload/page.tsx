@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowRight, ShieldCheck, Wifi, RefreshCw, Lock,
+  ArrowRight, ShieldCheck, Wifi, RefreshCw, Lock, Loader2,
 } from "lucide-react";
 import { Reveal } from "@/components/MotionWrap";
 
@@ -51,7 +51,7 @@ async function codeHash(code: string): Promise<string> {
 export default function UploadPage() {
   const [cells, setCells] = useState<string[]>(() => Array(CODE_LEN).fill(""));
   const [error, setError] = useState("");
-  const [phase, setPhase] = useState<"enter" | "handoff">("enter");
+  const [phase, setPhase] = useState<"enter" | "loading" | "handoff">("enter");
   const [host,  setHost]  = useState<string>(DEFAULT_HOST);
   const [hash,  setHash]  = useState<string>("");
   const refs = useRef<Array<HTMLInputElement | null>>([]);
@@ -149,7 +149,7 @@ export default function UploadPage() {
     // ── Fire window.open SYNCHRONOUSLY inside the user gesture ──
     // Wrapping it in setTimeout (even with a tiny delay) makes
     // browsers treat the call as scripted and block the popup. We
-    // open the new tab first; the "opening…" UI is updated after.
+    // open the new tab first; the "loading" UI is rendered after.
     const opened = window.open(targetUrl, "_blank", "noopener,noreferrer");
     if (!opened) {
       // Popup blocked anyway. Fall back to a top-level navigation —
@@ -158,7 +158,20 @@ export default function UploadPage() {
       window.location.href = targetUrl;
       return;
     }
-    setPhase("handoff");
+    // Show the loading state while the new tab is spinning up the
+    // FTP-style transfer on the badge. After a brief delay we clear
+    // the code cells and return to the empty entry form so the user
+    // can start a fresh transfer without manually wiping the input.
+    setPhase("loading");
+    window.setTimeout(() => {
+      setCells(Array(CODE_LEN).fill(""));
+      setHash("");
+      setError("");
+      setPhase("enter");
+      // Re-focus the first cell so the user can immediately type the
+      // next code if they're sending a second file.
+      refs.current[0]?.focus();
+    }, 1400);
   }
 
   return (
@@ -317,6 +330,38 @@ export default function UploadPage() {
                       body="Codes expire in 5 min." />
               </div>
             </motion.form>
+          ) : phase === "loading" ? (
+            <motion.div
+              key="loading"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0  }}
+              exit={{    opacity: 0, y:-10 }}
+              transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+              className="card-surface flex flex-col items-center gap-4 p-10
+                         text-center"
+            >
+              <div className="grid h-14 w-14 place-items-center rounded-pill
+                              bg-primary/15 text-primary">
+                <Loader2 className="h-6 w-6 animate-spin" />
+              </div>
+              <h2 className="font-display text-2xl">
+                Opening local page for FTP transfer…
+              </h2>
+              <p className="max-w-md text-sm text-text-dim">
+                A new tab is loading{" "}
+                <code className="text-text">http://{host || DEFAULT_HOST}</code>.
+                Approve the session on the badge to start sending files.
+              </p>
+              <div className="mt-2 h-1 w-40 overflow-hidden rounded-pill
+                              bg-bg-raised">
+                <motion.div
+                  className="h-full bg-primary"
+                  initial={{ width: "0%" }}
+                  animate={{ width: "100%" }}
+                  transition={{ duration: 1.4, ease: "easeInOut" }}
+                />
+              </div>
+            </motion.div>
           ) : (
             <motion.div
               key="handoff"
@@ -332,25 +377,17 @@ export default function UploadPage() {
                 <ArrowRight className="h-6 w-6 animate-pulse-soft" />
               </div>
               <h2 className="font-display text-2xl">
-                Opening transfer with{" "}
-                <span className="text-primary">{code}</span>…
+                Transfer tab opened.
               </h2>
               <p className="max-w-md text-sm text-text-dim">
-                A new tab is opening to{" "}
-                <code className="text-text">http://{host || DEFAULT_HOST}</code>.
                 Make sure your device is on the same WiFi as the badge,
-                approve the session on the badge, and pick a file.
-              </p>
-              <p className="max-w-md text-xs text-muted-deep">
-                If the new tab can't reach the badge, go back and
-                replace <code className="text-muted">oreo.local</code>{" "}
-                with the IP printed on the badge's Send Files page.
+                approve the session, and pick a file.
               </p>
               <button
                 onClick={() => { setPhase("enter"); setCells(Array(CODE_LEN).fill("")); }}
                 className="btn-ghost mt-4"
               >
-                Use a different code
+                Send another
               </button>
             </motion.div>
           )}

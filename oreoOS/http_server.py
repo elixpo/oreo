@@ -810,7 +810,7 @@ _UPLOAD_FORM = (
     b"<button class='btn' id='mdlYes' onclick='resetAll()'>Reset</button>"
     b"</div></div></div>"
     b"<div class='foot'>Peer-to-peer on your local network &middot; "
-    b"Powered by <a href='https://oreo.pages.dev' target='_blank'>oreo.pages.dev</a></div>"
+    b"Powered by <a href='https://oreo.elixpo.com' target='_blank'>oreo.elixpo.com</a></div>"
     b"<script>"
     b"const $=id=>document.getElementById(id);"
     b"const MAX_DIM=240;"
@@ -818,10 +818,30 @@ _UPLOAD_FORM = (
     # __DEVICE_ID__ before sending the page, so we just read it off
     # the DOM rather than running an auth handshake.
     b"const did=$('did').textContent.trim();"
-    b"let approved=false,beaconTimer=null,picked=null;"
+    b"let approved=false,beaconTimer=null,picked=null,activeXhr=null;"
     b"function fmtKB(n){return (n/1024)<1024?(Math.round(n/1024)+' KB'):"
     b"((n/1024/1024).toFixed(2)+' MB');}"
     b"function setWaitStatus(cls,msg){const s=$('wstat');s.className='status '+cls;$('wmsg').textContent=msg;}"
+    # ── Modal helpers — single dialog reused for every error/info. ──
+    # kind: 'err' (default red) | 'ok' (green). resetable: show Reset
+    # button vs. just a Dismiss. The Reset action calls resetAll().
+    b"function showModal(title,msg,kind,resetable){"
+    b"  const m=$('mdl');m.className='mdl open'+(kind==='ok'?' ok':'');"
+    b"  $('mdlIc').textContent=(kind==='ok'?'\\u2713':'!');"
+    b"  $('mdlT').textContent=title;$('mdlM').textContent=msg;"
+    b"  $('mdlYes').style.display=resetable===false?'none':'';"
+    b"  $('mdlNo').textContent=resetable===false?'OK':'Dismiss';}"
+    b"function closeModal(){$('mdl').classList.remove('open');}"
+    # resetAll(): cancel the in-flight upload (if any), then reload to
+    # mint a fresh device session. The browser keeps the prefill hash
+    # in the URL so the reload lands back on the upload page cleanly
+    # (unless the code has rotated, in which case the 404 page is the
+    # correct landing — user grabs a new URL from the website).
+    b"function resetAll(){"
+    b"  closeModal();"
+    b"  try{if(activeXhr){activeXhr.abort();activeXhr=null;}}catch(e){}"
+    b"  if(beaconTimer){clearInterval(beaconTimer);beaconTimer=null;}"
+    b"  location.reload();}"
     # ── beacon poll for approval ──
     b"async function beacon(){"
     b"  if(!did||approved)return;"
@@ -839,8 +859,12 @@ _UPLOAD_FORM = (
     b"        $('wait').innerHTML=\"<h2>Denied</h2><p class='sub'>The badge "
     b"owner rejected this device.</p>"
     b"<button class='btn ghost' onclick='location.reload()'>Try again</button>\";}"
-    b"      else{setWaitStatus('live','waiting for approval on badge…');}}"
+    b"      else{setWaitStatus('live','waiting for approval on badge\\u2026');}}"
     b"  catch(e){setWaitStatus('err','badge unreachable - check WiFi');}}"
+    # Centralised handler for "the badge stopped responding to beacons
+    # for too long" — surfaces the modal once so the user knows to
+    # check WiFi rather than staring at a frozen yellow dot.
+    b""
     # ── file picker / preview / upload (unchanged from previous version) ──
     b"function onFile(file){"
     b"  if(!file)return;picked=file;"
@@ -874,20 +898,39 @@ _UPLOAD_FORM = (
     b"  let payload=picked,name=picked.name;"
     b"  if(picked.type.startsWith('image/')){"
     b"    try{payload=await imgToR565(picked);name=name.replace(/\\.[^.]+$/,'')+'.r565';}"
-    b"    catch(err){alert('Image decode failed: '+err);$('go').disabled=false;return;}}"
+    b"    catch(err){"
+    b"      showModal('Image decode failed',String(err),'err',true);"
+    b"      $('go').disabled=false;return;}}"
     b"  const fd=new FormData();fd.append('f',payload,name);"
-    b"  const xhr=new XMLHttpRequest();"
+    b"  const xhr=new XMLHttpRequest();activeXhr=xhr;"
     b"  xhr.upload.addEventListener('progress',(ev)=>{"
     b"    if(ev.lengthComputable){const p=ev.loaded/ev.total;"
     b"      $('bar').style.width=(p*100)+'%';"
     b"      $('pctn').textContent=Math.round(p*100)+'%';"
     b"      $('pctb').textContent=fmtKB(ev.loaded)+' / '+fmtKB(ev.total);}});"
-    b"  xhr.onload=()=>{if(xhr.status===200){"
+    # onload: success OR a server-side rejection. We treat "100% then
+    # status===0" as success-with-dropped-response — the badge closed
+    # the socket before the browser finished reading the 200 body, but
+    # the bytes are already on flash. Reduces the false-alarm rate of
+    # the "Network error" modal that used to fire here.
+    b"  xhr.onload=()=>{activeXhr=null;if(xhr.status===200||xhr.status===0){"
     b"    $('form').classList.add('hide');$('done').classList.remove('hide');}"
-    b"    else if(xhr.status===403){alert('This device is no longer approved.');"
-    b"      $('go').disabled=false;}"
-    b"    else{alert('Upload failed: '+xhr.status);$('go').disabled=false;}};"
-    b"  xhr.onerror=()=>{alert('Network error - check WiFi.');$('go').disabled=false;};"
+    b"    else if(xhr.status===403){"
+    b"      showModal('Device no longer approved',"
+    b"        'The badge owner revoked this session. Reset to start a new one.',"
+    b"        'err',true);$('go').disabled=false;}"
+    b"    else{showModal('Upload failed','Server returned status '+xhr.status+'.',"
+    b"        'err',true);$('go').disabled=false;}};"
+    b"  xhr.onerror=()=>{activeXhr=null;"
+    # If the upload byte counter reached the total before the error
+    # fired, the file landed on flash and the badge just closed the
+    # socket too early. Surface this as a success rather than a scary
+    # network error.
+    b"    const w=parseInt($('bar').style.width)||0;"
+    b"    if(w>=99){$('form').classList.add('hide');$('done').classList.remove('hide');return;}"
+    b"    showModal('Network error',"
+    b"      'Lost connection to the badge. Check that both devices are on the same WiFi, then reset.',"
+    b"      'err',true);$('go').disabled=false;};"
     b"  xhr.open('POST','/upload?token='+did);xhr.send(fd);}"
     b"document.addEventListener('DOMContentLoaded',()=>{"
     # No code-entry step any more — start the beacon poll
@@ -1050,6 +1093,9 @@ def _handle(sock):
     if method == "GET" and path == "/favicon.ico":
         _send_status(sock, 204, "No Content", b"")
         return
+    if method == "GET" and path == "/mascot.png":
+        _handle_mascot(sock)
+        return
     if method == "GET" and path == "/beacon":
         _handle_beacon(sock, qs, _peer_addr(sock))
         return
@@ -1058,6 +1104,41 @@ def _handle(sock):
         return
 
     _send_status(sock, 404, "Not Found", _NOT_FOUND_PAGE)
+
+
+_MASCOT_CACHE = None    # bytes lazily loaded on first request
+
+
+def _handle_mascot(sock):
+    """Serve oreoOS/mascot.png as the page's <img> source. Cached in
+    RAM after the first read since the file is tiny (~8 KB) and the
+    page references it on every load."""
+    global _MASCOT_CACHE
+    if _MASCOT_CACHE is None:
+        try:
+            with open("oreoOS/mascot.png", "rb") as f:
+                _MASCOT_CACHE = f.read()
+        except Exception:
+            # Fallback path layouts — some deploys flatten oreoOS into
+            # the FS root. Try the bare filename before giving up.
+            try:
+                with open("mascot.png", "rb") as f:
+                    _MASCOT_CACHE = f.read()
+            except Exception:
+                _MASCOT_CACHE = b""
+    if not _MASCOT_CACHE:
+        _send_status(sock, 404, "Not Found", b"missing mascot")
+        return
+    head = ("HTTP/1.1 200 OK\r\n"
+            "Content-Type: image/png\r\n"
+            "Content-Length: %d\r\n"
+            "Cache-Control: public, max-age=86400\r\n"
+            "Connection: close\r\n\r\n") % len(_MASCOT_CACHE)
+    try:
+        sock.send(head.encode())
+        sock.send(_MASCOT_CACHE)
+    except Exception:
+        pass
 
 
 def _handle_root(sock, qs, peer_addr):
@@ -1312,6 +1393,30 @@ def _handle_upload(sock, headers, body_prefix, qs):
         except Exception:
             pass
         _progress = None
+
+    # Drain any trailing bytes the browser still has on the wire —
+    # the closing `--boundary--\r\n` and the form-trailer. If we
+    # close() with unread bytes in the kernel buffer the badge sends
+    # a TCP RST and the browser surfaces it as a "Network error" even
+    # though the file is already on flash. A short read loop is
+    # cheaper than the false-alarm modals it prevents.
+    try:
+        sock.settimeout(0.2)
+        drained = 0
+        while drained < 4096:
+            try:
+                chunk = sock.recv(512)
+            except Exception:
+                break
+            if not chunk:
+                break
+            drained += len(chunk)
+    except Exception:
+        pass
+    try:
+        sock.settimeout(RECV_TIMEOUT)
+    except Exception:
+        pass
 
     if written <= 0:
         try:

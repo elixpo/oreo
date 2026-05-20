@@ -1,8 +1,9 @@
 import type { Config } from "tailwindcss";
 // theme.js is the single source of truth for brand tokens; Tailwind
 // just re-exposes them as utility classes (bg-bg, text-primary, etc).
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const theme = require("./theme.js");
+// Newer Next.js loads tailwind.config.ts via the native ESM loader,
+// which doesn't expose `require` — use a static import instead.
+import theme from "./theme.js";
 
 const config: Config = {
   content: [
