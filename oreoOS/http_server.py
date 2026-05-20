@@ -753,7 +753,7 @@ _UPLOAD_FORM = (
     b".reset button:hover{color:var(--ink)}"
     b"</style></head><body>"
     b"<div class='brand'>"
-    b"<img class='mascot' src='https://oreo.pages.dev/mascot.png' alt='Oreo'>"
+    b"<img class='mascot' src='/mascot.png' alt='Oreo'>"
     b"<h1>Send to Oreo</h1></div>"
     b"<div class='panel'>"
     # ── Stage 1: wait for badge owner to approve this device.
@@ -976,7 +976,7 @@ _DISABLED_PAGE = (
 # either no query string at all, or a stale prefill from a prior
 # code that has since rotated. No code-entry form is exposed here
 # (that would let any LAN scanner brute-force the code), just a
-# direct pointer back to oreo.pages.dev/upload where they can
+# direct pointer back to oreo.elixpo.com/upload where they can
 # re-grab a fresh URL.
 _NOT_FOUND_PAGE = (
     b"<!doctype html><html lang='en'><head>"
@@ -1009,10 +1009,10 @@ _NOT_FOUND_PAGE = (
     b"<p class='code'>404</p>"
     b"<h1>Bad or expired code</h1>"
     b"<p>This page only opens when launched from "
-    b"<b>oreo.pages.dev/upload</b> with the current 6-character "
+    b"<b>oreo.elixpo.com/upload</b> with the current 6-character "
     b"code shown on the badge. The code rotates every 5 minutes "
     b"&mdash; head back and grab a fresh one.</p>"
-    b"<a class='btn' href='https://oreo.pages.dev/upload'>Open oreo.pages.dev/upload</a>"
+    b"<a class='btn' href='https://oreo.elixpo.com/upload'>Open oreo.elixpo.com/upload</a>"
     b"</body></html>"
 )
 

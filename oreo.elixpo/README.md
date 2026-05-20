@@ -1,7 +1,7 @@
 # oreo.elixpo
 
 Marketing site, app catalogue, and gated file-transfer launcher for the
-**Oreo Badge** — `oreo.pages.dev`.
+**Oreo Badge** — `oreo.elixpo.com`.
 
 Built with Next.js 14 (App Router, static export) + Tailwind + Framer
 Motion. The single source of truth for brand tokens is

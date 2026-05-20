@@ -56,7 +56,7 @@ const theme = {
   links: {
     github:  "https://github.com/elixpo/oreo",
     discord: "",
-    docs:    "https://oreo.pages.dev/docs",
+    docs:    "https://oreo.elixpo.com/docs",
   },
 };
 

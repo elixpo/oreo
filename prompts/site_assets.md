@@ -108,7 +108,7 @@ Variants:
   app tiles, each tile is a single coloured square with a centred
   glyph; the third tile (Gallery) has a pink ring around it"*.
 - `screen-transfer` — fill with: *"the SEND FILES page showing
-  'oreo.pages.dev/upload' in pink, a 6-character code 'K9MX72' in
+  'oreo.elixpo.com/upload' in pink, a 6-character code 'K9MX72' in
   large pink text, a 60% green progress bar, and a small yellow dot
   to the right of the code"*.
 - `screen-store` — fill with: *"the on-device App Store with 4
