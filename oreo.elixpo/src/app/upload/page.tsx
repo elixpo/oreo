@@ -120,9 +120,9 @@ export default function UploadPage() {
   // ALSO points at the live URL — that way if window.open is
   // blocked, the user can right-click → "open in new tab" on the
   // anchor we render.
-  const targetUrl = `http://${
-    (host.trim() || DEFAULT_HOST)
-  }/?prefill=${encodeURIComponent(hash)}`;
+  const rawHost = host.trim();
+  const safeHost = ADDR_OK.test(rawHost) ? rawHost : DEFAULT_HOST;
+  const targetUrl = `http://${safeHost}/?prefill=${encodeURIComponent(hash)}`;
 
   function handoff(e?: React.SyntheticEvent) {
     // Prevent the default form submit so the page doesn't reload
