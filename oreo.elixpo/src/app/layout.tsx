@@ -12,10 +12,9 @@ import PageTransition from "@/components/PageTransition";
 
 const SITE_TITLE       = "OreoOS — a Python OS in a pocket-sized badge";
 const SITE_DESCRIPTION =
-  "Open hardware. Open firmware. 20+ apps, on-device store, OTA over " +
-  "WiFi, AirDrop-style file transfer. MicroPython on ESP32-S3.";
+  "OreoOS - Micropython inside your pocket";
 const SITE_URL  = "https://oreo.elixpo.com";
-const OG_IMAGE  = "/og-banner.png";
+const OG_IMAGE  = "/og-banner.jpg";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
