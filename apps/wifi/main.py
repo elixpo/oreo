@@ -104,6 +104,24 @@ class App(oreoOS.App):
         self._ping_label  = ""
         self._busy        = ""          # "speed" | "ping" while a test runs
 
+        # Transfer-page change-detection state. The previous version
+        # marked the screen dirty every tick a session existed, which
+        # both wasted CPU (continuous repaint at 33 FPS) and produced
+        # the *opposite* of speed — input handling and accept() slots
+        # were thinner because the run loop spent every frame redrawing.
+        # We now repaint only when something visible actually changed,
+        # AND set dirty IMMEDIATELY when the session count goes up so
+        # a newly-arrived sender shows up on the next frame instead of
+        # the next 200ms poll tick.
+        self._last_sess_count = 0
+        self._last_sess_sig   = ""        # sids joined — detects swaps
+        self._last_prog_sig   = ""        # progress (id, received) snapshot
+        # Last 'Received' toast — we render a bottom pill for a couple
+        # of seconds after the http_server bumps last_upload(). 0 means
+        # "no toast active." Filename is what we show in the pill.
+        self._toast_seen_ts = 0
+        self._toast_name    = ""
+
     # ── data ────────────────────────────────────────────────────────────
     def _read(self):
         if not self._wifi:
