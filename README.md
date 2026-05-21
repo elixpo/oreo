@@ -431,16 +431,11 @@ We love new contributors. The bar is low; the welcome is warm.
 
 ---
 
-## 📫 Made by
-
 
 <div align="center">
 
 
-OreoOS, the mascot, the apps, and pretty much everything in this repo
-is the work of [**Ayushman Bhattacharya**](https://github.com/Circuit-Overtime).
-The Oreo Badge ships as a project under the
-[**Elixpo**](https://elixpo.com) umbrella.
+With 💖 by [**Ayushman Bhattacharya**](https://github.com/Circuit-Overtime).
 
 Want to help, ship an app, sponsor a build, or just say hi - ✉️ **hello@elixpo.com**
 
