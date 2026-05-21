@@ -32,6 +32,19 @@
 
 <img src="docs/images/banner.png" alt="OreoOS — the Oreo Badge" width="100%">
 
+---
+
+<div align="center">
+
+## 🎨 Assets by pollinations.ai
+
+[![Built with Pollinations](https://img.shields.io/badge/Built%20with-Pollinations-8a2be2?style=for-the-badge&logoColor=white&labelColor=6a0dad)](https://pollinations.ai)
+
+> Every sprite, banner, and mascot of the  project &dash; Oreo, the
+> badges, the in-app artwork, the website hero &dash; was generated with
+> [**Pollinations.ai**](https://pollinations.ai).
+
+</div>
 
 ---
 
