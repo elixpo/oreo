@@ -8,6 +8,10 @@ Controls:
   LEFT / RIGHT   previous / next tile (photos + the ADD tile at the end)
   UP   / DOWN    scroll the instruction panel (when on the ADD tile)
   A              refresh the photo listing
+  B              delete the currently-shown photo (frees flash space).
+                 Only enabled on .r565 uploads — baked .py photos are
+                 part of the deploy and removing them would just have
+                 the next deploy push them back.
   HOME           apps drawer
 """
 
@@ -156,6 +160,12 @@ class App(oreoOS.App):
         self._idx   = 0
         self._scroll = 0
         self._cache = {}
+        # Per-photo nearest-neighbour downscale cache. Keyed by
+        # (filename, target_w, target_h) so the same photo can hold
+        # multiple sizes — currently we only ever need one, but the
+        # extra key dimensions cost nothing and make a future fit-mode
+        # toggle trivial. Cleared whenever the source list changes.
+        self._scaled_cache = {}
         self._dirty = True
 
     def _is_add_tile(self):
@@ -187,7 +197,40 @@ class App(oreoOS.App):
             # Refresh listing (e.g., after dropping new photos on the FS)
             self._names = _list_photos()
             self._cache = {}
+            self._scaled_cache = {}
             self._idx   = 0
+            self._scroll = 0
+            self._dirty = True
+        elif btn == api.BTN_B:
+            # Delete the currently-selected photo. Only .r565 files
+            # (WiFi uploads) get deleted from flash — .py files are
+            # part of the deploy and a delete would only persist
+            # until the next `python tools/deploy.py`. Refusing them
+            # here avoids the surprise of "I deleted it but it came
+            # back."
+            if self._is_add_tile():
+                return
+            name = self._names[self._idx] if self._idx < len(self._names) else ""
+            if not name or not name.endswith(".r565"):
+                return
+            path = _GALLERY_DIR + "/" + name
+            try:
+                _os.remove(path)
+            except OSError:
+                pass
+            # Drop the cache entry so a re-add doesn't show stale bytes.
+            self._cache.pop(name, None)
+            # Drop any cached downscales that referenced this photo too
+            # — the keys embed the filename so a single pass clears them.
+            self._scaled_cache = {k: v for k, v in self._scaled_cache.items()
+                                  if k[0] != name}
+            self._names = _list_photos()
+            # Clamp the cursor: prefer staying on the same index so
+            # the next photo slides under the user's finger. If we
+            # were on the last real photo, the ADD tile is now under
+            # us, which is also fine.
+            if self._idx >= len(self._names) + 1:
+                self._idx = max(0, len(self._names))
             self._scroll = 0
             self._dirty = True
 
@@ -202,7 +245,15 @@ class App(oreoOS.App):
         if self._is_add_tile():
             widgets.draw_hint(d, "UP/DOWN=scroll  L/R=back")
         else:
-            widgets.draw_hint(d, "L/R=prev/next  A=refresh")
+            # Only advertise B=delete for uploaded photos, since baked
+            # .py photos refuse the delete and silently confusing the
+            # user with a hint that doesn't fire is worse than no hint.
+            cur_name = (self._names[self._idx]
+                        if self._idx < len(self._names) else "")
+            if cur_name.endswith(".r565"):
+                widgets.draw_hint(d, "L/R=prev/next  A=refresh  B=delete")
+            else:
+                widgets.draw_hint(d, "L/R=prev/next  A=refresh")
 
         # n/n counter inside the header bar (right-aligned). ADD tile counts
         # too so the user knows there's something after the last photo.
@@ -225,9 +276,53 @@ class App(oreoOS.App):
         ah = SH - widgets.HEADER_H - widgets.HINT_H - 16
         if ph:
             data, pw, phh = ph
-            px = (SW - pw) // 2
-            py = ay + (ah - phh) // 2
-            d.blit(data, px, py, pw, phh)
+            # Fit the photo entirely inside the play area while
+            # preserving aspect ratio. The browser caps uploads at
+            # 240x240 and the play area on a 320x240 screen is
+            # ~296x180 after the header/hint bars — so a 240x240
+            # photo gets downscaled to ~180x180 with the remaining
+            # horizontal space showing as background letterboxing.
+            avail_w, avail_h = SW - 8, ah
+            if pw <= avail_w and phh <= avail_h:
+                # Fits as-is.
+                blit_data, view_w, view_h = data, pw, phh
+            else:
+                # Nearest-neighbour downscale to fit. Integer math
+                # rather than floats so it runs fast enough on MP.
+                # NN over bilinear because the source is already small
+                # (≤240) and bilinear would need 4 reads per output
+                # pixel — too slow in pure Python.
+                view_w = avail_w
+                view_h = phh * avail_w // pw
+                if view_h > avail_h:
+                    view_h = avail_h
+                    view_w = pw * avail_h // phh
+                view_w = max(1, view_w)
+                view_h = max(1, view_h)
+                key = (self._names[self._idx], view_w, view_h)
+                blit_data = self._scaled_cache.get(key)
+                if blit_data is None:
+                    row_src = pw * 2
+                    row_dst = view_w * 2
+                    out = bytearray(row_dst * view_h)
+                    for r in range(view_h):
+                        sy = r * phh // view_h
+                        src_row_base = sy * row_src
+                        # Inner loop: nearest neighbour pixel pick.
+                        # Loop-local bindings shave off attribute
+                        # lookups in MicroPython.
+                        d_off = r * row_dst
+                        for c in range(view_w):
+                            sx = (c * pw // view_w) * 2
+                            so = src_row_base + sx
+                            out[d_off]     = data[so]
+                            out[d_off + 1] = data[so + 1]
+                            d_off += 2
+                    blit_data = out
+                    self._scaled_cache[key] = out
+            px = (SW - view_w) // 2
+            py = ay + (ah - view_h) // 2
+            d.blit(blit_data, px, py, view_w, view_h)
         else:
             d.text("broken photo", (SW - 12 * 16) // 2, ay + 40,
                    theme.MUTED, scale=2)

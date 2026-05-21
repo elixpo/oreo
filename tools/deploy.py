@@ -159,6 +159,10 @@ DEPLOY = [
     ("oreoOS/notif_panel.py",   "oreoOS/notif_panel.py"),
     ("oreoOS/pair_prompt.py",   "oreoOS/pair_prompt.py"),
     ("oreoOS/http_server.py",   "oreoOS/http_server.py"),
+    # Mascot image served at /mascot.png by the on-badge upload page.
+    # Without this in the deploy manifest the file never makes it to
+    # flash, so the local upload page renders a broken-image icon.
+    ("oreoOS/mascot.png",       "oreoOS/mascot.png"),
     ("oreoOS/gestures.py",      "oreoOS/gestures.py"),
 
     # Hardware drivers

@@ -104,6 +104,24 @@ class App(oreoOS.App):
         self._ping_label  = ""
         self._busy        = ""          # "speed" | "ping" while a test runs
 
+        # Transfer-page change-detection state. The previous version
+        # marked the screen dirty every tick a session existed, which
+        # both wasted CPU (continuous repaint at 33 FPS) and produced
+        # the *opposite* of speed — input handling and accept() slots
+        # were thinner because the run loop spent every frame redrawing.
+        # We now repaint only when something visible actually changed,
+        # AND set dirty IMMEDIATELY when the session count goes up so
+        # a newly-arrived sender shows up on the next frame instead of
+        # the next 200ms poll tick.
+        self._last_sess_count = 0
+        self._last_sess_sig   = ""        # sids joined — detects swaps
+        self._last_prog_sig   = ""        # progress (id, received) snapshot
+        # Last 'Received' toast — we render a bottom pill for a couple
+        # of seconds after the http_server bumps last_upload(). 0 means
+        # "no toast active." Filename is what we show in the pill.
+        self._toast_seen_ts = 0
+        self._toast_name    = ""
+
     # ── data ────────────────────────────────────────────────────────────
     def _read(self):
         if not self._wifi:
@@ -386,23 +404,76 @@ class App(oreoOS.App):
     # ── update ──────────────────────────────────────────────────────────
     def update(self, dt):
         self._poll_t += dt
-        if self._poll_t < self._poll_dt:
-            return
-        self._poll_t = 0.0
-        fresh = self._read()
-        if fresh != self._snap:
-            self._snap = fresh
-            self._dirty = True
-        # While the Transfer page is on screen, repaint every tick so
-        # the progress bar + pending-sender list stay live without the
-        # user having to nudge a button. The cost is negligible
-        # because the page is mostly text — but we only mark _dirty
-        # when there's actually something to refresh.
+        # WiFi info (RSSI, IP, link state) only needs the slow poll —
+        # 5 Hz is plenty and keeps the cost low. The transfer-page
+        # session/progress check runs OUTSIDE this gate so a new
+        # sender appears on the badge within one frame (~30 ms),
+        # not within one poll cycle (~200 ms).
+        slow_due = self._poll_t >= self._poll_dt
+        if slow_due:
+            self._poll_t = 0.0
+            fresh = self._read()
+            if fresh != self._snap:
+                self._snap = fresh
+                self._dirty = True
+        # ── Transfer-page repaint policy ──
+        # Instead of marking dirty every tick a session exists (the old
+        # behaviour, which kept the screen redrawing at full frame rate
+        # and made sender-detection FEEL slow), we compute cheap
+        # signatures of what's visible and only redraw on change.
+        # This also forces an immediate dirty when a new session
+        # appears, so a sender hitting /?prefill=... on their browser
+        # shows up on the badge inside the next frame (~30 ms) rather
+        # than waiting for the next 200 ms poll cycle.
         if self._mode == "transfer":
             hs = self._http()
             if hs is not None:
-                if hs.progress() is not None or hs.list_sessions():
+                try:
+                    sessions = hs.list_sessions()
+                except Exception:
+                    sessions = []
+                sig = ",".join("%s:%s" % (s.get("id", ""),
+                                          s.get("state", ""))
+                               for s in sessions)
+                if sig != self._last_sess_sig:
+                    self._last_sess_sig   = sig
+                    self._last_sess_count = len(sessions)
                     self._dirty = True
+
+                prog = hs.progress()
+                if prog:
+                    psig = "%s:%d" % (prog.get("id", ""),
+                                       prog.get("received", 0))
+                else:
+                    psig = ""
+                if psig != self._last_prog_sig:
+                    self._last_prog_sig = psig
+                    self._dirty = True
+
+                # Toast trigger — bump when http_server records a new
+                # upload completion. The pill is visible for TOAST_MS
+                # then fades; while it's visible we keep repainting so
+                # the auto-dismiss actually happens.
+                try:
+                    ts, name = hs.last_upload()
+                except Exception:
+                    ts, name = (0, "")
+                if ts and ts != self._toast_seen_ts:
+                    self._toast_seen_ts = ts
+                    self._toast_name    = name
+                    self._dirty = True
+                if self._toast_seen_ts and self._toast_name:
+                    try:
+                        held = time.ticks_diff(time.ticks_ms(),
+                                               self._toast_seen_ts)
+                    except Exception:
+                        held = 0
+                    if held < self.TOAST_MS:
+                        self._dirty = True
+                    elif self._toast_name:
+                        # Toast just expired — one more dirty to clear it.
+                        self._toast_name = ""
+                        self._dirty = True
 
     # ── render ──────────────────────────────────────────────────────────
     def draw(self, d):
@@ -549,6 +620,12 @@ class App(oreoOS.App):
     # LP_HOLD_MS = toggle the transfer-disabled master kill switch.
     # We track the press timestamp on key-down and decide on key-up.
     LP_HOLD_MS = 800
+
+    # Bottom 'Received' toast on the Send Files page — stays visible
+    # for this many ms after an upload completes. Kept short so it
+    # doesn't compete with the notification panel chip or hide the
+    # sender list, but long enough to read.
+    TOAST_MS = 2500
 
     def _on_button_transfer(self, btn):
         if btn in (api.BTN_HOME, api.BTN_B):
@@ -845,3 +922,31 @@ class App(oreoOS.App):
                            theme.MUTED2, fill=True)
                     d.rect(bar_x, bar_y, pct_w, 4,
                            theme.PRIMARY, fill=True)
+
+        # ── Bottom 'Received' toast ──
+        # Renders for self.TOAST_MS after http_server records a
+        # completed upload. A subtle pill at the bottom edge of the
+        # screen — the full panel still gets the notification panel
+        # entry separately; this toast is the in-app cue.
+        if self._toast_seen_ts and self._toast_name:
+            try:
+                held = time.ticks_diff(time.ticks_ms(),
+                                       self._toast_seen_ts)
+            except Exception:
+                held = self.TOAST_MS
+            if held < self.TOAST_MS:
+                label = "Received  %s" % self._toast_name[:18]
+                # Centre the pill horizontally; sit a few pixels above
+                # the bottom edge so it doesn't collide with the OS hint
+                # bar on devices that draw one.
+                txt_w  = len(label) * 8
+                pad_x  = 10
+                pad_y  = 4
+                pill_w = txt_w + 2 * pad_x
+                pill_h = 14
+                pill_x = max(2, (SW - pill_w) // 2)
+                pill_y = SH - pill_h - 6
+                d.rect(pill_x, pill_y, pill_w, pill_h,
+                       theme.TEAL, fill=True)
+                d.text(label, pill_x + pad_x, pill_y + pad_y,
+                       theme.BG, scale=1)
