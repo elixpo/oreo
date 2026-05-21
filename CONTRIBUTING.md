@@ -37,7 +37,9 @@ test is always on hardware. If you don't have a badge, ping
 The fastest path to a working app:
 
 ```bash
-cp -r apps/snake apps/my_app          # snake is the reference layout
+cp -r app_templates apps/my_app       # minimal counter app, ready to run
+# OR start from snake — fully-split reference layout:
+#   cp -r apps/snake apps/my_app
 # edit apps/my_app/manifest.json — name, author, icon
 # edit apps/my_app/src/app.py    — your App class lives here
 python tools/deploy.py /dev/ttyACM0
