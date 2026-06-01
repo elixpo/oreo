@@ -33,7 +33,7 @@ except ImportError:
 
 
 STICKER_DIR = Path("stickers")
-OUT_PATH    = STICKER_DIR / "sheet.png"
+OUT_PATH    = STICKER_DIR / "oreoOS_gummy_sheet.png"
 SKIP_NAMES  = {"sheet.png"}
 
 
@@ -46,11 +46,11 @@ def parse_args():
                    help="output sheet width in px (default 2480 = A4 @ 300 DPI)")
     p.add_argument("--h",    type=int, default=3508,
                    help="output sheet height in px (default 3508 = A4 @ 300 DPI)")
-    p.add_argument("--cols", type=int, default=3,
+    p.add_argument("--cols", type=int, default=4,
                    help="number of sticker columns (default 3)")
-    p.add_argument("--gap",  type=int, default=40,
+    p.add_argument("--gap",  type=int, default=30,
                    help="gap between stickers in px (default 40)")
-    p.add_argument("--margin", type=int, default=80,
+    p.add_argument("--margin", type=int, default=20,
                    help="outer page margin in px (default 80)")
     p.add_argument("--bg",   default="#FFF8EB",
                    help="sheet background colour (default warm ivory)")
