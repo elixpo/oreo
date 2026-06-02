@@ -5,15 +5,23 @@ in this folder is the source-of-truth for the physical board.
 
 ```
 pcb/
-├── README.md             this file
-├── BOM.md                full bill of materials with rationale
+├── README.md             this file — stackup, layout rules, pin map
 ├── badge.kicad_pro       KiCad project (added once schematic starts)
 ├── badge.kicad_sch       schematic
 ├── badge.kicad_pcb       PCB layout
 ├── badge-cache.lib       project-local symbol cache
 ├── gerbers/              fab-ready Gerber outputs (gitignored)
-└── manufacturing/        BOM CSV + CPL + assembly drawings for JLCPCB
+└── manufacturing/        BOM CSV + CPL + assembly drawings, generated at fab time
 ```
+
+**Bill of materials** lives as a GitHub issue so contributors can
+comment, propose substitutions, and track sign-off:
+→ **[#40 — v1 BOM](https://github.com/elixpo/oreo/issues/40)**.
+
+Don't duplicate the BOM into a checked-in file — the issue is the
+source of truth, and divergence between a checked-in BOM and the
+manufacturing CSV is how prototype runs come back with the wrong
+parts.
 
 ---
 
