@@ -1,0 +1,194 @@
+# Oreo Badge — PCB Bill of Materials
+
+**Revision:** v1 prototype
+**Stackup:** 2-layer, 1.6 mm FR-4, ENIG or HASL finish
+**Target fab:** JLCPCB / PCBWay (LCSC sourcing in part numbers below)
+**Module:** ESP32-S3-WROOM-1-N16R8 (16 MB flash, 8 MB octal-PSRAM, pre-certified)
+
+All passive values assume an ESP32-S3 module with **2.4 GHz WiFi + BLE active**,
+**LCD backlit at full brightness**, and **LiPo charge-while-running**. Cap
+counts are the *minimum* — don't substitute smaller bulks unless you've
+measured your supply with a scope.
+
+---
+
+## 🔌 U — Active components (ICs / modules)
+
+| Ref | Part Number | Package | Qty | Function | Notes |
+|---|---|---|---:|---|---|
+| **U1** | ESP32-S3-WROOM-1-N16R8 | Module 18×25.5 mm | 1 | MCU + WiFi + BLE + flash + PSRAM | Use the **N16R8** variant — matches firmware memory layout. Pre-certified module; no antenna/matching needed. |
+| **U2** | CH340N | SOP-8 (auto-3V3/5V) | 1 | USB → UART bridge for serial console | Cheaper + simpler than CH340E. Auto-detects logic level. Avoids the ESP32-S3 native-USB quirks during bring-up. |
+| **U3** | AP2112K-3.3 (or ME6211C33M5G) | SOT-23-5 | 1 | 3.3 V LDO, 600 mA, low dropout | AP2112 has very low noise — important so WiFi TX bursts don't visibly modulate the display. Output cap MUST be ≥ 1 µF ceramic. |
+| **U4** | TP4056 | SOP-8 | 1 | LiPo charge controller, 1A | Standard hobby part. Use a programming resistor to set the charge current (see R section). |
+| **U5** | DW01A + FS8205A | SOT-23-6 / SOT-23-6 | 1 ea | LiPo over-discharge / overcurrent / short-circuit protection | Skip ONLY if your battery already has an integrated protection PCM (most do). Confirm on the cell datasheet. |
+| **U6** | MPU-6050 (or MPU-6500) | QFN-24 4×4 mm | 1 | 6-axis IMU (accel + gyro) | Matches firmware memory. I²C @ addr 0x68. Decoupling caps mandatory. |
+| **U7** | ST7789V LCD module | 2.0" / 2.4" IPS, 320×240 | 1 | Display | Buy as a bare module with FFC ribbon — far easier than spinning a separate panel design. Tape-down to the rear cutout. |
+| **U8** | PESD5V0S1UL | SOD-323 | 2 | USB-C ESD protection (D+ / D-) | One per data line. Mandatory if conference attendees will touch the port. |
+| **D1** | SS14 or 1N5819 | SMA | 1 | USB-VBUS reverse-polarity / power-path diode | Optional if using TPS2113A power-path; required for the cheap P-MOSFET path. |
+
+---
+
+## 🔋 BAT — Battery + connector
+
+| Ref | Part | Spec | Qty | Notes |
+|---|---|---|---:|---|
+| **J_BAT** | JST-PH 2.0 mm 2-pin | Right-angle or SMT | 1 | Standard hobby-LiPo connector. Wire colour: red = +, black = − (verify before plug). |
+| **BAT1** | LiPo 503450 (or similar) | 500–800 mAh, 3.7 V nominal | 1 | Sweet spot for ~4-6h active / weeks standby on a badge. Prefer cells with **built-in protection PCM** so you can skip U5. |
+
+---
+
+## 🔌 J — Connectors + switches
+
+| Ref | Part | Footprint | Qty | Notes |
+|---|---|---|---:|---|
+| **J1** | USB Type-C receptacle, 16-pin | Mid-mount SMT | 1 | 16-pin variant (no Alt Mode) is fine for USB-FS. Add the 5.1 kΩ pull-downs on CC1/CC2 below. |
+| **J2** | FFC connector | 8-pin or 14-pin matching LCD ribbon | 1 | Match to the U7 module's ribbon spec. |
+| **J3** | Tag-Connect TC2030 footprint (no connector) | Hand-pads | (1 footprint) | For one-shot JTAG flash if USB ever bricks. Cost: 6 pads on the PCB. |
+| **SW_BOOT** | Tactile 6×6 mm SMT | SMT | 1 | GPIO 0 strap — held LOW at reset enters download mode. |
+| **SW_RST** | Tactile 6×6 mm SMT | SMT | 1 | Pulls EN to GND. |
+| **SW1…SW8** | Tactile 6×6 mm SMT | SMT | 8 | UP / DOWN / LEFT / RIGHT / A / B / C / HOME — matches the firmware button matrix. |
+
+---
+
+## 💡 LED / IR
+
+| Ref | Part | Footprint | Qty | Notes |
+|---|---|---|---:|---|
+| **LED_PWR** | Green SMD 0603 | 0603 | 1 | Power-on indicator. Series ~2.2 kΩ to keep < 1 mA idle. |
+| **LED_CHRG** | Red SMD 0603 | 0603 | 1 | TP4056 charge indicator. |
+| **LED_STAT** | RGB WS2812B-2020 (or 3 separate 0603) | 2020 / 0603 | 1 | OS notification LED — programmable. Use the 2020 micro variant for badge form factor. |
+| **D_IR_TX** | IR LED 940 nm | 5 mm radial or SMD 0805 | 1 | IR Quest transmit. Drive via a 2N7002 N-MOSFET + 150 Ω series for ~30 mA pulses. |
+| **U_IR_RX** | VS1838B or TSOP38238 | TO-92 / SMD | 1 | 38 kHz IR receiver. Add 100 nF decoupling + 100 Ω series on VCC per datasheet. |
+| **Q1** | 2N7002 | SOT-23 | 1 | IR LED low-side switch. |
+
+---
+
+## ⚡ C — Capacitors
+
+> **The single most important rule:** every 100 nF decoupling cap must be
+> within **5 mm of the pin it's protecting**, with the shortest possible
+> loop to GND. The number of caps matters less than the layout.
+
+| Ref | Value | Package | Qty | Where it goes | Notes |
+|---|---|---|---:|---|---|
+| C1 | 100 nF X7R | 0402 / 0603 | 4 | One per WROOM-1 VDD pin (pins 2, 11, 24…) | Local decoupling. **Place under the module on the bottom layer, via straight up to VDD.** |
+| C2 | 10 µF X7R | 0805 | 1 | 3V3 rail, near WROOM-1 | Mid-frequency bulk. |
+| C3 | 22 µF X5R (or 47 µF polymer / tantalum) | 0805 / SMD-A | 1 | 3V3 rail, near WROOM-1 VDD pins | WiFi TX-burst reservoir. Low-ESR tantalum/polymer is better than ceramic here. |
+| C4 | 10 µF X7R | 0805 | 1 | LDO **input** (U3 Vin) | Stops USB rail droop during WiFi peaks. |
+| C5 | 1 µF X7R | 0603 | 1 | LDO **output** (U3 Vout) | AP2112 requires ≥ 1 µF for stability. |
+| C6 | 100 nF | 0402 | 1 | EN pin (WROOM-1 pin 3) | Pairs with R_EN below for clean power-on reset. |
+| C7 | 100 nF | 0603 | 1 | CH340N pin 5 (VCC) | Decoupling. |
+| C8 | 4.7 µF | 0805 | 1 | CH340N VCC | Bulk. |
+| C9 | 100 nF + 10 µF | 0603 / 0805 | 1 each | USB-C VBUS | Standard USB recommendation. |
+| C10 | 10 µF | 0805 | 1 | TP4056 input (VCC) | Smooths USB during charge. |
+| C11 | 10 µF | 0805 | 1 | TP4056 output (BAT) | Battery-side bulk. |
+| C12 | 100 nF | 0603 | 1 | MPU-6050 VDD | Per datasheet. |
+| C13 | 10 nF | 0402 | 1 | MPU-6050 VLOGIC | Per datasheet. |
+
+**Total caps: ~16-20 pieces.** Buy in 100-piece reels of 0402 100 nF and 0603 10 µF — cheap and you'll burn through them across prototype revisions.
+
+---
+
+## ⚙ R — Resistors
+
+| Ref | Value | Package | Qty | Where | Why |
+|---|---|---|---:|---|---|
+| R_EN | 10 kΩ | 0402 | 1 | EN pin → 3V3 | Pull-up for proper reset behaviour. |
+| R_BOOT | 10 kΩ | 0402 | 1 | GPIO 0 → 3V3 | Strap pin pull-up. |
+| R_CC1, R_CC2 | 5.1 kΩ | 0402 | 2 | USB-C CC1, CC2 → GND | Identify the board as a USB device to USB-C hosts. **Without these, your USB-C-only laptop won't power the board.** |
+| R_USB_TX, R_USB_RX | 22 Ω | 0402 | 2 | In series with USB D+ / D- (between CH340 and connector) | USB-FS termination. |
+| R_TP4056_PROG | 1.2 kΩ | 0603 | 1 | TP4056 PROG pin | Sets charge current to **1 A**. For 500 mA charge, use 2.4 kΩ. **Match to battery capacity (rule of thumb: charge ≤ 1C).** |
+| R_TP4056_LED | 1 kΩ | 0603 | 2 | TP4056 CHRG / STDBY LEDs | Current limit. |
+| R_BAT_DIV | 100 kΩ × 2 | 0402 | 2 | Battery voltage divider → ESP32-S3 ADC pin | Brings 4.2 V max down to ~2.1 V into the ADC. Two equal resistors → 0.5× scale. |
+| R_IR_TX | 150 Ω | 0805 (heat) | 1 | In series with IR LED | Limits current to ~30 mA peak. |
+| R_IR_RX | 100 Ω | 0603 | 1 | In series with IR RX VCC | Per datasheet — isolates noise. |
+| R_LED_PWR | 2.2 kΩ | 0603 | 1 | Power LED current limit | ~1 mA — visible, low idle. |
+| R_LED_CHRG | 1 kΩ | 0603 | 1 | Charge LED current limit | |
+| R_btns | 10 kΩ × 8 | 0402 | (optional) | One per button to 3V3 if you use external pull-ups | ESP32-S3 has internal pull-ups; you can skip these and save 8 parts. **Recommended: skip unless you have ESD concerns.** |
+
+---
+
+## 🛡 F — Protection
+
+| Ref | Part | Footprint | Qty | Notes |
+|---|---|---|---:|---|
+| F1 | Polyfuse 500 mA hold / 1 A trip | 1206 | 1 | On USB VBUS, before TP4056 + LDO. Resettable. **Protects against bad USB cables / shorts.** |
+| TVS1, TVS2 | PESD5V0S1UL | SOD-323 | 2 | One per USB data line — see U8. |
+| TVS3 | SMAJ5.0CA | SMA | 1 | Optional — across VBUS for surge protection. Skip if you trust the polyfuse + TP4056's internal protection. |
+
+---
+
+## 📡 Antenna (already inside WROOM-1)
+
+**Nothing to add.** The ESP32-S3-WROOM-1 has an integrated PCB antenna and
+matching network on the module. Your only job is to **keep the area near
+the antenna corner of the module clear of ground pour and components** —
+specifically the keep-out zone in the WROOM-1 datasheet (typically a
+14×6 mm rectangle at one corner).
+
+---
+
+## 📐 Total parts count
+
+| Category | Count |
+|---|---:|
+| ICs / modules | 8 |
+| Battery + connectors | 4 |
+| Switches | 10 |
+| LEDs + IR | 5 |
+| Capacitors | ~16-20 |
+| Resistors | ~15-25 |
+| Protection (fuses + TVS) | 3-4 |
+| **Total** | **~60-80 unique placements** |
+
+A reasonable count for a prototype badge. Most parts are 0402/0603 — manageable to hand-solder but easier on a hot plate / stencil + reflow oven.
+
+---
+
+## 🛒 Quick BOM CSV (paste into JLCPCB / LCSC)
+
+For the first prototype-order pass, the LCSC C-numbers below are
+JLCPCB-stocked (so they assemble for free with their basic-parts SMT
+service). Saves you from hand-placing the 60+ passives.
+
+```csv
+designator,quantity,manufacturer,part_number,lcsc_code,description
+U1,1,Espressif,ESP32-S3-WROOM-1-N16R8,C2913201,SMD module
+U2,1,WCH,CH340N,C506813,USB→UART bridge
+U3,1,Diodes,AP2112K-3.3TRG1,C51118,3.3V LDO
+U4,1,TPower,TP4056,C16581,LiPo charger
+U6,1,InvenSense,MPU-6050,C19102,6-axis IMU
+U8,2,Nexperia,PESD5V0S1UL,C8801,USB ESD
+F1,1,Eaton,500mA polyfuse,C7888,polyfuse
+SW_BOOT/RST/1-8,10,Generic,6x6mm tactile,C318884,buttons
+J1,1,Generic,USB-C 16-pin,C165948,USB-C
+J_BAT,1,JST,PH2.0 2-pin SMT,C273126,LiPo connector
+```
+
+(Resistors and caps: bulk from any 0402/0603 grab-bag. JLCPCB's basic
+library has all standard values.)
+
+---
+
+## 🔬 Test points worth adding
+
+Cheap insurance for bring-up debugging. Just bare 1 mm round pads with
+silkscreen labels — costs nothing:
+
+- **3V3** (power rail)
+- **5V** (post-fuse VBUS)
+- **VBAT** (battery raw)
+- **GND** × 2 (one near each rail TP for short scope-probe loops)
+- **GPIO 0 / EN** (strap pins, for debugging stuck-in-bootloader issues)
+
+---
+
+## 🤔 Decisions deferred (revisit before final layout)
+
+- [ ] Speaker / buzzer? Currently none — adds ~2 parts (PWM-driven piezo) if you want sound.
+- [ ] Haptic motor? Coin-vibe with a 2N7002 driver + flyback diode.
+- [ ] Light sensor for auto-backlight? ALS like APDS-9930 — I²C, shares bus with IMU.
+- [ ] Real-time clock? ESP32-S3 has internal RTC but loses time on power-off. Add DS3231 + coin cell if standalone time-keeping matters.
+- [ ] Capacitive touch on PCB? ESP32-S3 supports touch pads natively — zero extra parts if you etch the pads into the silkscreen. Could replace one or more tactile buttons.
+
+Pick before final layout — adding any of these after the placement is locked is expensive.
