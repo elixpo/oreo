@@ -14,14 +14,16 @@ measured your supply with a scope.
 
 ## 🔌 U — Active components (ICs / modules)
 
-| Ref | Part Number | Package | Qty | Function | Notes |
+| Ref | Part | Package | Qty | Function | Notes |
 |---|---|---|---:|---|---|
 | **U1** | ESP32-S3-WROOM-1-N16R8 | Module 18×25.5 mm | 1 | MCU + WiFi + BLE + flash + PSRAM | Use the **N16R8** variant — matches firmware memory layout. Pre-certified module; no antenna/matching needed. |
-| **U2** | CH340N | SOP-8 (auto-3V3/5V) | 1 | USB → UART bridge for serial console | Cheaper + simpler than CH340E. Auto-detects logic level. Avoids the ESP32-S3 native-USB quirks during bring-up. |
-| **U3** | AP2112K-3.3 (or ME6211C33M5G) | SOT-23-5 | 1 | 3.3 V LDO, 600 mA, low dropout | AP2112 has very low noise — important so WiFi TX bursts don't visibly modulate the display. Output cap MUST be ≥ 1 µF ceramic. |
+| **U2** | CH340N | SOP-8 (auto-3V3/5V) | 1 | USB → UART bridge for serial console | Auto-detects logic level. Avoids the ESP32-S3 native-USB quirks during bring-up. |
+| **U3** | AP2112K-3.3 | SOT-23-5 | 1 | 3.3 V LDO, 600 mA, low dropout | Low-noise — important so WiFi TX bursts don't visibly modulate the display. Output cap MUST be ≥ 1 µF ceramic. |
 | **U4** | TP4056 | SOP-8 | 1 | LiPo charge controller, 1A | Standard hobby part. Use a programming resistor to set the charge current (see R section). |
 | **U5** | DW01A + FS8205A | SOT-23-6 / SOT-23-6 | 1 ea | LiPo over-discharge / overcurrent / short-circuit protection | Skip ONLY if your battery already has an integrated protection PCM (most do). Confirm on the cell datasheet. |
-| **U6** | MPU-6050 (or MPU-6500) | QFN-24 4×4 mm | 1 | 6-axis IMU (accel + gyro) | Matches firmware memory. I²C @ addr 0x68. Decoupling caps mandatory. |
+| **U6** | MPU-6050 (or MPU-6500) | QFN-24 4×4 mm | 1 | 6-axis IMU (accel + gyro) | Matches firmware memory. **AD0 pin tied to 3V3** → I²C addr **0x69** to avoid conflict with the DS3231 RTC (which is hard-wired to 0x68). Decoupling caps mandatory. |
+| **U9** | DS3231SN | SOIC-16 | 1 | High-accuracy I²C RTC with integrated TCXO (±2 ppm) | Keeps time across reboots and during sleep. Fixed I²C addr **0x68** — that's why U6's AD0 is pulled high. Backup powered from coin cell (BAT2 below). |
+| **U10** | GL5528 photoresistor (LDR) | Radial 5 mm | 1 | Ambient light sense → auto backlight + corner-LED dimming | 8-20 kΩ bright / 1 MΩ dark. Forms a divider with R_LDR (10 kΩ) feeding an ADC pin. |
 | **U7** | ST7789V LCD module | 2.0" / 2.4" IPS, 320×240 | 1 | Display | Buy as a bare module with FFC ribbon — far easier than spinning a separate panel design. Tape-down to the rear cutout. |
 | **U8** | PESD5V0S1UL | SOD-323 | 2 | USB-C ESD protection (D+ / D-) | One per data line. Mandatory if conference attendees will touch the port. |
 | **D1** | SS14 or 1N5819 | SMA | 1 | USB-VBUS reverse-polarity / power-path diode | Optional if using TPS2113A power-path; required for the cheap P-MOSFET path. |
@@ -34,6 +36,7 @@ measured your supply with a scope.
 |---|---|---|---:|---|
 | **J_BAT** | JST-PH 2.0 mm 2-pin | Right-angle or SMT | 1 | Standard hobby-LiPo connector. Wire colour: red = +, black = − (verify before plug). |
 | **BAT1** | LiPo 503450 (or similar) | 500–800 mAh, 3.7 V nominal | 1 | Sweet spot for ~4-6h active / weeks standby on a badge. Prefer cells with **built-in protection PCM** so you can skip U5. |
+| **BAT2** | CR1220 coin cell + holder | SMT through-hole holder, ~12 mm | 1 | RTC backup — keeps DS3231 ticking when the main LiPo dies. ~5 year shelf life. CR1220 chosen over CR2032 to save weight (1 g vs 3 g on the lanyard). |
 
 ---
 
@@ -50,13 +53,34 @@ measured your supply with a scope.
 
 ---
 
+## 🔊 Audio (wired headphones + on-board click)
+
+Wireless A2DP isn't possible on ESP32-S3 (LE only — no BT Classic /
+A2DP source). Going with **a wired 3.5 mm jack + I²S DAC** for proper
+audio, plus a tiny piezo for system clicks that don't need headphones.
+
+| Ref | Part | Footprint | Qty | Notes |
+|---|---|---|---:|---|
+| **U11** | MAX98357A or PCM5102A | SOIC-8 / TSSOP-14 | 1 | I²S DAC with built-in Class-D amp (MAX98357A is the simpler one — drives a small speaker or headphones at low impedance). Three GPIO: BCLK, LRCLK, DIN. |
+| **J_AUDIO** | TRRS 3.5 mm jack, switched | SMT, side-entry | 1 | "Switched" means inserting a plug disconnects the on-board piezo automatically — saves a GPIO + no clicks in your ear when plugging in. |
+| **SPK1** | Piezo buzzer 12 mm | SMT | 1 | Drives system sounds (boot chime, button clicks, IR-quest hits) when no headphones are plugged in. ~$0.20. Wire across the TRRS jack's normally-closed switch contacts. |
+
+**Why no Bluetooth audio in v1:**
+- ESP32-S3 has BT 5 LE only. A2DP requires BT Classic.
+- BLE Audio (LE Audio + LC3 codec) is in the BT5 spec but virtually no
+  headphones in the wild support it yet (only flagship 2023+ buds).
+- An external BT Classic module (BM83 / KCX_BT_EMITTER) would work but
+  adds $5-8, a chip, and a separate pairing UX. Deferred to v2.
+
+---
+
 ## 💡 LED / IR
 
 | Ref | Part | Footprint | Qty | Notes |
 |---|---|---|---:|---|
 | **LED_PWR** | Green SMD 0603 | 0603 | 1 | Power-on indicator. Series ~2.2 kΩ to keep < 1 mA idle. |
 | **LED_CHRG** | Red SMD 0603 | 0603 | 1 | TP4056 charge indicator. |
-| **LED_STAT** | RGB WS2812B-2020 (or 3 separate 0603) | 2020 / 0603 | 1 | OS notification LED — programmable. Use the 2020 micro variant for badge form factor. |
+| **LED_RGB1…4** | WS2812B-2020 addressable RGB | 2020 micro | **4** | The four corner "glow" LEDs — daisy-chained on a single data line from GPIO 3. **Brightness is software-modulated by the LDR reading** so the badge dims itself in a dark room. Place one in each PCB corner; the data line snakes around the perimeter. |
 | **D_IR_TX** | IR LED 940 nm | 5 mm radial or SMD 0805 | 1 | IR Quest transmit. Drive via a 2N7002 N-MOSFET + 150 Ω series for ~30 mA pulses. |
 | **U_IR_RX** | VS1838B or TSOP38238 | TO-92 / SMD | 1 | 38 kHz IR receiver. Add 100 nF decoupling + 100 Ω series on VCC per datasheet. |
 | **Q1** | 2N7002 | SOT-23 | 1 | IR LED low-side switch. |
@@ -84,6 +108,11 @@ measured your supply with a scope.
 | C11 | 10 µF | 0805 | 1 | TP4056 output (BAT) | Battery-side bulk. |
 | C12 | 100 nF | 0603 | 1 | MPU-6050 VDD | Per datasheet. |
 | C13 | 10 nF | 0402 | 1 | MPU-6050 VLOGIC | Per datasheet. |
+| C14 | 100 nF | 0402 | 1 | DS3231 VCC | Per datasheet. |
+| C15 | 100 nF | 0402 | 1 | DS3231 VBAT (coin-cell side) | Per datasheet. |
+| C16 | 100 nF + 10 µF | 0402 / 0805 | 1 each | MAX98357A VDD | Class-D amp current spikes — bulk cap matters. |
+| C17 | 1 µF | 0603 | 1 | Across the WS2812B chain VDD (close to chain start) | Stabilises the LED-string supply during all-bright frames. |
+| C18 | 100 nF | 0402 | 1 | LDR voltage divider tap → GND | Filters fast flicker (camera flashes, fluorescent lights) before the ADC reads it. |
 
 **Total caps: ~16-20 pieces.** Buy in 100-piece reels of 0402 100 nF and 0603 10 µF — cheap and you'll burn through them across prototype revisions.
 
@@ -105,6 +134,12 @@ measured your supply with a scope.
 | R_LED_PWR | 2.2 kΩ | 0603 | 1 | Power LED current limit | ~1 mA — visible, low idle. |
 | R_LED_CHRG | 1 kΩ | 0603 | 1 | Charge LED current limit | |
 | R_btns | 10 kΩ × 8 | 0402 | (optional) | One per button to 3V3 if you use external pull-ups | ESP32-S3 has internal pull-ups; you can skip these and save 8 parts. **Recommended: skip unless you have ESD concerns.** |
+| R_AD0 | 10 kΩ | 0402 | 1 | MPU-6050 AD0 → 3V3 | Moves MPU to addr **0x69** so it doesn't collide with DS3231 at 0x68. |
+| R_I2C_SDA, R_I2C_SCL | 4.7 kΩ | 0402 | 2 | I²C bus pull-ups | One pair shared by MPU-6050 + DS3231. Skip if the LCD ribbon already has them. |
+| R_RTC_VBAT | 1 kΩ | 0402 | 1 | Coin-cell series resistor on DS3231 VBAT | Protects against an inserted-backwards coin cell. Optional but cheap. |
+| R_LDR | 10 kΩ | 0402 | 1 | Lower half of GL5528 / 3V3 voltage divider | Brings the divider's tap-point into the ESP32-S3 ADC range across the LDR's full resistance swing. |
+| R_WS2812B | 470 Ω | 0402 | 1 | Series resistor on the WS2812B data line | Damps reflections on the daisy-chain DIN net so the LEDs don't randomly glitch. **Place close to GPIO 3, not close to the first LED.** |
+| R_I2S | 100 kΩ | 0402 | 1 | MAX98357A GAIN pin pulldown | Sets the amp gain to 12 dB. Different value = different gain step (see datasheet). |
 
 ---
 
@@ -132,16 +167,19 @@ specifically the keep-out zone in the WROOM-1 datasheet (typically a
 
 | Category | Count |
 |---|---:|
-| ICs / modules | 8 |
-| Battery + connectors | 4 |
+| ICs / modules | 11 (added DS3231, GL5528, MAX98357A) |
+| Battery + connectors | 5 (added CR1220 holder, TRRS jack) |
 | Switches | 10 |
-| LEDs + IR | 5 |
-| Capacitors | ~16-20 |
-| Resistors | ~15-25 |
+| LEDs + IR | 8 (4 corner WS2812Bs + status + charge + IR TX/RX) |
+| Audio | 2 (piezo, TRRS jack already counted above) |
+| Capacitors | ~24-28 |
+| Resistors | ~22-30 |
 | Protection (fuses + TVS) | 3-4 |
-| **Total** | **~60-80 unique placements** |
+| **Total** | **~85-100 unique placements** |
 
-A reasonable count for a prototype badge. Most parts are 0402/0603 — manageable to hand-solder but easier on a hot plate / stencil + reflow oven.
+Still a reasonable count for a prototype badge. The RTC + corner LEDs +
+audio added roughly 20 parts. Most are still 0402/0603 — manageable to
+hand-solder but a stencil + reflow oven keeps you sane.
 
 ---
 
@@ -183,12 +221,20 @@ silkscreen labels — costs nothing:
 
 ---
 
-## 🤔 Decisions deferred (revisit before final layout)
+## ✅ Decisions locked for v1
 
-- [ ] Speaker / buzzer? Currently none — adds ~2 parts (PWM-driven piezo) if you want sound.
-- [ ] Haptic motor? Coin-vibe with a 2N7002 driver + flyback diode.
-- [ ] Light sensor for auto-backlight? ALS like APDS-9930 — I²C, shares bus with IMU.
-- [ ] Real-time clock? ESP32-S3 has internal RTC but loses time on power-off. Add DS3231 + coin cell if standalone time-keeping matters.
-- [ ] Capacitive touch on PCB? ESP32-S3 supports touch pads natively — zero extra parts if you etch the pads into the silkscreen. Could replace one or more tactile buttons.
+- ✅ **RTC** — DS3231 (U9) + CR1220 coin cell (BAT2). MPU AD0 pulled high to free up addr 0x68.
+- ✅ **Ambient light** — GL5528 LDR (U10) on GPIO 16 ADC. Modulates LCD backlight + corner-LED brightness in software.
+- ✅ **Corner glow LEDs** — 4× WS2812B-2020, daisy-chained on GPIO 3. PCB-corner placement.
+- ✅ **Audio out** — MAX98357A I²S DAC + TRRS jack + piezo buzzer (no wireless).
+- ❌ **No haptic motor** — weight on the lanyard. Stays out.
+- ❌ **No touch panel** — deferred. SPI pins reserved on the LCD bus if added later.
+- ❌ **No wireless audio in v1** — ESP32-S3 lacks BT Classic; BLE Audio adoption too low. Revisit for v2 with external BT module.
 
-Pick before final layout — adding any of these after the placement is locked is expensive.
+## 🤔 Decisions still deferred (revisit before tape-out)
+
+- [ ] **Touch pads etched into PCB silkscreen?** ESP32-S3 has native cap-touch. Could replace the C button or HOME button. Zero extra BOM.
+- [ ] **External BT Classic module for v2 audio?** BM83, KCX_BT_EMITTER, or similar. ~$5-8.
+- [ ] **APDS-9930 instead of LDR?** Proper lux readings + IR proximity, ~$1.50, I²C. Overkill unless you want gesture-wave-to-mute.
+- [ ] **Coin-cell hot-swap?** If you want to be able to swap CR1220 without losing time, add a 1 µF buffer cap across the RTC VBAT pin big enough to hold for ~30 s.
+- [ ] **Lanyard hole reinforcement** — a brass eyelet press-fit through a mech-cutout vs just a plain PCB hole. Affects mech-cad, not BOM, but easy to forget.

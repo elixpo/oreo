@@ -172,26 +172,36 @@ Pins below are already referenced by `oreoWare/pins.py` in the firmware.
 | GPIO | Net | Notes |
 |---:|---|---|
 | 0 | BOOT strap | Tactile to GND |
-| 3 | RGB LED data | WS2812B |
+| 3 | WS2812B DIN | 4 corner LEDs daisy-chained — 470 Ω series at GPIO side |
 | 4 | IR RX | From VS1838B output |
 | 5 | IR TX | To 2N7002 gate |
 | 6 | LCD CS | ST7789 SPI chip-select |
 | 7 | LCD DC | Data/command |
 | 8 | LCD RST | Reset |
-| 9 | LCD BL | Backlight PWM |
+| 9 | LCD backlight PWM | LCD module BL pin — driven open-drain by ST7789 module's FET |
 | 10 | LCD MOSI | SPI MOSI |
 | 11 | LCD SCK | SPI clock |
-| 12 | I²C SDA | MPU-6050 |
-| 13 | I²C SCL | MPU-6050 |
-| 14 | VBAT_ADC | Battery monitor |
+| 12 | I²C SDA | **Shared bus**: MPU-6050 (0x69) + DS3231 (0x68) |
+| 13 | I²C SCL | Same bus |
+| 14 | VBAT_ADC | Battery monitor (1:1 divider) |
 | 15-18 | BTN_UP / DOWN / LEFT / RIGHT | Tactile to GND |
+| **16** | **LDR_ADC** | Ambient light sense (GL5528 + 10 kΩ divider) — *replaces BTN_RIGHT if a conflict — confirm against `oreoWare/pins.py`* |
 | 21 | BTN_A | |
 | 33 | BTN_B | |
 | 34 | BTN_C | |
 | 35 | BTN_HOME | |
+| **36** | **I²S BCLK** | MAX98357A bit-clock |
+| **37** | **I²S LRCLK** | Word-select |
+| **38** | **I²S DIN** | Audio data |
 | 19 | USB D- | Native USB |
 | 20 | USB D+ | Native USB |
 | EN | Reset | Tactile to GND + RC |
+
+⚠ **Pin 16 conflict check** — GPIOs 15-18 were already labelled as the
+D-pad. Reassign LDR to a free pin (38 freed up too, or use 39/40)
+before the layout locks. The firmware's `oreoWare/pins.py` is the
+arbiter; update it in the same commit as the schematic to keep them in
+sync.
 
 Pins 26-32 are reserved on WROOM-1 (octal-SPI flash/PSRAM) — don't use
 even if KiCad lets you.
