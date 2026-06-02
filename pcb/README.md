@@ -82,6 +82,42 @@ pcb/
 
 ---
 
+## 📍 Physical layout — edge-by-edge
+
+Conference-badge ergonomics dictate which side gets what. Decided:
+
+```
+                ┌───────[ lanyard hole ]───────┐
+                │           TOP                │
+                │                              │
+   USB-C        │                              │
+   3.5mm jack   │                              │   IR TX
+   charge LED   │           SCREEN             │   IR RX
+   (LEFT EDGE)  │           320×240            │   (RIGHT EDGE)
+                │                              │
+                │                              │
+                │           4 BUTTONS          │
+                │           4 BUTTONS          │
+                │                              │
+                │          BOTTOM              │
+                └──────────────────────────────┘
+                  (nothing on bottom — bare PCB edge)
+```
+
+**Why this side-split:**
+
+- **Lanyard top.** Standard for hangable badges; the centre of mass sits below the lanyard hole so the badge hangs vertical.
+- **Bottom kept blank.** Worn around the neck, the bottom edge gets bumped against desks, laptops, the wearer's torso. Nothing fragile (jack, USB receptacle, IR optics) belongs there.
+- **USB-C + 3.5 mm jack + charge LED on one side.** When the user plugs in to charge or listen to music, all cabling exits the same edge — no cable-spaghetti across the badge face. Charge LED visible to the wearer when plugged in.
+- **IR LED + IR receiver on the opposite side.** IR optics need an unobstructed sight-line. Putting them opposite the cable-edge means the cables can't shadow the IR beam. For badge-to-badge quests, the wearer turns the IR-edge toward the other person.
+- **IR optics flush with the PCB edge.** The IR LED + receiver should poke out (or sit right against) the edge so the beam isn't clipped by the enclosure / case if you ever add one.
+
+**IR-specific layout notes:**
+
+1. **IR TX and RX separated by ≥ 10 mm**, with a small ground-pour gap between them. The TX LED's IR scatter from PCB reflections can blind the nearby receiver if they're too close. A small piece of black tape between them at assembly also helps.
+2. **The IR LED needs the wider radial / side-emitter package** if you want side-firing (off the PCB edge) rather than top-firing. Confirm orientation in the schematic so the footprint matches.
+3. **The 38 kHz IR receiver hates power-supply noise.** Pull its VCC through a small ferrite bead + 100 nF cap directly at the device. If you skip this, the WiFi TX bursts modulate the receiver and you get phantom "IR received" events.
+
 ## 📐 Stackup
 
 **2-layer, 1.6 mm FR-4, 1 oz/ft² copper, ENIG finish.**
