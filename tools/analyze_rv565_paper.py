@@ -101,6 +101,41 @@ def column(table, name):
     return [int(row[name]) for row in table]
 
 
+def transfer(args, xs, ys, target_rows, sizes, period_us):
+    """Fit the inflate model on another window and predict this one."""
+    digest, train_csvs, _ = select_runs(args.transfer_from)
+    _, _, _, _, train_sizes, _ = read_container(args.transfer_media, digest)
+    train = rows(train_csvs)
+    tx = [train_sizes[int(row["source_frame"])] for row in train]
+    ty = column(train, "inflate_us")
+    slope, intercept, _ = fit(tx, ty)
+    errors = [y - (intercept + slope * x) for x, y in zip(xs, ys)]
+    print("\n== Transfer from %s" % args.transfer_from)
+    print("model %.3f ms + %.4f us/byte; mean error %.3f ms, MAE %.3f ms, "
+          "max %.3f ms" % (intercept / 1e3, slope,
+                           statistics.fmean(errors) / 1e3,
+                           statistics.fmean(map(abs, errors)) / 1e3,
+                           max(map(abs, errors)) / 1e3))
+    lcd = statistics.fmean(column(train, "lcd_us"))
+    predicted = sum(intercept + slope * size + lcd > period_us
+                    for size in sizes)
+    late = {}
+    for row in target_rows:
+        frame = int(row["source_frame"])
+        late[frame] = late.get(frame, False) or int(row["work_us"]) > period_us
+    print("serial late source frames: predicted %d/%d, measured %d/%d" %
+          (predicted, len(sizes), sum(late.values()), len(late)))
+    px, py = tx + xs, ty + ys
+    slope, intercept, r = fit(px, py)
+    residual = [y - (intercept + slope * x) for x, y in zip(px, py)]
+    print("pooled %.3f ms + %.4f us/byte, r2=%.4f, MAE %.3f ms, max %.3f ms" %
+          (intercept / 1e3, slope, r * r,
+           statistics.fmean(map(abs, residual)) / 1e3,
+           max(map(abs, residual)) / 1e3))
+    print("serial threshold: L <= %.0f bytes" %
+          ((period_us - lcd - intercept) / slope))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
@@ -108,8 +143,16 @@ def main():
         default=REPO_ROOT / "experiments/video_dma/main/video.rv565")
     parser.add_argument(
         "--label", default="native-dma-stripes",
-        help="standalone aggregate label, e.g. bbb-native-dma-stripes")
+        help="standalone aggregate label, e.g. bbb090-serial")
+    parser.add_argument(
+        "--transfer-from", metavar="LABEL",
+        help="serial label whose inflate model predicts this label's runs")
+    parser.add_argument(
+        "--transfer-media", type=Path,
+        help="container measured by --transfer-from")
     args = parser.parse_args()
+    if bool(args.transfer_from) != bool(args.transfer_media):
+        raise SystemExit("--transfer-from and --transfer-media go together")
 
     digest, standalone_csvs, gallery_csvs = select_runs(args.label)
     data, width, height, fps, sizes, payloads = read_container(
@@ -161,6 +204,9 @@ def main():
           (sizes[largest], (intercept + slope * sizes[largest]) / 1e3,
            observed / 1e3))
 
+    if args.transfer_from:
+        transfer(args, xs, ys, standalone, sizes, period_us)
+
     print("\n== Frame independence (payload bytes)")
     stream = b"".join(frames)
     shipped = sum(sizes)
@@ -204,6 +250,10 @@ def main():
         if name == "read_us":
             print("  raw-frame read projection %.1f ms" %
                   ((intercept + slope * frame_bytes) / 1e3))
+    read = statistics.fmean(column(gallery, "read_us"))
+    print("read throughput %.3f MB/s, raw-frame proportional projection %.1f ms"
+          % (statistics.fmean(gx) / read, read * frame_bytes /
+             statistics.fmean(gx) / 1e3))
     print("present over wire %.2f ms" %
           ((statistics.fmean(column(gallery, "present_us")) - wire_us) / 1e3))
 

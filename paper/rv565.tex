@@ -16,7 +16,7 @@
   pdftitle={RV565: Cross-Layer Co-Design for Frame-Independent Video Playback on MicroPython-Class ESP32-S3 Systems},
   pdfauthor={Ayushman Bhattacharya, Anwesha Chakraborty},
   pdfsubject={Compressed RGB565 media playback on an ESP32-S3 application platform},
-  pdfkeywords={RV565, ESP32-S3, RGB565, MicroPython, DMA, embedded video, Deflate, SPI display}
+  pdfkeywords={RV565, ESP32-S3, RGB565, MicroPython, DMA, dual-core pipeline, embedded video, Deflate, SPI display}
 }
 
 \newcommand{\system}{RV565}
@@ -39,24 +39,27 @@ Anwesha Chakraborty\textsuperscript{2}\\[-0.15em]
 \begin{abstract}
 Video on SPI-attached microcontroller displays is limited less by decoding
 than by where each byte lives and which stages run serially.  We present
-\system, a frame-independent video container whose decoded representation is
-the panel's native RGB565 format, and use it to characterise two data paths on
-an ESP32-S3: a standalone firmware that overlaps nearest-neighbour scaling with
-SPI direct-memory-access (DMA) transfers through two internal-memory stripes,
-and the same media played inside OreoOS, a MicroPython application operating
-system.  Across ten runs and 7,200 frames, the standalone path sustains
-24.004~FPS with no drop or deadline miss; its display transfer runs at 98.1\%
-of the 40~MHz wire-time bound while the CPU is idle for 90.9\% of it.  The
-integrated path reaches 14.093~FPS; stage timing attributes its 69.2~ms mean
-frame time to serialized filesystem input, inflation, scaling into an
-external-RAM framebuffer, and blocking presentation, with only 0.8~ms of
-interpreter overhead.  Two further results follow from the measurements.
-First, per-frame inflation time is linear in the compressed length stored in
-the container ($r^2=0.957$; 0.14~ms mean error on held-out frames), so decode
-cost can be bounded before playback.  Second, frame independence costs only
-0.6--1.7\% in size relative to a single Deflate stream, because a 48.6~KB
-RGB565 frame exceeds Deflate's 32~KiB match window; we derive the general
-condition.  Firmware, media hashes, raw logs, and analysis scripts are
+\system, a decode framework for frame-independent video whose decoded
+representation is the panel's native RGB565 format, and evaluate it on an
+ESP32-S3 with two ten-second windows of an openly licensed film.  A serial
+path---inflate, then scale into internal-memory stripes overlapped with SPI
+direct-memory-access (DMA) transfers---meets the 41.7~ms deadline on the
+lighter window but misses all 7,200 frames of the heavier one.  \system's
+dual-core pipeline inflates the next frame on the second core during the
+transfer and sustains 24~FPS with zero misses and 10.3~ms of slack on both
+windows; frame time then equals the display transfer, which runs at 98.1\% of
+the 40~MHz wire-time bound.  Because frames are independent, inflation time
+is linear in the compressed length stored in the container (pooled
+$r^2=0.9987$): a model fitted on one window predicts the other within
+0.04~ms and identifies from metadata alone which window the serial path
+cannot schedule.  We show why Deflate cannot exploit co-located temporal
+redundancy in RGB565 frames larger than 128$\times$128 pixels and measure the
+price: a shared Deflate stream changes size by at most 1.1\%, whereas an
+explicit XOR delta would save 46--80\%.  Inside OreoOS, a MicroPython
+application operating system, firmware inflation alone reaches 12.2~FPS;
+stage timing attributes the 80.4~ms frame time to serialized filesystem
+input, external-RAM placement, and blocking presentation, with 0.8~ms of
+interpreter overhead.  Firmware, measurements, and analysis scripts are
 released.
 \end{abstract}
 
@@ -104,35 +107,38 @@ through the memory hierarchy.
 \system{} occupies a deliberately narrow point in this space: host-side
 resampling and colour quantisation, intra-only frames, and lossless Deflate
 payloads~\cite{deutsch1996deflate} whose decoded bytes are already the panel's
-RGB565 format.  This work asks where the frame budget actually goes for such a
-stream on an ESP32-S3, both on bare firmware and inside
+RGB565 format.  Its decode framework comprises the container and its
+validation contract, a dual-core pipeline that places inflation, scaling, and
+DMA transfer on separate execution resources, an absolute-deadline scheduler,
+and a cost model that predicts schedulability from container metadata.  The
+entropy-decoding primitive is the standard \texttt{tinfl} inflater; we do not
+propose a new entropy coder.  This work asks where the frame budget goes for
+such a stream on an ESP32-S3, both on bare firmware and inside
 OreoOS~\cite{bhattacharya2026oreo}, a MicroPython~\cite{micropython}
-application operating system.  We do not propose a new entropy coder; the
-contribution is the co-design of representation, memory placement,
-scheduling, and display I/O, and an architectural characterisation that
-explains its behaviour.
+application operating system.
 
 Our contributions to the study of embedded media architectures are as
 follows.  We define a frame-independent, display-native container with a
 host- and device-side validation contract
-(Sections~\ref{sec:container}--\ref{sec:validation}).  We build a standalone
-data path in which double-buffered internal-SRAM stripes overlap scaling with
-SPI direct-memory-access (DMA) transfers, sustaining 24.004~FPS with zero
-deadline misses and placing the display transfer within 1.9\% of the
-wire-time bound, which shows that this class of system is bus-bound rather
-than decode-bound (Section~\ref{sec:bus}).  We show that intra-only Deflate
-makes decode cost a linear function of the payload length already stored in
-the container, so the complexity prediction that earlier real-time decoders
-had to estimate~\cite{mattavelli1998implementing} becomes available from
-metadata before playback (Section~\ref{sec:model}).  We quantify the storage
-cost of frame independence at 0.6--1.7\% and derive the condition under which
-Deflate's match window cannot exploit co-located temporal redundancy at all
-(Section~\ref{sec:independence}).  Finally, we provide a stage-resolved
-characterisation of interpreter-hosted playback showing that the gap between
-bare firmware and an application OS is caused by serialization and memory
-placement rather than interpreter overhead (Section~\ref{sec:gap}).  All
-firmware, measurements, and analysis scripts are
-public~\cite{bhattacharya2026oreo}.
+(Sections~\ref{sec:container}--\ref{sec:validation}).  We design a dual-core
+decode pipeline and evaluate it against the serial path as a controlled
+ablation on two workloads: it removes inflation from the critical path,
+holding 24~FPS with zero misses on content that the serial path cannot
+schedule, and reduces frame time to the display transfer, which runs within
+1.9\% of the wire-time bound (Section~\ref{sec:bus}).  We show that
+intra-only Deflate makes decode cost a linear function of the payload length
+already stored in the container, so that the complexity prediction earlier
+real-time decoders had to estimate~\cite{mattavelli1998implementing} becomes
+available from metadata before playback; the model transfers between windows
+and yields an admission threshold that classifies every frame correctly
+(Section~\ref{sec:model}).  We derive the condition under which Deflate's
+match window cannot exploit co-located temporal redundancy and quantify the
+real price of frame independence (Section~\ref{sec:independence}).  Finally,
+we provide a stage-resolved characterisation of interpreter-hosted playback
+showing that the gap between bare firmware and an application OS is caused by
+serialization and memory placement rather than interpreter overhead
+(Section~\ref{sec:gap}).  All firmware, measurements, and analysis scripts
+are public~\cite{bhattacharya2026oreo}.
 
 \section{RGB565 as the Design Starting Point}
 
@@ -159,12 +165,12 @@ B_{frame}=2WH
 \label{eq:frame}
 \end{equation}
 
-bytes before compression (Eq.~\eqref{eq:frame}).  Frame rate multiplies that value into a continuous
-storage and memory-bandwidth demand, while the final 320$\times$240 image must
-still cross the SPI bus.  \system{} consequently compresses what is stored and
-read, not what the display ultimately receives.  Every successfully decoded
-frame has a deterministic size and colour layout, which keeps validation,
-scaling, and presentation straightforward.
+bytes before compression (Eq.~\eqref{eq:frame}).  Frame rate multiplies that
+value into a continuous storage and memory-bandwidth demand, while the final
+320$\times$240 image must still cross the SPI bus.  \system{} consequently
+compresses what is stored and read, not what the display ultimately receives.
+Every successfully decoded frame has a deterministic size and colour layout,
+which keeps validation, scaling, and presentation straightforward.
 
 RGB565 also defines the quality boundary.  Deflate is lossless with respect to
 the encoded bytes, but conversion from the original colour space and spatial
@@ -188,41 +194,44 @@ That failure changed the question.  The problem was no longer how to parse a
 video file; it was how to move one complete frame through storage, memory,
 conversion, and the display bus before the next deadline while still returning
 to the operating-system loop.  Each later version removed one bottleneck from
-that path (Figure~\ref{fig:evolution}).  The intermediate prototypes were not
-instrumented, so this history is qualitative; only \system{} v6 is evaluated
-quantitatively.
+that path (Figure~\ref{fig:evolution}).  The first three prototypes were not
+instrumented, so their history is qualitative; the three \system{} v6 paths
+are evaluated quantitatively in Section~\ref{sec:evaluation}.
 
 \begin{figure*}[t]
 \centering
-\resizebox{0.96\textwidth}{!}{%
+\resizebox{\textwidth}{!}{%
 \begin{tikzpicture}[
   stage/.style={draw, rounded corners=2pt, minimum width=30mm,
                 minimum height=12mm, align=center, fill=gray!7},
   lesson/.style={font=\footnotesize, align=center, text width=29mm},
   arrow/.style={-{Latex[length=2.2mm]}, thick},
-  node distance=8mm
+  node distance=7mm
 ]
   \node[stage] (python) {Python decode\\and pixel scaling};
   \node[stage, right=of python] (native) {Native scaling\\into framebuffer};
   \node[stage, right=of native] (v4) {\system{} v4\\indexed PSRAM frames};
-  \node[stage, right=of v4, fill=green!8] (standalone) {\system{} v6\\standalone DMA};
-  \node[stage, right=of standalone, fill=orange!10] (os) {\system{} v6 in OreoOS\\firmware inflation};
+  \node[stage, right=of v4, fill=orange!10] (serial) {\system{} v6\\serial DMA path};
+  \node[stage, right=of serial, fill=orange!10] (os) {\system{} v6 in OreoOS\\firmware inflation};
+  \node[stage, right=of os, fill=green!10] (overlap) {\system{} v6\\dual-core overlap};
 
   \draw[arrow] (python) -- (native);
   \draw[arrow] (native) -- (v4);
-  \draw[arrow] (v4) -- (standalone);
-  \draw[arrow] (standalone) -- (os);
+  \draw[arrow] (v4) -- (serial);
+  \draw[arrow] (serial) -- (os);
+  \draw[arrow] (os) -- (overlap);
 
   \node[lesson, below=5mm of python] {Interpreter work\\starved controls};
   \node[lesson, below=5mm of native] {Scaling improved;\\flash remained costly};
   \node[lesson, below=5mm of v4] {Preload improved timing;\\palette reduced fidelity};
-  \node[lesson, below=5mm of standalone] {24.0 FPS, 0 misses:\\the bus is the bound};
-  \node[lesson, below=5mm of os] {14.1 FPS: stages\\remain serialized};
+  \node[lesson, below=5mm of serial] {24 FPS only while\\inflation fits the slack};
+  \node[lesson, below=5mm of os] {12.2 FPS: stages\\remain serialized};
+  \node[lesson, below=5mm of overlap] {24 FPS on both windows;\\the bus is the bound};
 \end{tikzpicture}}
 \caption{\system{} evolved by following the bottleneck exposed by each
-prototype.  The first three stages are qualitative history.  The two \system{}
-v6 stages are measured in Section~\ref{sec:evaluation}; fusing the standalone
-DMA path into OreoOS remains future work.}
+prototype.  The first three stages are qualitative history; the three
+\system{} v6 stages are measured in Section~\ref{sec:evaluation}.  Bringing
+the dual-core path into OreoOS remains future work.}
 \label{fig:evolution}
 \end{figure*}
 
@@ -248,18 +257,20 @@ avoidable ceiling on image fidelity.
 \system{} v6 returned to full-colour RGB565 frames and compressed each one
 independently.  To learn whether the hardware could sustain the intended
 playback rate, we temporarily removed the operating system and built a
-standalone ESP-IDF experiment that inflates frames natively and transfers
-the scaled output through two internal-memory stripes with SPI2 GDMA.  It
-sustains the 24~FPS target (Section~\ref{sec:standalone-results}).
+standalone ESP-IDF experiment that inflates each frame and then transfers the
+scaled output through two internal-memory stripes with SPI2 GDMA.  This serial
+path meets the deadline only while inflation fits in the slack left by the
+display transfer, which depends on content (Section~\ref{sec:standalone-results}).
 
-Reintroducing the operating system made the remaining boundary visible.  We
-moved Deflate decoding below the Python boundary into a firmware-resident
-module, but kept Gallery's existing filesystem input, framebuffer scaling, and
-display driver.  That integrated path reaches 14.093~FPS.  Rather than
-treating the shortfall as interpreter overhead, Section~\ref{sec:gap}
-decomposes it stage by stage.  This history matters to the method: the
-architecture was derived by measuring and relocating the critical path one
-layer at a time, and the measurements show which layer must move next.
+Reintroducing the operating system made a second boundary visible.  We moved
+Deflate decoding below the Python boundary into a firmware-resident module,
+but kept Gallery's existing filesystem input, framebuffer scaling, and display
+driver; that integrated path reaches 12.170~FPS, and Section~\ref{sec:gap}
+decomposes the shortfall stage by stage.  Measurements of the serial path then
+showed the CPU idle for most of each transfer, which led to the dual-core
+pipeline of Section~\ref{sec:overlap}.  This history matters to the method:
+the architecture was derived by measuring and relocating the critical path one
+layer at a time.
 
 \section{Background and Previous Work}
 
@@ -298,7 +309,7 @@ Complexity prediction~\cite{mattavelli1998implementing} & MPEG with predicted de
 QOI~\cite{szablewski2022qoi} & Byte-oriented lossless image & None & Run, index and delta ops & Per image & General \\
 LZ4 frame~\cite{collet2024lz4} & LZ77 without entropy stage & Within stream & Byte-copy decoding & None in frame format & General \\
 \midrule
-\system{} v6 (this work) & Display-native RGB565, per-frame Deflate & None & Inflate; scaling overlapped with DMA & $O(1)$ via length index & ESP32-S3, bare or MicroPython \\
+\system{} v6 (this work) & Display-native RGB565, per-frame Deflate & None & Inflate on a second core; scaling overlapped with DMA & $O(1)$ via length index & ESP32-S3, bare or MicroPython \\
 \bottomrule
 \end{tabular}
 \end{table*}
@@ -368,14 +379,15 @@ controller shared by peripherals~\cite{espressif2023datasheet,espressif2024trm}.
 ESP-IDF exposes queued SPI transactions backed by that
 DMA~\cite{espressif2026spi}.  These facilities do not themselves create a
 video architecture: the relevant design question is how decoded data is
-partitioned across this memory hierarchy and scheduled so that CPU work
-overlaps the panel transfer without violating DMA memory constraints.
+partitioned across this memory hierarchy and how work is placed on the two
+cores and the DMA engine so that the panel transfer is never starved.
 
 \section{The \system{} Method}
 
 The method follows the path of a frame from offline preparation to visible LCD
 output.  Its organising principle is to move expensive, unconstrained work to
-the host while keeping every device-side stage bounded and observable.
+the host while keeping every device-side stage bounded, observable, and, where
+possible, off the critical path.
 
 \subsection{Design goals}
 
@@ -396,12 +408,12 @@ history, a missed deadline can be handled by advancing the frame index, and a
 damaged payload cannot alter the dictionary used by later frames.  After one
 linear scan builds the offset table in $O(N)$ time, lookup is $O(1)$.
 
-Independence has a smaller storage cost under Deflate than intuition
-suggests.  When consecutive frames are concatenated into one stream, the
-co-located pixel of the previous frame lies exactly $2WH$ bytes behind the
-current position by Eq.~\eqref{eq:frame}.  Because a Deflate back-reference
-may reach at most 32,768~bytes~\cite{deutsch1996deflate}, the stream cannot
-reference that pixel whenever
+Within Deflate, independence costs less than intuition suggests.  When
+consecutive frames are concatenated into one stream, the co-located pixel of
+the previous frame lies exactly $2WH$ bytes behind the current position by
+Eq.~\eqref{eq:frame}.  Because a Deflate back-reference may reach at most
+32,768~bytes~\cite{deutsch1996deflate}, the stream cannot reference that pixel
+whenever
 
 \begin{equation}
 2WH > 32{,}768 \quad\Longleftrightarrow\quad WH > 16{,}384,
@@ -411,22 +423,24 @@ reference that pixel whenever
 that is, for any RGB565 frame larger than 128$\times$128 pixels.  Above that
 size, a shared stream can still reuse statistics and spatially displaced
 content near the end of the previous frame, but not static co-located content,
-which is a principal source of temporal redundancy in video.  Independence therefore
-gives up little that Deflate could have used.  Inter-frame codecs avoid this
-limit with motion-compensated reference pictures~\cite{wiegand2003overview},
-at the cost of reference state and catch-up decoding after a seek.  For the
-180$\times$135 frames evaluated here, $2WH=48{,}600$~bytes.
+which is a principal source of temporal redundancy in video.  Exploiting that
+redundancy requires explicit prediction from a reference frame, as in
+inter-frame codecs~\cite{wiegand2003overview}, at the cost of reference state
+and catch-up decoding after a seek.  For the 180$\times$135 frames evaluated
+here, $2WH=48{,}600$~bytes; Section~\ref{sec:independence} measures both
+sides of this trade-off.
 
 \subsection{End-to-end architecture}
 
 Figure~\ref{fig:architecture} shows the standalone data path.  The container
 is linked into the application image and read through the memory-mapped flash
-cache, so the standalone path has no separate filesystem read.  The decoded
-frame (48,600~bytes) and two 24-row output stripes (15,360~bytes each) reside
+cache, so the standalone path has no separate filesystem read.  Decoded frames
+(48,600~bytes each) and two 24-row output stripes (15,360~bytes each) reside
 in internal SRAM; the standalone firmware does not enable the external-RAM
 allocator.  While GDMA transfers stripe $n$, the CPU scales stripe $n+1$ into
-the alternate buffer.  Inflation of the next frame is not overlapped with
-transfer of the current one.
+the alternate buffer.  In the serial configuration a single core inflates a
+frame and then transfers it; in the overlapped configuration the second core
+inflates the next frame into a second buffer during the transfer.
 
 \begin{figure*}[t]
 \centering
@@ -441,6 +455,8 @@ transfer of the current one.
                 fill=blue!6},
   fast/.style={draw, rounded corners=2pt, minimum height=14mm,
                minimum width=24mm, align=center, fill=orange!13},
+  core/.style={draw, rounded corners=2pt, minimum height=14mm,
+               minimum width=25mm, align=center, fill=green!10},
   control/.style={draw, dashed, rounded corners=2pt, minimum height=13mm,
                   minimum width=25mm, align=center, fill=green!7},
   flow/.style={-{Latex[length=2.2mm]}, thick},
@@ -454,9 +470,9 @@ transfer of the current one.
 
   \node[store, below=25mm of container] (storage) {Memory-mapped\\flash};
   \node[block, left=of storage] (parser) {Header validation\\and frame index};
-  \node[block, left=of parser] (inflate) {ROM \texttt{tinfl}\\inflater};
-  \node[store, left=of inflate] (frame) {Decoded RGB565\\frame, SRAM};
-  \node[block, left=of frame] (scale) {Nearest-neighbour\\stripe scaler};
+  \node[core, left=of parser] (inflate) {\texttt{tinfl} inflate\\core 1 (overlap)};
+  \node[store, left=of inflate] (frame) {Decoded frames\\$k$, $k{+}1$ in SRAM};
+  \node[block, left=of frame] (scale) {Nearest-neighbour\\stripe scaler, core 0};
   \node[fast, above left=7mm and 12mm of scale] (stripea)
        {Stripe $n$\\internal SRAM A};
   \node[fast, below left=7mm and 12mm of scale] (stripeb)
@@ -464,7 +480,7 @@ transfer of the current one.
   \node[fast, left=13mm of scale] (dma) {SPI2 GDMA\\queued transfer};
   \node[block, left=of dma] (lcd) {320$\times$240\\RGB565 LCD};
 
-  \node[control, below=29mm of parser] (scheduler) {Absolute-deadline loop\\skip when late};
+  \node[control, below=29mm of parser] (scheduler) {Absolute-deadline loop\\prefetch $k{+}1$; skip when late};
 
   \draw[flow] (source) -- (host);
   \draw[flow] (host) -- (rgb);
@@ -481,6 +497,7 @@ transfer of the current one.
   \draw[flow] (stripeb.west) -| (dma.south);
   \draw[flow] (dma) -- (lcd);
   \draw[ctl] (scheduler) -- (parser);
+  \draw[ctl] (scheduler) -| (inflate.south);
   \draw[ctl] (scheduler.west) -| (dma.south);
 
   \node[draw, dashed, fit=(source)(host)(rgb)(deflate)(container),
@@ -489,19 +506,21 @@ transfer of the current one.
         label=above left:{\bfseries ESP32-S3 standalone data path}, inner sep=4mm] {};
 \end{tikzpicture}}
 \caption{The \system{} standalone architecture.  Frame independence permits
-indexed seeking and local recovery.  Alternating DMA-capable stripes allow CPU
-scaling to overlap display transfer.  Dashed arrows carry scheduling.  The
-OreoOS integration replaces the lower path with the serial stages of
-Figure~\ref{fig:timeline}.}
+indexed seeking and local recovery.  Alternating DMA-capable stripes let core
+0 scale while GDMA transfers; in the overlapped configuration core 1 inflates
+the next frame into a second buffer at the same time.  Dashed arrows carry
+scheduling.  The OreoOS integration replaces the lower path with the serial
+stages of Figure~\ref{fig:timeline}.}
 \label{fig:architecture}
 \end{figure*}
 
 Figure~\ref{fig:hardware-platform} documents the hardware boundary used by the
 measurements; the schematics are generated from KiCad~\cite{kicad} sources
-in the repository~\cite{bhattacharya2026oreo}.  The first panel isolates the LCD clock, data, command/data,
-reset, chip-select, and backlight paths.  The second places that display
-beside the DevKit's flash/PSRAM configuration, USB connection, active-low
-controls, and the header reserved for future input-latency tests.
+in the repository~\cite{bhattacharya2026oreo}.  The first panel isolates the
+LCD clock, data, command/data, reset, chip-select, and backlight paths.  The
+second places that display beside the DevKit's flash/PSRAM configuration, USB
+connection, active-low controls, and the header reserved for future
+input-latency tests.
 
 \begin{figure*}[!tp]
 \centering
@@ -585,32 +604,34 @@ is not implemented.
 \subsection{Host encoding}
 
 The encoder (\texttt{tools/encode\_video\_benchmark.py}
-in~\cite{bhattacharya2026oreo}) uses FFmpeg~\cite{ffmpeg} to resample the
-source to the target frame rate, resize it with a Lanczos
-filter~\cite{duchon1979lanczos} while preserving aspect ratio, crop to the
-target dimensions, and convert to RGB565BE (Eq.~\eqref{eq:pixel}).  Every
-frame is then compressed separately into a zlib stream~\cite{deutsch1996zlib}
-at level~1, the fastest setting.  Encoder complexity is
-thus irrelevant to device timing, and the level is a deliberate choice of
-fast compression rather than minimum size (Section~\ref{sec:independence}).
+in~\cite{bhattacharya2026oreo}) uses FFmpeg~\cite{ffmpeg} to seek to the
+start of the requested window, resample the source to the target frame rate,
+resize it with a Lanczos filter~\cite{duchon1979lanczos} while preserving
+aspect ratio, crop to the target dimensions, and convert to RGB565BE
+(Eq.~\eqref{eq:pixel}).  Every frame is then compressed separately into a
+zlib stream~\cite{deutsch1996zlib} at level~1, the fastest setting.  Encoder
+complexity is thus irrelevant to device timing, and the level is a deliberate
+choice of fast compression rather than minimum size
+(Section~\ref{sec:independence}).
 
-\subsection{Native decode and stripe pipeline}
+\subsection{Serial decode and stripe pipeline}
 
 The standalone decoder (\texttt{experiments/video\_dma}
 in~\cite{bhattacharya2026oreo}) reuses all large allocations, which are made
 with ESP-IDF's capability-based allocator so that buffers can be restricted
-to DMA-capable internal memory~\cite{espressif2026memalloc}.  It inflates one
-independent payload directly from memory-mapped flash into the decoded frame
-buffer, then scales output rows into one of two internal-memory stripes of
-24 rows each, ten stripes per frame.  The chip select is held asserted across
-the panel's RAMWR command and all stripes.  The first stripe is scaled and
-queued as an SPI transaction serviced by GDMA~\cite{espressif2026spi,espressif2024trm};
-while it is transferred, the CPU fills the other stripe; a wait for the
-completed transaction precedes reuse of a buffer, after which the roles
-alternate.  Measured work is therefore
+to DMA-capable internal memory~\cite{espressif2026memalloc}.  In the serial
+configuration it inflates one independent payload directly from
+memory-mapped flash into the decoded frame buffer, then scales output rows
+into one of two internal-memory stripes of 24 rows each, ten stripes per
+frame.  The chip select is held asserted across the panel's RAMWR command and
+all stripes.  The first stripe is scaled and queued as an SPI transaction
+serviced by GDMA~\cite{espressif2026spi,espressif2024trm}; while it is
+transferred, the CPU fills the other stripe; a wait for the completed
+transaction precedes reuse of a buffer, after which the roles alternate.
+Serial frame work is therefore
 
 \begin{equation}
-T_{work}=T_{inflate}+T_{lcd},\qquad
+T_{work}^{ser}=T_{inflate}+T_{lcd},\qquad
 T_{lcd}\approx T_{wire}+T_{scale}^{(1)}+\epsilon,
 \label{eq:work}
 \end{equation}
@@ -630,6 +651,33 @@ Playback meets its target only when the upper tail of $T_{work}$, not merely
 the mean, is below the period; the evaluation reports percentiles and the
 worst observed value.
 
+\subsection{Dual-core overlapped decode}
+\label{sec:overlap}
+
+The serial path leaves the CPU waiting for DMA for most of each transfer.
+The overlapped configuration exploits this by moving inflation to the second
+core.  A worker task pinned to core 1 owns inflation and communicates with
+the playback loop on core 0 through two single-entry queues.  Before
+transferring frame $k$, core 0 requests frame $k+1$ into the alternate
+decoded buffer; it then scales and transfers frame $k$ while core 1 inflates,
+and finally waits for the worker's completion message before swapping the
+buffers.  Frame work becomes
+
+\begin{equation}
+T_{work}^{ovl}=\max\bigl(T_{lcd},\,T_{inflate}^{(k+1)}\bigr)+\epsilon_{sync},
+\label{eq:overlap}
+\end{equation}
+
+so inflation leaves the critical path whenever it is shorter than the
+transfer.  The prefetch is speculative: if the scheduler skips frames, the
+prefetched frame is stale and the required frame is inflated on the critical
+path before playback resumes.  The configuration costs a second 48,600-byte
+decoded buffer and a 24~KiB worker stack, because \texttt{tinfl} keeps its
+decompressor state on the stack.  Both configurations are built from the same
+source and selected at compile time, and the firmware reports the active
+configuration with every run, so the comparison in Section~\ref{sec:bus} is a
+controlled ablation.
+
 \subsection{OreoOS integration}
 
 Gallery owns playback policy; at the measured revision, firmware owns only
@@ -639,16 +687,15 @@ buffer and a reused RGB565 frame buffer to the firmware-resident
 \texttt{\_oreo\_rv565} module, a MicroPython user C
 module~\cite{micropython} (\texttt{firmware/usermods/oreo\_rv565}
 in~\cite{bhattacharya2026oreo}).  That module calls
-\texttt{tinfl}~\cite{miniz}, validates
-the exact decoded length, and returns without constructing a temporary Python
-\texttt{bytes} object or a Python-managed Deflate stream.  A separate native
-Gallery routine then scales the frame into OreoOS's 153,600-byte framebuffer;
-Python draws a playback overlay; and the display driver presents the frame
-with blocking SPI writes in four 38,400-byte chunks separated by 200~$\mu$s
-pauses, which smooth supply current on the badge.  Because the MicroPython
-heap resides in PSRAM on this board, the compressed buffer, decoded frame,
-and framebuffer are all in external RAM.  The stages are strictly serial
-(Figure~\ref{fig:timeline}).
+\texttt{tinfl}~\cite{miniz}, validates the exact decoded length, and returns
+without constructing a temporary Python \texttt{bytes} object or a
+Python-managed Deflate stream.  A separate native Gallery routine then scales
+the frame into OreoOS's 153,600-byte framebuffer; Python draws a playback
+overlay; and the display driver presents the frame with blocking SPI writes in
+four 38,400-byte chunks separated by 200~$\mu$s pauses, which smooth supply
+current on the badge.  Because the MicroPython heap resides in PSRAM on this
+board, the compressed buffer, decoded frame, and framebuffer are all in
+external RAM.  The stages are strictly serial (Figure~\ref{fig:timeline}).
 
 \subsection{Scheduling and interaction semantics}
 
@@ -661,11 +708,10 @@ d_i=t_0+iP.
 \end{equation}
 
 The standalone player advances the absolute deadline of
-Eq.~\eqref{eq:deadline} after every transfer
-and waits for the remainder of the period.  If the clock is more than one
-period late, it advances both the deadline and frame index until they again
-describe a future presentation; skipped frames are counted as drops and are
-never decoded merely to catch up.
+Eq.~\eqref{eq:deadline} after every transfer and waits for the remainder of
+the period.  If the clock is more than one period late, it advances both the
+deadline and frame index until they again describe a future presentation;
+skipped frames are counted as drops and are never decoded merely to catch up.
 
 Gallery applies a bounded-work rule at the OS boundary instead: no more than
 one frame is decoded per update tick, and accumulated delay beyond one period
@@ -679,10 +725,9 @@ handlers only set preallocated flags; an 8~ms software debounce is applied
 when the OS loop polls them.  MicroPython runs pin handlers as scheduled
 (soft) callbacks unless a hard interrupt is requested~\cite{micropython2026pin},
 and OreoOS uses the default, so they execute after the current native call
-returns
-and sample the pin level at that time rather than at the edge.  Whether a tap
-shorter than a native frame operation is retained therefore depends on its
-timing, and we make no input-latency or retention claim.
+returns and sample the pin level at that time rather than at the edge.
+Whether a tap shorter than a native frame operation is retained therefore
+depends on its timing, and we make no input-latency or retention claim.
 
 \section{Evaluation}
 \label{sec:evaluation}
@@ -692,233 +737,295 @@ timing, and we make no input-latency or retention claim.
 \caption{Evaluated configuration.  Revisions identify the commits whose
 source files match the SHA-256 digests recorded with each measurement.}
 \label{tab:platform}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.30\columnwidth}%
-                >{\raggedright\arraybackslash}p{0.63\columnwidth}@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.27\columnwidth}%
+                >{\raggedright\arraybackslash}p{0.66\columnwidth}@{}}
 \toprule
 Parameter & Value \\
 \midrule
 Board & ESP32-S3-DevKitC-1 N16R8 \\
 Processor & Dual-core Xtensa LX7, 240~MHz (configured) \\
 Memory & 16~MiB flash, 8~MiB octal PSRAM \\
-Display & ST7789, 320$\times$240, RGB565, 4-wire SPI \\
+Display & ST7789, 320$\times$240, RGB565, 4-wire SPI; backlight 60\% PWM \\
 SPI clock & 40~MHz (driver-reported) \\
-Standalone & ESP-IDF v5.5.1; source rev.\ \texttt{411f8f2}; PSRAM allocator disabled \\
-Integrated & MicroPython v1.28.0 on ESP-IDF; Gallery rev.\ \texttt{dcca17b}; module rev.\ \texttt{de149c4} \\
-Clip & 240 frames (10~s), 180$\times$135, 24~FPS \\
-Container & 4,271,634 bytes (4.074~MiB) \\
+Standalone & ESP-IDF v5.5.1; tracked tree identical to rev.\ \texttt{8739e61}; PSRAM allocator disabled \\
+Integrated & MicroPython v1.28.0; Gallery source of rev.\ \texttt{dcca17b}; launcher rev.\ \texttt{aa9d719}; module rev.\ \texttt{de149c4} \\
+Source & \emph{Big Buck Bunny}~\cite{blender2008bbb}, 480p H.264, CC~BY~3.0 \\
+Workloads & W90: 90--100~s; W360: 360--370~s; each 240 frames, 180$\times$135, 24~FPS \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\subsection{Measurement methodology}
+\subsection{Workloads and methodology}
+
+The workloads are two ten-second windows of the openly licensed animated film
+\emph{Big Buck Bunny}~\cite{blender2008bbb} (480p H.264 release, SHA-256
+\texttt{b2acb9bd\ldots 55b9a27}), encoded as described above.  The windows were
+chosen before measurement to differ in compressed size: W90 compresses to
+6,421,314~bytes (payloads 24,341--33,261~bytes, mean 26,751) and W360 to
+8,959,471~bytes (36,958--37,816~bytes, mean 37,327), against 11,664,012~bytes
+for 240 raw frames.  Table~\ref{tab:platform} lists the evaluated configuration
+and the commits whose sources match the recorded digests.
 
 Timing uses the ESP32-S3 monotonic microsecond timer.  In the standalone
-firmware, frame work begins immediately before inflation and ends when the
-final queued LCD transaction completes; inflation, cumulative stripe scaling,
-cumulative DMA wait, and the complete LCD phase are timed separately.  In
-Gallery, frame work begins at the update tick that decodes the frame and ends
-after the display flush; filesystem read, inflation, scaling, total drawing,
-and presentation are timed separately, and the residual is attributed to the
-OS loop and interpreter.  Displayed FPS is completed presentations divided by
-wall time.  A deadline miss is frame work exceeding the period.
+firmware, frame work begins when the playback loop starts a frame and ends
+when that frame's final LCD transaction completes and, in the overlapped
+configuration, when the next frame's inflation has been collected.
+Inflation, cumulative stripe scaling, cumulative DMA wait, and the complete
+LCD phase are timed separately; in the overlapped configuration, the
+reported inflation time is that of the presented frame, measured on core 1.
+In Gallery, frame work begins at the update tick that decodes the frame and
+ends after the display flush; filesystem read, inflation, scaling, total
+drawing, and presentation are timed separately, and the residual is
+attributed to the OS loop and interpreter.  Displayed FPS is completed
+presentations divided by wall time.  A deadline miss is frame work exceeding
+the period.
 
-The standalone experiment uses a two-second, 48-frame warm-up and a
-30-second, 720-frame timed window.  Ten independently reset runs provide 7,200
-frame samples, covering every source frame 30 times.  Frame percentiles use
-the pooled empirical distribution with linear interpolation between order
-statistics (Hyndman and Fan's type~7~\cite{hyndman1996sample}); run-level
-aggregates use two-sided 95\% Student-$t$ intervals~\cite{student1908probable}.
-Linear models are ordinary least-squares fits, reported with Pearson's $r$.  Per-frame records are retained in RAM and printed
-only after the timed window, so serial output does not enter the reported
-latency.  Internal and external heap state is sampled at boot, after the clip
-is opened, before playback, and after the timed window.  The integrated
-experiment uses a 48-frame warm-up and one 720-frame window in the unmodified
-OreoOS Gallery loop with the same media file.
+Each standalone configuration uses a two-second, 48-frame warm-up and a
+30-second, 720-frame timed window.  Ten independently reset runs per
+configuration provide 7,200 frame samples, covering every source frame 30
+times.  Frame percentiles use the pooled empirical distribution with linear
+interpolation between order statistics (Hyndman and Fan's
+type~7~\cite{hyndman1996sample}); run-level aggregates use two-sided 95\%
+Student-$t$ intervals~\cite{student1908probable}.  Linear models are ordinary
+least-squares fits, reported with Pearson's $r$.  Per-frame records are
+retained in RAM and printed only after the timed window, so serial output
+does not enter the reported latency.  Internal and external heap state is
+sampled at boot, after the clip is opened, before playback, and after the
+timed window.  The integrated experiment uses a 48-frame warm-up and one
+720-frame window of W90 in the unmodified OreoOS Gallery loop.
 
 Every result is tied to the SHA-256 digests of the application image,
 media, build configuration, and relevant source files, and to the raw serial
 log and per-frame CSV it was computed from.  A collector rejects any capture
 whose numbered frame sequence is incomplete, and the aggregator refuses to
-pool runs whose artifact hashes differ.  The collectors, aggregator, and the
-script that derives every value in
+pool runs whose artifact hashes, configuration, or metadata differ.  The
+collectors, aggregator, and the script that derives every value in
 Sections~\ref{sec:bus}--\ref{sec:gap} (\texttt{tools/analyze\_rv565\_paper.py})
 are part of the released repository~\cite{bhattacharya2026oreo}.
-Table~\ref{tab:platform} lists the evaluated configuration and the commits
-whose sources match the recorded digests.
 
 \subsection{Results}
 \label{sec:standalone-results}
 
 \begin{table*}[!t]
 \centering
-\caption{Measured \system{} v6 frame work.  Both rows play the same 4.074~MiB
-file.  Integrated playback does not skip frames when late, so drops are not
-applicable (n/a).}
+\caption{Measured \system{} v6 frame work.  Standalone rows pool ten runs of
+720 frames; the integrated row is one 720-frame run.  Integrated playback does
+not skip frames when late, so drops are not applicable (n/a).}
 \label{tab:results}
 \resizebox{\textwidth}{!}{%
-\begin{tabular}{lccccccccc}
+\begin{tabular}{llccccccccc}
 \toprule
-Path & Frames & FPS & Drops & Misses & Mean (ms) & p50 (ms) & p95 (ms) & p99 (ms) & Max (ms) \\
+Workload & Path & Frames & FPS & Drops & Misses & Mean (ms) & p50 (ms) & p95 (ms) & p99 (ms) & Max (ms) \\
 \midrule
-Standalone: inflate + DMA stripes & 7,200 & 24.004 & 0 & 0 & 38.411 & 38.552 & 39.690 & 40.206 & 40.346 \\
-OreoOS Gallery + firmware inflate & 720 & 14.093 & n/a & 720 & 69.212 & 69.535 & 76.988 & 78.938 & 79.442 \\
+W90 & Standalone, serial & 7,200 & 24.002 & 0 & 0 & 40.224 & 40.205 & 40.741 & 41.348 & 41.353 \\
+W90 & Standalone, dual-core overlap & 7,200 & 24.009 & 0 & 0 & 31.324 & 31.322 & 31.331 & 31.333 & 31.334 \\
+W360 & Standalone, serial & 7,200 & 23.905 & 20 & 7,200 & 41.830 & 41.828 & 41.869 & 41.881 & 41.901 \\
+W360 & Standalone, dual-core overlap & 7,200 & 24.009 & 0 & 0 & 31.326 & 31.324 & 31.334 & 31.335 & 31.336 \\
+\midrule
+W90 & OreoOS Gallery, firmware inflation & 720 & 12.170 & n/a & 720 & 80.400 & 80.174 & 86.067 & 87.117 & 92.102 \\
 \bottomrule
 \end{tabular}
 }
 \end{table*}
 
-Table~\ref{tab:results} reports both paths.  The standalone path meets every
-41.667~ms deadline; its worst frame leaves 1.321~ms of slack.  Run-level
-variation is negligible: the 95\% interval on mean frame work is
-38.4106--38.4107~ms, and the run-level p99 ranges over 1~$\mu$s.  Paced FPS
-is fixed by the deadline loop, so tail margin and the miss count are the
-informative quantities.
+Table~\ref{tab:results} reports all five configurations.  The serial path
+meets every 41.667~ms deadline on W90 with 0.314~ms of slack at its worst
+frame, but misses every deadline on W360: its mean frame work exceeds the
+period by 0.163~ms, so lateness accumulates until the deadline loop skips one
+source frame roughly every 256 frames, giving 20 drops and 23.905~FPS.  The
+dual-core path meets every deadline on both windows with 10.331~ms of slack
+at its worst frame.  Run-level variation is negligible in every
+configuration; for example, the 95\% interval on W90 overlapped mean frame
+work is 31.32397--31.32401~ms.  Paced FPS is fixed by the deadline loop, so tail
+margin and the miss count are the informative quantities.
 
-The integrated path misses all 720 deadlines and presents 14.093~FPS.
-Because Gallery slows rather than skips, the clip plays at 0.587$\times$ real
-time.
+The integrated path misses all 720 deadlines and presents 12.170~FPS.
+Because Gallery slows rather than skips, W90 plays at 0.507$\times$ real
+time there.
 
 \begin{figure*}[t]
 \centering
-\begin{tikzpicture}[x=1.85mm, y=1mm, font=\scriptsize]
+\begin{tikzpicture}[x=1.62mm, y=1mm, font=\scriptsize]
   % Deadline
-  \draw[red!70!black, densely dashed, thick] (41.667,-1) -- (41.667,25)
+  \draw[red!70!black, densely dashed, thick] (41.667,-1) -- (41.667,37)
     node[above] {41.67 ms deadline (24 FPS)};
-  % Standalone
-  \node[anchor=east, align=right, font=\footnotesize] at (-1,16) {Standalone};
-  \draw[fill=blue!25] (0,12) rectangle (7.097,20);
-  \node[align=center] at (3.55,16) {inflate\\7.1};
-  \draw[fill=orange!25] (7.097,12) rectangle (38.409,20);
+  % Serial
+  \node[anchor=east, align=right, font=\footnotesize] at (-1,28) {Standalone\\serial};
+  \draw[fill=blue!25] (0,24) rectangle (8.910,32);
+  \node[align=center] at (4.45,28) {inflate\\8.9};
+  \draw[fill=orange!25] (8.910,24) rectangle (40.222,32);
   \fill[pattern=north east lines, pattern color=orange!70!black]
-    (7.097,12) rectangle (9.696,20);
-  \node[align=center] at (24,16) {LCD 31.3\\wire 30.72; scaling under DMA};
-  \node[above] at (38.409,20) {\textbf{38.4}};
+    (8.910,24) rectangle (11.508,32);
+  \node[align=center] at (25.5,28) {LCD 31.3\\wire 30.72; scaling under DMA};
+  \node[anchor=east] at (40.0,34) {\textbf{40.2}};
+  % Overlap
+  \node[anchor=east, align=right, font=\footnotesize] at (-1,16) {Standalone\\dual-core};
+  \draw[fill=orange!25] (0,16) rectangle (31.316,21);
+  \fill[pattern=north east lines, pattern color=orange!70!black]
+    (0,16) rectangle (2.598,21);
+  \node at (16.9,18.5) {core 0: LCD 31.3};
+  \draw[fill=blue!25] (0,11) rectangle (8.902,16);
+  \node at (4.45,13.5) {8.9};
+  \node[anchor=west] at (9.3,13.5) {core 1: inflate frame $k{+}1$};
+  \node[anchor=west] at (31.8,18.5) {\textbf{31.3}};
   % Gallery
-  \node[anchor=east, align=right, font=\footnotesize] at (-1,4) {OreoOS Gallery};
-  \draw[fill=gray!25] (0,0) rectangle (18.193,8);
-  \node[align=center] at (9.1,4) {filesystem read\\18.2};
-  \draw[fill=blue!25] (18.193,0) rectangle (25.991,8);
-  \node[align=center] at (22.09,4) {inflate\\7.8};
-  \draw[fill=green!20] (25.991,0) rectangle (35.107,8);
-  \node[align=center] at (30.55,4) {scale +\\overlay 9.1};
-  \draw[fill=orange!25] (35.107,0) rectangle (68.415,8);
-  \node[align=center] at (51.76,4) {present 33.3\\(blocking SPI)};
-  \draw[fill=black!50] (68.415,0) rectangle (69.212,8);
-  \node[anchor=west] at (69.7,4) {\textbf{69.2}};
+  \node[anchor=east, align=right, font=\footnotesize] at (-1,4) {OreoOS\\Gallery};
+  \draw[fill=gray!25] (0,0) rectangle (27.631,8);
+  \node[align=center] at (13.8,4) {filesystem read\\27.6};
+  \draw[fill=blue!25] (27.631,0) rectangle (37.156,8);
+  \node[align=center] at (32.39,4) {inflate\\9.5};
+  \draw[fill=green!20] (37.156,0) rectangle (46.256,8);
+  \node[align=center] at (41.7,4) {scale +\\overlay 9.1};
+  \draw[fill=orange!25] (46.256,0) rectangle (79.573,8);
+  \node[align=center] at (62.9,4) {present 33.3\\(blocking SPI)};
+  \draw[fill=black!50] (79.573,0) rectangle (80.400,8);
+  \node[anchor=west] at (80.9,4) {\textbf{80.4}};
   % Axis
-  \draw (0,-2) -- (72,-2);
-  \foreach \t in {0,10,20,30,40,50,60,70} {
+  \draw (0,-2) -- (84,-2);
+  \foreach \t in {0,10,20,30,40,50,60,70,80} {
     \draw (\t,-2) -- (\t,-3); \node[below] at (\t,-3) {\t};
   }
-  \node[below] at (36,-6.5) {mean frame work (ms)};
+  \node[below] at (42,-6.5) {mean frame work on W90 (ms)};
 \end{tikzpicture}
-\caption{Mean per-frame critical path, drawn to scale from the measured stage
-times.  The standalone path overlaps scaling (hatched, first stripe only on
-the critical path) with DMA and is bounded by the SPI wire time; the
-integrated path executes every stage serially.  The dark segment is OS and
-interpreter residual (0.80~ms).}
+\caption{Mean per-frame critical path on W90, drawn to scale from the
+measured stage times.  The serial path adds inflation to the transfer; the
+dual-core path inflates the next frame on core 1 during the transfer, so frame
+time equals the transfer; the integrated path executes every stage serially.
+Hatching marks the first stripe's scaling, the only scaling on the critical
+path.  The dark segment is OS and interpreter residual (0.83~ms).}
 \label{fig:timeline}
 \end{figure*}
 
-\subsection{The standalone path is bus-bound}
+\subsection{Overlap removes decode from the critical path}
 \label{sec:bus}
 
-Mean $T_{lcd}$ is 31.312~ms against the 30.72~ms wire time of
-Eq.~\eqref{eq:wire}: the display transfer runs at 98.1\% of the bus bound.
-Within it, the CPU spends 2.599~ms scaling and 28.470~ms waiting for DMA, so
-it is idle for 90.9\% of the transfer.  Mean inflation is 7.097~ms (p99
-8.889~ms), and Eq.~\eqref{eq:work} accounts for the measured mean work to
-within 2~$\mu$s.  Both quantities are tightly distributed: $T_{lcd}$ varies by
-only 12~$\mu$s between p50 and maximum, so nearly all tail variation comes
-from content-dependent inflation.
+In the serial path, Eq.~\eqref{eq:work} accounts for the measured mean work
+to within 2~$\mu$s on both windows (8.910 + 31.312 against 40.224~ms on W90;
+10.516 + 31.312 against 41.830~ms on W360).  Mean $T_{lcd}$ is 31.312~ms
+against the 30.72~ms wire time of Eq.~\eqref{eq:wire}, so the display transfer
+runs at 98.1\% of the bus bound.  Within it, core 0 spends 2.598~ms scaling
+and 28.470~ms waiting for DMA: it is idle for 90.9\% of the transfer, while
+the content-dependent inflation that precedes it decides whether the frame is
+late.
 
-The idle time is the next opportunity.  Inflating frame $k+1$ while frame $k$
-is transferred would need a second 48,600-byte decoded buffer, which fits in
-the 241.2~KiB of internal memory that remained free (Table~\ref{tab:resources}).
-It would add about 7.1~ms of CPU work inside a 28.5~ms idle window, bounding
-the period by $T_{lcd}$ alone: approximately 31.9~FPS, against the 32.55~FPS
-wire-time limit.  This is a projection from the measured components, not a
-measured result.
+The dual-core path converts that idle time into decode capacity.  Core 1
+inflates in 8.902~ms on W90 and 10.503~ms on W360, within 13~$\mu$s of the
+serial path's 8.910 and 10.516~ms, so running the two cores concurrently
+imposes no measurable contention penalty on inflation.  Frame work
+falls to 31.324 and 31.326~ms, exceeding the transfer by 8 and 9~$\mu$s of
+synchronisation, as Eq.~\eqref{eq:overlap} predicts; this is a 22.1\% and
+25.1\% reduction respectively.  The schedule is now bounded by the bus alone:
+inflation occupies 28--34\% of the transfer it hides behind, and the
+remaining headroom is 10.3~ms per frame at 24~FPS.  Paced at 24~FPS, the
+deadline loop does not exercise that headroom; the transfer time implies a
+ceiling of about 31.9~FPS for full-screen frames, which we did not measure.
 
 \subsection{Decode cost is predictable from the container}
 \label{sec:model}
 
-Compressed frame sizes range from 6,558 to 25,682~bytes (mean 17,794).
-Across all 7,200 standalone frames, inflation time is linear in the stored
-length $L$:
+Inflation time is linear in the stored payload length $L$.  On W90, whose
+payloads span 24,341--33,261~bytes, the serial runs give
+$T_{inflate}\approx4.950~\text{ms}+0.1480~\mu\text{s/byte}\times L$ with
+$r^2=0.987$; fitting on even-numbered source frames and testing on
+odd-numbered frames gives a mean absolute error of 0.023~ms.  W360's payloads
+span only 2.3\%, so its own fit is poorly conditioned ($r^2=0.200$) even
+though its held-out error is 0.016~ms.  The informative test is therefore
+transfer between windows: the W90 model predicts every W360 frame with a mean
+error of 0.040~ms (maximum 0.097~ms), whereas a model fitted on W360's narrow
+range alone mispredicts W90 by 0.86~ms on average.  Pooling both windows gives
 
 \begin{equation}
-T_{inflate}\approx 3.117\ \text{ms} + 0.2236\ \mu\text{s/byte}\times L,
+T_{inflate}\approx 4.858\ \text{ms} + 0.1515\ \mu\text{s/byte}\times L,
 \label{eq:inflate}
 \end{equation}
 
-with $r=0.978$ ($r^2=0.957$).  The intercept reflects the fixed cost of
-producing 48,600 output bytes; the slope reflects symbol decoding.  Fitting
-on even-numbered source frames and testing on odd-numbered frames gives a
-mean absolute error of 0.138~ms and a maximum error of 0.538~ms.  For the
-largest frame the model predicts 8.86~ms; the slowest observed instance of
-that frame took 8.94~ms.
+with $r^2=0.9987$ and a mean absolute error of 0.022~ms.  The intercept
+reflects the fixed cost of producing 48,600 output bytes; the slope reflects
+symbol decoding.
 
-Because $L$ is stored in the container, worst-case decode time is known when
-a file is ingested, before it is played.  Combined with the nearly constant
-$T_{lcd}$, a host tool can decide whether a clip is schedulable at a given
-rate and resolution from metadata alone, or re-encode it until it is.  This
-property follows from independent, single-codec frames; it would not hold for
-formats whose decode cost depends on reference state.
+Because $L$ is stored in the container, schedulability is decidable at
+ingest.  Substituting Eq.~\eqref{eq:inflate} and the measured $T_{lcd}$ into
+Eq.~\eqref{eq:work}, the serial path meets the period $P$ only for frames with
+
+\begin{equation}
+L \le L^{*}=\frac{P-T_{lcd}-a}{b}\approx 36{,}273\ \text{bytes},
+\label{eq:threshold}
+\end{equation}
+
+where $a$ and $b$ are the intercept and slope of Eq.~\eqref{eq:inflate}.
+W90's largest payload is 33,261~bytes and W360's smallest is 36,958~bytes, so
+the threshold predicts that no W90 frame and every W360 frame is late; the
+measurements agree on all 480 source frames.  Under Eq.~\eqref{eq:overlap},
+inflation stays hidden while $a+bL\le T_{lcd}$, that is, for payloads up to
+about 175~KB, far above the 48,600-byte raw frame; within the measured range,
+the dual-core path's schedulability no longer depends on content.  This property follows from
+independent, single-codec frames; it would not hold for formats whose decode
+cost depends on reference state.
 
 \subsection{The cost of frame independence}
 \label{sec:independence}
 
-The container occupies 4,271,634~bytes, against 11,664,012~bytes for the same
-240 frames stored raw: a ratio of 2.73$\times$.  To measure what independence
-gives up, we decoded the evaluated container losslessly on the host and
-recompressed the identical RGB565 frames under alternative organisations
-(Table~\ref{tab:independence}).  Recompressing each frame at level~1
-reproduces all 240 payloads byte for byte, confirming the setup.
+To measure what independence gives up, we decoded each evaluated container
+losslessly on the host and recompressed the identical RGB565 frames under
+alternative organisations (Table~\ref{tab:independence}).  Recompressing each
+frame at level~1 reproduces all 480 shipped payloads byte for byte,
+confirming the setup.
 
 \begin{table}[t]
 \centering
-\caption{Deflate payload bytes for the evaluated 240 frames under alternative
-organisations, relative to the shipped independent level-1 payloads.}
+\caption{Deflate payload bytes for the evaluated frames under alternative
+organisations, relative to the shipped independent level-1 payloads of the
+same window.}
 \label{tab:independence}
 \resizebox{\columnwidth}{!}{%
-\begin{tabular}{lrr}
+\begin{tabular}{lrrrr}
 \toprule
-Organisation & Bytes & Relative \\
+ & \multicolumn{2}{c}{W90} & \multicolumn{2}{c}{W360} \\
+Organisation & Bytes & Rel. & Bytes & Rel. \\
 \midrule
-Independent frames, level 1 (shipped) & 4,270,662 & 1.000 \\
-Single stream, level 1 & 4,244,946 & 0.994 \\
-Independent frames, level 6 & 3,554,817 & 0.832 \\
-Independent frames, level 9 & 3,550,852 & 0.831 \\
-Single stream, level 9 & 3,489,148 & 0.817 \\
-XOR with previous frame, level 1 & 5,275,672 & 1.235 \\
+Independent, level 1 (shipped) & 6,420,342 & 1.000 & 8,958,499 & 1.000 \\
+Single stream, level 1 & 6,488,284 & 1.011 & 8,947,582 & 0.999 \\
+Independent, level 6 & 6,027,250 & 0.939 & 8,881,173 & 0.991 \\
+Independent, level 9 & 6,024,303 & 0.938 & 8,881,230 & 0.991 \\
+Single stream, level 9 & 6,076,028 & 0.946 & 8,864,882 & 0.990 \\
+XOR with previous frame, level 1 & 1,254,138 & 0.195 & 4,840,026 & 0.540 \\
 \bottomrule
 \end{tabular}
 }
 \end{table}
 
-Compressing all frames as one stream saves only 0.60\% at level~1 and 1.74\%
-at level~9, as Eq.~\eqref{eq:window} predicts for a 48,600-byte frame: no
-co-located pixel of the previous frame is reachable.  The compression level
-matters about ten times more than independence: level~6 would shrink the
-payload by 16.8\%.  Its effect on device inflation time was not measured, so
-level~1 remains the evaluated configuration.  A naive XOR delta against the
-previous frame is 23.5\% larger: in this clip, XOR residuals compress worse
-than the frames themselves.  Exploiting temporal redundancy would therefore
-require motion compensation, which is exactly the decoder state that
-\system{} avoids.
+Within Deflate, independence is free, as Eq.~\eqref{eq:window} predicts for a
+48,600-byte frame.  A single shared stream is 1.1\% \emph{larger} than
+independent frames on W90 and 0.1\% smaller on W360 at level~1, and differs
+by at most 0.9\% at level~9: no co-located pixel of the previous frame is
+reachable.  The compression level matters more on W90 (6.1\% from level~1 to
+level~6) than on W360 (0.9\%); its effect on device inflation time was not
+measured, so level~1 remains the evaluated configuration.
+
+Independence is not free relative to explicit temporal prediction.  XOR
+against the previous frame, followed by the same level-1 Deflate, shrinks the
+payload by 80.5\% on W90 and 46.0\% on W360: the animation contains large
+static regions whose redundancy lies exactly $2WH$ bytes away, out of
+Deflate's reach.  The true price of independence on this content is therefore
+a 1.9--5.1$\times$ larger stream, paid in exchange for $O(1)$ seeking, local
+error recovery, and the length-predictable decode cost of
+Section~\ref{sec:model}.  A keyframe-plus-delta variant with a bounded group
+of frames would recover part of that price; with the second decoded buffer the
+dual-core path already holds a reference frame, but its decode cost would then
+depend on the reference chain.
 
 \subsection{Anatomy of the integration gap}
 \label{sec:gap}
 
-Table~\ref{tab:gallery} decomposes integrated frame work.  The interpreter
-and OS loop account for only 0.80~ms on average (p99 1.37~ms).  The gap to
-the standalone path comes from three structural differences.
+Table~\ref{tab:gallery} decomposes integrated frame work on W90.  The
+interpreter and OS loop account for only 0.83~ms on average (p99 1.32~ms).
+The gap to the standalone path comes from three structural differences.
 
 \begin{table}[t]
 \centering
-\caption{Integrated Gallery stage times (720 frames).  Overlay is drawing
-time other than scaling; the residual is OS loop and interpreter work.}
+\caption{Integrated Gallery stage times on W90 (720 frames).  Overlay is
+drawing time other than scaling; the residual is OS loop and interpreter
+work.}
 \label{tab:gallery}
 \small
 \setlength{\tabcolsep}{4pt}
@@ -926,123 +1033,136 @@ time other than scaling; the residual is OS loop and interpreter work.}
 \toprule
 Stage & Mean (ms) & p99 (ms) & Max (ms) \\
 \midrule
-Filesystem read & 18.193 & 25.934 & 26.748 \\
-Inflation & 7.798 & 9.541 & 9.638 \\
-Scaling (native) & 7.650 & 8.204 & 8.832 \\
-Overlay & 1.466 & 2.151 & 7.003 \\
-Presentation & 33.308 & 33.924 & 34.361 \\
-OS residual & 0.797 & 1.367 & 5.450 \\
+Filesystem read & 27.631 & 33.546 & 34.383 \\
+Inflation & 9.525 & 10.574 & 10.850 \\
+Scaling (native) & 7.641 & 8.194 & 8.743 \\
+Overlay & 1.459 & 2.074 & 7.010 \\
+Presentation & 33.317 & 33.918 & 34.344 \\
+OS residual & 0.827 & 1.315 & 5.204 \\
 \midrule
-Frame work & 69.212 & 78.938 & 79.442 \\
+Frame work & 80.400 & 87.117 & 92.102 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\paragraph{Filesystem input.}  Read time is linear in payload length
-(1.111~ms + 0.960~$\mu$s/byte, $r=0.984$), an effective throughput of about
-1.0~MB/s.  Extrapolated to an uncompressed 48,600-byte frame, the read alone
-would take about 47.8~ms, beyond the 41.7~ms period.  On this path, Deflate is
-therefore not merely a storage optimisation: it trades 7.8~ms of inflation for
-roughly 29.6~ms of avoided reads.  The standalone path avoids the cost
-entirely by reading memory-mapped flash.
+\paragraph{Filesystem input.}  Reading the mean 26,751-byte payload takes
+27.631~ms, an effective throughput of 0.97~MB/s.  Scaled proportionally to an
+uncompressed 48,600-byte frame, the read alone would take about 50.2~ms,
+beyond the 41.7~ms period.  On this path, Deflate is therefore not merely a
+storage optimisation: it is what brings input below the period at all.  The
+standalone path avoids the cost entirely by reading memory-mapped flash.
 
-\paragraph{Memory placement.}  Integrated inflation has nearly the same
-per-byte cost as the standalone path (0.2109 versus 0.2236~$\mu$s/byte) but a
-0.93~ms larger intercept (4.046 versus 3.117~ms), consistent with writing the
-48,600-byte output to PSRAM instead of internal SRAM.  Scaling takes 7.650~ms
-against 2.599~ms; it writes a complete 153,600-byte framebuffer in PSRAM
-rather than SRAM stripes, though the two kernels also differ, so the 2.9$\times$
-ratio is not attributed to memory placement alone.
+\paragraph{Memory placement.}  Integrated inflation takes 9.525~ms against
+8.910~ms standalone on the same frames.  Its per-byte cost is similar (0.1416
+against 0.1480~$\mu$s/byte) but its fixed cost is 0.79~ms higher (5.738
+against 4.950~ms), consistent with writing the 48,600-byte output to PSRAM
+instead of internal SRAM.  Scaling takes 7.641~ms against 2.598~ms; it writes
+a complete 153,600-byte framebuffer in PSRAM rather than SRAM stripes, though
+the two kernels also differ, so the 2.9$\times$ ratio is not attributed to
+memory placement alone.
 
-\paragraph{Serialized presentation.}  Presentation costs 33.308~ms, 2.59~ms
+\paragraph{Serialized presentation.}  Presentation costs 33.317~ms, 2.60~ms
 above the wire time, of which 0.6~ms are the deliberate inter-chunk pauses.
-Unlike the standalone path, no other stage runs during it.
+Unlike the standalone paths, no other stage runs during it.
 
 These results determine the next step.  Removing the filesystem read alone
-would leave about 51.0~ms of serial work, still above the period.  Meeting
+would leave about 52.8~ms of serial work, still above the period.  Meeting
 24~FPS inside OreoOS requires the standalone structure---memory-resident
-input, SRAM stripes, and scaling overlapped with DMA---to become a single
-firmware operation invoked once per frame by Gallery.
+input, SRAM stripes, scaling overlapped with DMA, and inflation on the second
+core---to become a single firmware operation invoked once per frame by
+Gallery.
+
+\subsection{Memory}
+
+Table~\ref{tab:resources} reports internal-SRAM allocation for both
+standalone configurations, identical across all runs and both windows.  The
+serial path allocates 81,816~bytes beyond the clip tables: the 48,600-byte
+decoded frame, two 15,360-byte stripes, and allocator overhead.  The
+dual-core path allocates 156,096~bytes; the 74,280-byte difference is the
+second decoded frame, the 24~KiB worker stack, and the queues and task
+control block.  Both figures exclude the 23,040-byte per-frame measurement
+array.  The 1.4~KiB drift between the pre-playback and final samples is SPI
+and backlight driver initialisation, which occurs after the pre-playback
+sample; it is identical in every run, so playback does not grow the heap.
+Integrated memory was not sampled during playback; by construction, Gallery
+allocates a 48,600-byte frame buffer and a 49,624-byte compressed buffer in
+addition to the 153,600-byte framebuffer that OreoOS already holds, all in
+PSRAM.
 
 \begin{table}[t]
 \centering
 \caption{Measured standalone memory use (internal SRAM; identical in all ten
-runs).}
+runs of both windows).}
 \label{tab:resources}
 \resizebox{\columnwidth}{!}{%
 \begin{tabular}{lrrrr}
 \toprule
-Allocation & SRAM & PSRAM & Drift & Minimum free \\
+Configuration & SRAM & PSRAM & Drift & Minimum free \\
 \midrule
-Native DMA path & 79.9 KiB & 0 KiB & 1.3 KiB & 241.2 KiB \\
+Serial & 79.9 KiB & 0 KiB & 1.4 KiB & 240.4 KiB \\
+Dual-core overlap & 152.4 KiB & 0 KiB & 1.4 KiB & 167.9 KiB \\
 \bottomrule
 \end{tabular}
 }
 \end{table}
 
-\subsection{Memory}
-
-Table~\ref{tab:resources} reports the standalone path's 81,816-byte
-(79.9~KiB) incremental allocation: the 48,600-byte decoded frame, two
-15,360-byte stripes, the frame tables, and allocator overhead.  It excludes
-the 23,040-byte (22.5~KiB) per-frame measurement array.  The 1.3~KiB drift
-between the pre-playback and final samples includes SPI driver
-initialisation, which occurs after the pre-playback sample; it is identical
-in every run, so playback does not grow the heap.  Integrated memory was not
-sampled during playback.  By construction, Gallery allocates a 48,600-byte
-frame buffer and a 49,624-byte compressed buffer in addition to the
-153,600-byte framebuffer that OreoOS already holds, all in PSRAM.
-
 \section{Limitations and Threats to Validity}
 
-The evaluation uses one ten-second clip, one board, and one resolution and
-rate.  The linear decode model and the independence measurements are
-therefore properties of this workload; content with different statistics may
-change the coefficients, though Eq.~\eqref{eq:window} does not depend on
-content.  The decode model is fitted and tested on the same clip, split by
-frame.  We report no image-quality metric: loss arises only from resampling
-and RGB565 quantisation, which an evaluation must measure against a fixed
-resized RGB888 reference using PSNR and SSIM~\cite{wang2004image}.
+The evaluation uses two ten-second windows of one animated film, one board,
+and one resolution and rate.  The coefficients of Eq.~\eqref{eq:inflate} and
+the independence measurements are properties of this content and
+configuration; footage with different statistics, such as camera noise, may
+change them, although Eq.~\eqref{eq:window} does not depend on content.  The
+decode model was validated across the two windows, not across films or
+resolutions, and the dual-core condition beyond the measured payload range is
+an extrapolation.  We report no image-quality metric: loss arises only from
+resampling and RGB565 quantisation, which an evaluation must measure against
+a fixed resized RGB888 reference using PSNR and SSIM~\cite{wang2004image}.
 
 No codec baseline is reported.  A comparison with MJPEG or with Espressif's
 player~\cite{espressif2026player} must hold decoded dimensions, rate, clip
 range, and quality constant, and must consider the complete resource envelope
-rather than size or FPS alone.  No ablation was run; the integrated row
-differs from the standalone row in input path, memory placement, scaling
-kernel, presentation, and the presence of the OS, and
-Section~\ref{sec:gap} separates these by stage timing rather than by
-controlled removal.  Input latency was not measured.  The CPU clock is the
-configured value, not a measurement.  The standalone runs were captured from a
-working tree whose benchmark source and build defaults were committed as
-\texttt{411f8f2} with matching hashes.
+rather than size or FPS alone.  The serial-against-overlap comparison is a
+controlled ablation, but the integrated row differs from the standalone rows
+in input path, memory placement, scaling kernel, presentation, and the
+presence of the OS; Section~\ref{sec:gap} separates these by stage timing
+rather than by controlled removal.  The integrated path does not yet use the
+dual-core pipeline.  Input latency was not measured.  The CPU clock is the
+configured value, not a measurement.  The standalone collectors recorded the
+working tree as modified only because of untracked files; the digest of the
+tracked difference from rev.\ \texttt{8739e61} is that of an empty diff.
 
 \system{} is currently silent, RGB565-specific, and intended for small
-displays.  Future work includes the fused firmware playback path, overlapping
-inflation with transfer, SD-card streaming, synchronised audio, a
-schedulability check in the ingest tool based on Eq.~\eqref{eq:inflate},
-quality-matched codec baselines, logic-analyser input-latency measurement, and
-other processors and bus widths.
+displays.  Future work includes the fused dual-core firmware path for OreoOS,
+a keyframe-plus-delta variant that keeps decode cost bounded, a
+schedulability check in the ingest tool based on Eq.~\eqref{eq:threshold},
+SD-card streaming, synchronised audio, quality-matched codec baselines,
+logic-analyser input-latency measurement, and other processors and bus
+widths.
 
 \section{Conclusion}
 
 \system{} treats microcontroller video as one timed storage, memory,
-decoding, scheduling, and display problem.  On an ESP32-S3, independent
-display-native frames and double-buffered DMA stripes sustain 24.004~FPS
-across 7,200 frames with zero misses, with the display transfer at 98.1\% of
-the SPI wire-time bound.  Independent Deflate frames make decode cost a
-linear function of stored length and, above $128\times128$ pixels, give up
-almost no compression.  Inside a MicroPython operating system, moving
-inflation into firmware is insufficient: the stage-resolved measurements
-place the remaining cost in serialized filesystem input, external-memory
-placement, and blocking presentation rather than in the interpreter, and
-identify the single fused firmware operation that should come next.
+decoding, scheduling, and display problem.  On an ESP32-S3, its dual-core
+pipeline hides inflation behind the display transfer and sustains 24~FPS with
+zero misses and 10.3~ms of slack on content that a serial path cannot
+schedule, leaving the frame bounded only by an SPI transfer that runs at
+98.1\% of its wire-time limit.  Independent Deflate frames make decode cost a
+linear function of a length the container already stores, so schedulability
+can be decided before playback; above 128$\times$128 pixels they cost nothing
+relative to a shared Deflate stream, while giving up the 46--80\% that
+explicit temporal prediction would save.  Inside a MicroPython operating
+system, moving inflation into firmware is insufficient: the stage-resolved
+measurements place the remaining cost in serialized filesystem input,
+external-memory placement, and blocking presentation rather than in the
+interpreter, and identify the fused firmware operation that should come next.
 
 \section*{Artifact Availability}
 
 OreoOS, the \system{} encoders, firmware modules, standalone benchmark, paper
-source, raw serial logs, per-frame data, artifact hashes, and the scripts
-that produce every reported value are archived at
-\url{https://doi.org/\artifactdoi} and developed at
+source, raw serial logs, per-frame data, artifact hashes, the encoded
+evaluation media, and the scripts that produce every reported value are
+archived at \url{https://doi.org/\artifactdoi} and developed at
 \url{https://github.com/elixpo/oreo}~\cite{bhattacharya2026oreo}.
 
 \begingroup
