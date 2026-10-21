@@ -4,6 +4,7 @@
 *.fdb_latexmk
 *.fls
 *.log
+!measurements/*.log
 *.out
 *.pdf
 !figures/*.pdf
