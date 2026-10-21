@@ -1,50 +1,55 @@
 # RV565 paper source
 
-This directory contains the measurement-ready academic draft for the RV565
-video architecture by Ayushman Bhattacharya (Pollinations AI), Anwesha
-Chakraborty (Department of Computer Science and Engineering, JIS University),
-and Nihal Gazi (Department of Computer Science and Engineering (AI & ML), IEM).
-Contact: `ayushman.elixpo@gmail.com`.
+This directory contains the RV565 paper by Ayushman Bhattacharya (Pollinations
+AI) and Anwesha Chakraborty (Department of Computer Science and Engineering,
+JIS University). Contact: `ayushman.elixpo@gmail.com`. Target: arXiv cs.AR,
+cross-listed to cs.MM.
 
-The quantitative fields are intentionally blank. Do not replace them with
-estimates. Populate them only from committed benchmark scripts and raw logs
-captured on the ESP32-S3 badge.
+Every number in the paper comes from a committed measurement or from a script
+run over one. Do not add estimates. Projections are labelled as projections in
+the text.
 
-The prose follows the actual engineering sequence: Python playback exposed
-interpreter starvation, native scaling exposed flash I/O, RV565 v4 validated
-PSRAM preloading, and the RV565 v6 standalone benchmark demonstrated the DMA
-path before reintegration with OreoOS. Figure requirements and provenance are
-documented in [`figures/README.md`](figures/README.md).
+| Source | Produces |
+| --- | --- |
+| `measurements/video-benchmark-native-dma-stripes-aggregate-*.json` | Table 3 standalone row, Table 6, Section 6.2 |
+| `measurements/video-benchmark-oreoos-gallery-*.json` | Table 3 integrated row |
+| `../tools/analyze_rv565_paper.py` | Sections 6.3–6.6, Tables 4 and 5, Figure 4 |
+| `figures/*.pdf` (from `schematics/build.sh`) | Figure 3 |
 
-Engineering work that gates the evaluation is tracked in:
+Run the derived analyses from the repository root. The label selects the
+standalone aggregate; its media digest selects the matching Gallery record.
+The script needs the evaluated container
+(`experiments/video_dma/main/video.rv565`) and refuses any file whose SHA-256
+differs from the measured one.
 
-- [#48 — persistent RMT RX failure](https://github.com/elixpo/oreo/issues/48)
-- [#49 — component-level firmware/filesystem flashing](https://github.com/elixpo/oreo/issues/49)
-- [#50 — native RV565 v6 decompression](https://github.com/elixpo/oreo/issues/50)
+```bash
+python3 -I tools/analyze_rv565_paper.py --label bbb-native-dma-stripes
+```
 
-Build locally with:
+## Evaluated revisions
+
+The collectors hash the sources used for each run. The matching commits are:
+
+| Path | Commit | Evidence |
+| --- | --- | --- |
+| Standalone `experiments/video_dma/main/main.c`, `sdkconfig.defaults` | `411f8f2` | `benchmark_source` and `sdkconfig_defaults` digests in each run JSON |
+| `apps/gallery/src/app.py`, `oreoOS/launcher.py` | `dcca17b` | `gallery` and `launcher` digests in the Gallery JSON |
+| `firmware/usermods/oreo_rv565/modoreo_rv565.c` | `de149c4` | `firmware_module` digest |
+| Media `video.rv565` | not redistributed | SHA-256 `2bc5ea5b…3d9ce6` |
+
+## Build
 
 ```bash
 cd paper
 latexmk -pdf rv565.tex
 ```
 
-The minimum manual sequence is:
+## Submit
 
-```bash
-pdflatex rv565.tex
-bibtex rv565
-pdflatex rv565.tex
-pdflatex rv565.tex
-```
-
-Before submission:
-
-1. pin every firmware, ESP-IDF, MicroPython, and ESP-GMF commit;
-2. publish the media manifest, licences, and SHA-256 hashes;
-3. commit raw serial logs and the script that produces each table;
-4. replace every blank rule in the evaluation section;
-5. revise the abstract and conclusion with measured results;
-6. select a venue template and apply its anonymisation policy; and
-7. archive the evaluated repository revision and add its DOI to both the
-   paper and `CITATION.cff`.
+1. Archive the repository on Zenodo and set `\artifactdoi` in `rv565.tex`
+   and `doi` in `../CITATION.cff`.
+2. Run `./make_arxiv.sh`. It refuses to package while the DOI is a
+   placeholder or the build has warnings, then verifies that the staged
+   sources compile without BibTeX.
+3. Upload `rv565-arxiv.tar.gz` to arXiv: primary cs.AR, cross-list cs.MM,
+   licence CC BY 4.0.

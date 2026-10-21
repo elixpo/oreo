@@ -6,4 +6,7 @@
 *.log
 *.out
 *.pdf
+!figures/*.pdf
 *.synctex.gz
+arxiv/
+rv565-arxiv.tar.gz
