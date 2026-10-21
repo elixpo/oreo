@@ -73,7 +73,7 @@ def select_runs(label):
         if json.loads(path.read_text())["artifacts"]["media"] == digest
     ]
     if not gallery:
-        raise SystemExit("no Gallery record uses media %s" % digest)
+        return digest, standalone, []
     gallery_csv = MEASUREMENTS / json.loads(
         gallery[-1].read_text())["frame_csv"]
     return digest, standalone, [gallery_csv]
@@ -181,6 +181,9 @@ def main():
     print("level-1 payloads reproduced byte for byte: %d/%d" %
           (reproduced, len(frames)))
 
+    if not gallery_csvs:
+        print("\n== No Gallery record uses this media; skipping decomposition")
+        return
     gallery = rows(gallery_csvs)
     print("\n== Gallery decomposition (%d frames)" % len(gallery))
     overlay = [d - s for d, s in zip(column(gallery, "draw_us"),
