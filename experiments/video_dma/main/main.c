@@ -26,6 +26,11 @@
 #ifndef RV565_BACKLIGHT
 #define RV565_BACKLIGHT 60
 #endif
+// RV565_SELFTEST=1 fills the panel red, green, blue and white at full
+// backlight before playback, to separate wiring faults from the video path.
+#ifndef RV565_SELFTEST
+#define RV565_SELFTEST 0
+#endif
 
 #define LCD_HOST       SPI2_HOST
 #define PIN_MOSI       11
@@ -198,6 +203,40 @@ static void backlight_set(int percent)
     ESP_ERROR_CHECK(ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, duty));
     ESP_ERROR_CHECK(ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0));
 }
+
+#if RV565_SELFTEST
+static void lcd_fill(uint16_t rgb565, uint8_t *stripe)
+{
+    for (int i = 0; i < LCD_W * STRIPE_ROWS; ++i) {
+        stripe[2 * i] = (uint8_t)(rgb565 >> 8);
+        stripe[2 * i + 1] = (uint8_t)(rgb565 & 0xff);
+    }
+    const uint8_t ramwr = 0x2c;
+    gpio_set_level(PIN_CS, 0);
+    gpio_set_level(PIN_DC, 0);
+    spi_poll(&ramwr, 1);
+    gpio_set_level(PIN_DC, 1);
+    for (int row = 0; row < LCD_H; row += STRIPE_ROWS) {
+        spi_poll(stripe, STRIPE_BYTES);
+    }
+    gpio_set_level(PIN_CS, 1);
+}
+
+static void lcd_self_test(uint8_t *stripe)
+{
+    static const uint16_t colours[] = {0xf800, 0x07e0, 0x001f, 0xffff};
+    static const char *const names[] = {"red", "green", "blue", "white"};
+    backlight_set(100);
+    for (size_t i = 0; i < sizeof(colours) / sizeof(colours[0]); ++i) {
+        lcd_fill(colours[i], stripe);
+        printf("RV565_SELFTEST,%s\n", names[i]);
+        fflush(stdout);
+        vTaskDelay(pdMS_TO_TICKS(1500));
+    }
+    lcd_fill(0x0000, stripe);
+    backlight_set(0);
+}
+#endif
 
 static void spi_init(void)
 {
@@ -566,6 +605,9 @@ void app_main(void)
     spi_init();
     lcd_init();
     backlight_init();
+#if RV565_SELFTEST
+    lcd_self_test(buffers[0]);
+#endif
     int actual_spi_khz = 0;
     ESP_ERROR_CHECK(spi_device_get_actual_freq(lcd, &actual_spi_khz));
 

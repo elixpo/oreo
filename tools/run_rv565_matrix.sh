@@ -32,7 +32,7 @@ python3 tools/encode_video_benchmark.py "$source_video" \
   experiments/video_dma/main/video.rv565 --start "$start" --seconds 10 --fps 24
 (
   cd experiments/video_dma
-  idf.py -DRV565_OVERLAP="$overlap" -DRV565_BACKLIGHT=60 build
+  idf.py -DRV565_OVERLAP="$overlap" -DRV565_BACKLIGHT="${RV565_BACKLIGHT:-60}" -DRV565_SELFTEST=0 build
   idf.py -p "$port" flash
 )
 
