@@ -59,7 +59,7 @@ The collectors hash the sources used for each run. The matching commits are:
 
 | Path | Commit | Evidence |
 | --- | --- | --- |
-| Standalone firmware and build defaults | `8739e61` | `repository` record in each run JSON; the tracked diff digest is that of an empty diff |
+| Standalone firmware and build defaults | `c3e7619` | Run JSONs record `8739e61`, the same tree (`790874e`) before a message-only history rewrite; the tracked diff digest is that of an empty diff |
 | `apps/gallery/src/app.py` | `dcca17b` | `gallery` digest in the Gallery JSON |
 | `oreoOS/launcher.py` | `aa9d719` | `launcher` digest |
 | `firmware/usermods/oreo_rv565/modoreo_rv565.c` | `de149c4` | `firmware_module` digest |

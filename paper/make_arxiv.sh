@@ -27,7 +27,7 @@ cp figures/lcd_interface.pdf figures/experimental_platform.pdf "$STAGE/figures/"
 # Compile the staged copy without BibTeX, exactly as arXiv will.
 (cd "$STAGE" && pdflatex -interaction=nonstopmode rv565.tex >/dev/null &&
   pdflatex -interaction=nonstopmode rv565.tex >/dev/null)
-rm -f "$STAGE"/rv565.{aux,log,out,pdf}
-
-tar -C "$STAGE" -czf rv565-arxiv.tar.gz .
+# Package only the sources arXiv needs, never build byproducts.
+tar -C "$STAGE" -czf rv565-arxiv.tar.gz rv565.tex rv565.bbl \
+  figures/lcd_interface.pdf figures/experimental_platform.pdf
 echo "arXiv upload: $SCRIPT_DIR/rv565-arxiv.tar.gz"

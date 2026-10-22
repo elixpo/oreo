@@ -751,7 +751,7 @@ Processor & Dual-core Xtensa LX7, 240~MHz (configured) \\
 Memory & 16~MiB flash, 8~MiB octal PSRAM \\
 Display & ST7789, 320$\times$240, RGB565, 4-wire SPI; backlight 60\% PWM \\
 SPI clock & 40~MHz (driver-reported) \\
-Standalone & ESP-IDF v5.5.1; tracked tree identical to rev.\ \texttt{8739e61}; PSRAM allocator disabled \\
+Standalone & ESP-IDF v5.5.1; tracked tree identical to rev.\ \texttt{c3e7619}; PSRAM allocator disabled \\
 Integrated & MicroPython v1.28.0; Gallery source of rev.\ \texttt{dcca17b}; launcher rev.\ \texttt{aa9d719}; module rev.\ \texttt{de149c4} \\
 Source & \emph{Big Buck Bunny}~\cite{blender2008bbb}, 480p H.264, CC~BY~3.0 \\
 Workloads & W90: 90--100~s; W360: 360--370~s; each 240 frames, 180$\times$135, 24~FPS \\
@@ -1134,7 +1134,10 @@ rather than by controlled removal.  The integrated path does not yet use the
 dual-core pipeline.  Input latency was not measured.  The CPU clock is the
 configured value, not a measurement.  The standalone collectors recorded the
 working tree as modified only because of untracked files; the digest of the
-tracked difference from rev.\ \texttt{8739e61} is that of an empty diff.
+tracked difference from the recorded revision is that of an empty diff.  The
+collectors recorded that revision as \texttt{8739e61}; a later message-only
+history rewrite gave the identical tree (\texttt{790874e}) the hash
+\texttt{c3e7619}.
 
 \system{} is currently silent, RGB565-specific, and intended for small
 displays.  Future work includes the fused dual-core firmware path for OreoOS,
