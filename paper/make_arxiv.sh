@@ -28,6 +28,10 @@ cp figures/lcd_interface.pdf figures/experimental_platform.pdf "$STAGE/figures/"
 (cd "$STAGE" && pdflatex -interaction=nonstopmode rv565.tex >/dev/null &&
   pdflatex -interaction=nonstopmode rv565.tex >/dev/null)
 # Package only the sources arXiv needs, never build byproducts.
-tar -C "$STAGE" -czf rv565-arxiv.tar.gz rv565.tex rv565.bbl \
-  figures/lcd_interface.pdf figures/experimental_platform.pdf
-echo "arXiv upload: $SCRIPT_DIR/rv565-arxiv.tar.gz"
+FILES="rv565.tex rv565.bbl figures/lcd_interface.pdf figures/experimental_platform.pdf"
+tar -C "$STAGE" -czf rv565-arxiv.tar.gz $FILES
+rm -f rv565-arxiv.zip
+# Add the figures directory whole: the zipfile CLI strips paths from files.
+(cd "$STAGE" && python3 -I -m zipfile -c "$SCRIPT_DIR/rv565-arxiv.zip" \
+  rv565.tex rv565.bbl figures)
+echo "arXiv upload: $SCRIPT_DIR/rv565-arxiv.zip (or rv565-arxiv.tar.gz)"
