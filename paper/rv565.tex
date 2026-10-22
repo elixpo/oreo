@@ -10,7 +10,7 @@
 \usepackage{url}
 \usepackage[hidelinks]{hyperref}
 \usepackage{xcolor}
-\usetikzlibrary{arrows.meta,fit,positioning,shapes.geometric,patterns}
+\usetikzlibrary{arrows.meta,calc,fit,positioning,shapes.geometric,patterns}
 
 \hypersetup{
   pdftitle={RV565: Cross-Layer Co-Design for Frame-Independent Video Playback on MicroPython-Class ESP32-S3 Systems},
@@ -468,19 +468,22 @@ inflates the next frame into a second buffer during the transfer.
   \node[block, right=of rgb] (deflate) {Independent\\zlib level 1 frame};
   \node[store, right=of deflate] (container) {\system{} v6\\container};
 
-  \node[store, below=25mm of container] (storage) {Memory-mapped\\flash};
+  % Device path, right to left, on one row; stripes sit in their own column.
+  \node[store, below=44mm of container] (storage) {Memory-mapped\\flash};
   \node[block, left=of storage] (parser) {Header validation\\and frame index};
   \node[core, left=of parser] (inflate) {\texttt{tinfl} inflate\\core 1 (overlap)};
   \node[store, left=of inflate] (frame) {Decoded frames\\$k$, $k{+}1$ in SRAM};
   \node[block, left=of frame] (scale) {Nearest-neighbour\\stripe scaler, core 0};
-  \node[fast, above left=7mm and 12mm of scale] (stripea)
+  \node[fast, anchor=east] (stripea) at ($(scale.west)+(-12mm,11mm)$)
        {Stripe $n$\\internal SRAM A};
-  \node[fast, below left=7mm and 12mm of scale] (stripeb)
-       {Stripe $n+1$\\internal SRAM B};
-  \node[fast, left=13mm of scale] (dma) {SPI2 GDMA\\queued transfer};
+  \node[fast, anchor=east] (stripeb) at ($(scale.west)+(-12mm,-11mm)$)
+       {Stripe $n{+}1$\\internal SRAM B};
+  \node[fast, anchor=east] (dma) at ($(stripea.west |- scale.west)+(-12mm,0)$)
+       {SPI2 GDMA\\queued transfer};
   \node[block, left=of dma] (lcd) {320$\times$240\\RGB565 LCD};
 
-  \node[control, below=29mm of parser] (scheduler) {Absolute-deadline loop\\prefetch $k{+}1$; skip when late};
+  \node[control] (scheduler) at ($(parser)+(0,-36mm)$)
+       {Absolute-deadline loop\\prefetch $k{+}1$; skip when late};
 
   \draw[flow] (source) -- (host);
   \draw[flow] (host) -- (rgb);
@@ -491,19 +494,20 @@ inflates the next frame into a second buffer during the transfer.
   \draw[flow] (parser) -- (inflate);
   \draw[flow] (inflate) -- (frame);
   \draw[flow] (frame) -- (scale);
-  \draw[flow] (scale.north) |- (stripea.east);
-  \draw[flow] (scale.south) |- (stripeb.east);
-  \draw[flow] (stripea.west) -| (dma.north);
-  \draw[flow] (stripeb.west) -| (dma.south);
+  \draw[flow] (scale.west) -- ++(-6mm,0) |- (stripea.east);
+  \draw[flow] (scale.west) -- ++(-6mm,0) |- (stripeb.east);
+  \draw[flow] (stripea.west) -- ++(-6mm,0) |- (dma.east);
+  \draw[flow] (stripeb.west) -- ++(-6mm,0) |- (dma.east);
   \draw[flow] (dma) -- (lcd);
   \draw[ctl] (scheduler) -- (parser);
-  \draw[ctl] (scheduler) -| (inflate.south);
-  \draw[ctl] (scheduler.west) -| (dma.south);
+  \draw[ctl] (scheduler.west) -| (inflate.south);
+  \draw[ctl] (scheduler.south) -- ++(0,-4mm) -| (dma.south);
 
   \node[draw, dashed, fit=(source)(host)(rgb)(deflate)(container),
         label=above:{\bfseries Host-side preparation}, inner sep=4mm] {};
   \node[draw, dashed, fit=(storage)(parser)(inflate)(frame)(scale)(stripea)(stripeb)(dma)(lcd),
-        label=above left:{\bfseries ESP32-S3 standalone data path}, inner sep=4mm] {};
+        label={[anchor=south west]north west:{\bfseries ESP32-S3 standalone data path}},
+        inner sep=4mm] {};
 \end{tikzpicture}}
 \caption{The \system{} standalone architecture.  Frame independence permits
 indexed seeking and local recovery.  Alternating DMA-capable stripes let core
