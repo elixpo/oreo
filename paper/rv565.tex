@@ -519,8 +519,8 @@ stages of Figure~\ref{fig:timeline}.}
 \end{figure*}
 
 Figure~\ref{fig:hardware-platform} documents the hardware boundary used by the
-measurements; the schematics are generated from KiCad~\cite{kicad} sources
-in the repository~\cite{bhattacharya2026oreo}.  The first panel isolates the
+measurements; the schematics were drawn in KiCad~\cite{kicad}.  The first
+panel isolates the
 LCD clock, data, command/data, reset, chip-select, and backlight paths.  The
 second places that display beside the DevKit's flash/PSRAM configuration, USB
 connection, active-low controls, and the header reserved for future
@@ -607,8 +607,7 @@ is not implemented.
 
 \subsection{Host encoding}
 
-The encoder (\texttt{tools/encode\_video\_benchmark.py}
-in~\cite{bhattacharya2026oreo}) uses FFmpeg~\cite{ffmpeg} to seek to the
+The encoder uses FFmpeg~\cite{ffmpeg} to seek to the
 start of the requested window, resample the source to the target frame rate,
 resize it with a Lanczos filter~\cite{duchon1979lanczos} while preserving
 aspect ratio, crop to the target dimensions, and convert to RGB565BE
@@ -620,8 +619,7 @@ choice of fast compression rather than minimum size
 
 \subsection{Serial decode and stripe pipeline}
 
-The standalone decoder (\texttt{experiments/video\_dma}
-in~\cite{bhattacharya2026oreo}) reuses all large allocations, which are made
+The standalone decoder reuses all large allocations, which are made
 with ESP-IDF's capability-based allocator so that buffers can be restricted
 to DMA-capable internal memory~\cite{espressif2026memalloc}.  In the serial
 configuration it inflates one independent payload directly from
@@ -689,8 +687,7 @@ inflation.  For each frame, Gallery reads one length-prefixed payload from the
 filesystem into a reused compressed buffer and passes memoryviews of that
 buffer and a reused RGB565 frame buffer to the firmware-resident
 \texttt{\_oreo\_rv565} module, a MicroPython user C
-module~\cite{micropython} (\texttt{firmware/usermods/oreo\_rv565}
-in~\cite{bhattacharya2026oreo}).  That module calls
+module~\cite{micropython}.  That module calls
 \texttt{tinfl}~\cite{miniz}, validates the exact decoded length, and returns
 without constructing a temporary Python \texttt{bytes} object or a
 Python-managed Deflate stream.  A separate native Gallery routine then scales
@@ -738,8 +735,7 @@ depends on its timing, and we make no input-latency or retention claim.
 
 \begin{table}[t]
 \centering
-\caption{Evaluated configuration.  Revisions identify the commits whose
-source files match the SHA-256 digests recorded with each measurement.}
+\caption{Evaluated configuration.}
 \label{tab:platform}
 \begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.27\columnwidth}%
                 >{\raggedright\arraybackslash}p{0.66\columnwidth}@{}}
@@ -751,8 +747,8 @@ Processor & Dual-core Xtensa LX7, 240~MHz (configured) \\
 Memory & 16~MiB flash, 8~MiB octal PSRAM \\
 Display & ST7789, 320$\times$240, RGB565, 4-wire SPI; backlight 60\% PWM \\
 SPI clock & 40~MHz (driver-reported) \\
-Standalone & ESP-IDF v5.5.1; tracked tree identical to rev.\ \texttt{c3e7619}; PSRAM allocator disabled \\
-Integrated & MicroPython v1.28.0; Gallery source of rev.\ \texttt{dcca17b}; launcher rev.\ \texttt{aa9d719}; module rev.\ \texttt{de149c4} \\
+Standalone & ESP-IDF v5.5.1; PSRAM allocator disabled \\
+Integrated & MicroPython v1.28.0 with the firmware-resident inflater; Gallery app \\
 Source & \emph{Big Buck Bunny}~\cite{blender2008bbb}, 480p H.264, CC~BY~3.0 \\
 Workloads & W90: 90--100~s; W360: 360--370~s; each 240 frames, 180$\times$135, 24~FPS \\
 \bottomrule
@@ -803,9 +799,9 @@ media, build configuration, and relevant source files, and to the raw serial
 log and per-frame CSV it was computed from.  A collector rejects any capture
 whose numbered frame sequence is incomplete, and the aggregator refuses to
 pool runs whose artifact hashes, configuration, or metadata differ.  The
-collectors, aggregator, and the script that derives every value in
-Sections~\ref{sec:bus}--\ref{sec:gap} (\texttt{tools/analyze\_rv565\_paper.py})
-are part of the released repository~\cite{bhattacharya2026oreo}.
+collection and analysis scripts that derive every value in
+Sections~\ref{sec:bus}--\ref{sec:gap} are included in the released
+artifact~\cite{bhattacharya2026oreo}.
 
 \subsection{Results}
 \label{sec:standalone-results}
@@ -1132,12 +1128,7 @@ in input path, memory placement, scaling kernel, presentation, and the
 presence of the OS; Section~\ref{sec:gap} separates these by stage timing
 rather than by controlled removal.  The integrated path does not yet use the
 dual-core pipeline.  Input latency was not measured.  The CPU clock is the
-configured value, not a measurement.  The standalone collectors recorded the
-working tree as modified only because of untracked files; the digest of the
-tracked difference from the recorded revision is that of an empty diff.  The
-collectors recorded that revision as \texttt{8739e61}; a later message-only
-history rewrite gave the identical tree (\texttt{790874e}) the hash
-\texttt{c3e7619}.
+configured value, not a measurement.
 
 \system{} is currently silent, RGB565-specific, and intended for small
 displays.  Future work includes the fused dual-core firmware path for OreoOS,
@@ -1169,8 +1160,7 @@ interpreter, and identify the fused firmware operation that should come next.
 OreoOS, the \system{} encoders, firmware modules, standalone benchmark, paper
 source, raw serial logs, per-frame data, artifact hashes, the encoded
 evaluation media, and the scripts that produce every reported value are
-archived at \url{https://doi.org/\artifactdoi} and developed at
-\url{https://github.com/elixpo/oreo}~\cite{bhattacharya2026oreo}.
+archived at \url{https://doi.org/\artifactdoi}~\cite{bhattacharya2026oreo}.
 
 \begingroup
 \fontsize{7pt}{7.4pt}\selectfont
