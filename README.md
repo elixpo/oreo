@@ -465,6 +465,41 @@ Everyone is welcome. See **[CONTRIBUTING.md](CONTRIBUTING.md)** and our
 Elixpo has taken part in and been supported by **GSSOC**, **Hacktoberfest**,
 **Pollinations.AI**, **MS Startup Foundations**, and **OSCI**.
 
+### Google Summer of Code 2027
+
+Elixpo is applying to be a mentoring organisation for Google Summer of Code
+2027. Google has not announced the 2027 programme yet, and Elixpo has not been
+accepted. Oreo hosts one proposed project idea:
+
+| Idea | Size | Difficulty | Mentors (primary / backup) |
+| --- | --- | --- | --- |
+| [Oreo badge desktop simulator](https://gsoc.elixpo.com/ideas/oreo-badge-simulator/) | 175 h | Intermediate | [Ayushman Bhattacharya](https://github.com/Circuit-Overtime) / [Vivek Yadav](https://github.com/ez-vivek) |
+
+**How to start** (no badge hardware needed)
+
+1. Read the idea page and the programme site at [gsoc.elixpo.com](https://gsoc.elixpo.com).
+2. Set up the Python environment from the "Get going" section above, and read
+   [LEARN.md](LEARN.md) for a guided tour of OreoOS.
+3. Read [`docs/README.md`](docs/README.md) and [`docs/HARDWARE.md`](docs/HARDWARE.md)
+   to see what the display and buttons do, since the simulator has to stand in
+   for them.
+4. Read [CONTRIBUTING.md](CONTRIBUTING.md), then pick a small issue from the
+   [issue tracker](https://github.com/elixpo/oreo/issues).
+
+**Configuration and access**
+
+This repository keeps configuration encrypted with SOPS. Applicants do not need
+any keys: the warm-up tasks and the core of the idea run locally without
+decrypting configuration. Once accepted, contributors receive SOPS access
+scoped to their project (for example for integration tests or staging), which
+is revoked when the programme ends.
+
+Questions go to **gsoc@elixpo.com**. GitHub Discussions for GSoC open once
+Google announces the 2027 dates.
+
+_Google Summer of Code is a programme of Google LLC; Elixpo is applying as a
+mentoring organisation and is not affiliated with or endorsed by Google._
+
 ## Get involved
 
 - 💬 **Join the conversation** in [GitHub Discussions](https://github.com/orgs/elixpo/discussions).
