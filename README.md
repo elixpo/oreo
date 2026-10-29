@@ -8,7 +8,7 @@
 
 **A handheld panda-themed conference badge that runs a real operating system.**
 
-[![License: MIT & CC-BY-4.0](https://img.shields.io/badge/license-MIT_%26_CC--BY--4.0-FF5D68?style=for-the-badge)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-FF5D68?style=for-the-badge)](LICENSE)
 [![MicroPython 1.28](https://img.shields.io/badge/MicroPython-1.28-00B4A5?style=for-the-badge&logo=python&logoColor=white)](https://micropython.org)
 [![ESP32-S3](https://img.shields.io/badge/ESP32--S3-N16R8-2E2E2E?style=for-the-badge&logo=espressif&logoColor=white)](https://www.espressif.com/en/products/socs/esp32-s3)
 [![OTA Updates](https://img.shields.io/badge/OTA-yes-FFBE1E?style=for-the-badge)](#-updates)
@@ -475,18 +475,15 @@ Elixpo has taken part in and been supported by **GSSOC**, **Hacktoberfest**,
 
 The Oreo mascot, badge sprites, and app icons live under
 [`assets/`](assets/). They are CC-BY-4.0, but the Oreo mascot, the chest
-E-badge, and the "Elixpo"/"Oreo" names and palette are reserved - see the
-[Oreo-trademarks exception](LICENSES/exceptions/Oreo-trademarks). A browsable
+E-badge, and the "Elixpo"/"Oreo" names are trademarks - see
+[`TRADEMARKS.md`](TRADEMARKS.md). A browsable
 brand kit is at **[elixpo.com/assets](https://elixpo.com/assets)**.
 
 ## License
 
-Oreo Badge uses the Elixpo **licensing standard**:
-
-- **Code** (OreoOS, oreoWare, apps, tooling) - [MIT](LICENSES/preferred/MIT)
-  (with the [Oreo-trademarks exception](LICENSES/exceptions/Oreo-trademarks)).
+- **Code** (OreoOS, oreoWare, apps, tooling) - [MIT](LICENSE).
 - **Brand & visual assets** (mascot, sprites, icons) -
-  [CC-BY-4.0](LICENSES/preferred/CC-BY-4.0) (with the same exception).
+  [CC-BY-4.0](LICENSES/preferred/CC-BY-4.0).
 - **Upstream firmware components** - the firmware image incorporates
   MicroPython (MIT) and Espressif ESP-IDF
   ([Apache-2.0](LICENSES/preferred/Apache-2.0)); downstream distributors of
@@ -494,8 +491,8 @@ Oreo Badge uses the Elixpo **licensing standard**:
   [`LICENSES/notices/notice-board`](LICENSES/notices/notice-board).
 
 The Oreo mascot, the chest E-badge, the "Elixpo", "Oreo", "Oreo Badge", and
-"OreoOS" names, domains, and palette are reserved - this protects the brand and
-its royalties while keeping the code and assets free. See [`LICENSE`](LICENSE)
+"OreoOS" names, and the elixpo.com domains are trademarks of the Elixpo project
+and are not licensed by MIT or CC-BY-4.0. See [`TRADEMARKS.md`](TRADEMARKS.md)
 and the per-product notice board, [`LICENSES/NOTICE`](LICENSES/NOTICE).
 
 ## Exclusive
