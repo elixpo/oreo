@@ -18,8 +18,7 @@ preferred/    Licence texts used in this repository.
               Code is MIT; brand/visual assets are CC-BY-4.0.
 
 exceptions/   Legacy. `exceptions/Oreo-trademarks` is superseded by
-              ../TRADEMARKS.md and is no longer applied to any file. It is
-              kept only because LICENSES/NOTICE still refers to it.
+              ../TRADEMARKS.md and is no longer applied to any file.
 
 notices/      Third-party attributions (the upstream credit list).
 ```

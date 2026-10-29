@@ -3,7 +3,8 @@ THIRD-PARTY NOTICES
 
 This repository depends on and incorporates third-party components, each
 distributed under its own license. The source code in this repository is
-licensed under the Elixpo standard (MIT for code, CC-BY-4.0 for assets); see
+licensed under the MIT (code) and CC-BY-4.0
+(visual assets); see
 ../../LICENSE.
 
 On-device runtime / firmware
