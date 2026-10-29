@@ -486,6 +486,14 @@ accepted. Oreo hosts one proposed project idea:
 4. Read [CONTRIBUTING.md](CONTRIBUTING.md), then pick a small issue from the
    [issue tracker](https://github.com/elixpo/oreo/issues).
 
+**Configuration and access**
+
+This repository keeps configuration encrypted with SOPS. Applicants do not need
+any keys: the warm-up tasks and the core of the idea run locally without
+decrypting configuration. Once accepted, contributors receive SOPS access
+scoped to their project (for example for integration tests or staging), which
+is revoked when the programme ends.
+
 Questions go to **gsoc@elixpo.com**. GitHub Discussions for GSoC open once
 Google announces the 2027 dates.
 
