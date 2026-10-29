@@ -39,7 +39,7 @@ license:
   trademark_policy: https://elixpo.com/terms
 ci:
   lint_cmd: ''
-  test_cmd: ''
+  test_cmd: python3 -m unittest discover -s tests -v
   build_cmd: ''
 maintainers:
 - github: Circuit-Overtime
