@@ -110,11 +110,11 @@ user can install on-device from the **App Market** tile.
 | <img src="assets/icons/raw/badge_icon.png" width="64"><br>**Badge** | <img src="assets/icons/raw/identity_icon.png" width="64"><br>**Identity** | <img src="assets/icons/raw/commits_icon.png" width="64"><br>**Commits** | <img src="assets/icons/raw/wallpaper_icon.png" width="64"><br>**Weather** |
 | <img src="assets/icons/raw/racer_icon.png" width="64"><br>**Racer** | <img src="assets/icons/raw/flappy_icon.png" width="64"><br>**Flappy** | <img src="assets/icons/raw/snake_icon.png" width="64"><br>**Snake** | <img src="assets/icons/raw/gamepad_icon.png" width="64"><br>**Gamepad** |
 | <img src="assets/icons/raw/gallery_icon.png" width="64"><br>**Gallery** | <img src="assets/icons/raw/IR_Quest_icon.png" width="64"><br>**IR Quest** | <img src="assets/icons/raw/reader_icon.png" width="64"><br>**Reader** | <img src="assets/icons/raw/storage_icon.png" width="64"><br>**Storage** |
-| <img src="assets/icons/raw/apps_icon.png" width="64"><br>**Market** | <img src="assets/icons/raw/settings_icon.png" width="64"><br>**Settings** | <img src="assets/icons/raw/about_icon.png" width="64"><br>**About** | |
+| <img src="assets/icons/raw/apps_icon.png" width="64"><br>**Market** | <img src="assets/icons/raw/settings_icon.png" width="64"><br>**Settings** | <img src="assets/icons/raw/about_icon.png" width="64"><br>**About** | <img src="assets/icons/raw/doom_icon.png" width="64"><br>**Doom** |
 
 </div>
 
-Bluetooth and WiFi don't get their own drawer tiles — they live inside **Settings**, alongside brightness, sleep, gestures and OTA. The notification panel (press **C** from anywhere) puts both radios + a brightness slider + manual time-sync one tap away.
+Bluetooth and WiFi don't get their own drawer tiles — they live inside **Settings**, alongside brightness, sleep, gestures and OTA. The notification panel (press **C** from anywhere except Doom, where C strafes) puts both radios + a brightness slider + manual time-sync one tap away.
 
 ### 📦 App Market — install / uninstall extras on-device
 
@@ -580,6 +580,13 @@ brand kit is at **[elixpo.com/assets](https://elixpo.com/assets)**.
   ([Apache-2.0](LICENSES/preferred/Apache-2.0)); downstream distributors of
   compiled firmware must retain those licenses. See
   [`LICENSES/notices/notice-board`](LICENSES/notices/notice-board).
+- **Exception: the Doom engine**
+  ([`firmware/usermods/oreo_doom/`](firmware/usermods/oreo_doom/)) is
+  [GPL-2.0-or-later](LICENSES/preferred/GPL-2.0), and firmware images built
+  with it are distributed as a whole under [GPL-3.0](LICENSES/preferred/GPL-3.0).
+  The game data is [Freedoom](LICENSES/notices/freedoom) (BSD-3-Clause),
+  downloaded at deploy time. See
+  [`LICENSES/exceptions/oreo_doom-GPL`](LICENSES/exceptions/oreo_doom-GPL).
 
 The Oreo mascot, the chest E-badge, the "Elixpo", "Oreo", "Oreo Badge", and
 "OreoOS" names, and the elixpo.com domains are trademarks of the Elixpo project

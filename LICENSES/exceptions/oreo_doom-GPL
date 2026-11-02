@@ -1,0 +1,44 @@
+oreo_doom licence exception
+===========================
+
+SPDX-License-Identifier: GPL-2.0-or-later
+Applies to: firmware/usermods/oreo_doom/, tests/doom_host/ (and firmware
+            images built with the engine)
+
+The repository is MIT, CERN-OHL-P-2.0 and CC-BY-4.0. The Doom engine is the
+one exception to that.
+
+WHAT IS DIFFERENT
+-----------------
+
+  * Every file under firmware/usermods/oreo_doom/ is licensed under the GNU
+    General Public License, version 2 or (at your option) any later version
+    (preferred/GPL-2.0). engine/sha1.c is GPL-3.0-or-later. These files come
+    from doomgeneric and Chocolate Doom, or were written for OreoOS to fit
+    them; see firmware/usermods/oreo_doom/README.md for their origin and the
+    list of changes. tests/doom_host/, which runs the engine on a PC, is
+    GPL-2.0-or-later as well.
+
+  * The OreoOS firmware image (oreoWare/firmware/OREO_BADGE-*.bin and any
+    image built by tools/build_firmware.sh) links that engine with
+    MicroPython (MIT), the OreoOS native modules (MIT) and Espressif ESP-IDF
+    (Apache-2.0). Apache-2.0 is compatible with GPL version 3 but not
+    version 2, so the image as a whole is distributed under GPL-3.0
+    (preferred/GPL-3.0). Its Corresponding Source is this repository at the
+    same commit, together with MicroPython v1.28.0 and ESP-IDF v5.5.1 as
+    fetched by tools/build_firmware.sh.
+
+WHAT IS NOT DIFFERENT
+---------------------
+
+  * Everything outside firmware/usermods/oreo_doom/ keeps its own licence.
+    The Python Doom app (apps/doom), the tools and the other native modules
+    stay MIT and can be used without the engine.
+  * Building firmware without the engine (remove its include line from
+    firmware/usermods/micropython.cmake) gives an image with no GPL code.
+
+GAME DATA
+---------
+
+  Freedoom, the game data, is BSD-3-Clause and is not stored in this
+  repository. See notices/freedoom.

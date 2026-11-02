@@ -239,9 +239,17 @@ strings "$MICROPY_IMAGE" | grep '_oreo_rv565' >/dev/null || fail \
   "native _oreo_rv565 module is missing from the image"
 strings "$MICROPY_IMAGE" | grep -F 'Oreo Badge' >/dev/null || fail \
   "Oreo Badge board identity is missing from the image"
+strings "$MICROPY_IMAGE" | grep '_oreo_doom' >/dev/null || fail \
+  "native _oreo_doom module is missing from the image"
+# A build directory configured before the 16 MiB layout keeps its old
+# sdkconfig; rebuild with --clean if this fails.
+strings "$BUILD_DIR/partition_table/partition-table.bin" | grep -x 'doom' >/dev/null || fail \
+  "partition table has no doom partition (stale build config: rerun with --clean)"
 
 printf 'Verified native module: _oreo_ir\n'
 printf 'Verified native module: _oreo_rv565\n'
+printf 'Verified native module: _oreo_doom\n'
+printf 'Verified partition table: 16 MiB layout with doom partition\n'
 printf 'Verified board identity: Oreo Badge (USB: Elixpo / Oreo Badge)\n'
 printf 'Built: %s\n' "$FIRMWARE_IMAGE"
 

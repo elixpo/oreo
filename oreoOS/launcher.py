@@ -223,8 +223,9 @@ def run_app(os_obj, app):
 
                         # Global C hotkey → toggle the notification panel
                         # before anything else gets a look. Works from any
-                        # app, including ones that would otherwise consume C.
-                        if b == api.BTN_C:
+                        # app, except one that sets CAPTURES_C because C is
+                        # one of its controls (Doom's strafe).
+                        if b == api.BTN_C and not getattr(app, "CAPTURES_C", False):
                             panel.toggle()
                             continue
 
