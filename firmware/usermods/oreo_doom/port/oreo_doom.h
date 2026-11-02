@@ -3,8 +3,8 @@
 // (oreo_doomgeneric.c, w_file_owz.c) and a platform (the MicroPython module
 // on the badge, or the host test).
 
-#ifndef OREO_DOOM_H
-#define OREO_DOOM_H
+#ifndef OREO_DOOM_PORT_API_H
+#define OREO_DOOM_PORT_API_H
 
 #include <stddef.h>
 #include <stdint.h>

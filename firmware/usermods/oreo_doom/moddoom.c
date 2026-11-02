@@ -13,6 +13,7 @@
 
 #include <string.h>
 
+#include "py/mperrno.h"
 #include "py/mphal.h"
 #include "py/runtime.h"
 
