@@ -13,9 +13,6 @@
 [![ESP32-S3](https://img.shields.io/badge/ESP32--S3-N16R8-2E2E2E?style=for-the-badge&logo=espressif&logoColor=white)](https://www.espressif.com/en/products/socs/esp32-s3)
 [![OTA Updates](https://img.shields.io/badge/OTA-yes-FFBE1E?style=for-the-badge)](#-updates)
 
-[![Made by Elixpo](https://img.shields.io/badge/made_by-Elixpo-FF5D68?style=flat-square)](https://elixpo.com)
-[![Issues welcome](https://img.shields.io/badge/issues-welcome-00B4A5?style=flat-square)](https://github.com/elixpo/oreo/issues)
-[![Stars](https://img.shields.io/github/stars/elixpo/oreo?style=flat-square&color=FFBE1E)](https://github.com/elixpo/oreo/stargazers)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/elixpo/oreo/badge)](https://scorecard.dev/viewer/?uri=github.com/elixpo/oreo)
 [![Wikidata](https://img.shields.io/badge/Wikidata-Q141968869-006699?style=flat-square&logo=wikidata&logoColor=white)](https://www.wikidata.org/wiki/Q141968869)
 [![arXiv](https://img.shields.io/badge/arXiv-2610.35935-b31b1b?style=flat-square)](https://arxiv.org/abs/2610.35935)
@@ -604,19 +601,6 @@ You may build, modify, sell and redistribute boards and firmware made from the
 open design files - just not under the reserved Elixpo / Oreo names or mascot.
 
 ---
-
-## ⭐ Star history
-
-<a href="https://www.star-history.com/#elixpo/oreo&Date">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=elixpo/oreo&type=Date&theme=dark" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=elixpo/oreo&type=Date" />
-    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=elixpo/oreo&type=Date" width="640" />
-  </picture>
-</a>
-
----
-
 
 <div align="center">
 
