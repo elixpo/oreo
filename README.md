@@ -8,7 +8,7 @@
 
 **A handheld panda-themed conference badge that runs a real operating system.**
 
-[![License: MIT](https://img.shields.io/badge/license-MIT-FF5D68?style=for-the-badge)](LICENSE)
+[![License: MIT · CERN-OHL-P · CC-BY-4.0](https://img.shields.io/badge/license-MIT_·_CERN--OHL--P_·_CC--BY--4.0-FF5D68?style=for-the-badge)](LICENSES/README.md)
 [![MicroPython 1.28](https://img.shields.io/badge/MicroPython-1.28-00B4A5?style=for-the-badge&logo=python&logoColor=white)](https://micropython.org)
 [![ESP32-S3](https://img.shields.io/badge/ESP32--S3-N16R8-2E2E2E?style=for-the-badge&logo=espressif&logoColor=white)](https://www.espressif.com/en/products/socs/esp32-s3)
 [![OTA Updates](https://img.shields.io/badge/OTA-yes-FFBE1E?style=for-the-badge)](#-updates)
@@ -571,6 +571,10 @@ brand kit is at **[elixpo.com/assets](https://elixpo.com/assets)**.
 ## License
 
 - **Code** (OreoOS, oreoWare, apps, tooling) - [MIT](LICENSE).
+- **Hardware** (KiCad schematics, PCB, symbols, BOMs and generated files under
+  [`circuit/`](circuit/)) -
+  [CERN-OHL-P-2.0](LICENSES/preferred/CERN-OHL-P-2.0), the permissive CERN Open
+  Hardware Licence.
 - **Brand & visual assets** (mascot, sprites, icons) -
   [CC-BY-4.0](LICENSES/preferred/CC-BY-4.0).
 - **Upstream firmware components** - the firmware image incorporates
@@ -581,22 +585,23 @@ brand kit is at **[elixpo.com/assets](https://elixpo.com/assets)**.
 
 The Oreo mascot, the chest E-badge, the "Elixpo", "Oreo", "Oreo Badge", and
 "OreoOS" names, and the elixpo.com domains are trademarks of the Elixpo project
-and are not licensed by MIT or CC-BY-4.0. See [`TRADEMARKS.md`](TRADEMARKS.md)
+and are not licensed by MIT, CERN-OHL-P-2.0 or CC-BY-4.0. See [`TRADEMARKS.md`](TRADEMARKS.md)
 and the per-product notice board, [`LICENSES/NOTICE`](LICENSES/NOTICE).
 
 ## Exclusive
 
-This repository ships firmware and hardware and reserves, on top of the
-MIT / CC-BY-4.0 grant (full text in [`LICENSES/NOTICE`](LICENSES/NOTICE)):
+This repository ships firmware and hardware. The files are open (MIT,
+CERN-OHL-P-2.0, CC-BY-4.0); what Elixpo reserves is identity, not the design
+(full text in [`LICENSES/NOTICE`](LICENSES/NOTICE)):
 
 - The **`oreoos`** published package name.
 - The official **firmware / OTA release bundles** distributed from GitHub
   Releases and the "Oreo" OTA identity.
-- The **Oreo Badge hardware design**, the panda mascot, and the chest E-badge
-  as brand-reserved product identity.
+- The **Oreo Badge name and look**: the "Oreo Badge" product name, the panda
+  mascot and the chest E-badge.
 
-You may build, modify, and redistribute boards and firmware from the open
-source - just not under the reserved Elixpo / Oreo names or mascot.
+You may build, modify, sell and redistribute boards and firmware made from the
+open design files - just not under the reserved Elixpo / Oreo names or mascot.
 
 ---
 
