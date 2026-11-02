@@ -3,6 +3,7 @@
 // from an OWZ image, with a simulated clock, scripted button presses, and
 // frames written as PPM. Usage:
 //   host_doom <file.owz> <outdir> [ticks] [zone-MiB]
+//   OREO_HOST_IDLE=1 host_doom ...      (no input: title and demo loop)
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -49,7 +50,12 @@ static void write_ppm(const char *dir, int n) {
 }
 
 // Scripted input by tick: start a game from the menu, then walk and shoot.
+// With OREO_HOST_IDLE set nothing is pressed, so the title screen's attract
+// loop plays every demo.
+static int idle;
+
 static uint32_t buttons_at(int t) {
+    if (idle) return 0;
     if (t >= 40 && t < 42) return OREO_BTN_HOME;         // open menu
     if (t >= 50 && t < 52) return OREO_BTN_A;            // New Game
     if (t >= 60 && t < 62) return OREO_BTN_A;            // episode 1
@@ -85,6 +91,7 @@ int main(int argc, char **argv) {
     oreo_owz_size = size;
 
     int ticks = argc > 3 ? atoi(argv[3]) : 400;
+    idle = getenv("OREO_HOST_IDLE") != NULL;
     char *zone = argc > 4 ? argv[4] : "4";
     char *dargv[] = {"doom", "-iwad", "owz:/freedoom1.wad", "-mb", zone, "-nosound", NULL};
     int r = oreo_doom_start(6, dargv);
@@ -100,7 +107,7 @@ int main(int argc, char **argv) {
             return 1;
         }
         frames += d;
-        if (t % 50 == 0 || t == ticks - 1) {
+        if (t % (idle ? 2000 : 50) == 0 || t == ticks - 1) {
             write_ppm(argv[2], t);
         }
     }

@@ -1,4 +1,4 @@
-"""Doom — Freedoom running on the badge's built-in Doom engine.
+"""Doom — Freedoom Episode 1 on the badge's built-in Doom engine.
 
 The engine is the firmware's _oreo_doom module (GPL-2.0-or-later, see
 firmware/usermods/oreo_doom). The game data is Freedoom in the badge's

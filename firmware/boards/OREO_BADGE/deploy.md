@@ -12,5 +12,5 @@ The Doom game data goes into the `doom` partition (see
 
 ```bash
 python tools/fetch_freedoom.py
-python -m esptool --chip esp32s3 --port /dev/ttyACM0 write-flash 0x2a0000 oreoWare/doom/freedoom1.owz
+python -m esptool --chip esp32s3 --port /dev/ttyACM0 write-flash 0x250000 oreoWare/doom/freedoom1.owz
 ```

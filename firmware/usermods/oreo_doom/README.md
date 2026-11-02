@@ -38,18 +38,24 @@ Each changed file carries a "Modified 2026 by the OreoOS project" line.
 |---|---|
 | `m_misc.c` | `M_FileExists` accepts `owz:` paths (game data in flash). |
 | `w_file.c` | `W_OpenFile` opens `owz:` paths with the OWZ reader. |
+| `m_menu.c` | With a single-episode IWAD, New Game goes straight to the skill menu instead of listing episodes that are not there. |
 | `d_loop.c`, `r_bsp.c`, `r_draw.c`, `r_main.c`, `r_plane.c`, `r_things.c`, `statdump.c` | Large static tables tagged `OREO_EXT_BSS`, which places them in PSRAM on the badge. |
 
 ## Game data
 
-The game is [Freedoom](https://freedoom.github.io) Phase 1 (BSD-3-Clause, see
+The game is Episode 1 (nine levels) of [Freedoom](https://freedoom.github.io)
+Phase 1 (BSD-3-Clause, see
 [`LICENSES/notices/freedoom`](../../../LICENSES/notices/freedoom)). It is
 never committed: [`tools/fetch_freedoom.py`](../../../tools/fetch_freedoom.py)
 downloads release 0.13.0, checks its SHA-256 and packs it with
 [`tools/pack_wad.py`](../../../tools/pack_wad.py) into OWZ (each lump zlib
-compressed; sound and music emptied, as the badge has no speaker), from
-27.5 MiB to 9.7 MiB. `./deploy --full` writes it to the `doom` flash partition
-(see `firmware/boards/OREO_BADGE/partitions-oreo-badge.csv`), which the module
+compressed; sound and music emptied, as the badge has no speaker; the other
+episodes' maps dropped and their title-screen demos replaced by an
+Episode 1 one, which would otherwise replay out of sync), from 27.5 MiB to
+6.9 MiB. All four episodes would need 9.7 MiB, which
+leaves too little flash for OreoOS's filesystem. `./deploy --full` writes it
+to the `doom` flash partition (see
+`firmware/boards/OREO_BADGE/partitions-oreo-badge.csv`), which the module
 memory-maps and inflates a lump at a time.
 
 ## Testing on a PC

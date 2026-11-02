@@ -69,6 +69,22 @@ class PackWadTest(unittest.TestCase):
         tiny = [e for e in entries if e[0].rstrip(b"\0") == b"TINY"][0]
         self.assertEqual(tiny[1], tiny[3])   # stored size == raw size: not compressed
 
+    def test_keep_episodes_drops_maps_and_retargets_demos(self):
+        demo = lambda e, m: bytes([109, 2, e, m]) + b"\x00" * 20
+        lumps = [
+            ("E1M1", b""), ("THINGS", b"a"), ("SECTORS", b"b"),
+            ("E2M1", b""), ("THINGS", b"c"), ("SECTORS", b"d"),
+            ("DEMO1", demo(1, 6)), ("DEMO2", demo(2, 4)),
+            ("TITLEPIC", b"t"),
+        ]
+        kept = self.packer.keep_episodes(lumps, {1})
+        self.assertEqual([n for n, _ in kept],
+                         ["E1M1", "THINGS", "SECTORS", "DEMO1", "DEMO2", "TITLEPIC"])
+        self.assertEqual(dict(kept)["THINGS"], b"a")
+        self.assertEqual(dict(kept)["DEMO2"], demo(1, 6))
+        with self.assertRaises(self.packer.PackError):
+            self.packer.keep_episodes([("DEMO1", demo(2, 1))], {1})
+
     def test_rejects_bad_input(self):
         with self.assertRaises(self.packer.PackError):
             self.packer.read_wad(b"PWAX" + b"\0" * 8)

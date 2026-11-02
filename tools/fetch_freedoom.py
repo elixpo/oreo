@@ -3,8 +3,10 @@
 
 Freedoom (https://freedoom.github.io, BSD-3-Clause) is a free replacement for
 Doom's game data. This downloads the pinned release, verifies its SHA-256,
-packs Phase 1 (freedoom1.wad) into OWZ with tools/pack_wad.py and checks the
-result fits the badge's "doom" partition. ./deploy --full writes it there.
+packs Episode 1 of Phase 1 (freedoom1.wad) into OWZ with tools/pack_wad.py
+and checks the result fits the badge's "doom" partition. ./deploy --full
+writes it there. One episode (nine levels) is what fits beside OreoOS in
+16 MiB of flash; the engine then runs in single-episode mode.
 
     python3 tools/fetch_freedoom.py            # -> oreoWare/doom/freedoom1.owz
     python3 tools/fetch_freedoom.py --print-offset
@@ -29,6 +31,7 @@ URL = ("https://github.com/freedoom/freedoom/releases/download/"
 SHA256 = "3f9b264f3e3ce503b4fb7f6bdcb1f419d93c7b546f4df3e874dd878db9688f59"
 WAD = "freedoom-%s/freedoom1.wad" % VERSION
 LICENSE = "freedoom-%s/COPYING.txt" % VERSION
+EPISODES = {1}
 
 REPO = Path(__file__).resolve().parent.parent
 CACHE = Path.home() / ".cache" / "oreo" / "freedoom"
@@ -87,7 +90,7 @@ def main(argv=None):
         notice = z.read(LICENSE)
 
     ident, lumps = pack_wad.read_wad(wad)
-    owz = pack_wad.pack(ident, pack_wad.strip_audio(lumps))
+    owz = pack_wad.pack(ident, pack_wad.prepare(lumps, episodes=EPISODES))
     if len(owz) > size:
         raise SystemExit("fetch_freedoom: %.2f MiB of game data does not fit the "
                          "%.2f MiB doom partition" % (len(owz) / 2**20, size / 2**20))
@@ -96,8 +99,8 @@ def main(argv=None):
     args.output.write_bytes(owz)
     # Freedoom's licence travels with its data.
     (args.output.parent / "FREEDOOM-COPYING.txt").write_bytes(notice)
-    print("Freedoom %s: %.2f MiB WAD -> %s %.2f MiB (partition 0x%x, %.2f MiB)" % (
-        VERSION, len(wad) / 2**20, args.output.relative_to(REPO) if args.output.is_relative_to(REPO)
+    print("Freedoom %s episode %s: %.2f MiB WAD -> %s %.2f MiB (partition 0x%x, %.2f MiB)" % (
+        VERSION, ",".join(map(str, sorted(EPISODES))), len(wad) / 2**20, args.output.relative_to(REPO) if args.output.is_relative_to(REPO)
         else args.output, len(owz) / 2**20, offset, size / 2**20))
     return 0
 

@@ -16,6 +16,9 @@
 //	DOOM selection menu, options, episode etc.
 //	Sliders and icons. Kinda widget stuff.
 //
+// Modified 2026 by the OreoOS project for the Oreo Badge; see
+// firmware/usermods/oreo_doom/README.md for the list of changes.
+//
 
 
 #include <stdlib.h>
@@ -905,6 +908,8 @@ void M_DrawNewGame(void)
     V_DrawPatchDirect(54, 38, W_CacheLumpName(DEH_String("M_SKILL"), PU_CACHE));
 }
 
+extern int epi;
+
 void M_NewGame(int choice)
 {
     if (netgame && !demoplayback)
@@ -914,8 +919,17 @@ void M_NewGame(int choice)
     }
 	
     // Chex Quest disabled the episode select screen, as did Doom II.
+    // Oreo Badge: so does a single-episode IWAD (shareware mode), which
+    // would otherwise list episodes it does not have. Modified 2026 for
+    // OreoOS.
 
-    if (gamemode == commercial || gameversion == exe_chex)
+    if (gamemode == shareware)
+    {
+	epi = 0;
+	NewDef.prevMenu = &MainDef;
+	M_SetupNextMenu(&NewDef);
+    }
+    else if (gamemode == commercial || gameversion == exe_chex)
 	M_SetupNextMenu(&NewDef);
     else
 	M_SetupNextMenu(&EpiDef);
