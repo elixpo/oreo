@@ -54,18 +54,23 @@ hardware, build/flash, or a decision).
 - [ ] 🤖 **Wikidata** item "OreoOS": instance of operating system, based on
       MicroPython, platform ESP32-S3, citing arXiv:2610.35935.
 - [ ] 🙋 **Hackaday.io** project page with photos, the badge video, and links.
+- [x] 🤖 **Own USB PID** under Espressif's VID: requested 0x83ED in
+      [espressif/usb-pids#425](https://github.com/espressif/usb-pids/pull/425)
+      (2026-11-02). Espressif grants PIDs to MicroPython boards routinely
+      (64 MicroPython entries in their list).
+- [ ] 🤖 When the PID is merged: set `MICROPY_HW_USB_VID 0x303A` and
+      `MICROPY_HW_USB_PID` in `firmware/boards/OREO_BADGE/mpconfigboard.h`.
+- [ ] 🤖 Submit "Elixpo Oreo Badge" to the Linux USB ID database (`usb.ids`,
+      linux-usb.org), so plain `lsusb` and systemd's hwdb name the badge.
+- [ ] 🙋 A good photo of the badge (JPEG, plain background) for MicroPython's
+      board page.
 - [ ] 🤖 **MicroPython upstream board** (`micropython/micropython`,
-      `ports/esp32/boards/ELIXPO_OREO_BADGE`), so the badge appears on
-      micropython.org/download with automatically built firmware. Maintainers
-      mostly accept boards other people can obtain, so send it once badges or
-      the open design are in other people's hands; the definition above is
-      written to be submitted as is.
-- [ ] 🤖 **Own USB PID** under Espressif's VID (`espressif/usb-pids`). Only
-      worth requesting when OreoOS adds its own USB function (for example
-      mass storage for the Gallery, or WebUSB file transfer): Espressif grants
-      PIDs for custom USB classes, and standard serial already works under the
-      default PID. With a PID, the badge can then be named in the Linux USB ID
-      database (`usb.ids`), so `lsusb` shows "Elixpo Oreo Badge" everywhere.
+      `ports/esp32/boards/ELIXPO_OREO_BADGE`, with the PID) plus the photo in
+      `micropython/micropython-media`, so the badge appears on
+      micropython.org/download with automatically built firmware. Commit
+      messages follow MicroPython's conventions with `Signed-off-by`. Review
+      is slow and favours boards people can obtain, so the PR points to the
+      open hardware files and build instructions.
 
 ## Level 3: adoption
 
