@@ -13,6 +13,7 @@
 [![ESP32-S3](https://img.shields.io/badge/ESP32--S3-N16R8-2E2E2E?style=for-the-badge&logo=espressif&logoColor=white)](https://www.espressif.com/en/products/socs/esp32-s3)
 [![OTA Updates](https://img.shields.io/badge/OTA-yes-FFBE1E?style=for-the-badge)](#-updates)
 
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/16187/badge)](https://www.bestpractices.dev/projects/16187)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/elixpo/oreo/badge)](https://scorecard.dev/viewer/?uri=github.com/elixpo/oreo)
 [![Wikidata](https://img.shields.io/badge/Wikidata-Q141968869-006699?style=flat-square&logo=wikidata&logoColor=white)](https://www.wikidata.org/wiki/Q141968869)
 [![arXiv](https://img.shields.io/badge/arXiv-2610.35935-b31b1b?style=flat-square)](https://arxiv.org/abs/2610.35935)
