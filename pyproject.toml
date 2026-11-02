@@ -23,7 +23,7 @@ dynamic         = ["version"]
 description     = "OreoOS — the friendly MicroPython operating system for the Elixpo Oreo Badge."
 readme          = "README.md"
 requires-python = ">=3.9"
-license         = { file = "LICENSE" }
+license         = { text = "MIT" }
 keywords        = ["esp32", "esp32-s3", "micropython", "badge", "conference-badge", "oreoos", "elixpo"]
 authors         = [
     { name = "Ayushman Bhattacharya", email = "hello@elixpo.com" },
@@ -36,6 +36,7 @@ classifiers     = [
     "Environment :: Console",
     "Intended Audience :: Developers",
     "Intended Audience :: Education",
+    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: Implementation :: MicroPython",
