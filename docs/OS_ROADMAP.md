@@ -47,6 +47,33 @@ hardware, build/flash, or a decision).
 
 ---
 
+## Level 1.5: a GitHub Universe–class badge
+
+The badge was conceived in the spirit of GitHub Universe's conference badges:
+your GitHub identity on your chest, working all day at a venue with patchy
+WiFi, and fun to hack. These items close the gap.
+
+- [x] 🤖 **Offline-first GitHub apps:** Badge and Commits open instantly from
+      flash and sync in the background only when WiFi is up; Commits' graph
+      now matches GitHub's calendar
+      ([oreo#71](https://github.com/elixpo/oreo/pull/71)).
+- [ ] 🙋 Test #71 on the badge (open both apps with and without WiFi).
+- [ ] 🤖 **Prefill at deploy:** `./deploy` fetches the profile and graph on
+      the laptop and writes the caches, so the very first open at a venue
+      shows real data with no WiFi at all.
+- [ ] 🤖 **QR code to your GitHub profile** on the Badge card (scan to
+      follow), generated on the badge from `GITHUB_USER`.
+- [ ] 🤖 **Name-badge idle screen:** after inactivity, show name, handle and
+      QR at low brightness instead of sleeping to black.
+- [ ] 🤖 **Swap handles over IR:** the IR link already pairs badges; exchange
+      GitHub handles and keep a "people I met" list with their QR codes.
+- [ ] 🤖 **Event pack:** an offline agenda app (now / next / my sessions)
+      loaded from a JSON file at deploy, for organisers to ship per event.
+- [ ] 🤖 **Set up without a laptop:** enter GitHub username and WiFi from the
+      on-badge web page, not only `.env` + deploy.
+- [ ] 🤖 **"Hack your badge" guide:** a 10-minute first-app walkthrough on
+      oreo.elixpo.com using `app_templates/`.
+
 ## Level 2: listed where people look
 
 - [ ] 🤖 **awesome-esp**, *Firmware* section, and **awesome-micropython**
