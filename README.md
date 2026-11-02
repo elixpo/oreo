@@ -8,7 +8,7 @@
 
 **A handheld panda-themed conference badge that runs a real operating system.**
 
-[![License: MIT & CC-BY-4.0](https://img.shields.io/badge/license-MIT_%26_CC--BY--4.0-FF5D68?style=for-the-badge)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-FF5D68?style=for-the-badge)](LICENSE)
 [![MicroPython 1.28](https://img.shields.io/badge/MicroPython-1.28-00B4A5?style=for-the-badge&logo=python&logoColor=white)](https://micropython.org)
 [![ESP32-S3](https://img.shields.io/badge/ESP32--S3-N16R8-2E2E2E?style=for-the-badge&logo=espressif&logoColor=white)](https://www.espressif.com/en/products/socs/esp32-s3)
 [![OTA Updates](https://img.shields.io/badge/OTA-yes-FFBE1E?style=for-the-badge)](#-updates)
@@ -60,7 +60,7 @@ A 2-inch full-colour LCD running at 33 fps with PWM-dimmed backlight. Every app 
 <td width="33%" valign="top">
 
 ### 🐼 Built-in app SDK
-`class App(oreoOS.App):` with three methods is all it takes. Copy `templates/example_app/`, edit, deploy. Your icon shows up in the launcher.
+`class App(oreoOS.App):` with three methods is all it takes. Copy [`app_templates/`](app_templates/), edit, deploy. Your icon shows up in the launcher.
 
 </td>
 <td width="33%" valign="top">
@@ -133,7 +133,7 @@ store.uninstall("pet")
 
 The Market is the right home for: games, themed sketches, hardware demos, hackathon entries. **Contribute one** by dropping a folder into `apps_market/<your_app>/` with the usual `main.py + manifest.json + __init__.py + assets/` shape; the deploy script picks it up automatically and the market tile lists it on next boot. Anything in `apps_market/` is **opt-in by default** — that's how you keep flash + drawer real estate tight for everyone else.
 
-Want yours to be **always-installed**? Drop it in `apps/` instead. Copy [`templates/example_app/`](templates/example_app/) as a starting point.
+Want yours to be **always-installed**? Drop it in `apps/` instead. Copy [`app_templates/`](app_templates/) as a starting point.
 
 ---
 
@@ -148,6 +148,37 @@ python tools/deploy.py /dev/ttyACM0      # flash to a connected board
 ```
 
 For step-by-step app-writing + OS internals, see [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
+Host tools need Python 3.9 or newer on Linux, macOS, or Windows via WSL. The
+badge itself runs MicroPython 1.28.
+
+### Warm-up (no badge, no keys)
+
+<!-- Command matches .github/workflows/tests.yml (Python 3.11, standard library only). -->
+
+```bash
+git clone https://github.com/elixpo/oreo
+cd oreo
+python3 -m unittest discover -s tests -v
+```
+
+**What works:** the hardware-free unit tests for pure helpers (colour packing in
+`oreoOS/api.py`, `.env` parsing in `oreoOS/config.py`). They use only the
+Python standard library, so no `pip install`, badge or key is needed.
+**What is skipped:** running OreoOS apps needs an ESP32-S3 badge; there is no
+desktop simulator yet. With a badge, `tools/deploy.py` runs without keys and writes blank
+WiFi and weather values when `.env.local` is missing. **Expected result:**
+`OK` at the end of the run. If something asks you for a secret, open an issue
+instead of working around it.
+
+### Configuration and access
+
+This repository keeps configuration encrypted with SOPS. Applicants do not need
+any keys: setup, tests and warm-up tasks run locally without decrypting
+configuration. Once accepted, contributors receive SOPS access scoped to their
+work (for example integration tests or staging), revoked when the programme
+ends. Do not try to decrypt or commit configuration; if setup asks for a
+secret, open an issue.
 
 ---
 
@@ -405,6 +436,18 @@ Cutting a release takes one command: `python tools/release.py`. Details in [`CON
 
 ---
 
+## 🎞 RV565 — the badge's video format, for any project
+
+The Gallery's video playback grew into **RV565**, a standalone library and file format for smooth video on ESP32 SPI displays (24 FPS with zero missed frames on the ESP32-S3; [arXiv:2610.35935](https://arxiv.org/abs/2610.35935)). It lives in its own repository, [elixpo/rv565](https://github.com/elixpo/rv565), and installs from the official channels:
+
+| Where | How |
+|---|---|
+| Arduino | Library Manager → **RV565**, or `arduino-cli lib install RV565` |
+| Python (desktop) | `pip install rv565` — [on PyPI](https://pypi.org/project/rv565/), with a Pillow plugin via `pip install "rv565[pillow]"` |
+| Browser | [oreo.elixpo.com/rv565/convert](https://oreo.elixpo.com/rv565/convert/) — convert a video with no install and no upload |
+
+---
+
 ## 📚 Reading order
 
 | | |
@@ -510,18 +553,15 @@ mentoring organisation and is not affiliated with or endorsed by Google._
 
 The Oreo mascot, badge sprites, and app icons live under
 [`assets/`](assets/). They are CC-BY-4.0, but the Oreo mascot, the chest
-E-badge, and the "Elixpo"/"Oreo" names and palette are reserved - see the
-[Oreo-trademarks exception](LICENSES/exceptions/Oreo-trademarks). A browsable
+E-badge, and the "Elixpo"/"Oreo" names are trademarks - see
+[`TRADEMARKS.md`](TRADEMARKS.md). A browsable
 brand kit is at **[elixpo.com/assets](https://elixpo.com/assets)**.
 
 ## License
 
-Oreo Badge uses the Elixpo **licensing standard**:
-
-- **Code** (OreoOS, oreoWare, apps, tooling) - [MIT](LICENSES/preferred/MIT)
-  (with the [Oreo-trademarks exception](LICENSES/exceptions/Oreo-trademarks)).
+- **Code** (OreoOS, oreoWare, apps, tooling) - [MIT](LICENSE).
 - **Brand & visual assets** (mascot, sprites, icons) -
-  [CC-BY-4.0](LICENSES/preferred/CC-BY-4.0) (with the same exception).
+  [CC-BY-4.0](LICENSES/preferred/CC-BY-4.0).
 - **Upstream firmware components** - the firmware image incorporates
   MicroPython (MIT) and Espressif ESP-IDF
   ([Apache-2.0](LICENSES/preferred/Apache-2.0)); downstream distributors of
@@ -529,8 +569,8 @@ Oreo Badge uses the Elixpo **licensing standard**:
   [`LICENSES/notices/notice-board`](LICENSES/notices/notice-board).
 
 The Oreo mascot, the chest E-badge, the "Elixpo", "Oreo", "Oreo Badge", and
-"OreoOS" names, domains, and palette are reserved - this protects the brand and
-its royalties while keeping the code and assets free. See [`LICENSE`](LICENSE)
+"OreoOS" names, and the elixpo.com domains are trademarks of the Elixpo project
+and are not licensed by MIT or CC-BY-4.0. See [`TRADEMARKS.md`](TRADEMARKS.md)
 and the per-product notice board, [`LICENSES/NOTICE`](LICENSES/NOTICE).
 
 ## Exclusive

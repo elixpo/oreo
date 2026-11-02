@@ -2,13 +2,15 @@
   "name": "oreo-elixpo",
   "version": "1.0.0",
   "private": true,
+  "license": "MIT",
   "description": "The Oreo Badge — marketing site, app catalogue, and gated file-transfer launcher.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "deploy": "next build && wrangler pages deploy out --project-name=oreo"
+    "deploy": "next build && wrangler pages deploy out --project-name=oreo",
+    "test:rv565": "node --test scripts/rv565.test.mjs"
   },
   "dependencies": {
     "framer-motion": "^11.11.17",
