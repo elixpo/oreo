@@ -107,6 +107,25 @@ WiFi, and fun to hack. These items close the gap.
       is slow and favours boards people can obtain, so the PR points to the
       open hardware files and build instructions.
 
+### Recognition and trust (2026-11-02)
+
+- [x] 🤖 Hardware design files licensed **CERN-OHL-P-2.0**; README "Exclusive"
+      clarified (names and look reserved, design open)
+      ([oreo#73](https://github.com/elixpo/oreo/pull/73)).
+- [x] 🙋 **OSHWA Open Source Hardware certification** submitted; under review
+      (usually under two weeks). When the UID arrives: add the certification
+      badge to the README and the badge page.
+- [x] 🤖 **OpenSSF Scorecard** workflow and badge
+      ([oreo#74](https://github.com/elixpo/oreo/pull/74)).
+- [ ] 🙋 **OpenSSF Best Practices** badge: register at bestpractices.dev
+      (answers prepared), then add the badge.
+- [x] 🤖 **MicroPython upstream board** opened as a draft
+      ([micropython#19846](https://github.com/micropython/micropython/pull/19846)).
+- [ ] 🙋 Build it on MicroPython master, flash, check banner, Wi-Fi scan and
+      `I2C(0).scan()` (expect 0x68), send the badge photo, then mark ready.
+- [x] 🤖 **MicroPython Show and tell** post
+      ([discussions#19847](https://github.com/orgs/micropython/discussions/19847)).
+
 ## Level 3: adoption
 
 - [ ] 🙋 Ship OreoOS on badges at an event (the way EMF Camp's Tildagon and
