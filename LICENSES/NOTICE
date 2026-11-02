@@ -10,6 +10,10 @@ official listings - are separate and documented in `../TRADEMARKS.md`.
 
 This notice adds no copyright restriction on top of those licences.
 
+EXCEPTION: the Doom engine under `../firmware/usermods/oreo_doom/` is
+GPL-2.0-or-later, and firmware images built with it are distributed as a
+whole under GPL-3.0. See `exceptions/oreo_doom-GPL`.
+
 REPOSITORY
 ----------
 
@@ -50,6 +54,16 @@ VISUAL ASSETS
   directory) are CC-BY-4.0. Reusing them as files only
   requires the attribution CC-BY-4.0 asks for; using the Elixpo or Oreo names
   or mascot as your own branding is covered by `../TRADEMARKS.md`.
+
+DOOM (EXCEPTION)
+----------------
+
+  The `_oreo_doom` firmware module (`../firmware/usermods/oreo_doom/`) is
+  the Doom engine from doomgeneric and Chocolate Doom, under
+  GPL-2.0-or-later, not MIT. Because it is linked with ESP-IDF (Apache-2.0),
+  OreoOS firmware images that include it are distributed under GPL-3.0, with
+  this repository as their source. The game data is Freedoom (BSD-3-Clause),
+  downloaded at deploy time. Full terms: `exceptions/oreo_doom-GPL`.
 
 THIRD-PARTY MATERIAL
 --------------------

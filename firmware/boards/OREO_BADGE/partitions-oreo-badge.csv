@@ -1,0 +1,10 @@
+# Oreo Badge flash layout (16 MiB, ESP32-S3 N16R8).
+# The firmware partition holds MicroPython with OreoOS's native modules and
+# the Doom engine; "doom" holds the compressed Freedoom game data written by
+# tools/fetch_freedoom.py; "vfs" is the OreoOS filesystem.
+# Name,   Type, SubType, Offset,   Size,     Flags
+nvs,      data, nvs,     0x9000,   0x6000,
+phy_init, data, phy,     0xf000,   0x1000,
+factory,  app,  factory, 0x10000,  0x290000,
+doom,     data, 0x40,    0x2a0000, 0x9e0000,
+vfs,      data, fat,     0xc80000, 0x380000,

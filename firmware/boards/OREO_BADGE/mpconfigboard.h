@@ -15,3 +15,7 @@
 
 #define MICROPY_HW_I2C0_SCL                 (9)
 #define MICROPY_HW_I2C0_SDA                 (8)
+
+// Doom's engine runs on the MicroPython task; its renderer recurses through
+// the BSP tree, so the task gets a larger stack than the 16 KiB default.
+#define MICROPY_TASK_STACK_SIZE             (32 * 1024)

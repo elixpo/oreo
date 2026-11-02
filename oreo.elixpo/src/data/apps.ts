@@ -69,6 +69,13 @@ export const PRELOADED: AppEntry[] = [
     details: "A two-button Flappy clone with the Oreo mascot as the protagonist. " +
              "Procedurally-generated pipe pairs, parallax scrolling background, " +
              "and a hi-score stored on flash so it survives reboot." }),
+  app("doom",    { name: "Doom",        category: "game", tint: "gold",    icon: "Gamepad2",
+    pngIcon: "/icons/doom_icon.png",
+    blurb:   "Freedoom, the full game, played on the badge buttons.",
+    details: "The Doom engine (doomgeneric / Chocolate Doom, GPL) built into the " +
+             "firmware, playing Freedoom Phase 1 from its own flash partition. " +
+             "D-pad moves, A fires, B opens doors, hold C to strafe; HOME opens " +
+             "the menu and HOME twice within a second returns to OreoOS." }),
   app("gallery", { name: "Gallery",     category: "core", tint: "gold",    icon: "Image",
     pngIcon: "/icons/gallery_icon.png",
     blurb:   "Photo viewer with thumbnail carousel. Auto-hiding UI.",
