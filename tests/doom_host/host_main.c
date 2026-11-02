@@ -61,7 +61,7 @@ static uint32_t buttons_at(int t) {
     if (t >= 60 && t < 62) return OREO_BTN_A;            // skill (no episode menu)
     if (t >= 70 && t < 72) return OREO_BTN_A;            // fire
     if (t >= 150 && t < 250) return OREO_BTN_UP;         // walk forward
-    if (t >= 250 && t < 280) return OREO_BTN_LEFT;       // strafe; the gyro turns
+    if (t >= 250 && t < 280) return OREO_BTN_LEFT;       // strafe; tilt turns
     if (t >= 280 && t < 300) return OREO_BTN_A;          // fire
     if (t >= 300 && t < 330) return OREO_BTN_C | OREO_BTN_RIGHT;   // strafe
     if (t >= 330 && t < 332) return OREO_BTN_C | OREO_BTN_UP;      // next weapon
@@ -105,7 +105,7 @@ int main(int argc, char **argv) {
     }
     int frames = 0;
     for (int t = 0; t < ticks; ++t) {
-        // Gyro on during play: a steady turn to the left.
+        // Tilt turning on during play: a steady turn.
         int d = oreo_doom_tick(buttons_at(t), t >= 250 && t < 280 ? 40 : 0, 1);
         if (d == 2) {
             printf("quit to OreoOS at tick %d; engine keeps running\n", t);

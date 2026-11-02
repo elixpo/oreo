@@ -27,7 +27,7 @@ copies each frame to the screen.
   build files.
 - `port/` and `moddoom.c` are written for OreoOS (GPL-2.0-or-later) and
   replace the files left out: start-up and one-step ticking, button mapping,
-  gyro aiming (turning added to the engine's mouse input during play),
+  tilt turning (turning added to the engine's mouse input during play),
   palette conversion to RGB565, the `exit()` trap that returns to OreoOS, and
   the OWZ reader.
 

@@ -4,8 +4,8 @@
 // panel's RGB565. Replaces doomgeneric.c and dummy.c from doomgeneric.
 //
 // Controls:
-//   D-pad      move / turn (menus: navigate); with gyro aiming, the badge's
-//              rotation turns and LEFT/RIGHT strafe
+//   D-pad      move / turn (menus: navigate); with tilt turning, tilting the
+//              badge turns and LEFT/RIGHT strafe
 //   A          fire (menus: select)
 //   B          use, open doors (prompts: yes)
 //   C (hold)   strafe with LEFT/RIGHT; C+UP cycles weapons 1-7
@@ -97,18 +97,18 @@ int DG_GetKey(int *pressed, unsigned char *key) {
     return 1;
 }
 
-// LEFT/RIGHT turn, or strafe when the gyro turns; menus always get arrows.
+// LEFT/RIGHT turn, or strafe when motion (tilt) turns; menus always get arrows.
 // The key sent on press is remembered so its release matches.
-static void side(int i, int down, int gyro) {
+static void side(int i, int down, int motion) {
     static const unsigned char turn_keys[2] = {KEY_LEFTARROW, KEY_RIGHTARROW};
     static const unsigned char strafe_keys[2] = {KEY_STRAFE_L, KEY_STRAFE_R};
     if (down) {
-        side_key[i] = (gyro && !menuactive) ? strafe_keys[i] : turn_keys[i];
+        side_key[i] = (motion && !menuactive) ? strafe_keys[i] : turn_keys[i];
     }
     push_key(down, side_key[i]);
 }
 
-static void feed_buttons(uint32_t buttons, int gyro) {
+static void feed_buttons(uint32_t buttons, int motion) {
     uint32_t changed = buttons ^ prev_buttons;
     prev_buttons = buttons;
     if (!changed) {
@@ -150,10 +150,10 @@ static void feed_buttons(uint32_t buttons, int gyro) {
                 push_key(down, KEY_DOWNARROW);
                 break;
             case OREO_BTN_LEFT:
-                side(0, down, gyro);
+                side(0, down, motion);
                 break;
             case OREO_BTN_RIGHT:
-                side(1, down, gyro);
+                side(1, down, motion);
                 break;
         }
     }
@@ -229,14 +229,14 @@ void oreo_doom_quit_to_os(void) {
     quit_to_os = 1;
 }
 
-int oreo_doom_tick(uint32_t buttons, int turn, int gyro) {
+int oreo_doom_tick(uint32_t buttons, int turn, int motion) {
     if (!running) {
         return -1;
     }
-    feed_buttons(buttons, gyro);
-    // The gyro turns the player only in play, never in menus or demos.
+    feed_buttons(buttons, motion);
+    // Motion turns the player only in play, never in menus or demos.
     // mousex collects turning until the next tic is built, which clears it.
-    if (gyro && gamestate == GS_LEVEL && !menuactive && !paused && !demoplayback) {
+    if (motion && gamestate == GS_LEVEL && !menuactive && !paused && !demoplayback) {
         mousex += turn;
         if (mousex > 4096) {
             mousex = 4096;

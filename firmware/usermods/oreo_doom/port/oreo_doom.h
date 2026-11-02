@@ -32,13 +32,13 @@ extern size_t oreo_owz_size;
 // without a reset), otherwise the engine's exit code.
 int oreo_doom_start(int argc, char **argv);
 
-// Feed the current button mask and run one engine step. With gyro set, `turn`
-// is added to the player's turning (mouse units: 1 = 8/65536 of a full turn)
-// and LEFT/RIGHT strafe instead of turning. Returns 1 when a new frame was
+// Feed the current button mask and run one engine step. With motion set,
+// `turn` is added to the player's turning (mouse units: 1 = 8/65536 of a full
+// turn) and LEFT/RIGHT strafe instead of turning. Returns 1 when a new frame was
 // drawn, 0 when not, 2 when the player chose Quit Game (the engine is back at
 // the title screen and keeps running), and -1 once the engine has stopped on
 // a fatal error; oreo_doom_exit_code() then gives its code.
-int oreo_doom_tick(uint32_t buttons, int turn, int gyro);
+int oreo_doom_tick(uint32_t buttons, int turn, int motion);
 
 // Called by the engine's Quit Game confirmation.
 void oreo_doom_quit_to_os(void);
