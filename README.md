@@ -16,6 +16,8 @@
 [![Made by Elixpo](https://img.shields.io/badge/made_by-Elixpo-FF5D68?style=flat-square)](https://elixpo.com)
 [![Issues welcome](https://img.shields.io/badge/issues-welcome-00B4A5?style=flat-square)](https://github.com/elixpo/oreo/issues)
 [![Stars](https://img.shields.io/github/stars/elixpo/oreo?style=flat-square&color=FFBE1E)](https://github.com/elixpo/oreo/stargazers)
+[![Wikidata](https://img.shields.io/badge/Wikidata-Q141968869-006699?style=flat-square&logo=wikidata&logoColor=white)](https://www.wikidata.org/wiki/Q141968869)
+[![arXiv](https://img.shields.io/badge/arXiv-2610.35935-b31b1b?style=flat-square)](https://arxiv.org/abs/2610.35935)
 
 </div>
 
@@ -507,6 +509,14 @@ Everyone is welcome. See **[CONTRIBUTING.md](CONTRIBUTING.md)** and our
 
 Elixpo has taken part in and been supported by **GSSOC**, **Hacktoberfest**,
 **Pollinations.AI**, **MS Startup Foundations**, and **OSCI**.
+
+OreoOS is recorded on Wikidata as
+[OreoOS (Q141968869)](https://www.wikidata.org/wiki/Q141968869), an embedded
+operating system based on MicroPython. Its video pipeline is described in the
+paper [RV565 (arXiv:2610.35935)](https://arxiv.org/abs/2610.35935), and the
+playback library is published separately as
+[RV565](https://github.com/elixpo/rv565) (Arduino Library Manager, ESP Component
+Registry, PyPI).
 
 ### Google Summer of Code 2027
 
