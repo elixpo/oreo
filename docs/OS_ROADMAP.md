@@ -81,10 +81,11 @@ WiFi, and fun to hack. These items close the gap.
       and **awesome-micropython**, *Frameworks* section next to micrOS
       ([mcauser/awesome-micropython#233](https://github.com/mcauser/awesome-micropython/pull/233)).
       One-line PRs, disclosed as our own (2026-11-02).
-- [x] 🤖 **Wikidata** item "OreoOS" prepared as a QuickStatements batch
-      (embedded operating system, based on MicroPython, Python, ESP32, MIT,
-      website, repository, inception, version).
-- [ ] 🙋 Run the batch at quickstatements.toolforge.org (needs a Wikidata login).
+- [x] 🙋 **Wikidata** item [OreoOS (Q141968869)](https://www.wikidata.org/wiki/Q141968869),
+      created by hand (new accounts can't run QuickStatements): embedded
+      operating system and free software, based on MicroPython, platform
+      ESP32-S3, Python, MIT, inception, version, website, repository, and
+      described by arXiv:2610.35935, with sourced statements (2026-11-02).
 - [x] 🤖 **Hackaday.io** page text drafted (name, summary, description,
       details, components, links, tags, image list).
 - [ ] 🙋 Post it on hackaday.io with photos and the badge video.
