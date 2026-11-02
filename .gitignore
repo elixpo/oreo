@@ -28,3 +28,8 @@ firmware/*.bin
 .deploy_hashes.json
 dist/
 legal/
+
+# Doom game data: flashed to the badge, never committed
+*.wad
+*.WAD
+*.owz
