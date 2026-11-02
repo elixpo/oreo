@@ -2,7 +2,9 @@ NOTICE
 ======
 
 The code in this repository is licensed under the MIT License (see
-`../LICENSE` and `preferred/MIT`). Visual assets are licensed under CC-BY-4.0
+`../LICENSE` and `preferred/MIT`). Hardware design files under `../circuit/`
+are licensed under the CERN Open Hardware Licence v2 - Permissive (see
+`preferred/CERN-OHL-P-2.0`). Visual assets are licensed under CC-BY-4.0
 (see `preferred/CC-BY-4.0`). Brand rules - names, mascot, logos, domains and
 official listings - are separate and documented in `../TRADEMARKS.md`.
 

@@ -2,8 +2,8 @@
 
 The code in this repository is licensed under the plain **MIT License**. The
 top-level [`LICENSE`](../LICENSE) is the standard MIT text; there is no custom
-exception attached to it. Brand and visual assets are licensed under
-**CC-BY-4.0**. The structure of this directory mirrors the Linux kernel's
+exception attached to it. Hardware design files are licensed under
+**CERN-OHL-P-2.0**, and brand and visual assets under **CC-BY-4.0**. The structure of this directory mirrors the Linux kernel's
 `LICENSES/` tree.
 
 Rules for the Elixpo and Oreo names, the Oreo mascot, the E-badge mark, and the
@@ -15,7 +15,8 @@ CC-BY-4.0 permissions.
 
 ```
 preferred/    Licence texts used in this repository.
-              Code is MIT; brand/visual assets are CC-BY-4.0.
+              Code is MIT; hardware is CERN-OHL-P-2.0; brand/visual
+              assets are CC-BY-4.0.
 
 exceptions/   Legacy. `exceptions/Oreo-trademarks` is superseded by
               ../TRADEMARKS.md and is no longer applied to any file.
@@ -28,6 +29,7 @@ notices/      Third-party attributions (the upstream credit list).
 | Path                          | SPDX ID     | Used for |
 |-------------------------------|-------------|----------|
 | `../LICENSE` / `preferred/MIT` | `MIT`       | All source code, scripts, configuration, and documentation. |
+| `preferred/CERN-OHL-P-2.0`    | `CERN-OHL-P-2.0` | Hardware design files under `circuit/`: KiCad schematics, PCB layout, symbol library, BOMs, generator scripts' outputs and the generated PDFs. |
 | `preferred/CC-BY-4.0`         | `CC-BY-4.0` | Brand and visual assets: the Oreo mascot art, badge sprites, app icons, banners, and splash art under `assets/` and the per-app `assets/` trees. |
 | `preferred/Apache-2.0`        | `Apache-2.0` | Reference copy - covers upstream ESP-IDF components shipped in the firmware image. |
 
