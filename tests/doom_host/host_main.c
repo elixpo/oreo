@@ -58,14 +58,18 @@ static uint32_t buttons_at(int t) {
     if (idle) return 0;
     if (t >= 40 && t < 42) return OREO_BTN_HOME;         // open menu
     if (t >= 50 && t < 52) return OREO_BTN_A;            // New Game
-    if (t >= 60 && t < 62) return OREO_BTN_A;            // episode 1
-    if (t >= 70 && t < 72) return OREO_BTN_A;            // skill
+    if (t >= 60 && t < 62) return OREO_BTN_A;            // skill (no episode menu)
+    if (t >= 70 && t < 72) return OREO_BTN_A;            // fire
     if (t >= 150 && t < 250) return OREO_BTN_UP;         // walk forward
-    if (t >= 250 && t < 280) return OREO_BTN_LEFT;       // turn
+    if (t >= 250 && t < 280) return OREO_BTN_LEFT;       // strafe; the gyro turns
     if (t >= 280 && t < 300) return OREO_BTN_A;          // fire
     if (t >= 300 && t < 330) return OREO_BTN_C | OREO_BTN_RIGHT;   // strafe
     if (t >= 330 && t < 332) return OREO_BTN_C | OREO_BTN_UP;      // next weapon
     if (t >= 340 && t < 360) return OREO_BTN_B;          // use
+    if (t >= 370 && t < 372) return OREO_BTN_HOME;       // menu
+    if (t >= 380 && t < 382) return OREO_BTN_UP;         // wraps to Quit Game
+    if (t >= 390 && t < 392) return OREO_BTN_A;          // select
+    if (t >= 400 && t < 402) return OREO_BTN_B;          // yes: back to OreoOS
     return 0;
 }
 
@@ -90,7 +94,7 @@ int main(int argc, char **argv) {
     oreo_owz_data = owz;
     oreo_owz_size = size;
 
-    int ticks = argc > 3 ? atoi(argv[3]) : 400;
+    int ticks = argc > 3 ? atoi(argv[3]) : 500;
     idle = getenv("OREO_HOST_IDLE") != NULL;
     char *zone = argc > 4 ? argv[4] : "4";
     char *dargv[] = {"doom", "-iwad", "owz:/freedoom1.wad", "-mb", zone, "-nosound", NULL};
@@ -101,13 +105,18 @@ int main(int argc, char **argv) {
     }
     int frames = 0;
     for (int t = 0; t < ticks; ++t) {
-        int d = oreo_doom_tick(buttons_at(t));
+        // Gyro on during play: a steady turn to the left.
+        int d = oreo_doom_tick(buttons_at(t), t >= 250 && t < 280 ? 40 : 0, 1);
+        if (d == 2) {
+            printf("quit to OreoOS at tick %d; engine keeps running\n", t);
+            d = 1;
+        }
         if (d < 0) {
             printf("engine exited at tick %d (code %d)\n", t, oreo_doom_exit_code());
             return 1;
         }
         frames += d;
-        if (t % (idle ? 2000 : 50) == 0 || t == ticks - 1) {
+        if (t % (idle ? 2000 : 25) == 0 || t == ticks - 1) {
             write_ppm(argv[2], t);
         }
     }

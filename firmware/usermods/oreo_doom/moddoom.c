@@ -8,7 +8,8 @@
 //   import _oreo_doom as doom
 //   doom.available()          # True when the doom partition holds an OWZ
 //   doom.start()              # 0 when running (resumes an existing game)
-//   drawn = doom.tick(mask)   # button mask in oreoOS.api BTN_* bit order
+//   r = doom.tick(mask, turn) # button mask in oreoOS.api BTN_* bit order,
+//                             # gyro turn or None; 2 = player chose Quit
 //   display.blit_fullscreen(doom.frame())
 
 #include <string.h>
@@ -112,10 +113,14 @@ static mp_obj_t doom_start(size_t n_args, const mp_obj_t *args) {
 }
 static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(doom_start_obj, 0, 1, doom_start);
 
-static mp_obj_t doom_tick(mp_obj_t buttons) {
-    return mp_obj_new_int(oreo_doom_tick(mp_obj_get_int(buttons)));
+// tick(buttons, turn=None): turn is the gyro's turning since the last call
+// (engine mouse units); None plays with the buttons alone.
+static mp_obj_t doom_tick(size_t n_args, const mp_obj_t *args) {
+    int gyro = n_args > 1 && args[1] != mp_const_none;
+    int turn = gyro ? mp_obj_get_int(args[1]) : 0;
+    return mp_obj_new_int(oreo_doom_tick(mp_obj_get_int(args[0]), turn, gyro));
 }
-static MP_DEFINE_CONST_FUN_OBJ_1(doom_tick_obj, doom_tick);
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(doom_tick_obj, 1, 2, doom_tick);
 
 static mp_obj_t doom_frame(void) {
     const uint8_t *frame = oreo_doom_frame();

@@ -909,6 +909,7 @@ void M_DrawNewGame(void)
 }
 
 extern int epi;
+void oreo_doom_quit_to_os(void);
 
 void M_NewGame(int choice)
 {
@@ -1146,15 +1147,13 @@ void M_QuitResponse(int key)
 {
     if (key != key_menu_confirm)
 	return;
-    if (!netgame)
-    {
-	if (gamemode == commercial)
-	    S_StartSound(NULL,quitsounds2[(gametic>>2)&7]);
-	else
-	    S_StartSound(NULL,quitsounds[(gametic>>2)&7]);
-	I_WaitVBL(105);
-    }
-    I_Quit ();
+    // Oreo Badge: hand control back to OreoOS and return to the title
+    // screen instead of exiting, so Doom can be started again without a
+    // reboot. No quit sound or 1.5 s wait for it: the badge has no
+    // speaker. Modified 2026 for OreoOS.
+    M_ClearMenus ();
+    D_StartTitle ();
+    oreo_doom_quit_to_os ();
 }
 
 

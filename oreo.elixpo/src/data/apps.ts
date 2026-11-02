@@ -75,7 +75,8 @@ export const PRELOADED: AppEntry[] = [
     details: "The Doom engine (doomgeneric / Chocolate Doom, GPL) built into the " +
              "firmware, playing Freedoom's first episode (nine levels) from its own " +
              "flash partition. " +
-             "D-pad moves, A fires, B opens doors, hold C to strafe; HOME opens " +
+             "Rotate the badge to aim (gyro), D-pad walks and strafes, A fires, " +
+             "B opens doors; HOME opens " +
              "the menu and HOME twice within a second returns to OreoOS." }),
   app("gallery", { name: "Gallery",     category: "core", tint: "gold",    icon: "Image",
     pngIcon: "/icons/gallery_icon.png",

@@ -6,7 +6,8 @@ Doom's game data. This downloads the pinned release, verifies its SHA-256,
 packs Episode 1 of Phase 1 (freedoom1.wad) into OWZ with tools/pack_wad.py
 and checks the result fits the badge's "doom" partition. ./deploy --full
 writes it there. One episode (nine levels) is what fits beside OreoOS in
-16 MiB of flash; the engine then runs in single-episode mode.
+16 MiB of flash; the engine then runs in single-episode mode. Its text is
+restyled for the small screen by tools/doom_text.py.
 
     python3 tools/fetch_freedoom.py            # -> oreoWare/doom/freedoom1.owz
     python3 tools/fetch_freedoom.py --print-offset
@@ -23,6 +24,7 @@ import zipfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import doom_text  # noqa: E402
 import pack_wad  # noqa: E402
 
 VERSION = "0.13.0"
@@ -90,7 +92,8 @@ def main(argv=None):
         notice = z.read(LICENSE)
 
     ident, lumps = pack_wad.read_wad(wad)
-    owz = pack_wad.pack(ident, pack_wad.prepare(lumps, episodes=EPISODES))
+    lumps = doom_text.restyle(pack_wad.prepare(lumps, episodes=EPISODES))
+    owz = pack_wad.pack(ident, lumps)
     if len(owz) > size:
         raise SystemExit("fetch_freedoom: %.2f MiB of game data does not fit the "
                          "%.2f MiB doom partition" % (len(owz) / 2**20, size / 2**20))

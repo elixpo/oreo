@@ -16,6 +16,9 @@
 //	Printed strings for translation.
 //	English language support (default).
 //
+// Modified 2026 by the OreoOS project for the Oreo Badge; see
+// firmware/usermods/oreo_doom/README.md for the list of changes.
+//
 
 #ifndef __D_ENGLSH__
 #define __D_ENGLSH__
@@ -34,7 +37,9 @@
 //	M_Menu.C
 //
 #define PRESSKEY 	"press a key."
-#define PRESSYN 	"press y or n."
+// Oreo Badge: the badge has no Y or N key; B answers yes (it sends y) and
+// HOME no. Modified 2026 for OreoOS.
+#define PRESSYN 	"press B for yes, HOME for no."
 #define QUITMSG	"are you sure you want to\nquit this great game?"
 #define LOADNET 	"you can't do load while in a net game!\n\n"PRESSKEY
 #define QLOADNET	"you can't quickload during a netgame!\n\n"PRESSKEY
@@ -60,7 +65,7 @@
 #define NETEND	"you can't end a netgame!\n\n"PRESSKEY
 #define ENDGAME	"are you sure you want to end the game?\n\n"PRESSYN
 
-#define DOSY		"(press y to quit to dos.)"
+#define DOSY		"(B quits to OreoOS, HOME stays.)"
 
 #define DETAILHI	"High detail"
 #define DETAILLO	"Low detail"

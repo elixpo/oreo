@@ -4,11 +4,13 @@
 // panel's RGB565. Replaces doomgeneric.c and dummy.c from doomgeneric.
 //
 // Controls:
-//   D-pad      move / turn (menus: navigate)
+//   D-pad      move / turn (menus: navigate); with gyro aiming, the badge's
+//              rotation turns and LEFT/RIGHT strafe
 //   A          fire (menus: select)
 //   B          use, open doors (prompts: yes)
 //   C (hold)   strafe with LEFT/RIGHT; C+UP cycles weapons 1-7
-//   HOME       menu (the OreoOS app turns a second HOME within 1 s into exit)
+//   HOME       menu, prompts: no (the OreoOS app turns a second HOME within
+//              1 s into exit)
 
 #include <setjmp.h>
 #include <string.h>
@@ -16,6 +18,7 @@
 #include "doom.h"
 #include "doomgeneric.h"
 #include "doomkeys.h"
+#include "doomstat.h"
 #include "doomtype.h"
 #include "i_video.h"
 #include "m_argv.h"
@@ -33,6 +36,7 @@ void M_FindResponseFile(void);
 
 extern struct color colors[256];
 extern boolean palette_changed;
+extern int mousex;              // g_game.c: turning from the mouse, per tic
 
 static jmp_buf trap;
 static int in_engine;
@@ -40,6 +44,7 @@ static int started;
 static int running;
 static int exit_code;
 static int frame_drawn;
+static int quit_to_os;
 
 static uint8_t *frame;          // OREO_DOOM_W * OREO_DOOM_H * 2
 static uint8_t lut[256][2];     // palette index -> big-endian RGB565
@@ -71,6 +76,7 @@ static unsigned keyq_head, keyq_tail;
 static uint32_t prev_buttons;
 static int weapon = 1;
 static int up_cycled_weapon;
+static unsigned char side_key[2];   // key LEFT / RIGHT sent when pressed
 
 static void push_key(int pressed, unsigned char key) {
     unsigned next = (keyq_head + 1) % KEYQ;
@@ -91,7 +97,18 @@ int DG_GetKey(int *pressed, unsigned char *key) {
     return 1;
 }
 
-static void feed_buttons(uint32_t buttons) {
+// LEFT/RIGHT turn, or strafe when the gyro turns; menus always get arrows.
+// The key sent on press is remembered so its release matches.
+static void side(int i, int down, int gyro) {
+    static const unsigned char turn_keys[2] = {KEY_LEFTARROW, KEY_RIGHTARROW};
+    static const unsigned char strafe_keys[2] = {KEY_STRAFE_L, KEY_STRAFE_R};
+    if (down) {
+        side_key[i] = (gyro && !menuactive) ? strafe_keys[i] : turn_keys[i];
+    }
+    push_key(down, side_key[i]);
+}
+
+static void feed_buttons(uint32_t buttons, int gyro) {
     uint32_t changed = buttons ^ prev_buttons;
     prev_buttons = buttons;
     if (!changed) {
@@ -133,10 +150,10 @@ static void feed_buttons(uint32_t buttons) {
                 push_key(down, KEY_DOWNARROW);
                 break;
             case OREO_BTN_LEFT:
-                push_key(down, KEY_LEFTARROW);
+                side(0, down, gyro);
                 break;
             case OREO_BTN_RIGHT:
-                push_key(down, KEY_RIGHTARROW);
+                side(1, down, gyro);
                 break;
         }
     }
@@ -185,7 +202,7 @@ int oreo_doom_start(int argc, char **argv) {
         return 0;               // resume the running game
     }
     if (started) {
-        return -2;              // the engine has quit; it cannot restart in place
+        return -2;              // stopped on a fatal error; cannot restart in place
     }
     started = 1;
     if (!DG_ScreenBuffer) {
@@ -208,11 +225,25 @@ int oreo_doom_start(int argc, char **argv) {
     return 0;
 }
 
-int oreo_doom_tick(uint32_t buttons) {
+void oreo_doom_quit_to_os(void) {
+    quit_to_os = 1;
+}
+
+int oreo_doom_tick(uint32_t buttons, int turn, int gyro) {
     if (!running) {
         return -1;
     }
-    feed_buttons(buttons);
+    feed_buttons(buttons, gyro);
+    // The gyro turns the player only in play, never in menus or demos.
+    // mousex collects turning until the next tic is built, which clears it.
+    if (gyro && gamestate == GS_LEVEL && !menuactive && !paused && !demoplayback) {
+        mousex += turn;
+        if (mousex > 4096) {
+            mousex = 4096;
+        } else if (mousex < -4096) {
+            mousex = -4096;
+        }
+    }
     frame_drawn = 0;
     if (setjmp(trap)) {
         in_engine = 0;
@@ -221,6 +252,10 @@ int oreo_doom_tick(uint32_t buttons) {
     in_engine = 1;
     doomgeneric_Tick();
     in_engine = 0;
+    if (quit_to_os) {
+        quit_to_os = 0;
+        return 2;
+    }
     return frame_drawn;
 }
 

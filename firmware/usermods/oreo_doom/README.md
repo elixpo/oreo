@@ -27,6 +27,7 @@ copies each frame to the screen.
   build files.
 - `port/` and `moddoom.c` are written for OreoOS (GPL-2.0-or-later) and
   replace the files left out: start-up and one-step ticking, button mapping,
+  gyro aiming (turning added to the engine's mouse input during play),
   palette conversion to RGB565, the `exit()` trap that returns to OreoOS, and
   the OWZ reader.
 
@@ -38,7 +39,8 @@ Each changed file carries a "Modified 2026 by the OreoOS project" line.
 |---|---|
 | `m_misc.c` | `M_FileExists` accepts `owz:` paths (game data in flash). |
 | `w_file.c` | `W_OpenFile` opens `owz:` paths with the OWZ reader. |
-| `m_menu.c` | With a single-episode IWAD, New Game goes straight to the skill menu instead of listing episodes that are not there. |
+| `m_menu.c` | With a single-episode IWAD, New Game goes straight to the skill menu instead of listing episodes that are not there. Quit Game returns to OreoOS and the title screen instead of exiting, so Doom can be started again without a reboot (no quit sound or wait: the badge has no speaker). |
+| `d_englsh.h` | Yes/no prompts name the badge's buttons (B yes, HOME no) instead of Y and N. |
 | `d_loop.c`, `r_bsp.c`, `r_draw.c`, `r_main.c`, `r_plane.c`, `r_things.c`, `statdump.c` | Large static tables tagged `OREO_EXT_BSS`, which places them in PSRAM on the badge. |
 
 ## Game data
@@ -56,7 +58,9 @@ Episode 1 one, which would otherwise replay out of sync), from 27.5 MiB to
 leaves too little flash for OreoOS's filesystem. `./deploy --full` writes it
 to the `doom` flash partition (see
 `firmware/boards/OREO_BADGE/partitions-oreo-badge.csv`), which the module
-memory-maps and inflates a lump at a time.
+memory-maps and inflates a lump at a time. Its text graphics are restyled
+for the 2" screen by [`tools/doom_text.py`](../../../tools/doom_text.py): a
+thin 5x7 font for messages, and the dark outlines removed from large text.
 
 ## Testing on a PC
 
