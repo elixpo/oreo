@@ -117,8 +117,10 @@ WiFi, and fun to hack. These items close the gap.
       badge to the README and the badge page.
 - [x] 🤖 **OpenSSF Scorecard** workflow and badge
       ([oreo#74](https://github.com/elixpo/oreo/pull/74)).
-- [ ] 🙋 **OpenSSF Best Practices** badge: register at bestpractices.dev
-      (answers prepared), then add the badge.
+- [x] 🙋 **OpenSSF Best Practices** badge: **passing**
+      ([project 16187](https://www.bestpractices.dev/projects/16187), 2026-11-02).
+      Answering it surfaced and fixed predictable Send Files codes
+      ([oreo#78](https://github.com/elixpo/oreo/pull/78)).
 - [x] 🤖 **MicroPython upstream board** opened as a draft
       ([micropython#19846](https://github.com/micropython/micropython/pull/19846)).
 - [ ] 🙋 Build it on MicroPython master, flash, check banner, Wi-Fi scan and
