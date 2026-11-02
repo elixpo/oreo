@@ -47,3 +47,12 @@ flat engineering export that is regenerated directly from the schematic model.
 - Confirm every regulator inductor, capacitor DC-bias curve and thermal margin.
 - Treat this as an engineering prototype, not a production-certified charger
   or RF design, until layout review, bring-up and compliance testing complete.
+
+## Licence
+
+The hardware design files in this directory are Open Hardware, licensed under
+the [CERN Open Hardware Licence v2 - Permissive](../../LICENSES/preferred/CERN-OHL-P-2.0)
+(CERN-OHL-P-2.0); see [`LICENSE`](LICENSE) for the notice. You may make,
+modify and sell boards from them; the Elixpo and Oreo names and mascot are
+trademarks, so derived boards need their own names (see
+[`TRADEMARKS.md`](../../TRADEMARKS.md)).
