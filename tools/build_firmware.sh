@@ -212,7 +212,9 @@ make -C "$MICROPY_DIR/ports/esp32" submodules \
   BOARD_DIR="$BOARD_DIR" \
   BUILD="$BUILD_NAME"
 
-if $CLEAN && [[ -d "$MICROPY_DIR/ports/esp32/$BUILD_NAME" ]]; then
+# Only a configured build can be cleaned; a fresh directory holds just the
+# submodule step above, which idf.py refuses to "fullclean".
+if $CLEAN && [[ -f "$MICROPY_DIR/ports/esp32/$BUILD_NAME/CMakeCache.txt" ]]; then
   printf 'Cleaning %s...\n' "$BUILD_NAME"
   make -C "$MICROPY_DIR/ports/esp32" clean \
     BOARD_DIR="$BOARD_DIR" \
