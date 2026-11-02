@@ -7,7 +7,9 @@ compressed as one stream. OWZ compresses every lump on its own with zlib
 the first time the engine asks for it, using the ESP32-S3's ROM inflater.
 
 The badge has no speaker, so sound effects, music and music-driver lumps are
-dropped by default (--keep-audio keeps them).
+emptied by default (--keep-audio keeps them): each keeps its name with zero
+bytes of data, because the engine still looks lumps such as the title music
+up by name and treats a missing one as fatal.
 
     python3 tools/pack_wad.py freedoom1.wad freedoom1.owz
     python3 tools/pack_wad.py --check freedoom1.owz freedoom1.wad
@@ -114,6 +116,11 @@ def unpack(owz):
     return ident, lumps
 
 
+def strip_audio(lumps):
+    """Empty the audio lumps, keeping their names and positions."""
+    return [(n, b"" if is_audio(n) else c) for n, c in lumps]
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("source", type=Path, help="WAD to pack (or OWZ with --check)")
@@ -128,20 +135,19 @@ def main(argv=None):
         if args.check:
             _, packed = unpack(args.source.read_bytes())
             ident, original = read_wad(args.output.read_bytes())
-            kept = [(n, c) for n, c in original if not is_audio(n)]
-            expected = original if len(packed) == len(original) else kept
-            if packed != expected:
+            if packed != original and packed != strip_audio(original):
                 raise PackError("OWZ does not match the WAD")
             print("ok: %d lumps identical to %s" % (len(packed), args.output.name))
             return 0
 
         data = args.source.read_bytes()
         ident, lumps = read_wad(data)
-        kept = lumps if args.keep_audio else [(n, c) for n, c in lumps if not is_audio(n)]
+        kept = lumps if args.keep_audio else strip_audio(lumps)
         owz = pack(ident, kept, args.level)
         args.output.write_bytes(owz)
-        print("%s: %d lumps (%d audio dropped), %.2f MiB -> %s %.2f MiB" % (
-            args.source.name, len(kept), len(lumps) - len(kept), len(data) / 2**20,
+        emptied = sum(1 for (n, c), (_, k) in zip(lumps, kept) if c and not k)
+        print("%s: %d lumps (%d audio emptied), %.2f MiB -> %s %.2f MiB" % (
+            args.source.name, len(kept), emptied, len(data) / 2**20,
             args.output.name, len(owz) / 2**20))
         return 0
     except PackError as exc:

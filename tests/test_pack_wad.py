@@ -52,11 +52,13 @@ class PackWadTest(unittest.TestCase):
         names = [n for n, _ in LUMPS if self.packer.is_audio(n)]
         self.assertEqual(names, ["DSPISTOL", "D_E1M1", "GENMIDI"])
 
-    def test_markers_survive_without_audio(self):
+    def test_audio_is_emptied_but_names_and_order_survive(self):
         _, lumps = self.packer.read_wad(make_wad(LUMPS))
-        kept = [(n, c) for n, c in lumps if not self.packer.is_audio(n)]
-        _, back = self.packer.unpack(self.packer.pack(b"IWAD", kept))
-        self.assertEqual([n for n, _ in back], ["PLAYPAL", "E1M1", "THINGS", "TITLEPIC", "TINY"])
+        _, back = self.packer.unpack(self.packer.pack(b"IWAD", self.packer.strip_audio(lumps)))
+        self.assertEqual([n for n, _ in back], [n for n, _ in LUMPS])
+        self.assertEqual(dict(back)["D_E1M1"], b"")       # music is looked up by name
+        self.assertEqual(dict(back)["DSPISTOL"], b"")
+        self.assertEqual(dict(back)["THINGS"], dict(LUMPS)["THINGS"])
         self.assertEqual(back[1], ("E1M1", b""))
 
     def test_compresses_and_stores_incompressible_lumps(self):
