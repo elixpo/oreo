@@ -2,6 +2,7 @@
   "name": "oreo-elixpo",
   "version": "1.0.0",
   "private": true,
+  "license": "MIT",
   "description": "The Oreo Badge — marketing site, app catalogue, and gated file-transfer launcher.",
   "scripts": {
     "dev": "next dev",

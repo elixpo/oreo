@@ -8,7 +8,7 @@
 
 **A handheld panda-themed conference badge that runs a real operating system.**
 
-[![License: MIT & CC-BY-4.0](https://img.shields.io/badge/license-MIT_%26_CC--BY--4.0-FF5D68?style=for-the-badge)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-FF5D68?style=for-the-badge)](LICENSE)
 [![MicroPython 1.28](https://img.shields.io/badge/MicroPython-1.28-00B4A5?style=for-the-badge&logo=python&logoColor=white)](https://micropython.org)
 [![ESP32-S3](https://img.shields.io/badge/ESP32--S3-N16R8-2E2E2E?style=for-the-badge&logo=espressif&logoColor=white)](https://www.espressif.com/en/products/socs/esp32-s3)
 [![OTA Updates](https://img.shields.io/badge/OTA-yes-FFBE1E?style=for-the-badge)](#-updates)
@@ -518,6 +518,41 @@ playback library is published separately as
 [RV565](https://github.com/elixpo/rv565) (Arduino Library Manager, ESP Component
 Registry, PyPI).
 
+### Google Summer of Code 2027
+
+Elixpo is applying to be a mentoring organisation for Google Summer of Code
+2027. Google has not announced the 2027 programme yet, and Elixpo has not been
+accepted. Oreo hosts one proposed project idea:
+
+| Idea | Size | Difficulty | Mentors (primary / backup) |
+| --- | --- | --- | --- |
+| [Oreo badge desktop simulator](https://gsoc.elixpo.com/ideas/oreo-badge-simulator/) | 175 h | Intermediate | [Ayushman Bhattacharya](https://github.com/Circuit-Overtime) / [Vivek Yadav](https://github.com/ez-vivek) |
+
+**How to start** (no badge hardware needed)
+
+1. Read the idea page and the programme site at [gsoc.elixpo.com](https://gsoc.elixpo.com).
+2. Set up the Python environment from the "Get going" section above, and read
+   [LEARN.md](LEARN.md) for a guided tour of OreoOS.
+3. Read [`docs/README.md`](docs/README.md) and [`docs/HARDWARE.md`](docs/HARDWARE.md)
+   to see what the display and buttons do, since the simulator has to stand in
+   for them.
+4. Read [CONTRIBUTING.md](CONTRIBUTING.md), then pick a small issue from the
+   [issue tracker](https://github.com/elixpo/oreo/issues).
+
+**Configuration and access**
+
+This repository keeps configuration encrypted with SOPS. Applicants do not need
+any keys: the warm-up tasks and the core of the idea run locally without
+decrypting configuration. Once accepted, contributors receive SOPS access
+scoped to their project (for example for integration tests or staging), which
+is revoked when the programme ends.
+
+Questions go to **gsoc@elixpo.com**. GitHub Discussions for GSoC open once
+Google announces the 2027 dates.
+
+_Google Summer of Code is a programme of Google LLC; Elixpo is applying as a
+mentoring organisation and is not affiliated with or endorsed by Google._
+
 ## Get involved
 
 - 💬 **Join the conversation** in [GitHub Discussions](https://github.com/orgs/elixpo/discussions).
@@ -528,18 +563,15 @@ Registry, PyPI).
 
 The Oreo mascot, badge sprites, and app icons live under
 [`assets/`](assets/). They are CC-BY-4.0, but the Oreo mascot, the chest
-E-badge, and the "Elixpo"/"Oreo" names and palette are reserved - see the
-[Oreo-trademarks exception](LICENSES/exceptions/Oreo-trademarks). A browsable
+E-badge, and the "Elixpo"/"Oreo" names are trademarks - see
+[`TRADEMARKS.md`](TRADEMARKS.md). A browsable
 brand kit is at **[elixpo.com/assets](https://elixpo.com/assets)**.
 
 ## License
 
-Oreo Badge uses the Elixpo **licensing standard**:
-
-- **Code** (OreoOS, oreoWare, apps, tooling) - [MIT](LICENSES/preferred/MIT)
-  (with the [Oreo-trademarks exception](LICENSES/exceptions/Oreo-trademarks)).
+- **Code** (OreoOS, oreoWare, apps, tooling) - [MIT](LICENSE).
 - **Brand & visual assets** (mascot, sprites, icons) -
-  [CC-BY-4.0](LICENSES/preferred/CC-BY-4.0) (with the same exception).
+  [CC-BY-4.0](LICENSES/preferred/CC-BY-4.0).
 - **Upstream firmware components** - the firmware image incorporates
   MicroPython (MIT) and Espressif ESP-IDF
   ([Apache-2.0](LICENSES/preferred/Apache-2.0)); downstream distributors of
@@ -547,8 +579,8 @@ Oreo Badge uses the Elixpo **licensing standard**:
   [`LICENSES/notices/notice-board`](LICENSES/notices/notice-board).
 
 The Oreo mascot, the chest E-badge, the "Elixpo", "Oreo", "Oreo Badge", and
-"OreoOS" names, domains, and palette are reserved - this protects the brand and
-its royalties while keeping the code and assets free. See [`LICENSE`](LICENSE)
+"OreoOS" names, and the elixpo.com domains are trademarks of the Elixpo project
+and are not licensed by MIT or CC-BY-4.0. See [`TRADEMARKS.md`](TRADEMARKS.md)
 and the per-product notice board, [`LICENSES/NOTICE`](LICENSES/NOTICE).
 
 ## Exclusive
