@@ -469,19 +469,31 @@ def progress():
 # call it and get the live value. `refresh_code()` forces a rotation
 # now — wired to the "R = refresh code" button on the Send Files page.
 
+def _random_code(n):
+    """`n` characters from SESSION_CHARSET drawn from the hardware RNG.
+
+    Badge codes and session ids grant upload access, so every character
+    comes straight from os.urandom (the ESP32's hardware RNG), with
+    rejection sampling so each character is equally likely. There is
+    deliberately no fallback: without a secure RNG this raises rather
+    than hand out guessable codes.
+    """
+    import os as _o
+    cs = SESSION_CHARSET
+    limit = 256 - (256 % len(cs))
+    out = []
+    while len(out) < n:
+        for b in _o.urandom(n):
+            if b < limit:
+                out.append(cs[b % len(cs)])
+                if len(out) == n:
+                    break
+    return "".join(out)
+
+
 def _gen_code(n=6):
     """Six-char alphanumeric code excluding ambiguous shapes."""
-    try:
-        import time as _t
-        seed = _t.ticks_ms() ^ id(_sessions)
-    except Exception:
-        seed = 1
-    out = []
-    cs = SESSION_CHARSET
-    for _ in range(n):
-        seed = (seed * 1103515245 + 12345) & 0x7FFFFFFF
-        out.append(cs[seed % len(cs)])
-    return "".join(out)
+    return _random_code(n)
 
 
 def current_code():
@@ -592,21 +604,9 @@ def set_transfer_enabled(on):
 
 
 def _new_session_id():
-    """Generate a 6-char alphanumeric id excluding ambiguous chars
-    (0/O, 1/I, l). os.urandom would be ideal but isn't always present
-    on MicroPython; time-mixed prand works for our scale."""
-    import time as _t
-    try:
-        import os as _o
-        seed = int.from_bytes(_o.urandom(4), "big")
-    except Exception:
-        seed = _t.ticks_ms() ^ id(_sessions)
-    out = []
-    n = len(SESSION_CHARSET)
-    for _ in range(6):
-        seed = (seed * 1103515245 + 12345) & 0x7FFFFFFF
-        out.append(SESSION_CHARSET[seed % n])
-    return "".join(out)
+    """Generate a 6-char session id excluding ambiguous chars
+    (0/O, 1/I, l), from the hardware RNG (see _random_code)."""
+    return _random_code(6)
 
 
 def tick():
