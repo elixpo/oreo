@@ -8,6 +8,8 @@ RV565 makes full-colour video practical on OreoOS by treating playback as a comp
 
 > **Executive takeaway:** moving frame inflation into firmware removed a costly and unpredictable language-runtime boundary. Reaching 24 FPS, however, requires the entire path—not only decompression—to be pipelined.
 
+Figures in this deck are the final measurements from the RV565 paper ([arXiv:2610.35935](https://arxiv.org/abs/2610.35935)), on two ten-second windows of *Big Buck Bunny* (W90 and W360).
+
 ---
 
 # 1. What this deck explains
@@ -17,7 +19,7 @@ RV565 makes full-colour video practical on OreoOS by treating playback as a comp
 - How frames move from an uploaded video to the LCD
 - Why decompression was moved from MicroPython into custom firmware
 - How double-buffered stripes and SPI2 GDMA sustain 24 FPS
-- Why the integrated Gallery currently measures 14.09 FPS despite looking smooth
+- Why the integrated Gallery measures 12.17 FPS despite looking smooth
 - What remains to bring the complete OreoOS path to a measured 24 FPS
 
 **Audience:** OreoOS contributors, embedded engineers, research collaborators, and reviewers.
@@ -355,49 +357,53 @@ This avoids making serial logging part of the workload being measured.
 
 # 16. Measured performance
 
-| Configuration | Frames | Effective FPS | Drops | Deadline misses | Work p50 | Work p95 | Work p99 |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| Standalone native DMA stripes | 7,200 across 10 runs | **24.004** | 0 | 0 | 38.552 ms | 39.690 ms | 40.206 ms |
-| OreoOS Gallery with firmware inflater | 720 | **14.093** | 0 | 720 | 69.535 ms | 76.988 ms | 78.938 ms |
+| Window | Configuration | Frames | FPS | Drops | Deadline misses | Work p50 | Work p95 | Work p99 |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| W90 | Standalone, serial | 7,200 across 10 runs | 24.002 | 0 | 0 | 40.205 ms | 40.741 ms | 41.348 ms |
+| W90 | Standalone, dual-core | 7,200 across 10 runs | **24.009** | 0 | 0 | 31.322 ms | 31.331 ms | 31.333 ms |
+| W360 | Standalone, serial | 7,200 across 10 runs | 23.905 | 20 | 7,200 | 41.828 ms | 41.869 ms | 41.881 ms |
+| W360 | Standalone, dual-core | 7,200 across 10 runs | **24.009** | 0 | 0 | 31.324 ms | 31.334 ms | 31.335 ms |
+| W90 | OreoOS Gallery, firmware inflation | 720 | **12.170** | n/a | 720 | 80.174 ms | 86.067 ms | 87.117 ms |
 
-The standalone pipeline stays below the 41.667 ms deadline even at p99. The integrated path is stable, but its p50 work time already exceeds the deadline.
+The dual-core standalone pipeline meets every deadline on both windows with 10.3 ms of slack; the serial one only on the lighter window. Gallery does not skip frames when late, so drops do not apply; its p50 work time already exceeds the deadline.
 
-**Claim boundary:** the hardware and standalone architecture have demonstrated 24 FPS. The current full Gallery integration has not yet demonstrated 24 FPS under instrumentation.
+**Claim boundary:** the hardware and standalone architecture have demonstrated 24 FPS. The full Gallery integration has not yet demonstrated 24 FPS under instrumentation.
 
 ---
 
 # 17. Where the integrated frame budget goes
 
-The current Gallery stages are largely serialized. Their measured mean times are:
+The Gallery stages are serialized. Their measured mean times on W90 are:
 
 ```mermaid
 flowchart LR
-    A[Storage read<br/>18.193 ms] --> B[Firmware inflate<br/>7.798 ms]
-    B --> C[Scale<br/>7.650 ms]
-    C --> D[Draw<br/>9.116 ms]
-    D --> E[Present<br/>33.308 ms]
-    E --> F[Total work<br/>69.212 ms]
+    A[Filesystem read<br/>27.631 ms] --> B[Firmware inflate<br/>9.525 ms]
+    B --> C[Scale<br/>7.641 ms]
+    C --> D[Overlay<br/>1.459 ms]
+    D --> E[Present<br/>33.317 ms]
+    E --> F[Total work<br/>80.400 ms]
 ```
 
 | Stage | Mean time |
 |---|---:|
-| Storage read | 18.193 ms |
-| Firmware inflate | 7.798 ms |
-| Scale | 7.650 ms |
-| Draw | 9.116 ms |
-| Present | 33.308 ms |
-| **Measured total work** | **69.212 ms** |
+| Filesystem read | 27.631 ms |
+| Firmware inflate | 9.525 ms |
+| Scale (native) | 7.641 ms |
+| Overlay | 1.459 ms |
+| Present | 33.317 ms |
+| OS and interpreter residual | 0.827 ms |
+| **Measured total work** | **80.400 ms** |
 
-The stage means are rounded and instrumentation boundaries may overlap slightly, but the conclusion is unambiguous: presentation plus serial preparation cannot fit into a 41.667 ms window.
+The interpreter is not the problem: it accounts for 0.83 ms. Presentation plus serial preparation cannot fit into a 41.667 ms window; even without the filesystem read, about 52.8 ms of serial work would remain.
 
 ---
 
-# 18. Why 14 FPS can still look smooth
+# 18. Why 12 FPS can still look smooth
 
 The eye does not perceive frame rate alone. The integrated playback can look surprisingly acceptable because:
 
 - frame delivery is regular rather than bursty;
-- all 720 measured frames were presented with zero drops;
+- Gallery slows down instead of skipping, so every source frame is shown (W90 plays at 0.507× real time);
 - the p50-to-p95 spread is modest for the complete workload;
 - independent frames avoid decoder recovery artifacts;
 - there is currently no audio clock exposing slow video time.
@@ -434,7 +440,7 @@ The next optimisation should target the whole critical path:
 4. remove the intermediate full-frame draw/present copy;
 5. preserve Python as the control plane rather than the pixel data plane.
 
-This is the shortest route from the measured 69 ms integrated frame toward the proven sub-41.667 ms native path.
+This is the shortest route from the measured 80 ms integrated frame toward the proven 31.3 ms dual-core native path.
 
 ---
 
@@ -504,7 +510,7 @@ This framing is both more accurate and stronger than claiming RV565 as a new com
 4. **Overlap CPU and I/O.** Double-buffered DMA stripes are what make the 24 FPS deadline attainable.
 5. **Measure inside the real OS.** A standalone ceiling and an integrated result answer different questions.
 6. **Design ingestion and storage together.** Media must be transformed and validated before it reaches constrained storage.
-7. **Keep claims honest.** OreoOS has a proven 24 FPS native pipeline and a currently measured 14.09 FPS Gallery path, with a concrete route to converge them.
+7. **Keep claims honest.** OreoOS has a proven 24 FPS native pipeline and a measured 12.17 FPS Gallery path, with a concrete route to converge them.
 
 ---
 
