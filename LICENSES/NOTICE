@@ -30,7 +30,7 @@ The following identify official Elixpo releases and are covered by
 `../TRADEMARKS.md`, not by an extra copyright term:
 
   - the "Oreo", "Oreo Badge", and "OreoOS" names
-  - the oreoos package name (GitHub Packages / PyPI)
+  - the oreoos package name (PyPI)
   - the official firmware/OTA release channel on this repository's GitHub
     Releases
   - the Oreo Badge product identity (you may build and redistribute boards

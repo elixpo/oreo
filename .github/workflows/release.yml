@@ -20,10 +20,7 @@ on:
       - 'oreoWare/**'
 
 permissions:
-  contents: write    
-                     
-  packages: write    
-                     
+  contents: write
 
 concurrency:
   group: oreo-release-${{ github.ref }}
@@ -135,17 +132,3 @@ jobs:
             See `CONTRIBUTING.md` for the release process.
           files: |
             upload/*
-
-
-      - name: Install build tools
-        run: pip install --upgrade build twine
-      - name: Build sdist + wheel
-        run: python -m build
-      - name: Publish to GitHub Packages (PyPI registry)
-        env:
-          TWINE_USERNAME: __token__
-          # Attribute the package upload to elixpoo too. The PAT needs
-          # `write:packages` (and `read:packages` for re-uploads).
-          TWINE_PASSWORD: ${{ secrets.CI_AGENT_TOKEN }}
-          TWINE_REPOSITORY_URL: https://${{ github.repository_owner }}.pkg.github.com/${{ github.repository_owner }}/
-        run: twine upload --skip-existing dist/oreoos-*.tar.gz dist/oreoos-*.whl
