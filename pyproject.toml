@@ -9,8 +9,9 @@
 # Build locally:
 #     pip install --upgrade build
 #     python -m build
-# That produces dist/oreoos-<version>.tar.gz + a .whl. CI publishes both
-# to GitHub Packages on every release tag.
+# That produces dist/oreoos-<version>.tar.gz + a .whl. Releases ship the OS
+# as GitHub Release assets (see .github/workflows/release.yml); the package is
+# not published to a registry. GitHub Packages has no Python registry.
 
 [build-system]
 requires      = ["setuptools >= 68", "wheel"]
