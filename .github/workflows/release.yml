@@ -48,14 +48,25 @@ jobs:
 
       - name: Resolve channel + version
         id: meta
+        # Inputs and commit text reach scripts through env, never through
+        # ${{ }} inside run: GitHub substitutes ${{ }} into the script before
+        # bash parses it, so text containing backticks or $( ) would execute.
+        env:
+          INPUT_CHANNEL: ${{ github.event.inputs.channel }}
+          INPUT_VERSION: ${{ github.event.inputs.version }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            CHANNEL="${{ github.event.inputs.channel }}"
-            VERSION="${{ github.event.inputs.version }}"
-            [ -z "$CHANNEL" ] && CHANNEL="stable"
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            CHANNEL="${INPUT_CHANNEL:-stable}"
+            VERSION="$INPUT_VERSION"
           else
             CHANNEL="stable"
             VERSION=""
+          fi
+          # Both become tag names, file paths and later arguments: accept only
+          # the shapes they can legitimately have.
+          case "$CHANNEL" in stable|beta) ;; *) echo "invalid channel: $CHANNEL"; exit 1 ;; esac
+          if [ -n "$VERSION" ] && ! printf '%s' "$VERSION" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "invalid version (expected vX.Y.Z): $VERSION"; exit 1
           fi
           # Next version: one patch above the newer of config.py and the
           # latest stable tag. main is protected (changes only through pull
@@ -84,6 +95,8 @@ jobs:
           echo "Building $TAG (current was $CURR)"
 
       - name: Build release artefacts
+        env:
+          RELEASE_NOTES: ${{ github.event.head_commit.message || github.event.inputs.version }}
         run: |
           # The asset-base-url makes the manifest's per-file URLs point
           # at the actual GitHub Release asset URLs once they're uploaded
@@ -92,7 +105,7 @@ jobs:
           python tools/build_release.py \
             --version "${{ steps.meta.outputs.version }}" \
             --channel "${{ steps.meta.outputs.channel }}" \
-            --notes   "${{ github.event.head_commit.message || github.event.inputs.version }}" \
+            --notes   "$RELEASE_NOTES" \
             --asset-base-url "$ASSET_BASE" \
             --out dist
 
