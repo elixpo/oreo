@@ -77,6 +77,25 @@ export default function BadgePage() {
                 Repo
               </a>
             </motion.div>
+            <motion.a
+              variants={fadeUp}
+              href="https://certification.oshwa.org/in000107.html"
+              target="_blank" rel="noreferrer"
+              className="mt-8 inline-flex items-center gap-4"
+              aria-label="Certified open source hardware, OSHWA UID IN000107"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/oshw_mark.png"
+                alt="OSHW IN000107"
+                className="h-12 w-auto"
+                width={4000} height={1122}
+                decoding="async"
+              />
+              <span className="text-sm text-text-dim">
+                Certified open source hardware by OSHWA
+              </span>
+            </motion.a>
           </motion.div>
 
         </div>

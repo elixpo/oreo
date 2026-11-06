@@ -17,6 +17,7 @@
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/elixpo/oreo/badge)](https://scorecard.dev/viewer/?uri=github.com/elixpo/oreo)
 [![Wikidata](https://img.shields.io/badge/Wikidata-Q141968869-006699?style=flat-square&logo=wikidata&logoColor=white)](https://www.wikidata.org/wiki/Q141968869)
 [![arXiv](https://img.shields.io/badge/arXiv-2610.35935-b31b1b?style=flat-square)](https://arxiv.org/abs/2610.35935)
+[![OSHWA certified: IN000107](https://img.shields.io/badge/OSHWA-IN000107-333333?style=flat-square)](https://certification.oshwa.org/in000107.html)
 
 </div>
 
@@ -567,6 +568,16 @@ E-badge, and the "Elixpo"/"Oreo" names are trademarks - see
 brand kit is at **[elixpo.com/assets](https://elixpo.com/assets)**.
 
 ## License
+
+The Oreo Badge is **certified open source hardware** by the Open Source
+Hardware Association, UID [IN000107](https://certification.oshwa.org/in000107.html).
+
+<a href="https://certification.oshwa.org/in000107.html">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="oreo.elixpo/public/oshw_mark_card.png">
+    <img src="oreo.elixpo/public/oshw_mark.png" alt="Certified open source hardware, OSHWA UID IN000107" width="260">
+  </picture>
+</a>
 
 - **Code** (OreoOS, oreoWare, apps, tooling) - [MIT](LICENSE).
 - **Hardware** (KiCad schematics, PCB, symbols, BOMs and generated files under
