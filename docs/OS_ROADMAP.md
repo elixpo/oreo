@@ -112,9 +112,9 @@ WiFi, and fun to hack. These items close the gap.
 - [x] 🤖 Hardware design files licensed **CERN-OHL-P-2.0**; README "Exclusive"
       clarified (names and look reserved, design open)
       ([oreo#73](https://github.com/elixpo/oreo/pull/73)).
-- [x] 🙋 **OSHWA Open Source Hardware certification** submitted; under review
-      (usually under two weeks). When the UID arrives: add the certification
-      badge to the README and the badge page.
+- [x] 🙋 **OSHWA Open Source Hardware certification**: certified
+      2026-11-06, UID [IN000107](https://certification.oshwa.org/in000107.html); mark in the README and on the
+      badge page.
 - [x] 🤖 **OpenSSF Scorecard** workflow and badge
       ([oreo#74](https://github.com/elixpo/oreo/pull/74)).
 - [x] 🙋 **OpenSSF Best Practices** badge: **passing**

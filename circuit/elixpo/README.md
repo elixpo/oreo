@@ -1,5 +1,9 @@
 # Oreo badge hardware
 
+The Oreo Badge is certified open source hardware by the Open Source Hardware
+Association, UID [IN000107](https://certification.oshwa.org/in000107.html). The design is licensed under
+CERN-OHL-P-2.0 (see `LICENSE` in this directory).
+
 This KiCad 10 project is the bare-chip successor to the ESP32-S3 DevKitC
 breadboard. The root schematic, `elixpo.kicad_sch`, links four detailed sheets:
 
