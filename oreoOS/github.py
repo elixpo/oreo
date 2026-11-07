@@ -21,6 +21,12 @@ GRAPH_PATH = "apps/commits/cache.txt"
 PROFILE_TTL_S = 6 * 3600
 GRAPH_TTL_S = 3 * 3600
 TIMEOUT_S = 6
+# The contributions page is ~250 kB of HTML. At TLS speeds on the ESP32-S3
+# that does not arrive inside TIMEOUT_S, and _http returns whatever it read
+# when its deadline passes, so the graph gets its own, longer budget. It runs
+# on a background thread (cache.Refresh), so the UI keeps going meanwhile.
+GRAPH_TIMEOUT_S = 25
+GRAPH_BYTES = 260 * 1024   # typical page size, for progress estimates only
 
 
 def user(default="octocat"):
@@ -44,10 +50,11 @@ def stale(age_s, ttl_s):
     return age_s is None or age_s > ttl_s
 
 
-def _get(url, accept=None):
+def _get(url, accept=None, timeout_s=TIMEOUT_S, on_progress=None):
     try:
         from oreoOS import _http
-        return _http.get_url(url, accept=accept, timeout_s=TIMEOUT_S)
+        return _http.get_url(url, accept=accept, timeout_s=timeout_s,
+                             on_progress=on_progress)
     except Exception:
         return None
 
@@ -167,6 +174,44 @@ def parse_contributions(body):
     return days
 
 
+def day_number(iso):
+    """Days since 1970-01-01 for a yyyy-mm-dd date (proleptic Gregorian)."""
+    y, m, d = int(iso[:4]), int(iso[5:7]), int(iso[8:10])
+    if m <= 2:
+        y -= 1
+    era = y // 400
+    yoe = y - era * 400
+    doy = (153 * (m - 3 if m > 2 else m + 9) + 2) // 5 + d - 1
+    return era * 146097 + yoe * 365 + yoe // 4 - yoe // 100 + doy - 719468
+
+
+def weekday(n):
+    """0 = Sunday ... 6 = Saturday for a day_number() (1970-01-01 = Thu)."""
+    return (n + 4) % 7
+
+
+def complete(days):
+    """True when `days` is an unbroken run covering about a year.
+
+    The page lists the calendar row by row, one weekday at a time, so a body
+    cut short (read deadline, dropped connection) still parses into dates
+    spanning the whole year, just with whole weekdays missing. Such a graph
+    must not replace a good one or be cached.
+    """
+    if not days or len(days) < 364:
+        return False
+    try:
+        prev = day_number(days[0][0])
+        for date, _l, _c in days[1:]:
+            n = day_number(date)
+            if n != prev + 1:
+                return False
+            prev = n
+    except (ValueError, IndexError):
+        return False
+    return True
+
+
 def cached_graph(login):
     """Return (days, age_s) from flash, or (None, None)."""
     try:
@@ -185,7 +230,11 @@ def cached_graph(login):
             age = max(0, int(time.time()) - int(ts))
         except Exception:
             age = None
-        return (days or None), (age if days else None)
+        if not days:
+            return None, None
+        # A cache written from a truncated page (before complete() existed)
+        # is still drawn, but reported as stale so it gets replaced.
+        return days, (age if complete(days) else None)
     except Exception:
         return None, None
 
@@ -201,17 +250,29 @@ def _save_graph(login, days):
         pass
 
 
-def fetch_graph(login):
-    """Fetch, parse and cache the contribution graph; returns days or None."""
+def fetch_graph(login, on_progress=None):
+    """Fetch, parse and cache the contribution graph; returns days or None.
+
+    `on_progress(phase, received_bytes)` is passed through to _http (phases
+    dns, connect, tls, request, read, redirect) and finally called with
+    "parse". It runs on the fetching thread, so it should only store values.
+    Returns None, leaving the cache alone, unless the whole year arrived.
+    """
     if not online():
         return None
     body = _get("https://github.com/users/%s/contributions" % login,
-                accept="text/html")
+                accept="text/html", timeout_s=GRAPH_TIMEOUT_S,
+                on_progress=on_progress)
     if not body:
         return None
+    if on_progress is not None:
+        try:
+            on_progress("parse", len(body))
+        except Exception:
+            pass
     days = parse_contributions(body)
     del body
-    if not days:
+    if not complete(days):
         return None
     _save_graph(login, days)
     return days
