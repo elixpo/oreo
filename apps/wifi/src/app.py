@@ -157,7 +157,10 @@ class App(oreoOS.App):
         self._c_done_ms = 0
         self._c_save    = None        # (ssid, pw) to save once joined
         self._c_ip      = ""
+        self._c_pending = None        # (ssid, pw) waiting for a scan to end
         self._pw_ssid   = ""
+        self._n_saved   = 0
+        self._count_saved()
 
         self._speed_label = ""
         self._ping_label  = ""
@@ -195,11 +198,18 @@ class App(oreoOS.App):
         except Exception:
             return True
 
+    def _count_saved(self):
+        try:
+            self._n_saved = len(self._wifi.list_saved()) if self._wifi else 0
+        except Exception:
+            self._n_saved = 0
+
     def _reload_nets(self):
         try:
             self._nets = self._wifi.list_saved() if self._wifi else []
         except Exception:
             self._nets = []
+        self._n_saved = len(self._nets)
         if self._nets_sel >= len(self._nets):
             self._nets_sel = max(0, len(self._nets) - 1)
 
@@ -464,20 +474,28 @@ class App(oreoOS.App):
         self._back    = back
         self._mode    = "connect"
         self._dirty   = True
+        self._c_state = "busy"
+        # IDF cannot join while a scan is hopping channels; queue the join
+        # until the background scan ends (a second or two at most).
+        self._c_pending = (ssid, pw)
+        if not w.scan_busy():
+            self._begin_pending()
+
+    def _begin_pending(self):
+        ssid, pw = self._c_pending
+        self._c_pending = None
         ok = False
         try:
-            ok = w.connect_begin(ssid, pw)
+            ok = self._wifi.connect_begin(ssid, pw)
         except Exception:
             ok = False
-        if ok:
-            self._c_state = "busy"
-        else:
-            self._c_state = "failed"
-            self._c_done_ms = time.ticks_ms()
+        if not ok:
+            self._finish_connect("failed")
 
     def _on_button_connect(self, btn):
         if self._c_state == "busy":
             if btn in (api.BTN_B, api.BTN_HOME):
+                self._c_pending = None
                 try:
                     self._wifi.connect_cancel()
                 except Exception:
@@ -502,6 +520,7 @@ class App(oreoOS.App):
                     self._wifi.add_saved(ssid, pw, priority=10)
                 except Exception:
                     pass
+                self._count_saved()
             hs = self._http()
             if hs is not None:
                 try:
@@ -512,6 +531,14 @@ class App(oreoOS.App):
         self._dirty = True
 
     def _tick_connect(self):
+        if self._c_state == "busy" and self._c_pending is not None:
+            try:
+                self._wifi.scan_poll()
+                if not self._wifi.scan_busy():
+                    self._begin_pending()
+            except Exception:
+                self._finish_connect("failed")
+            return True
         if self._c_state == "busy":
             try:
                 r = self._wifi.connect_poll()
@@ -674,9 +701,9 @@ class App(oreoOS.App):
             net = ("not connected" if on else "-", theme.MUTED)
         try:
             n_near = len(self._wifi.nearby()) if self._wifi else 0
-            n_saved = len(self._wifi.list_saved()) if self._wifi else 0
         except Exception:
-            n_near = n_saved = 0
+            n_near = 0
+        n_saved = self._n_saved
         scanning = bool(self._wifi and self._wifi.scan_busy())
         return (
             ("Status",       "ON" if on else "OFF",
