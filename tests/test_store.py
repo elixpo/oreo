@@ -269,6 +269,16 @@ class PartitionTest(unittest.TestCase):
         self.assertFalse(ok)
         self.assertEqual(bytes(part.data[:4]), b"\xff" * 4)
 
+    def test_failed_request_keeps_existing_data(self):
+        part = FakePartition(8)
+        before = bytes(part.data)
+        ok, _ = store_io.install_partition(
+            "doom", "https://x", len(self.image), self.sha,
+            stream_fn=lambda *a: None, part=part)
+        self.assertFalse(ok)
+        self.assertEqual(bytes(part.data), before)
+        self.assertEqual(part.writes, [])
+
     def test_never_writes_past_the_partition(self):
         part = FakePartition(2)
         ok, _ = store_io.install_partition(

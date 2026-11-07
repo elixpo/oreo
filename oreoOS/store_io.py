@@ -13,10 +13,11 @@ stays flat whatever the download size:
 Partition writes go through esp32.Partition and are limited to the labels
 in ALLOWED_PARTITIONS, so no catalogue entry can reach the firmware, NVS
 or the filesystem. Block 0 (which holds the data's magic, e.g. "OWZ1" for
-Doom) is erased first and written last, only after the whole image has
-been received and verified by size and SHA-256 against what is now on
-flash, so an interrupted install never leaves data the engine would try
-to load.
+Doom) is erased when the first body byte arrives and written last, only
+after the whole image has been received and verified by size and SHA-256
+against what is now on flash. A download that never starts leaves the
+partition as it was; one cut off midway leaves no data the engine would
+try to load.
 """
 
 import gc
@@ -328,8 +329,10 @@ class PartitionWriter:
         self.blk = 0
         self.received = 0
         self.hash = _hashlib.sha256()
-        # Invalidate whatever is there before any other block changes.
-        part.ioctl(_IOCTL_BLOCK_ERASE, 0)
+        # Block 0 is erased on the first body byte, not here: a missing
+        # release asset or a failed connection then leaves whatever game
+        # data is already on flash untouched.
+        self.erased = False
 
     def _flush(self):
         if self.blk >= self.blocks:
@@ -345,6 +348,10 @@ class PartitionWriter:
         n = len(mv)
         if self.received + n > self.size:
             return False
+        if not self.erased:
+            # Invalidate whatever is there before any other block changes.
+            self.part.ioctl(_IOCTL_BLOCK_ERASE, 0)
+            self.erased = True
         self.hash.update(mv)
         self.received += n
         i = 0
