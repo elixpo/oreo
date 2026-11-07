@@ -565,8 +565,6 @@ class NotifPanel:
         try:
             self._os.display.set_brightness(nxt)
             self._os._last_brightness = nxt
-            from oreoWare.display import save_brightness
-            save_brightness(nxt)
         except Exception:
             pass
 

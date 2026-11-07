@@ -694,14 +694,14 @@ def boot():
     # machine.reset() after apply to guarantee the new drivers boot fresh.
     os_obj = OS()
     _bc("OS() constructed")
-    # The user's brightness (panel or Settings), restored before anything
-    # is shown; the splash fades back up to it.
+    # Every boot starts at full brightness; the panel and Settings adjust it
+    # for the session (both through _last_brightness), and the splash fades
+    # back up to it.
+    os_obj._last_brightness = 100
     try:
-        from oreoWare.display import saved_brightness
-        os_obj._last_brightness = saved_brightness()
-        os_obj.display.set_brightness(os_obj._last_brightness)
+        os_obj.display.set_brightness(100)
     except Exception:
-        os_obj._last_brightness = 100
+        pass
 
     # Stamp the boot timestamp on the OS object so OTA can refuse to
     # probe inside the first minute of uptime — without this the very
