@@ -52,15 +52,16 @@ Current assignments:
 | Display BL (PWM backlight) | 17 | active-high; PWM-able |
 | BTN_HOME / A / B / C | 9 / 10 / 13 / 8 | active-low, pull-up |
 | BTN_UP / DOWN / LEFT / RIGHT | 4 / 5 / 6 / 7 | active-low, pull-up |
-| LED corners (TL/TR/BL/BR) | 38 / 39 / 40 / 41 | LEDC PWM via 470 Ω |
+| microSD CLK / CMD / D0 | 38 / 39 / 40 | SDMMC host, 1-bit, own DMA; 3.3 V breakout without level shifter; 10 kΩ pull-ups on CMD and D0 |
+| I²S BCLK / LRCLK / DOUT (MAX98357A) | 41 / 21 / 46 | amp VIN from 5 V; GPIO46 is a strap pin, no pull-up on it |
 | LED_STATUS (onboard NeoPixel) | 48 | WS2812 |
 | IR_TX (→ 2N2222 base via 4.7 kΩ) | 2 | RMT carrier @ 38 kHz |
 | IR_RX (TSOP38238 OUT) | 18 | active-low data |
 | ADC_VBAT (100 k/100 k divider) | 1 | ADC1_CH0 |
 | I²C SDA / SCL | 42 / 47 | 100 kHz default; shared bus |
 | IMU_INT (MPU-6050 → wake) | 3 | RTC GPIO |
-| TOUCH_OUT_1 (TTP223 #1) | 21 | RTC GPIO, active-high — primary pad, wake-capable; _reserved for v2_ |
-| TOUCH_OUT_2 (TTP223 #2) | 33 | non-RTC, active-high — secondary pad, edge-poll only; _reserved for v2_ |
+
+Corner LEDs and touch pads are not fitted on the breadboard: their pins now carry the microSD card and the speaker amp. They move to an I²C expander or the PCB (#102). Still free: GPIO48 (onboard NeoPixel, nothing drives it), GPIO0 and GPIO45 (strapping; avoid), GPIO19/20 (native USB, kept for the USB identity).
 
 Display SPI runs at **40 MHz**, the practical ceiling for GPIO-matrix-
 routed pins on the ESP32-S3 — going higher loses bits at the matrix.
