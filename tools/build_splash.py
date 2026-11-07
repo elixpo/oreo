@@ -61,7 +61,7 @@ BAND_Y = (SH - BAND_H) // 2 - 10
 MAX_W = 300
 SIZE = 44
 LOGO = 36
-TAG_SIZE = 15
+TAG_SIZE = 22
 BAR_W, BAR_H = SW - 100, 4
 BAR_X, BAR_Y = (SW - BAR_W) // 2, SH - 28
 

@@ -92,6 +92,33 @@ except Exception:
     pass
 
 
+BRIGHTNESS_PATH = "brightness.txt"
+BRIGHTNESS_DEFAULT = 100
+
+
+def saved_brightness():
+    """The brightness the user last chose (panel or Settings), 5..100."""
+    try:
+        with open(BRIGHTNESS_PATH) as f:
+            v = int(f.read().strip())
+        return max(5, min(100, v))
+    except Exception:
+        return BRIGHTNESS_DEFAULT
+
+
+def save_brightness(pct):
+    """Remember the user's brightness across reboots (written only when it
+    changes, so slider taps don't wear the flash)."""
+    pct = max(5, min(100, int(pct)))
+    try:
+        if saved_brightness() == pct:
+            return
+        with open(BRIGHTNESS_PATH, "w") as f:
+            f.write(str(pct))
+    except Exception:
+        pass
+
+
 class Display(api.Display):
     _mono_pal = None        # 2×1 RGB565 palette for blit_mono, built lazily
 

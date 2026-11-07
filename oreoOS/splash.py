@@ -40,7 +40,7 @@ HOLD_MS      = 150          # a word rests in place
 ROLL_MS      = 183          # the roll to the next word: 3 words a second
 CYCLE_MS     = HOLD_MS + ROLL_MS
 FRAME_MS     = 12           # animation thread tick
-MIN_TOTAL_MS = 2600         # finish() never returns earlier than this
+MIN_TOTAL_MS = 4000         # finish() never returns earlier than this
 FILL_MS      = 300          # finish() runs the loader to full over this
 FADE_OUT_MS  = 200          # backlight down at the end of the splash
 FADE_IN_MS   = 250          # and back up once the OS has drawn (fade_in)
@@ -65,7 +65,9 @@ def fade_in(os_obj):
         return
     os_obj._splash_faded = False
     try:
-        _ramp(os_obj.display, 0, getattr(os_obj, "_last_brightness", 100), FADE_IN_MS)
+        target = getattr(os_obj, "_last_brightness", 100)
+        _ramp(os_obj.display, 0, target, FADE_IN_MS)
+        os_obj.display.set_brightness(target)      # land exactly on it
     except Exception:
         try:
             os_obj.display.set_brightness(getattr(os_obj, "_last_brightness", 100))

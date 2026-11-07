@@ -65,7 +65,8 @@ class App(oreoOS.App):
             self._wifi = None
             self._bt   = None
 
-        self._brightness = 100   # logical brightness (0..100), backlight is pure HIGH for now
+        # Same value the notification panel's slider uses, saved across boots.
+        self._brightness = getattr(os, "_last_brightness", 100)
 
         # Power-manager settings live in the SETTINGS dict in oreoOS.power.
         # Default to "on, 120 s" if the module isn't importable for any reason.
@@ -149,6 +150,9 @@ class App(oreoOS.App):
             setter = getattr(self._os.display, "set_brightness", None)
             if setter:
                 setter(self._brightness)
+            self._os._last_brightness = self._brightness
+            from oreoWare.display import save_brightness
+            save_brightness(self._brightness)
         except Exception:
             pass
 
