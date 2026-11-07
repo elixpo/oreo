@@ -2,7 +2,8 @@
 
 The engine is the firmware's _oreo_doom module (GPL-2.0-or-later, see
 firmware/usermods/oreo_doom). The game data is Freedoom in the badge's
-"doom" flash partition, written by ./deploy --full. Each frame the app
+"doom" flash partition, downloaded by the App Store when Doom is installed
+(or flashed by ./deploy --full). Each frame the app
 hands the engine the held buttons and the turning from the badge's tilt,
 the engine runs and renders, and the frame is copied to the screen as is.
 
@@ -48,7 +49,7 @@ FAILED    = "failed"
 
 MESSAGES = {
     NO_ENGINE: ("This firmware has no", "Doom engine.", "Update the badge firmware."),
-    NO_DATA:   ("No Doom game data.", "Reflash the badge with", "./deploy --full"),
+    NO_DATA:   ("No Doom game data.", "Reinstall Doom from", "the App Store."),
 }
 
 

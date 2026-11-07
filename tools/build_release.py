@@ -55,6 +55,7 @@ SHIP_PATTERNS = [
     "oreoOS/ota.py",
     "oreoOS/storage.py",
     "oreoOS/store.py",
+    "oreoOS/store_io.py",
     "oreoOS/notifications.py",
     "oreoOS/notif_panel.py",
     "oreoOS/pair_prompt.py",
@@ -98,6 +99,10 @@ SHIP_GLOBS = [
     "apps/*/main.py",
     "apps/*/manifest.json",
     "apps/*/__init__.py",
+    # Modular apps keep their code in src/ (main.py is only a shim), so an
+    # OTA that skipped src/ would ship a new shim over stale code.
+    "apps/*/src/**/*.py",
+    "apps/*/src/**/*.mpy",
     "apps/reader/assets/*.md",
     "apps/reader/assets/*.txt",
     "apps/*/assets/__init__.py",
@@ -124,7 +129,8 @@ def _collect_paths():
 
     for g in SHIP_GLOBS:
         for p in sorted(REPO_ROOT.glob(g)):
-            if p.is_file() and "__pycache__" not in p.parts:
+            if p.is_file() and "__pycache__" not in p.parts \
+                    and "tests" not in p.parts[2:]:
                 _add(p)
 
     out.sort(key=lambda t: t[1])
