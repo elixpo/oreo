@@ -180,6 +180,10 @@ class SplashHelpersTest(unittest.TestCase):
         finally:
             art.close()
 
+    def test_home_wallpaper_is_a_full_frame(self):
+        size = (ROOT / "oreoOS" / "wallpaper.bin").stat().st_size
+        self.assertEqual(size, 320 * 240 * 2)
+
     def test_full_splash_run_without_thread(self):
         sp = self.sp
         clock = FakeClock()

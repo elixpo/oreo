@@ -9,7 +9,13 @@ greeting band from that frame and draws two masks per frame with
 framebuf's palette blit (C), so words roll smoothly over the photo.
 
     python3 tools/build_splash.py               # writes oreoOS/splash.bin
+                                                # and oreoOS/wallpaper.bin
     python3 tools/build_splash.py --preview out.png
+
+It also writes oreoOS/wallpaper.bin, the home screen wallpaper: the light
+wallpaper as a raw 320x240 big-endian RGB565 frame (oreoOS/home.py reads it
+straight into a buffer). Both wallpapers come from oreo.elixpo/public, so
+the website and the badge share one copy.
 
 Fonts (SIL Open Font License 1.1, rendered to bitmaps): Inter SemiBold for
 Latin and Cyrillic, Noto Sans Bold for Indic scripts and Arabic, Noto Sans
@@ -37,10 +43,14 @@ from PIL import Image, ImageDraw, ImageFont, ImageStat, features
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "oreoOS" / "splash.bin"
 LOGO_SRC = ROOT / "oreo.elixpo" / "public" / "favicon.ico"
-BG_SRC = ROOT / "assets" / "sprites" / "raw" / "splash_bg.jpg"
+BG_SRC = ROOT / "oreo.elixpo" / "public" / "wallpaper_dark.png"
+HOME_SRC = ROOT / "oreo.elixpo" / "public" / "wallpaper_light.png"
+HOME_OUT = ROOT / "oreoOS" / "wallpaper.bin"
+HOME_WASH = 0.15                # towards theme.BG, so Home's dark text reads
+THEME_BG = (255, 248, 235)
 
 SW, SH = 320, 240
-BG_DIM = 0.30                   # backdrop brightness (as the old splash)
+BG_DIM = 0.75                   # the dark wallpaper, a touch darker for text
 INK = (250, 246, 236)           # greeting: warm cream on the dark photo
 TAG = (255, 140, 150)           # "OreoOS": light theme pink
 BAR_TRACK = (40, 46, 70)
@@ -132,13 +142,23 @@ def gs4_hmsb(mask):
     return bytes(out)
 
 
-def backdrop():
-    src = Image.open(BG_SRC).convert("RGB")
+def fit(path):
+    """The image scaled to cover 320x240 and centre-cropped."""
+    src = Image.open(path).convert("RGB")
     scale = max(SW / src.width, SH / src.height)
     src = src.resize((round(src.width * scale), round(src.height * scale)), Image.LANCZOS)
     left, top = (src.width - SW) // 2, (src.height - SH) // 2
-    img = src.crop((left, top, left + SW, top + SH))
-    return Image.eval(img, lambda v: int(v * BG_DIM))
+    return src.crop((left, top, left + SW, top + SH))
+
+
+def backdrop():
+    return Image.eval(fit(BG_SRC), lambda v: int(v * BG_DIM))
+
+
+def home_wallpaper():
+    img = fit(HOME_SRC)
+    wash = Image.new("RGB", img.size, THEME_BG)
+    return Image.blend(img, wash, HOME_WASH)
 
 
 def logo():
@@ -200,6 +220,9 @@ def main():
         blob += struct.pack("<H", m.width) + gs4_hmsb(m)
     args.out.write_bytes(blob)
     print("wrote %s: %d greetings, %.1f KB" % (args.out, len(masks), len(blob) / 1024))
+    home = home_wallpaper()
+    HOME_OUT.write_bytes(rgb565_be(home))
+    print("wrote %s: 320x240 home wallpaper" % HOME_OUT)
 
     if args.preview:
         def expand(v):
@@ -218,6 +241,7 @@ def main():
             d.rectangle([BAR_X, BAR_Y, BAR_X + BAR_W - 1, BAR_Y + BAR_H - 1], fill=BAR_TRACK)
             d.rectangle([BAR_X, BAR_Y, BAR_X + BAR_W * (k + 2) // 8, BAR_Y + BAR_H - 1], fill=BAR_FILL)
             sheets.append(shot)
+        sheets.append(home)
         sheet = Image.new("RGB", (SW, SH * len(sheets)))
         for i, s in enumerate(sheets):
             sheet.paste(s, (0, i * SH))

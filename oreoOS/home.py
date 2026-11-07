@@ -78,6 +78,7 @@ def _poll_network():
 _bg_cache         = None
 _apps_cache       = None
 _scaled_bg_cache  = None   # pre-rendered 320×240 RGB565 (big-endian) bytearray
+WALLPAPER_PATH    = "oreoOS/wallpaper.bin"
 
 
 def _load_bg():
@@ -122,6 +123,17 @@ def _get_scaled_bg():
     global _scaled_bg_cache
     if _scaled_bg_cache is not None:
         return _scaled_bg_cache if _scaled_bg_cache is not False else None
+
+    # The full-resolution wallpaper (tools/build_splash.py): a raw 320x240
+    # big-endian RGB565 frame, read straight into the buffer.
+    try:
+        out = bytearray(320 * 240 * 2)
+        with open(WALLPAPER_PATH, "rb") as f:
+            if f.readinto(out) == len(out):
+                _scaled_bg_cache = (out, 320, 240)
+                return _scaled_bg_cache
+    except Exception:
+        pass
 
     bg = _load_bg()
     if not bg:

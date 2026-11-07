@@ -64,6 +64,7 @@ SHIP_PATTERNS = [
     "oreoOS/power.py",
     "oreoOS/splash.py",
     "oreoOS/splash.bin",
+    "oreoOS/wallpaper.bin",
     "oreoOS/sprite.py",
     "oreoOS/theme.py",
     "oreoOS/timeutil.py",
