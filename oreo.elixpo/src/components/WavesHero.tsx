@@ -324,7 +324,7 @@ export default function WavesHero() {
                        backdrop-blur"
           >
             <Sparkles className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
-            v1.4 · MicroPython · open source
+            v2.0 · MicroPython · open source
           </motion.div>
 
           <motion.h1
