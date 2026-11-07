@@ -204,8 +204,9 @@ class Display(api.Display):
                                        framebuf.RGB565)
             self._mono_pal = pal
         ink = _swap(color) or 0x0100
-        pal.pixel(0, 0)
-        pal.pixel(1, ink)
+        # pixel(x, y, c) writes; the two-argument form only reads.
+        pal.pixel(0, 0, 0)
+        pal.pixel(1, 0, ink)
         # framebuf needs a writable buffer; font modules hold bytes, so
         # callers on a hot path should hand over a cached bytearray.
         if not isinstance(mask, bytearray):
