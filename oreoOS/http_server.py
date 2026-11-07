@@ -1523,6 +1523,10 @@ def _handle_beacon(sock, qs, peer_addr):
 
 def _approved_token(qs):
     token = qs.get("token", "")
+    # Drop sessions whose beacon went quiet first: nothing else prunes
+    # while the badge sits outside the Send Files page, and an expired
+    # approval must not keep authorising credential writes.
+    _prune_sessions()
     s = _sessions.get(token) if token else None
     if s is None or s.get("state") != "approved":
         return None
