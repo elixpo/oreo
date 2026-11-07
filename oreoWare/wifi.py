@@ -1350,11 +1350,27 @@ _auto_tried   = []
 _auto_scanned = False
 _auto_refresh = False     # post-connect nearby scan still to do
 _auto_next_ms = 0
+_auto_seq     = 0         # scan_seq() when this machine started its scan
 _AUTO_TICK_MS = 150
 
 
 def auto_state():
     return _auto_state
+
+
+def auto_stop():
+    """Hand the radio to the user: the WiFi app calls this before a
+    manual connect so the boot sequence does not fight it."""
+    global _auto_state
+    if _auto_state in (AUTO_TRY, AUTO_SCAN):
+        _auto_state = AUTO_OFF
+
+
+def _auto_scan():
+    global _auto_state, _auto_scanned, _auto_seq
+    _auto_scanned = True
+    _auto_seq = _scan_seq
+    _auto_state = AUTO_SCAN if scan_start() else AUTO_FAIL
 
 
 def _auto_try_next():
@@ -1392,8 +1408,7 @@ def auto_begin():
         _auto_queue.append(last)
         if _auto_try_next():
             return
-    _auto_scanned = True
-    _auto_state = AUTO_SCAN if scan_start() else AUTO_FAIL
+    _auto_scan()
 
 
 def auto_tick():
@@ -1416,8 +1431,7 @@ def auto_tick():
         if _auto_try_next():
             return False
         if not _auto_scanned:
-            _auto_scanned = True
-            _auto_state = AUTO_SCAN if scan_start() else AUTO_FAIL
+            _auto_scan()
             return False
         _auto_state = AUTO_FAIL
         return False
@@ -1426,7 +1440,10 @@ def auto_tick():
         s = scan_poll()
         if s == "busy":
             return False
-        visible = nearby() if s == "done" else None
+        # Another poller (the WiFi app) may have collected the results
+        # first; a moved scan_seq means they are fresh all the same.
+        fresh = s == "done" or _scan_seq != _auto_seq
+        visible = nearby() if fresh else None
         saved = list_saved()
         _auto_queue = pick_candidates(saved, visible, _auto_tried)
         if _auto_try_next():
