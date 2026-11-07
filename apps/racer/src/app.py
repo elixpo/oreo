@@ -31,8 +31,12 @@ mechanics are playable even before the asset pipeline has run.
 Hi-score persists in apps/racer/hi.txt.
 """
 
+import time
+
 import oreoOS
 from oreoOS import api
+
+from .spawn import Rng, choose_x
 
 
 SW = api.SCREEN_W       # 320
@@ -51,7 +55,18 @@ CAR_W, CAR_H = 32, 40
 PLAYER_Y     = PLAY_BOT - CAR_H - 18
 
 ENEMY_W, ENEMY_H = 32, 40
-ENEMY_LANES  = (ROAD_X + 28, ROAD_X + ROAD_W // 2 - ENEMY_W // 2, ROAD_X + ROAD_W - ENEMY_W - 28)
+# Player and traffic share one x range, kerb to kerb. The old three fixed
+# lanes stopped 28 px short of each kerb, which (with HIT_SLACK_PX) left a
+# strip along both edges where no car could ever touch the player.
+CAR_X_MIN    = ROAD_X + 4
+CAR_X_MAX    = ROAD_X + ROAD_W - CAR_W - 4
+# Traffic drives toward the player on its own, so braking to a crawl no
+# longer freezes the road into an easy, almost static puzzle.
+ENEMY_SELF_V = 45.0
+# Spawner fairness: % of spawns aimed at the player's current x, and the
+# narrowest free gap (px of player positions) a new car may leave.
+AIM_PCT      = 35
+MIN_FREE_GAP = 24
 
 MAX_STEER_PX_PER_S   = 260.0   # keeps lane changes ahead of the faster
                                 # scroll so the game stays playable.
@@ -65,6 +80,8 @@ ENEMY_SPAWN_FLOOR    = 0.28    # tighter cap; was 0.40. At score ~100 you
 # overlap test. Higher = more forgiving (smaller effective hitbox). 14 leaves
 # roughly the body of the car as the hit-zone, ignoring the rounded fenders.
 HIT_SLACK_PX         = 14
+# Player x positions within this distance of a car's x collide with it.
+HIT_HALF_X           = (CAR_W + ENEMY_W) // 2 - HIT_SLACK_PX
 
 ROLL_DEADZONE_DEG    = 4.0
 ROLL_SATURATION_DEG  = 30.0
@@ -200,6 +217,8 @@ class App(oreoOS.App):
         # state so tap-tap doesn't snap the car instantly).
         self._btn_steer    = 0.0
         self._btn_throttle = 0.0
+        self._rng          = Rng(time.ticks_ms() if hasattr(time, "ticks_ms")
+                                 else int(time.time() * 1000))
 
         self._reset_run()
 
@@ -307,9 +326,7 @@ class App(oreoOS.App):
 
         if self._state == PLAY:
             self._player_x += steer * MAX_STEER_PX_PER_S * dt
-            self._player_x  = _clamp(self._player_x,
-                                     ROAD_X + 4,
-                                     ROAD_X + ROAD_W - CAR_W - 4)
+            self._player_x  = _clamp(self._player_x, CAR_X_MIN, CAR_X_MAX)
 
             # Top speed climbs with score. +1.6 % per point + a higher cap
             # (2.6×). At score 40 you're at full speed already; after that
@@ -359,30 +376,28 @@ class App(oreoOS.App):
                     # next frame batch instead of forfeiting the whole slot.
                     self._spawn_left = 0.15
                 else:
-                    # Lane choice: avoid lanes that still have an enemy in
-                    # the upper REACTION_PX band (gives the player room to
-                    # leave that lane before this new car arrives).
-                    REACTION_PX = ENEMY_H + 60   # was +90 — adjacent-lane
-                                                 # blocks lift sooner so an
-                                                 # enemy can appear in the
-                                                 # same lane you just left.
-                    blocked = set()
-                    for e in self._enemies:
-                        if e.y < PLAY_TOP + REACTION_PX:
-                            for i, lx in enumerate(ENEMY_LANES):
-                                if abs(e.x - lx) < ENEMY_W // 2:
-                                    blocked.add(i)
-                                    break
-                    free = [i for i in range(len(ENEMY_LANES)) if i not in blocked]
-                    if free:
-                        pick = free[int(self._blink * 31) % len(free)]
-                        spr  = self._spr_enemy_a if int(self._blink * 17) & 1 else self._spr_enemy_b
-                        self._enemies.append(_Enemy(ENEMY_LANES[pick],
-                                                    PLAY_TOP - ENEMY_H, spr))
+                    # Position choice: anywhere kerb to kerb (some spawns
+                    # aimed at the player), rejecting any x that would
+                    # close the road together with cars still near the
+                    # top. See spawn.py for the fairness rule.
+                    REACTION_PX = ENEMY_H + 60
+                    recent = [int(e.x) for e in self._enemies
+                              if e.y < PLAY_TOP + REACTION_PX]
+                    x = choose_x(self._rng, self._player_x, recent,
+                                 CAR_X_MIN, CAR_X_MAX, HIT_HALF_X,
+                                 MIN_FREE_GAP, aim_pct=AIM_PCT)
+                    if x is None:
+                        self._spawn_left = 0.15
+                    else:
+                        spr = (self._spr_enemy_a if self._rng.next() & 1
+                               else self._spr_enemy_b)
+                        self._enemies.append(_Enemy(x, PLAY_TOP - ENEMY_H, spr))
 
-            new_enemies = []
-            for e in self._enemies:
-                e.y += self._scroll_v * dt
+            # Compact the list in place (no per-frame list allocation).
+            enemies = self._enemies
+            keep = 0
+            for e in enemies:
+                e.y += (self._scroll_v + ENEMY_SELF_V) * dt
                 if e.y > PLAY_BOT:
                     self._score += 1
                     continue
@@ -390,13 +405,14 @@ class App(oreoOS.App):
                 # so only a real body-on-body overlap counts. Was -6 which
                 # treated rounded fenders as solid.
                 if (abs((e.x + ENEMY_W // 2) - (self._player_x + CAR_W // 2))
-                        < (CAR_W + ENEMY_W) // 2 - HIT_SLACK_PX
+                        < HIT_HALF_X
                     and abs((e.y + ENEMY_H // 2) - (PLAYER_Y + CAR_H // 2))
                         < (CAR_H + ENEMY_H) // 2 - HIT_SLACK_PX):
                     self._on_crash()
                     return
-                new_enemies.append(e)
-            self._enemies = new_enemies
+                enemies[keep] = e
+                keep += 1
+            del enemies[keep:]
 
             self._dirty = True
 
@@ -508,7 +524,8 @@ class App(oreoOS.App):
         # max (which climbs with score) so a full bar always means "flat out".
         bar_w = 60
         d.rect(8, SH - 12, bar_w, 4, C_SHADOW, fill=True)
-        speed_mult    = min(1.8, 1.0 + 0.005 * self._score)
+        # Same curve as update() so a full bar really means flat out.
+        speed_mult    = min(2.6, 1.0 + 0.016 * self._score)
         effective_max = ROAD_SCROLL_MAX * speed_mult
         v_pct = (self._scroll_v - ROAD_SCROLL_MIN) / max(
             1.0, effective_max - ROAD_SCROLL_MIN)
