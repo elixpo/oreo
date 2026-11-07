@@ -55,6 +55,7 @@ SHIP_PATTERNS = [
     "oreoOS/ota.py",
     "oreoOS/storage.py",
     "oreoOS/store.py",
+    "oreoOS/store_io.py",
     "oreoOS/notifications.py",
     "oreoOS/notif_panel.py",
     "oreoOS/pair_prompt.py",
