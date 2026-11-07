@@ -390,8 +390,14 @@ def run_app(os_obj, app):
                         time.ticks_us(), present_start_us))
                 frame_errs = 0
             except Exception as e:
-                # A failed first frame drops the pending swipe.
-                os_obj._splash_frame = None
+                # A failed first frame keeps the swipe pending for the next
+                # one, but only for a few frames.
+                if getattr(os_obj, "_splash_frame", None) is not None:
+                    tries = getattr(os_obj, "_swipe_tries", 0) + 1
+                    os_obj._swipe_tries = tries
+                    print("[splash] first frame failed (%d): %s" % (tries, e))
+                    if tries >= 3:
+                        os_obj._splash_frame = None
                 # Per-frame exception swallow + counter. Logging via
                 # print keeps a breadcrumb on the USB serial console for
                 # post-mortem; we don't draw anything because the

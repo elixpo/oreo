@@ -115,7 +115,14 @@ def swipe_in(os_obj):
         return
     os_obj._splash_frame = None
     d = os_obj.display
+    home = None
+    frames = 0
     try:
+        try:
+            import gc
+            gc.collect()
+        except Exception:
+            pass
         home = bytearray(d._buf)
         buf = d._buf
         cols = [_rgb565(c) for c in SWIPE_COLS]
@@ -139,14 +146,17 @@ def swipe_in(os_obj):
             compose_swipe(buf, splash, home, swipe_edge(t), fill_row)
             d._dirty = True
             d.present()
+            frames += 1
             time.sleep_ms(1)        # yield (and lets a test clock advance)
         buf[:] = home
+        print("[splash] swipe: %d frames in %d ms" % (frames, _diff(_ms(), t0)))
     except Exception as e:
-        print("[splash] swipe:", e)
-        try:
-            d._buf[:] = home
-        except Exception:
-            pass
+        print("[splash] swipe failed:", e)
+        if home is not None:
+            try:
+                d._buf[:] = home
+            except Exception:
+                pass
     d._dirty = True
 
 
@@ -348,10 +358,15 @@ class Splash:
             while self._alive and waited < 500:
                 time.sleep_ms(5)
                 waited += 5
-            if self._art is not None:
-                # Keep the final frame: the launcher swipes from it into the
-                # OS's first frame (swipe_in).
-                self._os._splash_frame = bytearray(self._os.display._buf)
+            if self._art is not None and self._bg is not None:
+                # Keep the final frame for the swipe into the OS (swipe_in).
+                # The backdrop buffer is no longer needed, so it becomes the
+                # snapshot: no new 150 KB allocation at this point.
+                snap = self._bg
+                self._bg = None
+                snap[:] = self._os.display._buf
+                self._os._splash_frame = snap
+                print("[splash] frame kept for the swipe")
         except Exception as e:
             print("[splash] finish:", e)
         self.release()
