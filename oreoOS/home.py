@@ -356,14 +356,21 @@ class Home(oreoOS.App):
                 pass
             return
 
+        # Partial frames name the band they touched so the OS flushes only
+        # those rows (the colon blink no longer pushes the whole screen).
+        top, bot = SH, 0
         if clock_only:
             # Clear ONLY the clock+date area, then redraw
             self._draw_clock_area(d, h, m, wd, day, mon, yr)
             self._clock_dirty = False
+            top, bot = _CLOCK_Y, _DATE_Y + 16
 
         if status_only:
             self._draw_status_bar(d, h, m)
             self._status_dirty = False
+            top, bot = 0, max(bot, _STATUS_H)
+        if bot > top:
+            self._present_region = (0, top, SW, min(SH, bot) - top)
 
     def _draw_status_bar(self, d, h, m):
         # Forest-green to match the bg image's foliage; thin pink accent line.
@@ -407,10 +414,15 @@ class Home(oreoOS.App):
             # Slice rows _CLOCK_Y..(_DATE_Y+8) from the cached bg
             slice_y = _CLOCK_Y - _MAIN_TOP
             slice_h = (_DATE_Y + 8) - _CLOCK_Y
-            row_bytes = sw * 2
-            start = slice_y * row_bytes
-            end   = start + slice_h * row_bytes
-            d.blit(data[start:end], 0, _CLOCK_Y, sw, slice_h)
+            if sw == SW:
+                # Opaque row copy straight out of the cached buffer: no
+                # 30 KB slice allocation per clock tick.
+                d.blit_rows(data, _CLOCK_Y, slice_h, slice_y)
+            else:
+                row_bytes = sw * 2
+                start = slice_y * row_bytes
+                end   = start + slice_h * row_bytes
+                d.blit(data[start:end], 0, _CLOCK_Y, sw, slice_h)
         else:
             d.rect(0, _CLOCK_Y, SW, (_DATE_Y + 8) - _CLOCK_Y, theme.BG, fill=True)
 

@@ -105,6 +105,16 @@ When in doubt, ship to `apps_market/` so the drawer stays curated.
   `on_enter` runs.
 - **Framebuf is RGB565 big-endian.** Use `oreoOS.api.rgb(r, g, b)` to
   pack colours — don't construct the integer by hand.
+- **C opens the notification panel** from any app. If C is one of your
+  controls, set `CAPTURES_C = True` on the `App` class (or on the
+  instance while it matters, e.g. only during play) and C reaches
+  `on_button_press` instead.
+- **Partial redraws.** If `draw()` repaints only part of the screen,
+  set `self._present_region = (x, y, w, h)` in that frame and the OS
+  flushes just that rectangle. Override `invalidate()` to schedule a
+  full repaint; the OS calls it after an overlay (the panel) covered
+  you. `widgets.Scroller` gives an eased, frame-rate independent
+  scroll offset for lists and grids.
 - **Themed colours over raw RGB.** Prefer `theme.PRIMARY`, `theme.BG`,
   `theme.TEAL` etc. — your app stays consistent if the brand palette
   shifts.

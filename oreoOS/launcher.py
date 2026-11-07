@@ -17,6 +17,7 @@ from oreoOS.config import VERSION   # single source of truth; deploy bumps PATCH
 # plus ~3 ms render → total ≈ 34 ms. The sleep rarely actually fires during
 # gameplay; it caps idle screens so they don't hammer the panel >50 fps.
 FRAME_MIN_MS = 30
+LOADING_SLIDE_MS = 240      # app-loading panel slide-in
 
 _APPS_CANDIDATES = ("/apps", "/remote/apps", "apps")
 
@@ -77,6 +78,18 @@ def load_app(app_dir):
     return app
 
 
+def _invalidate(app):
+    """Ask an app for a full repaint after an overlay covered it."""
+    try:
+        hook = getattr(app, "invalidate", None)
+        if hook is not None:
+            hook()
+        else:
+            app._dirty = True
+    except Exception:
+        pass
+
+
 # ── loading transition (used for slow apps) ──────────────────────────────────
 # A flag-on-the-App-class opts in:    class App(oreoOS.App): SHOW_LOADING = True
 # Cost: ~210 ms slide-in animation BEFORE app.on_enter — the heavy load then
@@ -85,8 +98,11 @@ def load_app(app_dir):
 def _show_loading(os_obj, label, author=None):
     """Slide a primary-coloured panel down from the top, covering the screen.
 
-    Polls HOME each frame so the user can abort a slow app launch without
-    waiting for the on_enter to finish — returns True when interrupted.
+    Time-based ease-out over LOADING_SLIDE_MS, so the slide takes the same
+    time whatever a frame costs. Each frame repaints and flushes only the
+    panel's own rows; the screen below stays as it was, so the panel reads
+    as sliding over the previous view. Polls HOME each frame so the user
+    can abort a slow app launch — returns True when interrupted.
     """
     from oreoOS import theme
     display = os_obj.display
@@ -96,8 +112,6 @@ def _show_loading(os_obj, label, author=None):
     label  = (label  or "")[:16].upper()
     byline = ("By @" + author[:24]) if author else ""
 
-    steps      = 12          # more keyframes = smoother slide
-    frame_ms   = 33          # ≈ 30 fps
     label_lbl  = "LOADING"
     label_x_l  = (SW - len(label_lbl) * 16) // 2
     label_x_n  = (SW - len(label)     *  8) // 2
@@ -105,21 +119,27 @@ def _show_loading(os_obj, label, author=None):
     hint       = "HOME to cancel"
     hint_x     = (SW - len(hint) * 8) // 2
 
-    for i in range(steps + 1):
+    start = time.ticks_ms()
+    shown = 0
+    while shown < SH:
         # HOME interrupt — the only escape hatch while the slide plays,
         # since the app's on_enter blocks the main loop once we exit.
         buttons.update()
         if buttons.just_pressed(api.BTN_HOME):
             return True
 
-        t        = i / steps
-        eased    = 1.0 - (1.0 - t) ** 3
-        panel_h  = int(eased * SH)
+        t = time.ticks_diff(time.ticks_ms(), start) / LOADING_SLIDE_MS
+        if t >= 1.0:
+            panel_h = SH
+        else:
+            u = 1.0 - t
+            panel_h = int((1.0 - u * u * u) * SH)
+        if panel_h <= shown:
+            time.sleep_ms(2)
+            continue
+        shown = panel_h
 
         display.rect(0, 0, SW, panel_h, theme.PRIMARY, fill=True)
-        if panel_h < SH:
-            display.rect(0, panel_h, SW, SH - panel_h, theme.BG, fill=True)
-
         if panel_h > 60:
             cy = panel_h // 2
             display.text(label_lbl, label_x_l, cy - 16, api.WHITE, scale=2)
@@ -128,9 +148,7 @@ def _show_loading(os_obj, label, author=None):
                 display.text(byline, byline_x, cy + 24, api.WHITE)
             if panel_h > 140:
                 display.text(hint, hint_x, panel_h - 22, api.WHITE)
-
-        display.present()
-        time.sleep_ms(frame_ms)
+        display.present_rect(0, 0, SW, panel_h)
     return False
 
 
@@ -224,8 +242,10 @@ def run_app(os_obj, app):
                         # Global C hotkey → toggle the notification panel
                         # before anything else gets a look. Works from any
                         # app, except one that sets CAPTURES_C because C is
-                        # one of its controls (Doom's strafe).
-                        if b == api.BTN_C and not getattr(app, "CAPTURES_C", False):
+                        # one of its controls (Doom's strafe, Gamepad). An
+                        # open panel still takes C so it can always close.
+                        if b == api.BTN_C and (panel.is_active() or
+                                               _np_mod.hotkey_allowed(app)):
                             panel.toggle()
                             continue
 
@@ -298,13 +318,11 @@ def run_app(os_obj, app):
             # to redraw the area the panel just vacated. Without this the
             # last frame of the panel lingers as visible artifacts because
             # the app's _dirty flag is False and panel.draw bails on _t==0.
-            panel_was_active = panel.is_active()
+            # While the panel slides up it uncovers app pixels it painted
+            # over, so the app repaints on each of those frames as well.
             panel.tick(dt)
-            if panel_was_active and not panel.is_active():
-                try:
-                    app._dirty = True
-                except Exception:
-                    pass
+            if panel.consume_closed() or panel.is_closing():
+                _invalidate(app)
 
             # Refresh the pair-confirm overlay's view of the SMP state
             # every frame. Cheap — just one module-level dict peek.
@@ -316,14 +334,16 @@ def run_app(os_obj, app):
             if pp_was_active and not pair_pp.is_active():
                 # Prompt dismissed — force the underlying app to redraw
                 # because the overlay painted over its frame.
-                try:
-                    app._dirty = True
-                except Exception:
-                    pass
+                _invalidate(app)
+                panel.invalidate()
 
             try:
                 app.update(dt)
-                app.draw(os_obj.display)
+                # A fully open panel covers the whole screen: skip the app's
+                # paint (it would be overdrawn) and let the panel redraw only
+                # when its own content changes.
+                if not panel.covers_screen():
+                    app.draw(os_obj.display)
                 panel.draw(os_obj.display)
                 # Pair prompt is the topmost layer — drawn last so the
                 # 6-digit code can never be obscured by a panel slide-in.
@@ -332,9 +352,20 @@ def run_app(os_obj, app):
                         pair_pp.draw(os_obj.display)
                     except Exception:
                         pass
+                # Apps that redrew only one band can name it in
+                # _present_region; the OS then flushes just that rectangle
+                # (a full 153 KB push is the most expensive part of a frame).
+                region = getattr(app, "_present_region", None)
+                if region is not None:
+                    app._present_region = None
+                    if panel.is_active() or pair_pp.is_active():
+                        region = None
                 present_hook = getattr(app, "after_present", None)
                 if present_hook is None:
-                    os_obj.display.present()
+                    if region is None:
+                        os_obj.display.present()
+                    else:
+                        os_obj.display.present_rect(*region)
                 else:
                     present_start_us = time.ticks_us()
                     os_obj.display.present()
@@ -371,6 +402,8 @@ def run_app(os_obj, app):
             # machine.deepsleep() internally when the threshold is hit — that
             # call never returns; next reset starts main.py fresh.
             if pm and not realtime:
+                if panel.keeps_awake():
+                    pm.note_event()      # torch on: never doze mid-use
                 pm.tick(app)
 
             # Background OTA probe — cheap, rate-limited internally to one
@@ -589,10 +622,23 @@ def _bc(tag):
         pass
 
 
+class _NoSplash:
+    """Stand-in when the splash module cannot load: boot code calls the
+    same methods unconditionally."""
+
+    def progress(self, frac):
+        pass
+
+    def pump(self):
+        return False
+
+    def finish(self):
+        pass
+
+
 def boot():
     _bc("entered boot()")
     from oreoWare.os import OS
-    from oreoOS.splash import show_splash
     from oreoOS.home   import Home
     _bc("imports done")
 
@@ -635,16 +681,20 @@ def boot():
             machine.reset()
         except Exception:
             pass
-    # Splash must NEVER kill the boot — if the big bg asset OOMs or the
-    # mascot module is missing we just want to fall through to the home
-    # screen. Whatever's on the LCD stays visible (initial black frame from
-    # Display.__init__, or partial splash) until Home draws its first frame.
-    _bc("show_splash")
+    # The splash keeps animating while the rest of boot runs: intro()
+    # draws the logo + title, then pump() repaints the "hello" greeting
+    # between boot steps and inside the WiFi association wait. Splash
+    # must NEVER kill the boot — every Splash method swallows its own
+    # errors, and a failed import falls back to a no-op stand-in.
+    _bc("splash intro")
     try:
-        show_splash(os_obj)
+        from oreoOS.splash import Splash
+        splash = Splash(os_obj)
+        splash.intro()
     except Exception as e:
-        _bc("show_splash FAILED: %s" % e)
-    _bc("splash done")
+        _bc("splash FAILED: %s" % e)
+        splash = _NoSplash()
+    _bc("splash intro done")
 
     # Start WiFi and BT after splash. Two safety gates so a weak supply
     # (e.g. powered from an FTDI's onboard 3V3 LDO @ ~100 mA) doesn't brown
@@ -669,13 +719,18 @@ def boot():
                 wifi_ok_to_try = False
     except Exception:
         pass
+    splash.progress(0.2)
 
     try:
         from oreoWare import wifi, bt
         if wifi_ok_to_try:
             _bc("wifi.connect_from_config begin")
-            wifi.connect_from_config()
+            try:
+                wifi.connect_from_config(pump_cb=splash.pump)
+            except TypeError:
+                wifi.connect_from_config()
             _bc("wifi.connect_from_config done")
+            splash.progress(0.6)
             # Bring up the LAN file-upload server now that we have an
             # IP. Listener is non-blocking + idempotent; the run-loop
             # tick handles accept(). No-op if WiFi failed.
@@ -686,9 +741,11 @@ def boot():
                 pass
         else:
             _bc("wifi skipped")
+        splash.progress(0.7)
         _bc("bt.init_from_config begin")
         bt.init_from_config()
         _bc("bt.init_from_config done")
+        splash.progress(0.85)
         if wifi_ok_to_try and wifi.is_connected():
             _bc("ntp sync begin")
             try:
@@ -699,6 +756,9 @@ def boot():
             _bc("ntp sync done")
     except Exception as e:
         _bc("wifi/bt block FAILED: %s" % e)
+    splash.finish()
+    del splash
+    gc.collect()
     _bc("entering main loop")
 
     while True:
