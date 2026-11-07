@@ -239,17 +239,24 @@ strings "$MICROPY_IMAGE" | grep '_oreo_rv565' >/dev/null || fail \
   "native _oreo_rv565 module is missing from the image"
 strings "$MICROPY_IMAGE" | grep -F 'Oreo Badge' >/dev/null || fail \
   "Oreo Badge board identity is missing from the image"
-strings "$MICROPY_IMAGE" | grep '_oreo_doom' >/dev/null || fail \
-  "native _oreo_doom module is missing from the image"
 # A build directory configured before the 16 MiB layout keeps its old
 # sdkconfig; rebuild with --clean if this fails.
-strings "$BUILD_DIR/partition_table/partition-table.bin" | grep -x 'doom' >/dev/null || fail \
-  "partition table has no doom partition (stale build config: rerun with --clean)"
+# The table is 32-byte entries (magic 0xAA50, type, subtype, offset, size,
+# 16-byte name, flags); vfs must exist and reach the end of the 16 MiB flash.
+python3 - "$BUILD_DIR/partition_table/partition-table.bin" <<'PY' || fail \
+  "partition table has no vfs partition reaching the end of 16 MiB (stale build config: rerun with --clean)"
+import struct, sys
+data = open(sys.argv[1], "rb").read()
+for i in range(0, len(data) - 31, 32):
+    magic, _, _, offset, size, name, _ = struct.unpack("<HBBII16sI", data[i:i + 32])
+    if magic == 0xAA50 and name.rstrip(b"\0") == b"vfs":
+        sys.exit(0 if offset + size == 0x1000000 else 1)
+sys.exit(1)
+PY
 
 printf 'Verified native module: _oreo_ir\n'
 printf 'Verified native module: _oreo_rv565\n'
-printf 'Verified native module: _oreo_doom\n'
-printf 'Verified partition table: 16 MiB layout with doom partition\n'
+printf 'Verified partition table: 16 MiB layout with vfs partition\n'
 printf 'Verified board identity: Oreo Badge (USB: Elixpo / Oreo Badge)\n'
 printf 'Built: %s\n' "$FIRMWARE_IMAGE"
 
