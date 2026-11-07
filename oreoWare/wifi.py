@@ -553,8 +553,7 @@ def connect_from_config(pump_cb=None):
             continue
         pw = n.get("password") or ""
         try:
-            print("[wifi] trying a saved network (p=%s)" %
-                  n.get("priority", "?"))
+            print("[wifi] trying a saved network")
             ok = connect(ssid_, pw,
                          timeout_ms=_PER_NET_TIMEOUT,
                          pump_cb=pump_cb)

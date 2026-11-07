@@ -50,6 +50,13 @@ def tls_wrap(raw, host):
     keeps concurrent fetches (background refresh threads) independent.
     """
     ctx = _ssl.SSLContext(_ssl.PROTOCOL_TLS_CLIENT)
+    # TLS 1.2 is the floor. MicroPython's mbedTLS 3.x has no TLS 1.0/1.1 at
+    # all and no minimum_version attribute, so this only takes effect where
+    # the attribute exists (CPython, host tests).
+    try:
+        ctx.minimum_version = _ssl.TLSVersion.TLSv1_2
+    except Exception:
+        pass
     ctx.verify_mode = _ssl.CERT_NONE
     return ctx.wrap_socket(raw, server_hostname=host)
 MAX_REDIRECTS = 3

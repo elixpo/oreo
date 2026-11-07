@@ -397,12 +397,12 @@ def mpremote_batch(actions, label=""):
         try:
             mounted_path = "/remote/" + local.relative_to(root).as_posix()
         except ValueError:
-            print("  ERROR: refusing to mount-copy a file outside the project: %s" % local)
+            print("  ERROR: refusing to mount-copy a file outside the project (device path %s)" % a[2])
             return 2
         try:
             size = local.stat().st_size
         except OSError as exc:
-            print("  ERROR: cannot stat %s: %s" % (local, exc))
+            print("  ERROR: cannot stat the file for %s: %s" % (a[2], exc.__class__.__name__))
             return 2
         remote = "/" + a[2].lstrip("/")
         copies.append((mounted_path, remote, size, a[1]))
@@ -482,8 +482,8 @@ def mpremote_batch(actions, label=""):
     return rc
 
 
-def write_secrets_local():
-    """Generate a local .secrets_tmp.py by importing the project's config.py.
+def write_device_config():
+    """Generate a local .cfg_snapshot.py by importing the project's config.py.
 
     config.py is the single source of truth: non-secret values are edited
     inline there, secrets come from .env. This function just snapshots every
@@ -543,7 +543,7 @@ def write_secrets_local():
         out.append(("%-18s = " + fmt) % (name, getattr(_cfg, name, "")))
     out.append("")
 
-    tmp = Path(".secrets_tmp.py")
+    tmp = Path(".cfg_snapshot.py")
     tmp.write_text("\n".join(out))
     return tmp
 
@@ -740,10 +740,10 @@ def main():
     # Generate secrets before comparing it with the cache. Hashing the rendered
     # file still notices .env changes, without unconditionally writing the same
     # tiny module on every deploy.
-    secrets_tmp = write_secrets_local()
-    secrets_hash = _hash_file(secrets_tmp)
+    cfg_snapshot = write_device_config()
+    secrets_hash = _hash_file(cfg_snapshot)
     if cache.get("secrets.py") != secrets_hash:
-        actions.append(("cp", str(secrets_tmp), "secrets.py"))
+        actions.append(("cp", str(cfg_snapshot), "secrets.py"))
         new_cache["secrets.py"] = secrets_hash
     else:
         skipped_pre += 1
@@ -850,7 +850,7 @@ def main():
                          _human_size(deficit)))
                 print("  Free up space (delete photos / documents / caches) "
                       "or rerun with --no-free-guard to override.")
-                secrets_tmp.unlink(missing_ok=True)
+                cfg_snapshot.unlink(missing_ok=True)
                 sys.exit(2)
     print()
 
@@ -866,7 +866,7 @@ def main():
             print("No changed files to push.")
             rc = 0
     finally:
-        secrets_tmp.unlink(missing_ok=True)
+        cfg_snapshot.unlink(missing_ok=True)
     push_elapsed = _t.time() - push_t0
     print("  binary stream took %.1fs" % push_elapsed)
 

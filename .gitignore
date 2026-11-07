@@ -23,6 +23,7 @@ firmware/*.bin
 .vscode/settings.json
 .idea/
 .secrets_tmp.py
+.cfg_snapshot.py
 *.swp
 .env.local
 .deploy_hashes.json
