@@ -759,6 +759,18 @@ def main():
             and (p / "manifest.json").exists()
             and not p.name.startswith("_")
     })
+    # Apps the App Store installs (apps_market/index.json) live under apps/
+    # too but are not in the repo's apps/: never prune them. Their market
+    # folder names stay as well, so the Store can migrate an older install
+    # saved under that name (e.g. "Oreo Pet") to its id.
+    store_apps = set()
+    try:
+        for e in json.loads(Path("apps_market/index.json").read_text())["apps"]:
+            store_apps.add(e["id"])
+            store_apps.add(e["path"].split("/", 1)[1])
+    except (OSError, ValueError, KeyError, IndexError):
+        pass
+    repo_apps = sorted(set(repo_apps) | store_apps)
     apps_prune = (
         "import os\n"
         "keep = set(%r)\n"
