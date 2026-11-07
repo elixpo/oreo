@@ -18,6 +18,7 @@ import importlib.util
 import os
 import sys
 import tempfile
+import threading
 import types
 import unittest
 from pathlib import Path
@@ -68,6 +69,10 @@ class FakeDisplay:
     def __init__(self):
         self.rects = []
         self.texts = []
+        self.presented = []
+
+    def present_rect(self, x, y, w, h):
+        self.presented.append((x, y, w, h))
 
     def clear(self, color):
         self.rects = []
@@ -111,7 +116,8 @@ class GridTest(unittest.TestCase):
         app._levels = bytearray(self.app_mod.SLOTS)
         app._set_days(days)
         app._live = False
-        app._sync = 0
+        app._note = None
+        app._job = None
         app._dirty = True
         d = FakeDisplay()
         app.draw(d)
@@ -266,6 +272,160 @@ class FetchGraphTest(unittest.TestCase):
         self.assertEqual(len(cached), 106)
         self.assertIsNone(age)
         self.assertTrue(self.github.stale(age, self.github.GRAPH_TTL_S))
+
+
+class FakeOS:
+    def __init__(self):
+        self.display = FakeDisplay()
+
+
+class LoadingTest(unittest.TestCase):
+    """The fetch runs on cache.Refresh while the UI keeps animating."""
+
+    def setUp(self):
+        self.m, self.github = load_commits()
+        self.gate = threading.Event()
+        self.result = year()
+        self.cached = None
+        g = self.github
+        g.user = lambda default="": "Circuit-Overtime"
+        g.online = lambda: True
+        g.cached_graph = lambda login: (self.cached, None)
+        self.started = threading.Event()
+
+        def fake_fetch(login, on_progress=None):
+            self.progress = on_progress
+            self.started.set()
+            self.gate.wait(5)
+            return self.result
+        g.fetch_graph = fake_fetch
+
+    def tearDown(self):
+        self.gate.set()
+
+    def enter(self):
+        app = self.m.App()
+        os_ = FakeOS()
+        app.on_enter(os_)
+        return app, os_.display
+
+    def finish(self, app):
+        self.gate.set()
+        for _ in range(500):
+            app.update(0.016)
+            if not app._busy():
+                return
+            threading.Event().wait(0.002)
+        self.fail("fetch never finished")
+
+    def in_band(self, rects, region):
+        x0, y0, w, h = region
+        return all(x0 <= x and y0 <= y and x + rw <= x0 + w and y + rh <= y0 + h
+                   for x, y, rw, rh, _ in rects)
+
+    def test_cached_graph_stays_while_band_animates(self):
+        self.cached = year()
+        app, d = self.enter()
+        self.assertTrue(app._busy())
+        self.assertTrue(app._job.threaded)
+        self.assertTrue(self.started.wait(2))
+        app.draw(d)
+        cells = [r for r in d.rects if r[4] in set(self.m._COLORS) and r[2] == self.m.CELL_PX
+                 and self.m.GY0 <= r[1] < self.m.GY0 + self.m.GRID_H]
+        self.assertEqual(len(set(r[0] for r in cells)), 53)      # cached graph shown
+        self.assertIn("SYNC 0%", [t for t, _, _ in d.texts])
+        self.assertNotIn("less", [t for t, _, _ in d.texts])
+
+        # Progress reported from the worker thread repaints only the band.
+        self.progress("read", self.github.GRAPH_BYTES // 2)
+        app.update(0.1)
+        d.rects, d.texts = [], []
+        app.draw(d)
+        band = (self.m.BAND_X, self.m.BAND_Y, self.m.BAND_W, self.m.BAND_H)
+        self.assertTrue(d.rects)
+        self.assertTrue(self.in_band(d.rects, band))
+        self.assertEqual(app._present_region, band)
+        self.assertEqual([t for t, _, _ in d.texts], ["SYNC 56%"])
+
+        # Nothing changed: nothing drawn.
+        d.rects = []
+        app.draw(d)
+        self.assertEqual(d.rects, [])
+        # Time alone moves the chaser.
+        app.update(0.2)
+        app.draw(d)
+        self.assertTrue(d.rects)
+
+        self.finish(app)
+        d.rects, d.texts = [], []
+        app.draw(d)
+        texts = [t for t, _, _ in d.texts]
+        self.assertIn("LIVE", texts)
+        self.assertIn("less", texts)
+        self.assertIsNone(app._present_region)
+
+    def test_no_cache_fills_skeleton_grid(self):
+        app, d = self.enter()
+        self.assertTrue(self.started.wait(2))
+        app.draw(d)
+        m = self.m
+        skeleton = [r for r in d.rects if r[4] == m._COLORS[0] and r[2] == m.CELL_PX]
+        self.assertEqual(len(skeleton), m.SLOTS)
+        self.progress("tls", 0)
+        app.update(0.1)
+        d.rects, d.texts = [], []
+        app.draw(d)
+        self.assertIn("Securing the connection", [t for t, _, _ in d.texts])
+        self.progress("read", self.github.GRAPH_BYTES)
+        app.update(0.1)
+        d.rects, d.texts = [], []
+        app.draw(d)
+        # Only the newly reached columns are painted: 5 (at 11%) .. 49 (at 95%).
+        filled = sorted(set(r[0] for r in d.rects
+                            if r[4] == m._COLORS[1] and r[2] == m.CELL_PX))
+        self.assertEqual(app._filled, m.WEEKS * 95 // 100)
+        self.assertEqual(filled, [m.GX0 + w * m.PITCH for w in range(5, 50)])
+        self.assertEqual(app._present_region, m.EMPTY_REGION)
+        self.assertTrue(self.in_band(d.rects, m.EMPTY_REGION))
+        self.finish(app)
+        app.draw(d)
+        self.assertTrue(app._days)
+
+    def test_failed_fetch_keeps_cache_and_says_so(self):
+        self.cached = year()
+        self.result = None
+        app, d = self.enter()
+        self.finish(app)
+        app.draw(d)
+        self.assertIn("FAILED", [t for t, _, _ in d.texts])
+        self.assertEqual(app._days, self.cached)
+
+    def test_without_thread_progress_paints_from_the_callback(self):
+        self.cached = year()
+        saved = sys.modules.get("_thread")
+        sys.modules["_thread"] = None           # import fails: deferred path
+        try:
+            app, d = self.enter()
+        finally:
+            if saved is not None:
+                sys.modules["_thread"] = saved
+            else:
+                del sys.modules["_thread"]
+        self.assertFalse(app._job.threaded)
+        app.draw(d)                              # cached screen first
+        self.gate.set()
+        orig = self.github.fetch_graph
+
+        def fetch_with_progress(login, on_progress=None):
+            on_progress("tls", 0)
+            on_progress("read", 20000)
+            return orig(login, on_progress)
+        self.github.fetch_graph = fetch_with_progress
+        for _ in range(3):
+            app.update(0.016)
+        self.assertGreaterEqual(len(d.presented), 2)
+        self.assertFalse(app._busy())
+        self.assertTrue(app._live)
 
 
 if __name__ == "__main__":

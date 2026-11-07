@@ -1,9 +1,12 @@
 """Commits — GitHub contribution graph + stat strip.
 
 Opens instantly from the graph cached on flash; when it is older than
-oreoOS.github.GRAPH_TTL_S and WiFi is connected, it refreshes after the first
-frame under a SYNCING label. Press A to refresh now. Layout fills the play area as
-one tall card so there's no dead cream space below the grid:
+oreoOS.github.GRAPH_TTL_S and WiFi is connected, it is fetched again in the
+background (oreoOS.cache.Refresh) while the cached graph stays on screen and
+the bottom row turns into a progress bar with a SYNC nn% pill. With no cache
+yet, an empty grid fills up with the progress instead. Press A to refresh now.
+Layout fills the play area as one tall card so there's no dead cream space
+below the grid:
 
   ┌── card ───────────────────────────────────────────┐
   │           @Circuit-Overtime                       │
@@ -30,7 +33,7 @@ Controls:
 """
 
 import oreoOS
-from oreoOS import api, github
+from oreoOS import api, cache, github
 from oreoOS import theme, widgets
 
 SW = api.SCREEN_W
@@ -62,6 +65,37 @@ STRIP_TOP  = CARD_Y + CARD_H - 60             # stat strip + legend
 GY0    = _SUB_BOT + max(0, (STRIP_TOP - _SUB_BOT - GRID_H) // 2)
 GRID_PAD = 4
 LEG_Y  = CARD_Y + CARD_H - 14
+
+# Sync progress band: the legend row, swapped for a bar and a pill while a
+# fetch runs. Only this band is repainted and flushed per frame.
+BAND_X, BAND_Y = CARD_X + 2, LEG_Y - 3
+BAND_W, BAND_H = CARD_W - 4, 15
+PILL_W = len("SYNC 100%") * 8 + 12
+PILL_X = CARD_X + CARD_W - PILL_W - 10
+BAR_X, BAR_Y, BAR_H = CARD_X + 10, LEG_Y + 1, 4
+BAR_W = PILL_X - 8 - BAR_X
+CHASE_W = 14
+# With no graph yet, the grid area fills too (and the status line above it).
+EMPTY_Y = USER_Y + 28
+EMPTY_REGION = (CARD_X + 2, EMPTY_Y, CARD_W - 4, BAND_Y + BAND_H - EMPTY_Y)
+
+# Progress: _http reports dns -> connect -> tls -> request -> read (bytes so
+# far); the body read fills READ_FROM..READ_TO against github.GRAPH_BYTES.
+_PHASE_PCT = {"dns": 3, "connect": 7, "tls": 11, "request": 16,
+              "redirect": 16, "read": 18, "parse": 97}
+READ_FROM, READ_TO = 18, 95
+_PHASE_TEXT = {"dns": "Looking up github.com", "connect": "Connecting",
+               "tls": "Securing the connection", "request": "Asking GitHub",
+               "redirect": "Following a redirect", "parse": "Reading the graph"}
+
+
+def progress_pct(phase, received):
+    """0..99 for a fetch at `phase` with `received` bytes read."""
+    if phase == "read":
+        n = received if received < github.GRAPH_BYTES else github.GRAPH_BYTES
+        return READ_FROM + (READ_TO - READ_FROM) * n // github.GRAPH_BYTES
+    return _PHASE_PCT.get(phase, 0)
+
 
 BUCKETS = [
     (235, 237, 240),
@@ -183,10 +217,17 @@ class App(oreoOS.App):
         days, age = github.cached_graph(self._user)
         self._set_days(days)
         self._live = False
-        # 0 idle, 1 SYNCING label requested, 2 label drawn: fetch now.
-        self._sync = 1 if (github.stale(age, github.GRAPH_TTL_S)
-                           and github.online()) else 0
+        self._note = None             # "NO WIFI" / "FAILED" pill text
+        self._job = cache.Refresh(self._fetch)
+        self._reset_progress()
         self._dirty = True
+        if github.stale(age, github.GRAPH_TTL_S):
+            self._refresh(quiet=True)
+
+    def on_exit(self):
+        # A running fetch finishes on its own and writes the cache; the next
+        # open picks the result up from flash.
+        self._job = None
 
     def _set_days(self, days):
         """Adopt a new day list; everything derived from it is built here,
@@ -204,26 +245,115 @@ class App(oreoOS.App):
                       ("busiest", "%d" % busy),
                       ("total",   _fmt_count(total)))
 
+    # ── background fetch ─────────────────────────────────────────────────
+    def _fetch(self):
+        # Runs on the Refresh worker thread: no drawing, only data.
+        return github.fetch_graph(self._user, self._on_progress)
+
+    def _on_progress(self, phase, received=0):
+        self._phase = phase
+        self._rx = received
+        job = self._job
+        if job is None or job.threaded or not job.busy():
+            return
+        # No _thread: the fetch runs inside poll(), so the main loop is
+        # stalled. Repaint the band from here, at most every 16 kB read.
+        if phase == "read" and received - self._painted_rx < 16384:
+            return
+        self._painted_rx = received
+        self._tick_progress(0.1)
+        try:
+            d = self._os.display
+            self._draw_progress(d)
+            if self._days:
+                d.present_rect(BAND_X, BAND_Y, BAND_W, BAND_H)
+            else:
+                d.present_rect(*EMPTY_REGION)
+        except Exception:
+            pass
+
+    def _reset_progress(self):
+        self._phase = None
+        self._rx = 0
+        self._painted_rx = 0
+        self._pct = 0
+        self._anim = 0.0
+        self._step = -1
+        self._kb = -1
+        self._pill = "SYNC 0%"
+        self._status = "Starting"
+        self._filled = 0              # skeleton grid columns already filled
+        self._band_dirty = False
+
+    def _refresh(self, quiet=False):
+        job = self._job
+        if job is None or job.busy():
+            return
+        if not github.online():
+            if not quiet:
+                self._note = "NO WIFI"
+                self._dirty = True
+            return
+        self._note = None
+        self._reset_progress()
+        job.start()
+        self._dirty = True
+
+    def _tick_progress(self, dt):
+        """Advance the animation; flag the band only when its look changes."""
+        self._anim += dt
+        phase = self._phase
+        pct = progress_pct(phase, self._rx)
+        if pct < self._pct:
+            pct = self._pct           # never run backwards (e.g. redirect)
+        step = int(self._anim * 15)
+        if pct != self._pct:
+            self._pct = pct
+            self._pill = "SYNC %d%%" % pct
+        if not self._days:
+            if phase == "read":
+                kb = self._rx >> 10
+                if kb >> 3 != self._kb:
+                    self._kb = kb >> 3
+                    self._status = "Downloading %d kB" % kb
+            else:
+                self._status = _PHASE_TEXT.get(phase, "Starting")
+        if step != self._step:
+            self._step = step
+            self._band_dirty = True
+
     def on_button_press(self, btn):
-        if btn == api.BTN_A and self._sync == 0:
-            self._sync = 1
-            self._dirty = True
+        if btn == api.BTN_A:
+            self._refresh()
 
     def update(self, dt):
-        if self._sync == 1:
-            self._sync = 2          # let draw() paint the SYNCING label first
-        elif self._sync == 2:
-            days = github.fetch_graph(self._user)
-            if days:
-                self._set_days(days)
+        job = self._job
+        if job is None:
+            return
+        if job.poll():
+            if job.result:
+                self._set_days(job.result)
                 self._live = True
-            self._sync = 0
+                self._note = None
+            else:
+                self._note = "FAILED"
             self._dirty = True
+        elif job.busy():
+            self._tick_progress(dt)
+
+    # ── render ───────────────────────────────────────────────────────────
+    def _busy(self):
+        return self._job is not None and self._job.busy()
 
     def draw(self, d):
         if not self._dirty:
+            if self._band_dirty and self._busy():
+                self._draw_progress(d)
+                self._present_region = ((BAND_X, BAND_Y, BAND_W, BAND_H)
+                                        if self._days else EMPTY_REGION)
             return
         self._dirty = False
+        self._present_region = None
         d.clear(theme.BG)
         widgets.draw_header(d, "COMMITS")
         widgets.draw_hint  (d, "A=refresh  HOME=back")
@@ -240,7 +370,6 @@ class App(oreoOS.App):
 
         if not self._days:
             self._draw_empty(d)
-            self._draw_sync(d)
             return
 
         # Headline (active days, longest streak) and the window it covers.
@@ -260,8 +389,10 @@ class App(oreoOS.App):
             d.text(val, mx - len(val) * 8, strip_y, theme.PRIMARY, scale=2)
             d.text(lbl, mx - len(lbl) * 4, strip_y + 22, theme.MUTED)
 
-        self._draw_legend(d)
-        self._draw_sync(d)
+        if self._busy():
+            self._draw_progress(d)
+        else:
+            self._draw_legend(d)
 
     def _draw_grid(self, d):
         """Every week of the year, oldest on the left, newest on the right."""
@@ -277,7 +408,7 @@ class App(oreoOS.App):
                        CELL_PX, CELL_PX, colors[lv], fill=True)
 
     def _draw_legend(self, d):
-        """Legend (bottom-left) and LIVE / OFFLINE pill (bottom-right)."""
+        """Legend (bottom-left) and LIVE / OFFLINE / note pill (bottom-right)."""
         lg_x = CARD_X + 10
         d.text("less", lg_x, LEG_Y + (CELL_PX - 8) // 2, theme.MUTED)
         for i in range(5):
@@ -285,27 +416,78 @@ class App(oreoOS.App):
                    _COLORS[i], fill=True)
         d.text("more", lg_x + 36 + 5 * PITCH + 4,
                LEG_Y + (CELL_PX - 8) // 2, theme.MUTED)
+        self._draw_pill(d)
 
-        pill   = "LIVE" if self._live else "OFFLINE"
-        pill_c = theme.GREEN if self._live else theme.MUTED
-        pw     = len(pill) * 8 + 12
+    def _draw_pill(self, d):
+        if self._note:
+            pill, pill_c = self._note, theme.ORANGE
+        elif self._live:
+            pill, pill_c = "LIVE", theme.GREEN
+        else:
+            pill, pill_c = "OFFLINE", theme.MUTED
+        pw = len(pill) * 8 + 12
         d.rect(CARD_X + CARD_W - pw - 10, LEG_Y - 2, pw, 12, pill_c, fill=True)
         d.text(pill, CARD_X + CARD_W - pw - 4, LEG_Y, api.WHITE)
 
-    def _draw_sync(self, d):
-        if not self._sync:
+    def _draw_progress(self, d):
+        """The sync band: progress bar, moving chaser and SYNC nn% pill.
+
+        With no graph yet the skeleton grid fills column by column with the
+        progress and the status line above it names the current step.
+        """
+        self._band_dirty = False
+        d.rect(BAND_X, BAND_Y, BAND_W, BAND_H, theme.CARD, fill=True)
+        fw = BAR_W * self._pct // 100
+        d.rect(BAR_X, BAR_Y, BAR_W, BAR_H, theme.MUTED2, fill=True)
+        if fw:
+            d.rect(BAR_X, BAR_Y, fw, BAR_H, theme.PRIMARY, fill=True)
+        rem = BAR_W - fw
+        if rem > CHASE_W:
+            cx = BAR_X + fw + (self._step * 4) % (rem - CHASE_W)
+            d.rect(cx, BAR_Y, CHASE_W, BAR_H, theme.GOLD, fill=True)
+        d.rect(PILL_X, LEG_Y - 2, PILL_W, 12, theme.PRIMARY, fill=True)
+        d.text(self._pill, PILL_X + (PILL_W - len(self._pill) * 8) // 2,
+               LEG_Y, api.WHITE)
+        if self._days:
             return
-        label = "SYNCING"
-        w = len(label) * 8 + 12
-        x = SW - w - 8
-        y = widgets.HEADER_H + 4
-        d.rect(x, y, w, 12, theme.PRIMARY, fill=True)
-        d.text(label, x + 6, y + 2, api.WHITE)
+        # Status line and filling skeleton grid (no-cache state only).
+        d.rect(CARD_X + 2, USER_Y + 40, CARD_W - 4, 10, theme.CARD, fill=True)
+        st = self._status
+        d.text(st, (SW - len(st) * 8) // 2, USER_Y + 41, theme.MUTED)
+        cols = WEEKS * self._pct // 100
+        fill = _COLORS[1]
+        for w in range(self._filled, cols):
+            x = GX0 + w * PITCH
+            for r in range(DAYS):
+                d.rect(x, GY0 + r * PITCH, CELL_PX, CELL_PX, fill, fill=True)
+        if cols > self._filled:
+            self._filled = cols
+        # Leading column pulses so the grid moves during the TLS handshake.
+        if cols < WEEKS:
+            lead = _COLORS[2 + (self._step >> 2) % 3]
+            x = GX0 + cols * PITCH
+            for r in range(DAYS):
+                d.rect(x, GY0 + r * PITCH, CELL_PX, CELL_PX, lead, fill=True)
 
     def _draw_empty(self, d):
-        lines = ("No contribution data yet.",
-                 "Connect WiFi, then press A." if not self._sync
-                 else "Fetching from GitHub...")
-        for i, line in enumerate(lines):
-            d.text(line, (SW - len(line) * 8) // 2, USER_Y + 50 + i * 14,
+        busy = self._busy()
+        line = "No contribution data yet."
+        d.text(line, (SW - len(line) * 8) // 2, EMPTY_Y, theme.TEXT_BRIGHT)
+        if not busy:
+            hint = ("Sync failed, press A to retry." if self._note == "FAILED"
+                    else "Connect WiFi, then press A.")
+            d.text(hint, (SW - len(hint) * 8) // 2, USER_Y + 41,
                    theme.TEXT_BRIGHT)
+            self._draw_pill(d)
+            return
+        # Empty skeleton grid that _draw_progress fills as the fetch runs.
+        d.rect(GX0 - GRID_PAD, GY0 - GRID_PAD,
+               GRID_W + GRID_PAD * 2, GRID_H + GRID_PAD * 2,
+               theme.DOCK_SEL, fill=True)
+        empty = _COLORS[0]
+        for w in range(WEEKS):
+            x = GX0 + w * PITCH
+            for r in range(DAYS):
+                d.rect(x, GY0 + r * PITCH, CELL_PX, CELL_PX, empty, fill=True)
+        self._filled = 0
+        self._draw_progress(d)
