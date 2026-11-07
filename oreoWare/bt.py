@@ -32,6 +32,9 @@ Status codes notified back over TX (single byte):
   0xE3 BAD_TYPE          unknown type byte
   0xE4 DECOMPRESS_FAIL   deflate raised
   0xE5 WRITE_FAIL        filesystem error (likely out of space)
+  0xE6 STALLED           no data for RX_STALL_MS mid-transfer; state reset
+
+See docs/BLUETOOTH.md for what works today and its limits.
 
 Usage:
     from oreoWare import bt
@@ -52,6 +55,14 @@ _STATUS_BAD_CRC          = b"\xE2"
 _STATUS_BAD_TYPE         = b"\xE3"
 _STATUS_DECOMPRESS_FAIL  = b"\xE4"
 _STATUS_WRITE_FAIL       = b"\xE5"
+_STATUS_STALLED          = b"\xE6"
+
+# A transfer that stops receiving bytes for this long is abandoned. Without
+# it a single dropped write-without-response packet left the reassembler
+# waiting forever for bytes that never come (the "stuck" transfer in #23):
+# every later write was then parsed as payload of the dead transfer.
+RX_STALL_MS = 5000
+_rx_last_ms = 0
 
 
 _ble        = None
@@ -714,7 +725,7 @@ class _RxState:
 
 
 def _irq(event, data):
-    global _conn, _rx_state, _conn_started_ms
+    global _conn, _rx_state, _conn_started_ms, _rx_last_ms
     global _conn_addr_type, _conn_addr_bytes
     if event == _IRQ_CENTRAL_CONNECT:
         conn_handle, _addr_type, _addr = data
@@ -802,6 +813,11 @@ def _irq(event, data):
             return
         chunk = _get_ble().gatts_read(_rx_handle)
         if chunk:
+            try:
+                import time as _t
+                _rx_last_ms = _t.ticks_ms()
+            except Exception:
+                pass
             _feed(chunk)
     elif event == _IRQ_SCAN_RESULT:
         addr_type, addr, adv_type, rssi, adv_data = data
@@ -1102,6 +1118,55 @@ _watchdog_last_ms = 0
 _WATCHDOG_INTERVAL_MS = 30 * 1000
 
 
+def _rx_in_progress(st):
+    return st is not None and (st.length is not None or len(st.buf) > 0)
+
+
+def rx_progress():
+    """(received_bytes, total_bytes, kind) for the transfer in flight,
+    or None. kind is "image", "text" or "markdown". For the BT app UI."""
+    st = _rx_state
+    if st is None or st.length is None:
+        return None
+    kind = {b"I": "image", b"T": "text", b"M": "markdown"}.get(
+        st.type_byte, "file")
+    return (len(st.buf), st.length, kind)
+
+
+def peer_mac():
+    """MAC of the connected central, or None."""
+    if _conn is None or _conn_addr_bytes is None:
+        return None
+    try:
+        return _mac_str(_conn_addr_bytes)
+    except Exception:
+        return None
+
+
+def _check_rx_stall(now):
+    global _rx_state, _last_progress_bytes
+    st = _rx_state
+    if not _rx_in_progress(st):
+        return
+    import time as _t
+    if _t.ticks_diff(now, _rx_last_ms) < RX_STALL_MS:
+        return
+    got = len(st.buf)
+    want = st.length or 0
+    print("[bt] transfer stalled at %d/%d bytes; reset" % (got, want))
+    _rx_state = _RxState() if _conn is not None else None
+    _last_progress_bytes = 0
+    _notify(_STATUS_STALLED)
+    try:
+        _post_notification("rejected", None, None,
+                           title="BT transfer stalled",
+                           body="%d of %d KB, send again" %
+                                (got // 1024, max(1, want // 1024)),
+                           kind="reject")
+    except Exception:
+        pass
+
+
 def watchdog_tick():
     """Called from the OS run loop. Cheap when nothing's wrong."""
     global _watchdog_last_ms
@@ -1110,6 +1175,8 @@ def watchdog_tick():
         now = _t.ticks_ms()
     except Exception:
         return
+    if _rx_state is not None:
+        _check_rx_stall(now)
     if _t.ticks_diff(now, _watchdog_last_ms) < _WATCHDOG_INTERVAL_MS:
         return
     _watchdog_last_ms = now
