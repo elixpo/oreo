@@ -6,7 +6,7 @@ while `is_active()` is True routes all subsequent input through the
 panel rather than the running app. Apps that use C themselves set
 `CAPTURES_C = True` (see `hotkey_allowed`): a single C then goes to the
 app and a quick double-tap of C opens the panel, unless the app also sets
-`C_DOUBLE_TAP = False` (C is too busy there, e.g. Doom's strafe).
+`C_DOUBLE_TAP = False` (C is too busy there, e.g. Gamepad's button test).
 
 Layout (slides down from the top, full screen):
 

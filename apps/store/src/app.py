@@ -505,8 +505,6 @@ class App(oreoOS.App):
         lines = [e["name"] + " and its files will", "be deleted from this badge.",
                  "", "You can reinstall it later",
                  "from Discover."]
-        if e.get("data"):
-            lines[2] = "Game data stays in flash."
         if e.get("local"):
             lines[3:] = ["It isn't in the catalogue,", "so it can't be reinstalled."]
         return lines

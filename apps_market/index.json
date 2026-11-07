@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "featured": ["patakha", "doom", "racer"],
+  "featured": ["patakha", "racer"],
   "apps": [
     {
       "id": "patakha",
@@ -24,26 +24,6 @@
         ["src/app.py", 11406],
         ["src/game.py", 18691],
         ["src/render.py", 12458]
-      ]
-    },
-    {
-      "id": "doom",
-      "path": "apps_market/doom",
-      "name": "Doom",
-      "tagline": "Freedoom on your badge",
-      "description": "Freedoom Episode 1 on the badge's built-in Doom engine. Tilt to turn, D-pad walks and strafes, A fires, B opens doors. Installing downloads 6.9 MB of game data into the Doom flash partition.",
-      "category": "Games",
-      "author": "Circuit-Overtime",
-      "version": "0.1",
-      "icon": "doom_icon.png",
-      "size": 7615,
-      "data": {"partition": "doom", "url": "https://github.com/elixpo/oreo/releases/download/doom-freedoom-0.13.0/freedoom1.owz", "size": 7186254, "sha256": "03979732ec18d772e370d5a71190aeeb986faa031ad0e1019c7ead743d9635ee"},
-      "files": [
-        ["__init__.py", 0],
-        ["main.py", 240],
-        ["manifest.json", 205],
-        ["src/__init__.py", 0],
-        ["src/app.py", 7170]
       ]
     },
     {

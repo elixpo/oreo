@@ -1,9 +1,8 @@
-"""Hardware-free tests for the App Store: catalogue, install, partition data.
+"""Hardware-free tests for the App Store: catalogue, install, downloads.
 
     python3 -m unittest discover -s tests -v
 """
 
-import hashlib
 import importlib.util
 import json
 import os
@@ -27,16 +26,6 @@ store = load("oreoOS/store.py", "oreo_store_under_test")
 store_io = load("oreoOS/store_io.py", "oreo_store_io_under_test")
 indexer = load("tools/build_store_index.py", "oreo_store_index_under_test")
 INDEX = json.loads((ROOT / "apps_market" / "index.json").read_text())
-
-
-def partitions():
-    csv = ROOT / "firmware" / "boards" / "OREO_BADGE" / "partitions-oreo-badge.csv"
-    out = {}
-    for line in csv.read_text().splitlines():
-        if line.strip() and not line.startswith("#"):
-            f = [x.strip() for x in line.split(",")]
-            out[f[0]] = (int(f[3], 0), int(f[4], 0))
-    return out
 
 
 class CatalogueTest(unittest.TestCase):
@@ -75,16 +64,6 @@ class CatalogueTest(unittest.TestCase):
                 self.assertEqual(store.device_file(rel),
                                  indexer.device_file(rel), rel)
 
-    def test_doom_data_fits_its_partition(self):
-        doom = [e for e in INDEX["apps"] if e["id"] == "doom"][0]
-        data = doom["data"]
-        self.assertEqual(data["partition"], "doom")
-        self.assertIn("doom", store_io.ALLOWED_PARTITIONS)
-        self.assertTrue(data["url"].startswith(
-            "https://github.com/elixpo/oreo/releases/download/"))
-        self.assertEqual(len(data["sha256"]), 64)
-        self.assertLessEqual(data["size"], partitions()["doom"][1])
-
     def test_unsafe_entries_are_dropped(self):
         good = {"id": "racer", "path": "apps_market/racer",
                 "files": [["main.py", 1], ["../boot.py", 1],
@@ -96,9 +75,6 @@ class CatalogueTest(unittest.TestCase):
         self.assertIsNone(store.normalise_entry(dict(good, id="a b")))
         self.assertIsNone(store.normalise_entry(
             dict(good, path="oreoOS/../apps")))
-        bad_data = dict(good, data={"partition": "doom", "url": "http://x",
-                                    "size": 1, "sha256": "0" * 64})
-        self.assertIsNone(store.normalise_entry(bad_data)["data"])
 
     def test_versions(self):
         self.assertTrue(store.is_newer("0.2", "0.1"))
@@ -115,10 +91,9 @@ class InstallTest(unittest.TestCase):
         os.chdir(self.tmp)
         os.mkdir("apps")
         self.saved = {k: getattr(store, k) for k in
-                      ("TMP_DIR", "DATA_DIR", "wifi_up", "_io", "_apps",
+                      ("TMP_DIR", "wifi_up", "_io", "_apps",
                        "_featured", "_invalidate_launcher")}
         store.TMP_DIR = self.tmp + "/stage"
-        store.DATA_DIR = self.tmp + "/data"
         store.wifi_up = lambda: True
         store._invalidate_launcher = lambda: None
         self.remote = {
@@ -205,101 +180,6 @@ class InstallTest(unittest.TestCase):
             ok, _ = store.uninstall(app_id)
             self.assertFalse(ok)
         self.assertTrue(os.path.exists("apps/settings"))
-
-
-class FakePartition:
-    def __init__(self, blocks):
-        self.blocks = blocks
-        self.data = bytearray(b"\xAA" * (blocks * 4096))
-        self.writes = []
-
-    def ioctl(self, op, arg):
-        if op == 4:
-            return self.blocks
-        if op == 5:
-            return 4096
-        if op == 6:
-            self.data[arg * 4096:(arg + 1) * 4096] = b"\xff" * 4096
-            self.writes.append(("erase", arg))
-            return 0
-
-    def writeblocks(self, blk, buf):
-        assert 0 <= blk < self.blocks
-        self.data[blk * 4096:(blk + 1) * 4096] = buf
-        self.writes.append(("write", blk))
-
-    def readblocks(self, blk, buf):
-        buf[:] = self.data[blk * 4096:(blk + 1) * 4096]
-
-
-def fake_stream(image, cut=None):
-    def stream(url, sink, on_progress=None, timeout_s=0):
-        mv = memoryview(image if cut is None else image[:cut])
-        for i in range(0, len(mv), 1000):
-            if sink(mv[i:i + 1000]) is False:
-                return None
-        return len(mv)
-    return stream
-
-
-class PartitionTest(unittest.TestCase):
-    def setUp(self):
-        self.image = b"OWZ1" + bytes(range(256)) * 50
-        self.sha = hashlib.sha256(self.image).hexdigest()
-
-    def test_writes_block_zero_last_and_verifies(self):
-        part = FakePartition(8)
-        ok, msg = store_io.install_partition(
-            "doom", "https://x", len(self.image), self.sha,
-            stream_fn=fake_stream(self.image), part=part)
-        self.assertTrue(ok, msg)
-        self.assertEqual(part.writes[0], ("erase", 0))
-        self.assertEqual(part.writes[-1], ("write", 0))
-        self.assertEqual(bytes(part.data[:len(self.image)]), self.image)
-        self.assertTrue(store_io.partition_matches(
-            "doom", len(self.image), self.sha, part=part))
-
-    def test_bad_checksum_leaves_block_zero_erased(self):
-        part = FakePartition(8)
-        ok, _ = store_io.install_partition(
-            "doom", "https://x", len(self.image), "0" * 64,
-            stream_fn=fake_stream(self.image), part=part)
-        self.assertFalse(ok)
-        self.assertEqual(bytes(part.data[:4]), b"\xff" * 4)
-        self.assertFalse(store_io.partition_matches(
-            "doom", len(self.image), self.sha, part=part))
-
-    def test_short_download_is_rejected(self):
-        part = FakePartition(8)
-        ok, _ = store_io.install_partition(
-            "doom", "https://x", len(self.image), self.sha,
-            stream_fn=fake_stream(self.image, cut=5000), part=part)
-        self.assertFalse(ok)
-        self.assertEqual(bytes(part.data[:4]), b"\xff" * 4)
-
-    def test_failed_request_keeps_existing_data(self):
-        part = FakePartition(8)
-        before = bytes(part.data)
-        ok, _ = store_io.install_partition(
-            "doom", "https://x", len(self.image), self.sha,
-            stream_fn=lambda *a: None, part=part)
-        self.assertFalse(ok)
-        self.assertEqual(bytes(part.data), before)
-        self.assertEqual(part.writes, [])
-
-    def test_never_writes_past_the_partition(self):
-        part = FakePartition(2)
-        ok, _ = store_io.install_partition(
-            "doom", "https://x", len(self.image), self.sha,
-            stream_fn=fake_stream(self.image), part=part)
-        self.assertFalse(ok)                  # 12.8 KB image, 8 KB partition
-        self.assertEqual(part.writes, [])
-
-    def test_only_allowed_partitions(self):
-        for name in ("vfs", "nvs", "factory", "phy_init"):
-            ok, _ = store_io.install_partition(
-                name, "https://x", 4, "0" * 64, part=FakePartition(4))
-            self.assertFalse(ok)
 
 
 class FakeSocket:

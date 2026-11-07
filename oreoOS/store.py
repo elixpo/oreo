@@ -14,9 +14,6 @@ manifest.json of type "app"; that is exactly what the launcher lists
 are moved into /apps only when every file arrived with the expected size,
 so a failed install or update never leaves a broken app behind and an
 update keeps the old version until the new one is complete.
-
-An app may also carry `data`: an image streamed into a dedicated flash
-partition (Doom's game data). See oreoOS/store_io.py.
 """
 
 import gc
@@ -54,7 +51,6 @@ MARKET_PATH = "apps_market"
 INDEX_PATH  = MARKET_PATH + "/index.json"
 CACHE_PATH  = "/store_index.json"
 ICONS_DIR   = "/store_icons"
-DATA_DIR    = "/store_data"
 TMP_DIR     = "/store_tmp"
 APPS_DIR    = "apps"
 USER_AGENT  = "OreoBadge-AppStore"
@@ -277,18 +273,7 @@ def normalise_entry(raw):
         "icon":        _text(raw.get("icon")),
         "size":        _int(raw.get("size")),
         "files":       files,
-        "data":        None,
     }
-    data = raw.get("data")
-    if isinstance(data, dict):
-        url = _text(data.get("url"))
-        sha = _text(data.get("sha256")).lower()
-        size = _int(data.get("size"))
-        part = _text(data.get("partition"))
-        if url.startswith("https://") and len(sha) == 64 and size > 0 \
-           and part:
-            entry["data"] = {"partition": part, "url": url,
-                             "size": size, "sha256": sha}
     return entry
 
 
@@ -342,7 +327,6 @@ def is_newer(remote, local):
 
 
 _manifest_cache = {}   # id → manifest dict or False; cleared on changes
-_data_cache = {}       # partition → sha256 recorded by the last data install
 
 
 def installed_manifest(app_id):
@@ -375,41 +359,23 @@ def is_default(app_id):
     return app_id in DEFAULT_APPS
 
 
-def _data_marker(part):
-    return DATA_DIR + "/" + part + ".json"
-
-
-def data_ready(entry):
-    """True when an app's partition data is recorded as installed."""
-    data = entry.get("data")
-    if not data:
-        return True
-    part = data["partition"]
-    if part not in _data_cache:
-        m = _read_json(_data_marker(part))
-        _data_cache[part] = m.get("sha256") if isinstance(m, dict) else None
-    return _data_cache[part] == data["sha256"]
-
-
 def app_state(entry):
     """INSTALL / OPEN / UPDATE for a catalogue entry."""
     v = installed_version(entry["id"])
     if v is None:
         return INSTALL
-    if is_newer(entry["version"], v) or not data_ready(entry):
+    if is_newer(entry["version"], v):
         return UPDATE
     return OPEN
 
 
 def total_size(entry):
-    data = entry.get("data")
-    return entry["size"] + (data["size"] if data else 0)
+    return entry["size"]
 
 
 def forget_installed():
     """Drop cached install state (after install/uninstall/deploy)."""
     _manifest_cache.clear()
-    _data_cache.clear()
 
 
 # ── catalogue lifecycle ─────────────────────────────────────────────────
@@ -647,7 +613,7 @@ def _fallback_files(entry):
 
 
 def _io():
-    """The streaming/partition helpers, imported only when installing."""
+    """The streaming download helpers, imported only when installing."""
     from oreoOS import store_io
     return store_io
 
@@ -677,42 +643,12 @@ def install(app_id, progress_cb=None):
     if "main.py" not in names or "manifest.json" not in names:
         return False, "incomplete app"
 
-    data = entry["data"]
     total = sum(f[1] for f in files)
-    if data and not data_ready(entry):
-        total += data["size"]
     done = 0
 
-    # 1. Partition data first: the app is useless without it.
-    store_io = _io()
-    if data and not data_ready(entry):
-        part = data["partition"]
-        _report(progress_cb, 0, total, "Checking game data")
-        def _cp(received, _t):
-            _report(progress_cb, received, total, "Checking game data")
-        if store_io.partition_matches(part, data["size"], data["sha256"],
-                                      on_progress=_cp):
-            ok, msg = True, "ok"
-        else:
-            def _dp(received, _t):
-                _report(progress_cb, received, total, "Game data")
-            ok, msg = store_io.install_partition(
-                part, data["url"], data["size"], data["sha256"], _dp)
-        if not ok:
-            return False, msg
-        _ensure_dir(DATA_DIR)
-        try:
-            with open(_data_marker(part), "w") as f:
-                f.write(_json.dumps({"sha256": data["sha256"],
-                                     "size": data["size"]}))
-        except Exception:
-            pass
-        _data_cache.pop(part, None)
-        done += data["size"]
-        gc.collect()
-
-    # 2. App files into a staging directory, manifest.json last.
+    # 1. App files into a staging directory, manifest.json last.
     stage = TMP_DIR + "/" + app_id
+    store_io = _io()
     _rm_tree(stage)
     _ensure_dir(stage)
     files = [f for f in files if f[0] != "manifest.json"] + \
@@ -738,7 +674,7 @@ def install(app_id, progress_cb=None):
         _rm_tree(stage)
         return False, "bad manifest"
 
-    # 3. Swap into place; the old version stays until the new one is whole.
+    # 2. Swap into place; the old version stays until the new one is whole.
     target = APPS_DIR + "/" + app_id
     old = TMP_DIR + "/" + app_id + ".old"
     _rm_tree(old)
@@ -788,9 +724,7 @@ def _carry_user_files(src, dst, rel=""):
 
 
 def uninstall(app_id):
-    """Remove an installed app. Built-in apps are refused. Partition data
-    (Doom's game data) is left in its partition: the space is reserved
-    for it either way, and a reinstall then skips the download."""
+    """Remove an installed app. Built-in apps are refused."""
     if is_default(app_id) or not valid_id(app_id):
         return False, "built-in app"
     target = APPS_DIR + "/" + app_id

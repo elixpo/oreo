@@ -243,7 +243,7 @@ def run_app(os_obj, app):
                         # Global C hotkey → toggle the notification panel
                         # before anything else gets a look. Works from any
                         # app, except one that sets CAPTURES_C because C is
-                        # one of its controls (Doom's strafe, Gamepad). An
+                        # one of its controls (a game's fire button, Gamepad). An
                         # open panel still takes C so it can always close.
                         if b == api.BTN_C and (panel.is_active() or
                                                _np_mod.hotkey_allowed(app)):

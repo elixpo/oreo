@@ -4,9 +4,9 @@
 The badge's App Store downloads this one file to list every installable
 app. Each entry has two kinds of fields:
 
-  curated   name, tagline, description, category, author, featured order
-            and `data` (partition image) -- edited by hand in index.json
-            and kept as they are by this tool;
+  curated   name, tagline, description, category, author and featured
+            order -- edited by hand in index.json and kept as they are by
+            this tool;
   computed  id (manifest "slug" or the folder name), version and icon
             (from the app's manifest.json), files and size (the files
             that go on the badge, same rule as tools/deploy.py).
@@ -18,14 +18,11 @@ badge then lists its files through the GitHub API at install time).
 
     python3 tools/build_store_index.py              # rewrite index.json
     python3 tools/build_store_index.py --check      # exit 1 if stale
-    python3 tools/build_store_index.py --doom-data oreoWare/doom/freedoom1.owz
-        # also refresh Doom's data size + sha256 from a packed OWZ
 
 Run it after changing anything under apps_market/ and commit the result.
 """
 
 import argparse
-import hashlib
 import json
 import sys
 from pathlib import Path
@@ -61,15 +58,7 @@ def app_files(folder):
     return out
 
 
-def sha256(path):
-    h = hashlib.sha256()
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(1 << 20), b""):
-            h.update(chunk)
-    return h.hexdigest()
-
-
-def build(current, doom_data=None):
+def build(current):
     entries = {e["path"]: dict(e) for e in current.get("apps", [])}
     folders = sorted(p for p in MARKET.iterdir()
                      if p.is_dir() and (p / "manifest.json").exists())
@@ -91,18 +80,13 @@ def build(current, doom_data=None):
         e["files"] = app_files(folder)
         e["size"] = sum(size for _, size in e["files"])
         entries[path] = e
-    if doom_data is not None:
-        for e in entries.values():
-            if e.get("data", {}).get("partition") == "doom":
-                e["data"]["size"] = doom_data.stat().st_size
-                e["data"]["sha256"] = sha256(doom_data)
 
     order = [e["path"] for e in current.get("apps", [])]
     apps = sorted(entries.values(),
                   key=lambda e: (order.index(e["path"]) if e["path"] in order
                                  else len(order), e["path"]))
     keys = ("id", "path", "name", "tagline", "description", "category",
-            "author", "version", "icon", "size", "data", "files")
+            "author", "version", "icon", "size", "files")
     apps = [{k: e[k] for k in keys if k in e} for e in apps]
     return {
         "format": 1,
@@ -138,11 +122,9 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--check", action="store_true",
                     help="exit 1 if index.json is out of date")
-    ap.add_argument("--doom-data", type=Path,
-                    help="packed Doom OWZ to take the data size and sha256 from")
     args = ap.parse_args(argv)
     current = json.loads(INDEX.read_text()) if INDEX.exists() else {}
-    text = render(build(current, args.doom_data))
+    text = render(build(current))
     if args.check:
         if not INDEX.exists() or INDEX.read_text() != text:
             print("apps_market/index.json is stale: run python3 tools/build_store_index.py")
