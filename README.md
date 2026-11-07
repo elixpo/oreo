@@ -139,6 +139,16 @@ Want yours to be **always-installed**? Drop it in `apps/` instead. Copy [`app_te
 
 ---
 
+### Doom edition
+
+Doom is not part of OreoOS 2.0: dropping its 7 MB game-data partition gives the filesystem about 13.7 MB. The complete Doom build stays on the [`doom-edition`](https://github.com/elixpo/oreo/tree/doom-edition) branch: the engine (doomgeneric / Chocolate Doom, GPL), the Doom app, the Freedoom tooling, the partition layout with the `doom` partition and a prebuilt firmware image. To put it on a badge (this erases it):
+
+```bash
+git fetch origin doom-edition && git switch doom-edition
+./build-firmware --clean      # or use the prebuilt oreoWare/firmware/OREO_BADGE-v1.28.0.bin
+./deploy --full               # firmware, Freedoom data and OS
+```
+
 ## 🚀 Get going
 
 ```bash
