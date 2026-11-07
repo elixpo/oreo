@@ -13,6 +13,8 @@ Controls:
   arrows  move the crosshair (long-press accelerates ~5x after ~0.4 s held)
   B       cycle display model RGB -> HSL -> CMYK -> RGB
   A       save the current colour to apps/color_picker/state.txt
+  C       show the colour on the badge's RGB LED, or turn it off
+          (a double-tap of C opens the notification panel)
   HOME    back to the apps drawer
 
 The current colour is read directly out of the upscaled spectrum buffer at
@@ -41,6 +43,51 @@ ACCEL_AFTER_S       = 0.4
 
 # Channel labels per model (just for the header readout)
 _MODELS = ("RGB", "HSL", "CMYK")
+
+LED_SCALE = 0.4      # WS2812 at full power is glaring a hand's width away
+
+
+# ── the badge's RGB LED (onboard WS2812, oreoWare.pins.LED_STATUS) ──────────
+
+class _Led:
+    """The onboard WS2812 showing one colour. Silently absent off-badge."""
+
+    def __init__(self):
+        self._np = None
+        self._last = None
+        try:
+            from machine import Pin
+            from neopixel import NeoPixel
+            from oreoWare import pins
+            self._np = NeoPixel(Pin(pins.LED_STATUS, Pin.OUT), 1)
+        except Exception:
+            self._np = None
+
+    def show(self, rgb):
+        if self._np is None:
+            return
+        c = led_level(rgb)
+        if c == self._last:
+            return
+        self._last = c
+        try:
+            self._np[0] = c
+            self._np.write()
+        except Exception:
+            pass
+
+    def off(self):
+        self.show((0, 0, 0))
+
+
+def led_level(rgb):
+    """The LED drive level for a colour: scaled, but a lit channel never
+    rounds down to 0."""
+    out = []
+    for v in rgb:
+        s = int(v * LED_SCALE + 0.5)
+        out.append(1 if (v and not s) else s)
+    return tuple(out)
 
 
 # ── conversions ─────────────────────────────────────────────────────────────
@@ -130,6 +177,8 @@ def _load_rgb():
 class App(oreoOS.App):
     name         = "Color"
     SHOW_LOADING = True       # ~300 ms upscale at entry — hidden by the panel
+    # C toggles the LED here; a double-tap of C opens the notification panel.
+    CAPTURES_C   = True
 
     # ── lifecycle ──────────────────────────────────────────────────────────
     def on_enter(self, os):
@@ -156,7 +205,25 @@ class App(oreoOS.App):
         self._hold_t = {api.BTN_LEFT: 0.0, api.BTN_RIGHT: 0.0,
                         api.BTN_UP:   0.0, api.BTN_DOWN:  0.0}
         self._sample_color()
+        self._led = _Led()
+        try:
+            self._led_on = bool(os.settings_get("color_picker_led", True))
+        except Exception:
+            self._led_on = True
+        self._update_led()
         self._dirty = True
+
+    def on_exit(self):
+        try:
+            self._led.off()
+        except Exception:
+            pass
+
+    def _update_led(self):
+        if self._led_on:
+            self._led.show(self._rgb)
+        else:
+            self._led.off()
 
     # ── input ──────────────────────────────────────────────────────────────
     def on_button_press(self, btn):
@@ -176,8 +243,15 @@ class App(oreoOS.App):
             except Exception:
                 pass
             self._saved_flash = 1.2
+        elif btn == api.BTN_C:
+            self._led_on = not self._led_on
+            try:
+                self._os.settings_set("color_picker_led", self._led_on)
+            except Exception:
+                pass
         self._clamp_cursor()
         self._sample_color()
+        self._update_led()
         self._dirty = True
 
     def update(self, dt):
@@ -209,6 +283,7 @@ class App(oreoOS.App):
         if moved:
             self._clamp_cursor()
             self._sample_color()
+            self._update_led()
             self._dirty = True
 
         if self._saved_flash > 0:
@@ -250,7 +325,7 @@ class App(oreoOS.App):
 
         # ── header bar (pink, compact) ─────────────────────────────────────
         self._draw_header(d)
-        widgets.draw_hint(d, "arrows=pick  B=mode  A=save  HOME=back")
+        widgets.draw_hint(d, "arrows=pick B=mode A=save C=LED")
 
         # ── crosshair ──────────────────────────────────────────────────────
         self._draw_cursor(d)
@@ -280,6 +355,8 @@ class App(oreoOS.App):
         # Tiny readout per the active model
         readout = self._readout_str()
         d.text(readout, sw_x + sw_sz + 8, (H - 8) // 2, api.WHITE)
+        if self._led_on:
+            d.text("LED", SW - 30, (H - 8) // 2, theme.GOLD)
 
     def _readout_str(self):
         r, g, b = self._rgb

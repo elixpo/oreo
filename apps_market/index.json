@@ -215,9 +215,9 @@
       "description": "A full-screen colour spectrum: move the crosshair to pick a colour, B switches between RGB, HSL and CMYK, A saves it.",
       "category": "Tools",
       "author": "Circuit-Overtime",
-      "version": "0.1",
+      "version": "0.2",
       "icon": "color_icon.png",
-      "size": 55445,
+      "size": 57687,
       "files": [
         ["__init__.py", 0],
         ["assets/__init__.py", 0],
@@ -225,9 +225,9 @@
         ["assets/optimized/color_icon.py", 8807],
         ["assets/optimized/color_splash.py", 33423],
         ["main.py", 242],
-        ["manifest.json", 210],
+        ["manifest.json", 250],
         ["src/__init__.py", 0],
-        ["src/app.py", 12763]
+        ["src/app.py", 14965]
       ]
     },
     {
