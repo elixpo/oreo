@@ -130,7 +130,8 @@ class App(oreoOS.App):
         self._profile, self._age0 = github.cached_profile(self._user)
         self._opened_ms = time.ticks_ms()
         self._age_txt = ""
-        self._note = None            # "offline" / "sync failed" footnote
+        self._age_s = -1
+        self._note = None           # "offline" / "sync failed" footnote
         user = self._user
         self._job = cache.Refresh(lambda: github.fetch_profile(user))
         if github.stale(self._age0, github.PROFILE_TTL_S):
@@ -154,12 +155,17 @@ class App(oreoOS.App):
         self._job.start()
 
     def _update_age(self):
+        # Called every frame: only rebuild the label (a string allocation)
+        # when the elapsed second changes.
+        el = time.ticks_diff(time.ticks_ms(), self._opened_ms) // 1000
+        if el == self._age_s and self._age_txt:
+            return
+        self._age_s = el
         if self._age0 is None:
             txt = ""
         elif self._age0 >= cache.UNKNOWN_AGE:
             txt = _age_label(self._age0)
         else:
-            el = time.ticks_diff(time.ticks_ms(), self._opened_ms) // 1000
             txt = _age_label(self._age0 + el)
         if txt != self._age_txt:
             self._age_txt = txt
@@ -177,6 +183,7 @@ class App(oreoOS.App):
                 self._profile = job.result
                 self._age0 = 0
                 self._opened_ms = time.ticks_ms()
+                self._age_s = -1
                 self._note = None
             else:
                 self._note = "sync failed"
