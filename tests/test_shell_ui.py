@@ -116,98 +116,88 @@ class SplashHelpersTest(unittest.TestCase):
     def setUp(self):
         self.saved = _stub_oreoos()
         self.sp = _load("oreoOS/splash.py", "oreoOS.splash")
+        self.sp.BIN_PATH = str(ROOT / "oreoOS" / "splash.bin")
 
     def tearDown(self):
         sys.modules.pop("oreoOS.splash", None)
         _restore(self.saved)
 
-    def test_timeline_cycles_words_and_fades(self):
+    def test_roll_timeline(self):
         sp = self.sp
-        idx, a, dy = sp.greet_frame(0)
-        self.assertEqual((idx, a, dy), (0, 0.0, sp.GREET_SLIDE))
-        idx, a, dy = sp.greet_frame(sp.GREET_IN_MS + 10)
-        self.assertEqual((idx, a, dy), (0, 1.0, 0))
-        idx, a, dy = sp.greet_frame(sp.GREET_CYCLE_MS - 1)
-        self.assertEqual(idx, 0)
-        self.assertLess(a, 0.05)
-        self.assertLess(dy, 0)
-        idx, _, _ = sp.greet_frame(sp.GREET_CYCLE_MS)
-        self.assertEqual(idx, 1)
-        idx, _, _ = sp.greet_frame(sp.GREET_CYCLE_MS * len(sp.GREETINGS))
-        self.assertEqual(idx, 0)
+        self.assertEqual(sp.roll_state(0, 16, 64), (0, 1, 0))
+        self.assertEqual(sp.roll_state(sp.HOLD_MS - 1, 16, 64), (0, 1, 0))
+        k, n, off = sp.roll_state(sp.HOLD_MS + sp.ROLL_MS // 2, 16, 64)
+        self.assertEqual((k, n), (0, 1))
+        self.assertTrue(0 < off < 64)
+        self.assertEqual(sp.roll_state(sp.CYCLE_MS - 1, 16, 64)[2], 64)
+        self.assertEqual(sp.roll_state(sp.CYCLE_MS, 16, 64), (1, 2, 0))
+        self.assertEqual(sp.roll_state(sp.CYCLE_MS * 15, 16, 64)[:2], (15, 0))
+        self.assertEqual(sp.roll_state(sp.CYCLE_MS * 16, 16, 64)[0], 0)
 
-    def test_words_fit_the_band(self):
+    def test_ease(self):
         sp = self.sp
-        font = _load("assets/fonts/optimized/pixelify_24.py", "pf24_under_test")
-        mask = bytearray(sp._MASK_STRIDE * font.GLYPH_H)
-        for w in sp.GREETINGS:
-            for ch in w:
-                self.assertIn(ch, font._FONT)
-            width = sp.build_word_mask(w, font._FONT, font.GLYPH_W,
-                                       font.GLYPH_H, font.BPR, font.KERN,
-                                       {}, mask, sp._MASK_STRIDE)
-            self.assertLessEqual(width, sp._CLEAR_X1 - sp._CLEAR_X0, w)
+        self.assertEqual(sp.ease(0.0), 0.0)
+        self.assertEqual(sp.ease(1.0), 1.0)
+        vals = [sp.ease(i / 20) for i in range(21)]
+        self.assertEqual(vals, sorted(vals))
 
-    def test_mask_matches_per_pixel_render(self):
+    def test_compose_band(self):
         sp = self.sp
-        font = _load("assets/fonts/optimized/pixelify_24.py", "pf24_under_test")
-        gw, gh, bpr, kern = font.GLYPH_W, font.GLYPH_H, font.BPR, font.KERN
-        stride = sp._MASK_STRIDE
-        for word in ("hello", "konnichiwa", "nomoshkar"):
-            mask = bytearray(stride * gh)
-            width = sp.build_word_mask(word, font._FONT, gw, gh, bpr, kern,
-                                       {}, mask, stride)
-            # Reference: the PixelFont renderer's layout, pixel by pixel.
-            ref = set()
-            x = (stride * 8 - width) // 2
-            for ch in word:
-                bits = font._FONT[ch]
-                lo, adv = sp.glyph_extent(bits, gw, gh, bpr)
-                for row in range(gh):
-                    for col in range(gw):
-                        if bits[row * bpr + (col >> 3)] & (0x80 >> (col & 7)):
-                            ref.add((x + col - lo, row))
-                x += adv + kern
-            got = set()
-            for row in range(gh):
-                for px in range(stride * 8):
-                    if mask[row * stride + (px >> 3)] & (0x80 >> (px & 7)):
-                        got.add((px, row))
-            self.assertEqual(got, ref, word)
+        bh, w = 4, 2
+        stride = sp.SW * 2
+        bg = b"\x00\x01" * sp.SW
+        cur = bytes(range(1, 1 + w * 2 * bh))
+        nxt = bytes(range(100, 100 + w * 2 * bh))
+        x = ((sp.SW - w) // 2) * 2
+        fb = bytearray(stride * bh)
+        sp.compose_band(fb, stride, 0, bh, bg, cur, w, nxt, w, 0)
+        for y in range(bh):
+            self.assertEqual(fb[y * stride + x:y * stride + x + w * 2],
+                             cur[y * w * 2:(y + 1) * w * 2])
+            self.assertEqual(fb[y * stride:y * stride + 2], b"\x00\x01")
+        sp.compose_band(fb, stride, 0, bh, bg, cur, w, nxt, w, bh)
+        for y in range(bh):
+            self.assertEqual(fb[y * stride + x:y * stride + x + w * 2],
+                             nxt[y * w * 2:(y + 1) * w * 2])
+        sp.compose_band(fb, stride, 0, bh, bg, cur, w, nxt, w, 1)
+        self.assertEqual(fb[x:x + w * 2], cur[w * 2:w * 4])          # cur row 1
+        last = (bh - 1) * stride
+        self.assertEqual(fb[last + x:last + x + w * 2], nxt[0:w * 2])  # nxt row 0
 
-    def test_lerp565_endpoints(self):
+    def test_splash_bin_is_consistent(self):
         sp = self.sp
-        self.assertEqual(sp.lerp565(0x0000, 0xFFFF, 0.0), 0x0000)
-        self.assertEqual(sp.lerp565(0x0000, 0xFFFF, 1.0), 0xFFFF)
-        mid = sp.lerp565(0x0000, 0xFFFF, 0.5)
-        self.assertEqual((mid >> 11) & 0x1F, 15)
+        art = sp._Art(sp.BIN_PATH)
+        try:
+            self.assertGreaterEqual(art.count, 8)
+            self.assertTrue(all(0 < w <= sp.SW for w in art.widths))
+            self.assertEqual(len(art.logo), art.logo_w * art.logo_h * 2)
+            self.assertEqual(len(art.tag), art.tag_w * art.tag_h * 2)
+            end = art.offsets[-1] + art.widths[-1] * art.band_h * 2
+            self.assertEqual(end, (ROOT / "oreoOS" / "splash.bin").stat().st_size)
+            self.assertEqual(art.bg565, self.saved and sys.modules["oreoOS.theme"].BG)
+        finally:
+            art.close()
 
-    def test_full_splash_run_on_fake_display(self):
+    def test_full_splash_run_without_thread(self):
         sp = self.sp
         clock = FakeClock()
         sp.time = clock
-        sp._get_bg = lambda: None            # procedural backdrop path
-        sp._get_splash_logo = lambda: None
-        os_obj = types.SimpleNamespace(display=FakeDisplay(sp.SW, sp.SH))
-        s = sp.Splash(os_obj)
+        d = FakeDisplay(sp.SW, sp.SH)
+        d._buf = d.buf
+        s = sp.Splash(types.SimpleNamespace(display=d))
+        s._start_thread = lambda: None       # pump() path, deterministic
         s.intro()
-        self.assertGreaterEqual(clock.t, sp.INTRO_MS)
-        for i in range(60):                  # ~ a wifi connect, 80 ms pumps
+        for _ in range(80):
             self.assertFalse(s.pump())
-            clock.t += 80
-            if i == 20:
-                s.progress(0.5)
+            clock.t += 30
         s.finish()
         self.assertGreaterEqual(clock.t, sp.MIN_TOTAL_MS)
-        d = os_obj.display
-        monos = [c for c in d.calls if c[0] == "blit_mono"]
-        self.assertTrue(monos, "greeting never drawn")
-        # every greeting frame flushes only its band, never the full screen
-        bands = [p for p in d.presented if p and p[1] == sp._BAND_Y]
-        self.assertTrue(all(p[3] == sp._BAND_H for p in bands))
-        self.assertEqual(d.presented.count(None), 1)   # only the backdrop
-        self.assertEqual(s._bar_pos, 1.0)
-        self.assertIsNone(s._snap)           # released
+        self.assertEqual(d.presented[0], None)            # first full frame
+        bands = d.presented[1:]
+        self.assertTrue(bands, "the greeting never rolled")
+        self.assertTrue(all(p == (0, s._band_y, sp.SW, 64) for p in bands))
+        self.assertGreaterEqual(s._last[0], 1)            # moved past "hello"
+        self.assertIsNone(s._art)                         # released
 
 
 class ScrollerTest(unittest.TestCase):

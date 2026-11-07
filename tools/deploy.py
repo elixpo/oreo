@@ -150,6 +150,7 @@ DEPLOY = [
     ("oreoOS/launcher.py",      "oreoOS/launcher.py"),
     ("oreoOS/power.py",         "oreoOS/power.py"),
     ("oreoOS/splash.py",        "oreoOS/splash.py"),
+    ("oreoOS/splash.bin",       "oreoOS/splash.bin"),   # tools/build_splash.py
     ("oreoOS/theme.py",         "oreoOS/theme.py"),
     ("oreoOS/timeutil.py",      "oreoOS/timeutil.py"),
     ("oreoOS/widgets.py",       "oreoOS/widgets.py"),

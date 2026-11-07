@@ -768,14 +768,26 @@ def boot():
         splash.progress(0.85)
     except Exception as e:
         _bc("wifi/bt block FAILED: %s" % e)
+    # Build the first Home while the greeting is still rolling, so the
+    # splash covers that loading too and hands straight over to Home.
+    first = None
+    try:
+        apps = list_apps()
+        first = (apps, Home(apps))
+    except Exception as e:
+        _bc("first home FAILED: %s" % e)
     splash.finish()
     del splash
     gc.collect()
     _bc("entering main loop")
 
     while True:
-        apps = list_apps()
-        home = Home(apps)
+        if first is not None:
+            apps, home = first
+            first = None
+        else:
+            apps = list_apps()
+            home = Home(apps)
         # Reaching the home screen is the "I'm done" signal — clear any
         # launcher resume context so the next drawer open starts fresh
         # rather than restoring the user to where they last were inside
