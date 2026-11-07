@@ -130,11 +130,12 @@ class App(oreoOS.App):
         if not self._wifi:
             return
         if on:
+            # Non-blocking: the run loop finishes the join (boot
+            # auto-connect state machine) so Settings never freezes.
             try:
-                self._wifi.radio_on()
+                self._wifi.auto_begin()
             except Exception:
                 pass
-            self._wifi.connect_from_config()
         else:
             try:
                 self._wifi.radio_off()
@@ -294,8 +295,12 @@ class App(oreoOS.App):
             return "—"
         try:
             if self._wifi.is_connected():
-                ip = self._wifi.ip() or ""
-                return ip or "on"
+                return self._wifi.ssid() or self._wifi.ip() or "on"
+            try:
+                if self._wifi.connect_target():
+                    return "joining..."
+            except Exception:
+                pass
             try:
                 if self._wifi.is_radio_on():
                     return "on"
