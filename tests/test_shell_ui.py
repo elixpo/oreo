@@ -219,6 +219,52 @@ class SplashHelpersTest(unittest.TestCase):
         self.assertEqual(bytes(d.buf[:4]), b"\x12\x34\x12\x34")
         self.assertEqual(bytes(d.buf[-4:]), b"\x12\x34\x12\x34")
 
+    def test_framebuf_swipe_matches_python(self):
+        """The C (framebuf) path draws the same chevrons as the Python one,
+        up to its 4-row strips: compare at strip-centre rows."""
+        sp = self.sp
+        import struct as _s
+
+        class FB:
+            def __init__(self, buf, w, h, fmt, stride=None):
+                self.buf, self.w, self.h = buf, w, h
+                self.stride = stride or w
+
+            def _o(self, x, y):
+                return (y * self.stride + x) * 2
+
+            def fill_rect(self, x, y, w, h, c):
+                px = _s.pack("<H", c)          # framebuf stores native LE
+                for r in range(h):
+                    o = self._o(x, y + r)
+                    self.buf[o:o + w * 2] = px * w
+
+            def blit(self, src, x, y, key=-1):
+                for r in range(src.h):
+                    so = src._o(0, r)
+                    o = self._o(x, y + r)
+                    self.buf[o:o + src.w * 2] = src.buf[so:so + src.w * 2]
+
+        fbmod = types.SimpleNamespace(FrameBuffer=FB, RGB565=1)
+        splash = bytearray(bytes([1, 1]) * (sp.SW * sp.SH))
+        home = bytearray(bytes([2, 2]) * (sp.SW * sp.SH))
+        cols = [sp._rgb565(c) for c in sp.SWIPE_COLS]
+        swapped = [((c & 0xFF) << 8) | (c >> 8) for c in cols]
+        rows = [_s.pack(">H", c) for c in cols]
+        for edge in (250, 120, 0, -60):
+            a = bytearray(len(home))
+            sp.compose_swipe_fb(FB(a, sp.SW, sp.SH, 1), memoryview(splash),
+                                memoryview(home), edge, swapped, fbmod)
+            b = bytearray(len(home))
+            def fill_row(x, y, w, i):
+                o = (y * sp.SW + x) * 2
+                b[o:o + w * 2] = rows[i] * w
+            sp.compose_swipe(b, splash, home, edge, fill_row)
+            stride = sp.SW * 2
+            for y in range(sp.SWIPE_STRIP // 2, sp.SH, sp.SWIPE_STRIP):
+                self.assertEqual(a[y * stride:(y + 1) * stride],
+                                 b[y * stride:(y + 1) * stride], (edge, y))
+
     def test_swipe_geometry(self):
         sp = self.sp
         self.assertGreaterEqual(sp.swipe_edge(0), sp.SW)

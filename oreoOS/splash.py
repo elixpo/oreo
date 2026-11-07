@@ -106,6 +106,41 @@ def compose_swipe(dst, splash, home, edge, fill_row):
             dst[o + cur * 2:o + stride] = home[o + cur * 2:o + stride]
 
 
+SWIPE_STRIP  = 4            # rows per strip in the framebuf path
+
+
+def compose_swipe_fb(fb, splash_mv, home_mv, edge, cols, fb_mod):
+    """One swipe frame through framebuf (all copying in C): per 4-row strip,
+    a blit of the splash left of the chevrons, a blit of the OS right of
+    them (strided views, no copies), then the chevron bands as fill_rect.
+    cols are framebuf pixel values (byte-swapped RGB565)."""
+    FB = fb_mod.FrameBuffer
+    fmt = fb_mod.RGB565
+    t, g = SWIPE_T, SWIPE_GAP
+    n = len(cols)
+    half = SH // 2
+    stride = SW * 2
+    y0 = 0
+    while y0 < SH:
+        h = SWIPE_STRIP if y0 + SWIPE_STRIP <= SH else SH - y0
+        dy = y0 + (h >> 1) - half
+        x = edge + (dy if dy >= 0 else -dy) * SWIPE_SLOPE // 100
+        a = 0 if x < 0 else (SW if x > SW else x)
+        base = y0 * stride
+        if a > 0:
+            fb.blit(FB(splash_mv[base:], a, h, fmt, SW), 0, y0)
+        if a < SW:
+            fb.blit(FB(home_mv[base + a * 2:], SW - a, h, fmt, SW), a, y0)
+        for i in range(n):
+            b0 = x + i * (t + g)
+            c0 = 0 if b0 < 0 else (SW if b0 > SW else b0)
+            b1 = b0 + t
+            c1 = 0 if b1 < 0 else (SW if b1 > SW else b1)
+            if c1 > c0:
+                fb.fill_rect(c0, y0, c1 - c0, h, cols[i])
+        y0 += h
+
+
 def swipe_in(os_obj):
     """Run the swipe if the splash left one pending. The launcher calls this
     with the OS's first frame drawn in the framebuffer but not yet shown;
@@ -129,21 +164,26 @@ def swipe_in(os_obj):
         if framebuf is not None:
             fb = framebuf.FrameBuffer(buf, SW, SH, framebuf.RGB565)
             sw = [((c & 0xFF) << 8) | (c >> 8) for c in cols]
+            smv = memoryview(splash)
+            hmv = memoryview(home)
 
-            def fill_row(x, y, w, i):
-                fb.fill_rect(x, y, w, 1, sw[i])
+            def draw(edge):
+                compose_swipe_fb(fb, smv, hmv, edge, sw, framebuf)
         else:
             rows = [struct.pack(">H", c) for c in cols]
 
             def fill_row(x, y, w, i):
                 o = (y * SW + x) * 2
                 buf[o:o + w * 2] = rows[i] * w
+
+            def draw(edge):
+                compose_swipe(buf, splash, home, edge, fill_row)
         t0 = _ms()
         while True:
             t = _diff(_ms(), t0)
             if t >= SWIPE_MS:
                 break
-            compose_swipe(buf, splash, home, swipe_edge(t), fill_row)
+            draw(swipe_edge(t))
             d._dirty = True
             d.present()
             frames += 1
