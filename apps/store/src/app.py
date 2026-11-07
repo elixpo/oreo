@@ -59,15 +59,27 @@ class App(oreoOS.App):
         self._busy = False
         self._prog_ms = 0
         self._installed = []
+        self._dirty = False          # set by the OS after an overlay closes
         store.forget_installed()
         self._load_rows()
         self._want_refresh = store.needs_refresh()
         if not store.wifi_up():
             self._status = "OFFLINE" if self._apps else ""
             self._want_refresh = False
-        pending = store.find(store.take_pending() or "")
-        if pending:
-            self._open_detail(pending)
+        # Settings may ask for an app's page (store.open_app). Without a
+        # cached catalogue it is opened once the refresh has loaded one.
+        self._pending = store.take_pending()
+        self._open_pending()
+
+    def _open_pending(self):
+        if not self._pending:
+            return
+        e = store.find(self._pending)
+        if e is not None:
+            self._pending = None
+            self._open_detail(e)
+        elif not self._want_refresh:
+            self._pending = None
 
     # ── data ───────────────────────────────────────────────────────────
 
@@ -181,6 +193,10 @@ class App(oreoOS.App):
         self._queue = []
         if keep and self._view == "list":
             self._select_id(keep)
+        if self._view == "list":
+            self._open_pending()
+        else:
+            self._pending = None
         gc.collect()
         self._paint = "full"
 
@@ -436,6 +452,10 @@ class App(oreoOS.App):
             pass
 
     def draw(self, d):
+        if self._dirty:
+            # The notification panel or pair prompt painted over us.
+            self._dirty = False
+            self._paint = "full"
         paint = self._paint
         if not paint:
             return
