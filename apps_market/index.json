@@ -36,14 +36,14 @@
       "author": "Circuit-Overtime",
       "version": "0.1",
       "icon": "doom_icon.png",
-      "size": 7560,
+      "size": 7615,
       "data": {"partition": "doom", "url": "https://github.com/elixpo/oreo/releases/download/doom-freedoom-0.13.0/freedoom1.owz", "size": 7186254, "sha256": "03979732ec18d772e370d5a71190aeeb986faa031ad0e1019c7ead743d9635ee"},
       "files": [
         ["__init__.py", 0],
         ["main.py", 240],
         ["manifest.json", 205],
         ["src/__init__.py", 0],
-        ["src/app.py", 7115]
+        ["src/app.py", 7170]
       ]
     },
     {
@@ -141,7 +141,7 @@
       "author": "Circuit-Overtime",
       "version": "0.1",
       "icon": "elixpo_pet_icon.png",
-      "size": 199257,
+      "size": 199398,
       "files": [
         ["__init__.py", 0],
         ["assets/__init__.py", 0],
@@ -156,7 +156,7 @@
         ["main.py", 244],
         ["manifest.json", 205],
         ["src/__init__.py", 0],
-        ["src/app.py", 13127]
+        ["src/app.py", 13268]
       ]
     },
     {
@@ -191,13 +191,13 @@
       "author": "Circuit-Overtime",
       "version": "0.1",
       "icon": "bluetooth_icon.png",
-      "size": 7423,
+      "size": 7564,
       "files": [
         ["__init__.py", 0],
         ["main.py", 238],
         ["manifest.json", 181],
         ["src/__init__.py", 0],
-        ["src/app.py", 7004]
+        ["src/app.py", 7145]
       ]
     },
     {

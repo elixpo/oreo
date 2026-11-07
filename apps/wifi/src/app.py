@@ -104,6 +104,9 @@ def _clip(s, n):
 
 
 class App(oreoOS.App):
+    # C is one of this app's controls: a single C stays here and a
+    # double-tap of C opens the notification panel.
+    CAPTURES_C = True
     name         = "WiFi"
     author       = "Circuit-Overtime"
     SHOW_LOADING = False
@@ -354,6 +357,8 @@ class App(oreoOS.App):
             self._scan_note = "scan failed"
 
     def _on_button_nearby(self, btn):
+        # C rescans here; the OS opens the notification panel on a
+        # double-tap of C instead (CAPTURES_C on the class).
         if btn in (api.BTN_HOME, api.BTN_B):
             self._mode = "main"
         elif btn in (api.BTN_C, api.BTN_RIGHT):

@@ -4,7 +4,9 @@ A single instance lives on the OS object (`os._notif_panel`). The run
 loop in launcher.py intercepts BTN_C globally, calls `toggle()`, and
 while `is_active()` is True routes all subsequent input through the
 panel rather than the running app. Apps that use C themselves set
-`CAPTURES_C = True` (see `hotkey_allowed`).
+`CAPTURES_C = True` (see `hotkey_allowed`): a single C then goes to the
+app and a quick double-tap of C opens the panel, unless the app also sets
+`C_DOUBLE_TAP = False` (C is too busy there, e.g. Doom's strafe).
 
 Layout (slides down from the top, full screen):
 
@@ -89,6 +91,18 @@ def hotkey_allowed(app):
     """
     try:
         return not getattr(app, "CAPTURES_C", False)
+    except Exception:
+        return True
+
+
+DOUBLE_TAP_MS = 350
+
+
+def double_tap_opens(app):
+    """True when a double-tap of C should open the panel over an app that
+    captures C. Apps opt out with `C_DOUBLE_TAP = False`."""
+    try:
+        return bool(getattr(app, "C_DOUBLE_TAP", True))
     except Exception:
         return True
 

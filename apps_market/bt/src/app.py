@@ -31,6 +31,9 @@ GREEN = api.rgb(61, 190, 120)
 
 
 class App(oreoOS.App):
+    # C is one of this app's controls: a single C stays here and a
+    # double-tap of C opens the notification panel.
+    CAPTURES_C = True
     name         = "Bluetooth"
     author       = "Circuit-Overtime"
     SHOW_LOADING = False

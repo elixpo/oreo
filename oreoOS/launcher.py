@@ -208,6 +208,7 @@ def run_app(os_obj, app):
     REPEAT_MS = 80
     AUTOREPEAT_BUTTONS = (api.BTN_UP, api.BTN_DOWN, api.BTN_LEFT, api.BTN_RIGHT)
     next_repeat_ms = {b: 0 for b in AUTOREPEAT_BUTTONS}
+    last_c_ms = None    # previous C press, for the double-tap panel gesture
 
     app.on_enter(os_obj)
     last = time.ticks_ms()
@@ -246,8 +247,19 @@ def run_app(os_obj, app):
                         # open panel still takes C so it can always close.
                         if b == api.BTN_C and (panel.is_active() or
                                                _np_mod.hotkey_allowed(app)):
+                            last_c_ms = None
                             panel.toggle()
                             continue
+                        # Apps that use C: a single C is theirs, a quick
+                        # double-tap opens the panel (the first tap has
+                        # already reached the app; the second does not).
+                        if b == api.BTN_C and _np_mod.double_tap_opens(app):
+                            if (last_c_ms is not None and time.ticks_diff(
+                                    now, last_c_ms) <= _np_mod.DOUBLE_TAP_MS):
+                                last_c_ms = None
+                                panel.toggle()
+                                continue
+                            last_c_ms = now
 
                         # Panel-open input is routed to the panel and the
                         # underlying app sees nothing.

@@ -58,6 +58,7 @@ class App(oreoOS.App):
 
     # C is Doom's strafe button, so the notification panel stays shut.
     CAPTURES_C = True
+    C_DOUBLE_TAP = False     # strafing taps C quickly
 
     def on_enter(self, os):
         self._os = os

@@ -42,6 +42,7 @@ class App(oreoOS.App):
     # C is one of the buttons under test: keep the OS-wide C hotkey (the
     # notification panel) out of the way while this app is in front.
     CAPTURES_C = True
+    C_DOUBLE_TAP = False     # fast C presses are part of the test
 
     def on_enter(self, os):
         self._os         = os
