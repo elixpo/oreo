@@ -208,13 +208,42 @@ class SplashHelpersTest(unittest.TestCase):
         self.assertTrue(any(p == bar for p in rects))
         self.assertTrue(all(p in ((0, band_y, sp.SW, band_h), bar) for p in rects))
         self.assertIsNone(s._art)                         # released
-        brights = [c[1] for c in d.calls if c[0] == "bright"]
-        self.assertEqual(brights[-1], 0)                  # faded out
-        self.assertTrue(os_obj._splash_faded)
-        sp.fade_in(os_obj)
-        brights = [c[1] for c in d.calls if c[0] == "bright"]
-        self.assertEqual(brights[-1], 70)                 # back to the user's level
-        self.assertFalse(os_obj._splash_faded)
+        self.assertFalse([c for c in d.calls if c[0] == "bright"])   # no dimming
+        self.assertEqual(len(os_obj._splash_frame), sp.SW * sp.SH * 2)
+        # The swipe ends on the OS frame and clears the pending flag.
+        d.buf[:] = b"\x12\x34" * (sp.SW * sp.SH)
+        n = len(d.presented)
+        sp.swipe_in(os_obj)
+        self.assertIsNone(os_obj._splash_frame)
+        self.assertGreater(len(d.presented), n)          # frames were shown
+        self.assertEqual(bytes(d.buf[:4]), b"\x12\x34\x12\x34")
+        self.assertEqual(bytes(d.buf[-4:]), b"\x12\x34\x12\x34")
+
+    def test_swipe_geometry(self):
+        sp = self.sp
+        self.assertGreaterEqual(sp.swipe_edge(0), sp.SW)
+        self.assertLessEqual(sp.swipe_edge(sp.SWIPE_MS) + sp.swipe_span()
+                             + (sp.SH // 2) * sp.SWIPE_SLOPE // 100, 0)
+        stride = sp.SW * 2
+        splash = bytes([1, 1]) * (sp.SW * sp.SH)
+        home = bytes([2, 2]) * (sp.SW * sp.SH)
+        dst = bytearray(len(home))
+        fills = []
+        def fill_row(x, y, w, i):
+            fills.append((x, y, w, i))
+            dst[(y * sp.SW + x) * 2:(y * sp.SW + x + w) * 2] = bytes([9, i]) * w
+        sp.compose_swipe(dst, splash, home, 100, fill_row)
+        mid = (sp.SH // 2) * stride
+        self.assertEqual(dst[mid:mid + 2], b"\x01\x01")              # splash on the left
+        self.assertEqual(dst[mid + 100 * 2:mid + 100 * 2 + 2], b"\x09\x00")  # first chevron
+        self.assertEqual(dst[mid + stride - 2:mid + stride], b"\x02\x02")    # OS on the right
+        top_tip = [f for f in fills if f[1] == 0 and f[3] == 0][0]
+        self.assertGreater(top_tip[0], 100)                            # chevron: rows away
+        # from the centre sit further right, so the tip points left
+        sp.compose_swipe(dst, splash, home, sp.SW, fill_row)
+        self.assertEqual(bytes(dst), splash)
+        sp.compose_swipe(dst, splash, home, -1000, fill_row)
+        self.assertEqual(bytes(dst), home)
 
 
 class ScrollerTest(unittest.TestCase):

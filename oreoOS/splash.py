@@ -3,7 +3,8 @@
 Boot splash: the dimmed photo backdrop with the logo top left, "hello"
 rolling through languages in the middle (each word in its own script,
 anti-aliased, light on the dark photo), a small "OreoOS" under it and a
-loader along the bottom. tools/build_splash.py renders it all into
+loader along the bottom; it hands over to the OS with a chevron swipe
+(swipe_in). tools/build_splash.py renders it all into
 oreoOS/splash.bin: the static frame, plus one 16-level coverage mask per
 greeting. Each frame restores the greeting band from the static frame and
 draws two masks with framebuf's palette blit, then flushes only the band
@@ -42,37 +43,111 @@ CYCLE_MS     = HOLD_MS + ROLL_MS
 FRAME_MS     = 12           # animation thread tick
 MIN_TOTAL_MS = 4000         # finish() never returns earlier than this
 FILL_MS      = 300          # finish() runs the loader to full over this
-FADE_OUT_MS  = 200          # backlight down at the end of the splash
-FADE_IN_MS   = 250          # and back up once the OS has drawn (fade_in)
+
+# Swipe into the OS: big chevrons (tip pointing left) in the light
+# wallpaper's colours sweep right to left over the final splash frame,
+# revealing the OS's first frame behind them.
+SWIPE_MS     = 520
+SWIPE_T      = 30           # chevron thickness, px
+SWIPE_GAP    = 12           # gap between chevrons (shows the OS)
+SWIPE_SLOPE  = 70           # 1/100 px of depth per row from the centre
+SWIPE_COLS   = ((250, 186, 194), (166, 226, 208), (253, 212, 140))
 
 
-def _ramp(display, start, end, ms):
-    """Ease the backlight from start% to end% over ms."""
-    t0 = _ms()
-    while True:
-        t = _diff(_ms(), t0)
-        p = ease(t / ms) if ms > 0 else 1.0
-        display.set_brightness(start + (end - start) * p)
-        if t >= ms:
-            return
-        time.sleep_ms(10)
+def _rgb565(c):
+    return ((c[0] & 0xF8) << 8) | ((c[1] & 0xFC) << 3) | (c[2] >> 3)
 
 
-def fade_in(os_obj):
-    """Bring the backlight back after the splash faded out. The launcher
-    calls this once, right after the first OS frame is on the panel."""
-    if not getattr(os_obj, "_splash_faded", False):
+def swipe_span():
+    """Total width of the chevron stack."""
+    n = len(SWIPE_COLS)
+    return n * SWIPE_T + (n - 1) * SWIPE_GAP
+
+
+def swipe_edge(t_ms):
+    """x of the leading chevron tip at t_ms: from just off the right edge to
+    fully off the left edge, eased."""
+    depth = (SH // 2) * SWIPE_SLOPE // 100
+    x0 = SW
+    x1 = -(swipe_span() + depth)
+    return int(x0 + (x1 - x0) * ease(t_ms / SWIPE_MS))
+
+
+def compose_swipe(dst, splash, home, edge, fill_row):
+    """One swipe frame into dst (big-endian RGB565 rows). Per row: splash
+    left of the leading chevron, then the chevron bands (fill_row(x, y, w,
+    colour_index)) with the OS showing in the gaps and behind them."""
+    stride = SW * 2
+    t, g = SWIPE_T, SWIPE_GAP
+    n = len(SWIPE_COLS)
+    half = SH // 2
+    for y in range(SH):
+        o = y * stride
+        dy = y - half
+        x = edge + (dy if dy >= 0 else -dy) * SWIPE_SLOPE // 100
+        # splash, left of the chevrons
+        a = 0 if x < 0 else (SW if x > SW else x)
+        if a:
+            dst[o:o + a * 2] = splash[o:o + a * 2]
+        # bands and gaps, then the OS
+        cur = a
+        for i in range(n):
+            b0 = x + i * (t + g)
+            b1 = b0 + t
+            c0 = 0 if b0 < 0 else (SW if b0 > SW else b0)
+            c1 = 0 if b1 < 0 else (SW if b1 > SW else b1)
+            if c0 > cur:
+                dst[o + cur * 2:o + c0 * 2] = home[o + cur * 2:o + c0 * 2]
+            if c1 > c0:
+                fill_row(c0, y, c1 - c0, i)
+            if c1 > cur:
+                cur = c1
+        if cur < SW:
+            dst[o + cur * 2:o + stride] = home[o + cur * 2:o + stride]
+
+
+def swipe_in(os_obj):
+    """Run the swipe if the splash left one pending. The launcher calls this
+    with the OS's first frame drawn in the framebuffer but not yet shown;
+    it ends with that frame in place for the normal present."""
+    splash = getattr(os_obj, "_splash_frame", None)
+    if splash is None:
         return
-    os_obj._splash_faded = False
+    os_obj._splash_frame = None
+    d = os_obj.display
     try:
-        target = getattr(os_obj, "_last_brightness", 100)
-        _ramp(os_obj.display, 0, target, FADE_IN_MS)
-        os_obj.display.set_brightness(target)      # land exactly on it
-    except Exception:
+        home = bytearray(d._buf)
+        buf = d._buf
+        cols = [_rgb565(c) for c in SWIPE_COLS]
+        if framebuf is not None:
+            fb = framebuf.FrameBuffer(buf, SW, SH, framebuf.RGB565)
+            sw = [((c & 0xFF) << 8) | (c >> 8) for c in cols]
+
+            def fill_row(x, y, w, i):
+                fb.fill_rect(x, y, w, 1, sw[i])
+        else:
+            rows = [struct.pack(">H", c) for c in cols]
+
+            def fill_row(x, y, w, i):
+                o = (y * SW + x) * 2
+                buf[o:o + w * 2] = rows[i] * w
+        t0 = _ms()
+        while True:
+            t = _diff(_ms(), t0)
+            if t >= SWIPE_MS:
+                break
+            compose_swipe(buf, splash, home, swipe_edge(t), fill_row)
+            d._dirty = True
+            d.present()
+            time.sleep_ms(1)        # yield (and lets a test clock advance)
+        buf[:] = home
+    except Exception as e:
+        print("[splash] swipe:", e)
         try:
-            os_obj.display.set_brightness(getattr(os_obj, "_last_brightness", 100))
+            d._buf[:] = home
         except Exception:
             pass
+    d._dirty = True
 
 
 def _ms():
@@ -274,18 +349,11 @@ class Splash:
                 time.sleep_ms(5)
                 waited += 5
             if self._art is not None:
-                # Fade to black; the launcher fades the OS in (fade_in) once
-                # Home's first frame is on the panel.
-                _ramp(self._os.display,
-                      getattr(self._os, "_last_brightness", 100), 0, FADE_OUT_MS)
-                self._os._splash_faded = True
+                # Keep the final frame: the launcher swipes from it into the
+                # OS's first frame (swipe_in).
+                self._os._splash_frame = bytearray(self._os.display._buf)
         except Exception as e:
             print("[splash] finish:", e)
-            try:
-                self._os.display.set_brightness(
-                    getattr(self._os, "_last_brightness", 100))
-            except Exception:
-                pass
         self.release()
 
     def release(self):
