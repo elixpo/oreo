@@ -70,7 +70,7 @@ export default function AppsPage() {
           <div className="mx-auto mt-20 max-w-5xl text-center">
             <h2 className="font-display text-2xl tracking-tight">Preloaded</h2>
             <p className="mt-1 text-sm text-muted">
-              Shipped with v1. Edit or remove any of them locally.
+              Built into OreoOS 2.0. Edit any of them locally.
             </p>
           </div>
         </Reveal>
@@ -95,9 +95,9 @@ export default function AppsPage() {
         {/* Store */}
         <Reveal>
           <div className="mx-auto mt-24 max-w-5xl text-center">
-            <h2 className="font-display text-2xl tracking-tight">From the store</h2>
+            <h2 className="font-display text-2xl tracking-tight">From the App Store</h2>
             <p className="mt-1 text-sm text-muted">
-              Community apps installable at runtime from{" "}
+              Install, update or remove these from the badge's App Store. They live in{" "}
               <code className="text-text-dim">apps_market/</code> on the repo.
             </p>
           </div>

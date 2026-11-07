@@ -6,7 +6,8 @@ import { motion } from "framer-motion";
 import {
   Contact, Bird, Image as ImageIcon, Worm, Compass, BookOpen, Car,
   Cloud, GitCommit, User, Gamepad2, HardDrive, Palette, PawPrint,
-  Cpu, Wifi, Bluetooth, RefreshCw, Settings, ArrowUpRight,
+  Cpu, Wifi, Bluetooth, RefreshCw, Settings, ArrowUpRight, Store,
+  Sparkles, Hand,
   type LucideIcon,
 } from "lucide-react";
 import type { AppEntry, AppIconId } from "@/data/apps";
@@ -14,7 +15,7 @@ import type { AppEntry, AppIconId } from "@/data/apps";
 const ICONS: Record<AppIconId, LucideIcon> = {
   Contact, Bird, Image: ImageIcon, Worm, Compass, BookOpen, Car, Cloud,
   GitCommit, User, Gamepad2, HardDrive, Palette, PawPrint, Cpu, Wifi,
-  Bluetooth, RefreshCw, Settings,
+  Bluetooth, RefreshCw, Settings, Store, Sparkles, Hand,
 };
 
 type Tint = { ring: string; glow: string; text: string };

@@ -244,14 +244,14 @@ export default async function AppDetail({
         {/* ── ACTION BAR ─────────────────────────────────────────────── */}
         <div className="mx-auto mt-8 flex max-w-3xl flex-wrap justify-center gap-3">
           <a
-            href={`https://github.com/elixpo/oreo/tree/main/apps/${encodeURIComponent(app.slug)}`}
+            href={`https://github.com/elixpo/oreo/tree/main/${app.category === "store" ? "apps_market" : "apps"}/${encodeURIComponent(app.slug)}`}
             target="_blank" rel="noreferrer"
             className="btn-primary"
           >
             <Github className="h-4 w-4" /> View source
           </a>
           <a
-            href={`https://github.com/elixpo/oreo/blob/main/apps/${encodeURIComponent(app.slug)}/manifest.json`}
+            href={`https://github.com/elixpo/oreo/blob/main/${app.category === "store" ? "apps_market" : "apps"}/${encodeURIComponent(app.slug)}/manifest.json`}
             target="_blank" rel="noreferrer"
             className="btn-ghost"
           >
