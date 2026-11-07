@@ -190,16 +190,7 @@ if $FULL_BOARD; then
     fail "multiple firmware images in oreoWare/firmware/; keep exactly one"
   FIRMWARE="${firmware_images[0]}"
 
-  # Doom's game data (Freedoom, downloaded and packed, never committed) goes
-  # into its own partition in the same write. Without it the badge still
-  # works; the Doom app explains how to add the data later.
   FLASH_IMAGES=(0x0 "$FIRMWARE")
-  if "$PYTHON" tools/fetch_freedoom.py; then
-    FLASH_IMAGES+=("$("$PYTHON" tools/fetch_freedoom.py --print-offset)"
-                   "$SCRIPT_DIR/oreoWare/doom/freedoom1.owz")
-  else
-    printf 'Freedoom unavailable; flashing without Doom game data.\n'
-  fi
 
   # Preflight every tool before erase-flash. A missing mpremote discovered
   # after the firmware write would leave the badge bootable but without OS

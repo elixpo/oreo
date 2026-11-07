@@ -76,7 +76,7 @@ Weather, GitHub commits, OTA updates — all live. WiFi power-capped at 11 dBm s
 <td valign="top">
 
 ### 🎮 Default apps + an App Store
-GitHub tools, a markdown reader, a gallery, storage breakdown. Games (Doom included), IR quests, weather and more install on-device from the App Store.
+GitHub tools, a markdown reader, a gallery, storage breakdown. Games, IR quests, weather and more install on-device from the App Store.
 
 </td>
 <td valign="top">
@@ -111,19 +111,19 @@ install on-device from the **App Store** tile.
 | <img src="assets/icons/raw/badge_icon.png" width="64"><br>**Badge** | <img src="assets/icons/raw/identity_icon.png" width="64"><br>**Identity** | <img src="assets/icons/raw/commits_icon.png" width="64"><br>**Commits** | <img src="assets/icons/raw/wallpaper_icon.png" width="64"><br>**Weather** |
 | <img src="assets/icons/raw/racer_icon.png" width="64"><br>**Racer** | <img src="assets/icons/raw/flappy_icon.png" width="64"><br>**Flappy** | <img src="assets/icons/raw/snake_icon.png" width="64"><br>**Snake** | <img src="assets/icons/raw/gamepad_icon.png" width="64"><br>**Gamepad** |
 | <img src="assets/icons/raw/gallery_icon.png" width="64"><br>**Gallery** | <img src="assets/icons/raw/IR_Quest_icon.png" width="64"><br>**IR Quest** | <img src="assets/icons/raw/reader_icon.png" width="64"><br>**Reader** | <img src="assets/icons/raw/storage_icon.png" width="64"><br>**Storage** |
-| <img src="assets/icons/raw/apps_icon.png" width="64"><br>**App Store** | <img src="assets/icons/raw/settings_icon.png" width="64"><br>**Settings** | <img src="assets/icons/raw/about_icon.png" width="64"><br>**About** | <img src="assets/icons/raw/doom_icon.png" width="64"><br>**Doom** |
+| <img src="assets/icons/raw/apps_icon.png" width="64"><br>**App Store** | <img src="assets/icons/raw/settings_icon.png" width="64"><br>**Settings** | <img src="assets/icons/raw/about_icon.png" width="64"><br>**About** | |
 
 </div>
 
-Bluetooth and WiFi don't get their own drawer tiles — they live inside **Settings**, alongside brightness, sleep, gestures and OTA. The notification panel (press **C** from anywhere except Doom, where C strafes) puts both radios + a brightness slider + manual time-sync one tap away.
+Bluetooth and WiFi don't get their own drawer tiles — they live inside **Settings**, alongside brightness, sleep, gestures and OTA. The notification panel (press **C** from anywhere; apps that use C themselves, like Gamepad, take a double-tap instead) puts both radios + a brightness slider + manual time-sync one tap away.
 
 ### 📦 App Store — install, update and remove apps on-device
 
-The badge ships a small default set (About, Badge, Commits, Gallery, Gamepad, Identity, Reader, Settings, Storage and the App Store, plus the system apps Apps, Updates and WiFi). Everything else lives under [`apps_market/`](apps_market/) and installs from the **App Store** tile: Doom, Racer, Flappy Oreo, Snake, Elixpo Pet, IR Quest, Bluetooth, Weather, Color, Gestures and the Diwali special, Patakha.
+The badge ships a small default set (About, Badge, Commits, Gallery, Gamepad, Identity, Reader, Settings, Storage and the App Store, plus the system apps Apps, Updates and WiFi). Everything else lives under [`apps_market/`](apps_market/) and installs from the **App Store** tile: Racer, Flappy Oreo, Snake, Elixpo Pet, IR Quest, Bluetooth, Weather, Color, Gestures and the Diwali special, Patakha.
 
 - **Discover** (first page): a featured card plus every app with its icon, tagline, category, size and an **INSTALL / OPEN / UPDATE** button. **A** opens the app's page (author, version, size, description) where you install it, with a progress bar.
 - **Installed** (press **B**): every app on the badge. Built-in apps can only be opened; others can be updated or uninstalled behind a confirm dialog, and reinstalled from Discover any time.
-- The catalogue is one file, [`apps_market/index.json`](apps_market/index.json), cached on the badge so the Store opens instantly and refreshes in the background. Doom's 6.9 MB of game data downloads straight into its own flash partition.
+- The catalogue is one file, [`apps_market/index.json`](apps_market/index.json), cached on the badge so the Store opens instantly and refreshes in the background. Apps install into the badge's filesystem, which takes all of the 16 MB flash after the firmware: about 13.7 MB.
 
 ```python
 # Programmatic API (handy from the REPL):
@@ -591,13 +591,6 @@ Hardware Association, UID [IN000107](https://certification.oshwa.org/in000107.ht
   ([Apache-2.0](LICENSES/preferred/Apache-2.0)); downstream distributors of
   compiled firmware must retain those licenses. See
   [`LICENSES/notices/notice-board`](LICENSES/notices/notice-board).
-- **Exception: the Doom engine**
-  ([`firmware/usermods/oreo_doom/`](firmware/usermods/oreo_doom/)) is
-  [GPL-2.0-or-later](LICENSES/preferred/GPL-2.0), and firmware images built
-  with it are distributed as a whole under [GPL-3.0](LICENSES/preferred/GPL-3.0).
-  The game data is [Freedoom](LICENSES/notices/freedoom) (BSD-3-Clause),
-  downloaded at deploy time. See
-  [`LICENSES/exceptions/oreo_doom-GPL`](LICENSES/exceptions/oreo_doom-GPL).
 
 The Oreo mascot, the chest E-badge, the "Elixpo", "Oreo", "Oreo Badge", and
 "OreoOS" names, and the elixpo.com domains are trademarks of the Elixpo project

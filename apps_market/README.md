@@ -29,30 +29,5 @@ An entry may be listed before its folder exists (Patakha while it is
 being built); the badge then finds its files through the GitHub API at
 install time. Run the tool once the folder lands.
 
-## Doom's game data
-
-Doom's engine is in the firmware; its data (Freedoom Episode 1 packed as
-OWZ, 6.9 MB) goes into the `doom` flash partition. The Doom entry's
-`data` field gives the download URL, size and SHA-256. The App Store
-streams it into the partition, verifies it, and only then writes the
-first block, so the engine never sees half-written data. It writes
-nothing but the `doom` partition.
-
-The URL points at a GitHub release asset that must be published once
-(and again whenever the Freedoom version or `tools/pack_wad.py` output
-changes):
-
-```bash
-python3 tools/fetch_freedoom.py
-python3 tools/build_store_index.py --doom-data oreoWare/doom/freedoom1.owz
-gh release create doom-freedoom-0.13.0 \
-    oreoWare/doom/freedoom1.owz oreoWare/doom/FREEDOOM-COPYING.txt \
-    --repo elixpo/oreo --latest=false \
-    --title "Doom game data (Freedoom 0.13.0)" \
-    --notes "Freedoom Episode 1 packed for the Oreo Badge's doom partition. BSD-3-Clause, see FREEDOOM-COPYING.txt."
-```
-
-`--latest=false` matters: OTA updates read `releases/latest`, so this
-release must never become the latest one. If `build_store_index.py`
-changes the size or SHA-256, commit `index.json`, because the badge
-rejects a download that does not match it.
+Apps install into the badge's filesystem (the `vfs` partition), which
+takes all of the 16 MB flash after the firmware: about 13.7 MB.
