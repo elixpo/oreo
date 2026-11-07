@@ -27,8 +27,8 @@ TICKS_PER_S = 1000 // TICK_MS
 
 # ── player ───────────────────────────────────────────────────────────────
 GROUND_Y     = 226                 # a target whose bottom reaches this landed
-PLAYER_W     = 24
-PLAYER_H     = 18
+PLAYER_W     = 36
+PLAYER_H     = 27
 PLAYER_Y     = GROUND_Y - PLAYER_H
 PLAYER_SPEED = ONE * 7 // 2        # 3.5 px/tick = 175 px/s
 PLAYER_ACCEL = ONE * 3 // 8        # roll-on to full speed in ~9 ticks
@@ -39,7 +39,7 @@ N_BULLETS      = 16
 BULLET_W       = 3
 BULLET_H       = 8
 BULLET_VY      = -7 * ONE
-FIRE_COOLDOWN  = 9                 # held A: ~5.5 shots/s
+FIRE_COOLDOWN  = 11                # held A: ~4.5 shots/s
 UFO_COOLDOWN   = 4                 # UFO auto fire: 12.5 shots/s
 
 # ── targets ──────────────────────────────────────────────────────────────
@@ -47,16 +47,16 @@ N_TARGETS = 12
 K_MATCHBOX, K_ANAR, K_CHAKRI, K_UFO = 0, 1, 2, 3
 T_W      = (14, 10, 12, 20)
 T_H      = (9, 14, 12, 10)
-T_SPEED  = (ONE, ONE * 13 // 10, ONE * 9 // 10, ONE * 2 // 5)   # level 0
+T_SPEED  = (ONE * 5 // 4, ONE * 13 // 8, ONE * 9 // 8, ONE * 2 // 5)   # level 0
 T_POINTS = (5, 10, 15, 0)
 UFO_PCT  = 5                       # % of spawns that are the UFO power-up
 
-SPAWN_BASE = 70 * ONE              # spawn interval at level 0, 1/256 ticks
+SPAWN_BASE = 56 * ONE              # spawn interval at level 0, 1/256 ticks
 SPAWN_MIN  = 12 * ONE
 MULT_ONE   = 4096
-LEVEL_PCT  = 12                    # every level: +12 % fall, +12 % spawn rate
+LEVEL_PCT  = 14                    # every level: +14 % fall, +14 % spawn rate
 LEVEL_POINTS = 100
-MAX_LEVEL  = 15                    # cap: ~5.5x the starting speed
+MAX_LEVEL  = 15                    # cap: ~7x the starting speed (1.14^15)
 
 MILESTONES = (250, 500, 1000)
 

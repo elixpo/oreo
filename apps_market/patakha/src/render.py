@@ -15,17 +15,21 @@ SW, SH = api.SCREEN_W, api.SCREEN_H
 FP = g.FP
 
 # ── colours (Oreo festive palette on a Diwali night sky) ─────────────────
-SKY = (api.rgb(18, 14, 46), api.rgb(26, 18, 62), api.rgb(38, 22, 78),
-       api.rgb(54, 28, 92), api.rgb(72, 34, 100))
-C_STAR    = api.rgb(255, 244, 210)
-C_STAR_D  = api.rgb(150, 140, 170)
-C_CITY    = api.rgb(30, 20, 52)
-C_CITY_HI = api.rgb(44, 30, 70)
-C_WINDOW  = api.rgb(255, 196, 90)
-C_GROUND  = api.rgb(70, 36, 30)
-C_GROUND2 = api.rgb(96, 52, 36)
-C_CLAY    = api.rgb(196, 98, 52)
-C_CLAY_D  = api.rgb(140, 64, 36)
+# The backdrop is kept dim (about half brightness) so the launcher, the
+# falling targets and the fireworks are what the eye follows.
+SKY = (api.rgb(8, 6, 22), api.rgb(11, 8, 28), api.rgb(15, 10, 34),
+       api.rgb(20, 12, 40), api.rgb(26, 14, 44))
+C_STAR    = api.rgb(150, 142, 124)
+C_STAR_D  = api.rgb(64, 60, 78)
+C_CITY    = api.rgb(14, 10, 26)
+C_CITY_HI = api.rgb(20, 14, 34)
+C_WINDOW  = api.rgb(110, 84, 40)
+C_GROUND  = api.rgb(34, 18, 16)
+C_GROUND2 = api.rgb(46, 26, 20)
+C_CLAY    = api.rgb(98, 50, 28)
+C_CLAY_D  = api.rgb(70, 34, 20)
+BG_FLAME   = api.rgb(150, 136, 70)    # diya flames, dimmed
+BG_FLAME_O = api.rgb(150, 82, 24)
 C_FLAME   = api.rgb(255, 230, 110)
 C_FLAME_O = api.rgb(255, 140, 40)
 C_DARK    = theme.TEXT_BRIGHT
@@ -48,7 +52,8 @@ PALETTE = (
     api.rgb(255, 120, 40),    # ember
     api.rgb(120, 110, 130),   # smoke
 )
-BULB = (theme.GOLD, theme.PRIMARY, theme.TEAL, theme.GREEN, theme.ORANGE)
+BULB = (api.rgb(128, 96, 16), api.rgb(128, 46, 52), api.rgb(0, 90, 82),
+        api.rgb(30, 100, 50), api.rgb(128, 70, 16))     # dimmed string lights
 
 # ── sprites: (dx, dy, w, h, colour) ──────────────────────────────────────
 SPR_MATCHBOX = (
@@ -73,22 +78,26 @@ SPR_UFO = (
     (0, 6, 20, 2, theme.PRIMARY),
     (4, 8, 12, 2, C_SILVER_D),
 )
+# 36 x 27 (game.PLAYER_W x PLAYER_H).
 SPR_LAUNCHER = (
-    (2, 15, 5, 3, C_DARK),
-    (17, 15, 5, 3, C_DARK),
-    (0, 10, 24, 6, C_WOOD),
-    (0, 10, 24, 1, theme.GOLD),
-    (9, 0, 6, 11, theme.PRIMARY),
-    (9, 3, 6, 1, theme.GOLD),
-    (9, 7, 6, 1, theme.GOLD),
-    (8, 0, 8, 2, C_DARK),
+    (3, 22, 8, 5, C_DARK),
+    (25, 22, 8, 5, C_DARK),
+    (5, 24, 4, 2, C_SILVER_D),
+    (27, 24, 4, 2, C_SILVER_D),
+    (0, 15, 36, 8, C_WOOD),
+    (0, 15, 36, 2, theme.GOLD),
+    (13, 1, 10, 15, theme.PRIMARY),
+    (13, 5, 10, 2, theme.GOLD),
+    (13, 10, 10, 2, theme.GOLD),
+    (15, 2, 2, 12, api.rgb(255, 170, 180)),
+    (12, 0, 12, 3, C_DARK),
 )
 SPR_SAUCER = (
-    (6, 14, 12, 4, api.rgb(40, 110, 120)),
-    (0, 8, 24, 5, C_SILVER),
-    (7, 2, 10, 6, theme.TEAL),
-    (9, 3, 3, 2, api.WHITE),
-    (-2, 12, 28, 2, theme.PRIMARY),
+    (9, 21, 18, 6, api.rgb(40, 110, 120)),
+    (0, 12, 36, 8, C_SILVER),
+    (10, 3, 16, 9, theme.TEAL),
+    (13, 4, 5, 3, api.WHITE),
+    (-3, 18, 42, 3, theme.PRIMARY),
 )
 SPR_BULLET = (
     (0, 0, 3, 2, theme.GOLD),
@@ -252,8 +261,8 @@ def draw_background(d, bg, tick):
     i = 0
     for x in DIYA_X:
         fl = ((tick >> 2) + i * 3) & 3
-        rect(x + 3, gy + 1 + (fl & 1), 3, 5 - (fl & 1), C_FLAME_O, True)
-        rect(x + 4, gy + 3, 1, 3, C_FLAME, True)
+        rect(x + 3, gy + 1 + (fl & 1), 3, 5 - (fl & 1), BG_FLAME_O, True)
+        rect(x + 4, gy + 3, 1, 3, BG_FLAME, True)
         i += 1
 
 
@@ -317,12 +326,12 @@ def draw_world(d, w):
             glow = theme.TEAL if tick & 2 else api.rgb(120, 255, 230)
             # Blink faster in the last two seconds so the end is readable.
             if w.ufo > 2 * g.TICKS_PER_S or tick & 4:
-                d.rect(x - 4, y + 4, 32, 14, glow, False)
-                d.rect(x - 3, y + 5, 30, 12, glow, False)
+                d.rect(x - 6, y + 6, 48, 21, glow, False)
+                d.rect(x - 5, y + 7, 46, 19, glow, False)
             _spr(rect, SPR_SAUCER, x, y)
             lit = (tick >> 1) & 3
             for j in range(4):
-                rect(x + j * 7, y + 12, 2, 2,
+                rect(x + 2 + j * 10, y + 18, 3, 3,
                      api.WHITE if j == lit else theme.GOLD, True)
         else:
             _spr(rect, SPR_LAUNCHER, x, y)

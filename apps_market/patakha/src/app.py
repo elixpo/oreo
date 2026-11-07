@@ -31,7 +31,7 @@ MAX_TICKS_PER_FRAME = 5        # after a stall, catch up at most 100 ms
 OVER_LOCK_TICKS = 40           # ignore A for 0.8 s so held fire can't skip it
 
 TILT_DEADZONE_DEG = 3.0
-TILT_FULL_DEG = 20.0
+TILT_FULL_DEG = 15.0
 
 
 def _load_hi():
@@ -108,7 +108,9 @@ class App(oreoOS.App):
             except Exception:
                 pass
         saved = os.settings_get("patakha_mode", None)
-        self._mode = saved if saved in ("IMU", "BTN") else "BTN"
+        # Tilt by default when the badge has a gyro, as in Racer.
+        self._mode = saved if saved in ("IMU", "BTN") else (
+            "IMU" if self._imu is not None else "BTN")
 
     def on_exit(self):
         if self._imu is not None:

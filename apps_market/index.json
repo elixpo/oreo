@@ -12,7 +12,7 @@
       "author": "Circuit-Overtime",
       "version": "0.1",
       "icon": "patakha_icon.png",
-      "size": 50659,
+      "size": 51250,
       "files": [
         ["__init__.py", 0],
         ["assets/__init__.py", 0],
@@ -21,9 +21,9 @@
         ["main.py", 243],
         ["manifest.json", 224],
         ["src/__init__.py", 0],
-        ["src/app.py", 10710],
-        ["src/game.py", 18676],
-        ["src/render.py", 11999]
+        ["src/app.py", 10827],
+        ["src/game.py", 18691],
+        ["src/render.py", 12458]
       ]
     },
     {
