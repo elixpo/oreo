@@ -78,6 +78,11 @@ class App(oreoOS.App):
         self._t_over = mk("GAME OVER", theme.PRIMARY, 3)
         self._t_pause = mk("PAUSED", theme.PRIMARY, 3)
         self._t_newhi = mk("NEW HIGH!", theme.GOLD, 2)
+        # Action hints at double size so they read at arm's length.
+        self._t_resume = mk("A or B to resume", api.WHITE, 2)
+        self._t_quit = mk("HOME = quit", r.C_DIM, 2)
+        self._t_again = mk("A = play again", api.WHITE, 2)
+        self._t_back = mk("HOME = back", r.C_DIM, 2)
         self._t_banner = (
             None,
             mk("FASTER!", theme.ORANGE, 2),
@@ -268,9 +273,13 @@ class App(oreoOS.App):
                 r.blit_center(d, self._t_banner[w.banner], 92,
                               self._banner_fb[w.banner], api.WHITE, 2)
         elif s == PAUSE:
+            # One block centred on the screen: title, then two hint lines.
+            d.rect(20, 66, 280, 110, r.C_CARD, True)
+            d.rect(20, 66, 280, 110, theme.PRIMARY, False)
             r.blit_center(d, self._t_pause, 80, "PAUSED", theme.PRIMARY, 3)
-            r.center_text(d, "A or B to resume", 124, api.WHITE)
-            r.center_text(d, "HOME = quit", 140, r.C_DIM)
+            r.blit_center(d, self._t_resume, 118, "A or B to resume",
+                          api.WHITE, 2)
+            r.blit_center(d, self._t_quit, 144, "HOME = quit", r.C_DIM, 2)
         else:
             self._draw_over(d)
 
@@ -289,18 +298,18 @@ class App(oreoOS.App):
         r.center_text(d, "B = pause   HOME = back", 180, r.C_DIM)
 
     def _draw_over(self, d):
-        d.rect(40, 44, 240, 140, r.C_CARD, True)
-        d.rect(40, 44, 240, 140, theme.PRIMARY, False)
-        d.rect(41, 45, 238, 138, theme.PRIMARY, False)
-        r.blit_center(d, self._t_over, 56, "GAME OVER", theme.PRIMARY, 3)
-        r.blit_center(d, self._t_final, 92, "SCORE %d" % self._world.score,
+        d.rect(24, 30, 272, 180, r.C_CARD, True)
+        d.rect(24, 30, 272, 180, theme.PRIMARY, False)
+        d.rect(25, 31, 270, 178, theme.PRIMARY, False)
+        r.blit_center(d, self._t_over, 42, "GAME OVER", theme.PRIMARY, 3)
+        r.blit_center(d, self._t_final, 78, "SCORE %d" % self._world.score,
                       api.WHITE, 2)
         if self._new_hi:
-            r.blit_center(d, self._t_newhi, 116, "NEW HIGH!", theme.GOLD, 2)
+            r.blit_center(d, self._t_newhi, 102, "NEW HIGH!", theme.GOLD, 2)
         else:
-            r.center_text(d, "BEST %d" % self._hi, 120, theme.GOLD)
+            r.center_text(d, "BEST %d" % self._hi, 106, theme.GOLD)
         if self._over_t >= OVER_LOCK_TICKS and (self._world.tick >> 4) & 1 == 0:
-            r.center_text(d, "A = play again", 146, api.WHITE)
+            r.blit_center(d, self._t_again, 130, "A = play again", api.WHITE, 2)
+        r.blit_center(d, self._t_back, 156, "HOME = back", r.C_DIM, 2)
         r.center_text(d, "Mode: %s  (B = swap)" % self._mode_label(),
-                      160, r.C_DIM)
-        r.center_text(d, "HOME = back", 172, r.C_DIM)
+                      186, r.C_DIM)
