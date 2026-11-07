@@ -89,7 +89,7 @@ thing per frame.
 | Location | What it means |
 |---|---|
 | `apps/<name>/` | **Default-installed.** Tile appears in the drawer on every fresh deploy. Use for core OS tools + apps every badge owner should have. |
-| `apps_market/<name>/` | **Opt-in.** Ships in the catalogue but isn't in the drawer until the user installs from the on-device **App Market** tile. Use for games, sketches, hackathon entries, themed extras. |
+| `apps_market/<name>/` | **Opt-in.** Listed in the catalogue (`apps_market/index.json`, regenerate with `python3 tools/build_store_index.py`) but not in the drawer until the user installs it from the on-device **App Store**. Use for games, sketches, hackathon entries, themed extras. |
 
 Both trees have the exact same shape — `tools/deploy.py` walks both.
 When in doubt, ship to `apps_market/` so the drawer stays curated.
