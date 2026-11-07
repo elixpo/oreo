@@ -171,3 +171,85 @@ def play_area():
     SW = api.SCREEN_W
     SH = api.SCREEN_H
     return (0, HEADER_H, SW, SH - HEADER_H - HINT_H)
+
+
+# ── easing + smooth scrolling ────────────────────────────────────────────────
+
+def ease_out(t):
+    """Cubic ease-out on 0..1: fast start, soft landing."""
+    if t <= 0.0:
+        return 0.0
+    if t >= 1.0:
+        return 1.0
+    u = 1.0 - t
+    return 1.0 - u * u * u
+
+
+def ease_in(t):
+    """Cubic ease-in on 0..1: soft start, fast finish."""
+    if t <= 0.0:
+        return 0.0
+    if t >= 1.0:
+        return 1.0
+    return t * t * t
+
+
+class Scroller:
+    """Time-based eased scroll offset for lists and grids.
+
+    Apps keep their logical position (selected row, top row) as before and
+    hand the pixel target to the scroller; it glides there with an ease-out
+    curve over `dur` seconds, independent of the frame rate. Re-targeting
+    mid-glide (held UP/DOWN auto-repeat) restarts the curve from the current
+    position, so the motion chases the cursor instead of jumping.
+
+        self._scroll = widgets.Scroller()
+        self._scroll.set_target(top_row * ROW_H)      # on input
+        if self._scroll.step(dt): self._anim_dirty = True   # in update()
+        y = base - self._scroll.value                  # in draw()
+
+    No allocation per step: plain float maths on four slots.
+    """
+
+    __slots__ = ("pos", "target", "dur", "_from", "_t")
+
+    def __init__(self, pos=0, dur=0.16):
+        self.pos    = float(pos)
+        self.target = float(pos)
+        self.dur    = dur
+        self._from  = float(pos)
+        self._t     = dur
+
+    def set_target(self, target, snap=False):
+        target = float(target)
+        if snap:
+            self.pos = self.target = self._from = target
+            self._t  = self.dur
+            return
+        if target == self.target:
+            return
+        self._from  = self.pos
+        self.target = target
+        self._t     = 0.0
+
+    def step(self, dt):
+        """Advance by dt seconds. Returns True while the offset changed."""
+        if self._t >= self.dur:
+            return False
+        self._t += dt
+        if self._t >= self.dur:
+            self._t  = self.dur
+            self.pos = self.target
+            return True
+        self.pos = self._from + (self.target - self._from) * \
+            ease_out(self._t / self.dur)
+        return True
+
+    def moving(self):
+        return self._t < self.dur
+
+    @property
+    def value(self):
+        """Current offset rounded to whole pixels."""
+        p = self.pos
+        return int(p + 0.5) if p >= 0 else -int(-p + 0.5)

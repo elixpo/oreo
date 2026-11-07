@@ -24,11 +24,11 @@ _env = _load_env()
 # OS version. tools/deploy.py auto-bumps the PATCH number on every push.
 # The literal MUST stay on its own line as `VERSION = "vN.N.N"` — the
 # deploy regex relies on that exact format to rewrite in place.
-VERSION           = "v1.4.127"
+VERSION           = "v2.0.0"
 # ISO-date stamp of the current VERSION. Updated by tools/release.py
 # (or by hand for hot-fix builds). Shown on the Updates page as the
 # "Latest stable as of …" line when no newer release is available.
-RELEASE_DATE      = "2026-05-16"
+RELEASE_DATE      = "2026-11-07"
 
 GITHUB_USER       = "Circuit-Overtime"
 DISPLAY_NAME      = "Ayushman Bhattacharya"
@@ -81,7 +81,7 @@ WIFI_TX_DBM       = 11
 WIFI_POWERSAVE    = True
 BT_ADV_INTERVAL_MS = 500
 APP_CATEGORIES = (
-    ("Games",  "cat_games",  ("doom", "flappy", "snake", "racer", "pet")),
+    ("Games",  "cat_games",  ("flappy", "snake", "racer", "pet", "patakha")),
     ("GitHub", "cat_github", ("badge",  "identity", "commits")),
     ("Utils",  "cat_utils",  ("weather",)),
     ("Tools",  "cat_tools",  ("gallery", "color_picker", "gamepad", "quest")),

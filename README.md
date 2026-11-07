@@ -75,8 +75,8 @@ Weather, GitHub commits, OTA updates — all live. WiFi power-capped at 11 dBm s
 <tr>
 <td valign="top">
 
-### 🎮 14 default apps + an App Market
-Games, GitHub tools, IR quests, a markdown reader, storage breakdown, gesture controls. More optional apps (colour picker, the Elixpo Pet panda) install on-device from the App Market tile.
+### 🎮 Default apps + an App Store
+GitHub tools, a markdown reader, a gallery, storage breakdown. Games, IR quests, weather and more install on-device from the App Store.
 
 </td>
 <td valign="top">
@@ -101,8 +101,8 @@ IR beacons, BLE advertise + scan, a quest system. Hand someone your badge — th
 Every tile in the drawer is its own folder under [`apps/`](apps/),
 written as a small `class App(oreoOS.App)` with three lifecycle methods.
 Two trees ship to the badge: [`apps/`](apps/) is what's pre-installed,
-[`apps_market/`](apps_market/) is the catalogue of opt-in extras the
-user can install on-device from the **App Market** tile.
+[`apps_market/`](apps_market/) is the catalogue of apps the user can
+install on-device from the **App Store** tile.
 
 <div align="center">
 
@@ -111,33 +111,43 @@ user can install on-device from the **App Market** tile.
 | <img src="assets/icons/raw/badge_icon.png" width="64"><br>**Badge** | <img src="assets/icons/raw/identity_icon.png" width="64"><br>**Identity** | <img src="assets/icons/raw/commits_icon.png" width="64"><br>**Commits** | <img src="assets/icons/raw/wallpaper_icon.png" width="64"><br>**Weather** |
 | <img src="assets/icons/raw/racer_icon.png" width="64"><br>**Racer** | <img src="assets/icons/raw/flappy_icon.png" width="64"><br>**Flappy** | <img src="assets/icons/raw/snake_icon.png" width="64"><br>**Snake** | <img src="assets/icons/raw/gamepad_icon.png" width="64"><br>**Gamepad** |
 | <img src="assets/icons/raw/gallery_icon.png" width="64"><br>**Gallery** | <img src="assets/icons/raw/IR_Quest_icon.png" width="64"><br>**IR Quest** | <img src="assets/icons/raw/reader_icon.png" width="64"><br>**Reader** | <img src="assets/icons/raw/storage_icon.png" width="64"><br>**Storage** |
-| <img src="assets/icons/raw/apps_icon.png" width="64"><br>**Market** | <img src="assets/icons/raw/settings_icon.png" width="64"><br>**Settings** | <img src="assets/icons/raw/about_icon.png" width="64"><br>**About** | <img src="assets/icons/raw/doom_icon.png" width="64"><br>**Doom** |
+| <img src="assets/icons/raw/apps_icon.png" width="64"><br>**App Store** | <img src="assets/icons/raw/settings_icon.png" width="64"><br>**Settings** | <img src="assets/icons/raw/about_icon.png" width="64"><br>**About** | |
 
 </div>
 
-Bluetooth and WiFi don't get their own drawer tiles — they live inside **Settings**, alongside brightness, sleep, gestures and OTA. The notification panel (press **C** from anywhere except Doom, where C strafes) puts both radios + a brightness slider + manual time-sync one tap away.
+Bluetooth and WiFi don't get their own drawer tiles — they live inside **Settings**, alongside brightness, sleep, gestures and OTA. The notification panel (press **C** from anywhere; apps that use C themselves, like Gamepad, take a double-tap instead) puts both radios + a brightness slider + manual time-sync one tap away.
 
-### 📦 App Market — install / uninstall extras on-device
+### 📦 App Store — install, update and remove apps on-device
 
-Apps that ship under [`apps_market/`](apps_market/) are **optional**. They aren't in the launcher drawer until you install them. The default catalogue today: **Color Picker** and **Elixpo Pet** — both are good demos but don't pull their weight as always-on tiles.
+The badge ships a small default set (About, Badge, Commits, Gallery, Gamepad, Identity, Reader, Settings, Storage and the App Store, plus the system apps Apps, Updates and WiFi). Everything else lives under [`apps_market/`](apps_market/) and installs from the **App Store** tile: Racer, Flappy Oreo, Snake, Elixpo Pet, IR Quest, Bluetooth, Weather, Color, Gestures and the Diwali special, Patakha.
 
-Open the **App Market** tile, scroll to the app you want, press **A**:
-- **INSTALL** → copies the tree from `/apps_market/<name>/` to `/apps/<name>/`. Next time you open the drawer the tile is there.
-- **INSTALLED** → press **A** again to uninstall. The catalogue copy stays put so re-install is one tap.
+- **Discover** (first page): a featured card plus every app with its icon, tagline, category, size and an **INSTALL / OPEN / UPDATE** button. **A** opens the app's page (author, version, size, description) where you install it, with a progress bar.
+- **Installed** (press **B**): every app on the badge. Built-in apps can only be opened; others can be updated or uninstalled behind a confirm dialog, and reinstalled from Discover any time.
+- The catalogue is one file, [`apps_market/index.json`](apps_market/index.json), cached on the badge so the Store opens instantly and refreshes in the background. Apps install into the badge's filesystem, which takes all of the 16 MB flash after the firmware: about 13.7 MB.
 
 ```python
-# Programmatic API (handy from REPL or another app):
+# Programmatic API (handy from the REPL):
 from oreoOS import store
-store.list_market()      # [{name, dir, icon, author, installed}, …]
-store.install("pet")     # → bool
-store.uninstall("pet")
+store.refresh()              # fetch the catalogue
+store.install("racer")       # → (ok, message)
+store.uninstall("racer")     # built-in apps are refused
 ```
 
-The Market is the right home for: games, themed sketches, hardware demos, hackathon entries. **Contribute one** by dropping a folder into `apps_market/<your_app>/` with the usual `main.py + manifest.json + __init__.py + assets/` shape; the deploy script picks it up automatically and the market tile lists it on next boot. Anything in `apps_market/` is **opt-in by default** — that's how you keep flash + drawer real estate tight for everyone else.
+**Contribute an app** by adding `apps_market/<your_app>/` with the usual `main.py + manifest.json + __init__.py + src/ + assets/` shape, then run `python3 tools/build_store_index.py` and add a tagline, description and category to its entry in `apps_market/index.json`. See [`apps_market/README.md`](apps_market/README.md).
 
 Want yours to be **always-installed**? Drop it in `apps/` instead. Copy [`app_templates/`](app_templates/) as a starting point.
 
 ---
+
+### Doom edition
+
+Doom is not part of OreoOS 2.0: dropping its 7 MB game-data partition gives the filesystem about 13.7 MB. The complete Doom build stays on the [`doom-edition`](https://github.com/elixpo/oreo/tree/doom-edition) branch: the engine (doomgeneric / Chocolate Doom, GPL), the Doom app, the Freedoom tooling, the partition layout with the `doom` partition and a prebuilt firmware image. To put it on a badge (this erases it):
+
+```bash
+git fetch origin doom-edition && git switch doom-edition
+./build-firmware --clean      # or use the prebuilt oreoWare/firmware/OREO_BADGE-v1.28.0.bin
+./deploy --full               # firmware, Freedoom data and OS
+```
 
 ## 🚀 Get going
 
@@ -591,13 +601,6 @@ Hardware Association, UID [IN000107](https://certification.oshwa.org/in000107.ht
   ([Apache-2.0](LICENSES/preferred/Apache-2.0)); downstream distributors of
   compiled firmware must retain those licenses. See
   [`LICENSES/notices/notice-board`](LICENSES/notices/notice-board).
-- **Exception: the Doom engine**
-  ([`firmware/usermods/oreo_doom/`](firmware/usermods/oreo_doom/)) is
-  [GPL-2.0-or-later](LICENSES/preferred/GPL-2.0), and firmware images built
-  with it are distributed as a whole under [GPL-3.0](LICENSES/preferred/GPL-3.0).
-  The game data is [Freedoom](LICENSES/notices/freedoom) (BSD-3-Clause),
-  downloaded at deploy time. See
-  [`LICENSES/exceptions/oreo_doom-GPL`](LICENSES/exceptions/oreo_doom-GPL).
 
 The Oreo mascot, the chest E-badge, the "Elixpo", "Oreo", "Oreo Badge", and
 "OreoOS" names, and the elixpo.com domains are trademarks of the Elixpo project

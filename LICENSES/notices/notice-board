@@ -20,17 +20,6 @@ On-device runtime / firmware
       https://github.com/espressif/esp-idf
   * ESP32-S3 toolchain               - respective upstream licenses
       (xtensa-esp32s3-elf, newlib, FreeRTOS components)
-  * Doom engine (doomgeneric,        - GPL-2.0-or-later (sha1.c GPL-3.0-or-later)
-    Chocolate Doom, id Software)
-      Copyright (C) 1993-1996 Id Software, Inc.; (C) 2005-2014 Simon Howard
-      and Chocolate Doom contributors; doomgeneric by ozkl.
-      Vendored in ../../firmware/usermods/oreo_doom/; makes firmware images
-      that include it GPL-3.0. See ../exceptions/oreo_doom-GPL.
-      https://github.com/ozkl/doomgeneric
-  * Freedoom                         - BSD-3-Clause
-      Copyright (C) 2001-2024 Contributors to the Freedoom project.
-      Game data, downloaded at deploy time. See freedoom.
-      https://freedoom.github.io
 
 Host-side tooling (see oreoOS/requirements.txt for versions)
 ------------------------------------------------------------

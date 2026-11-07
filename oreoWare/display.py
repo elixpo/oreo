@@ -93,6 +93,8 @@ except Exception:
 
 
 class Display(api.Display):
+    _mono_pal = None        # 2×1 RGB565 palette for blit_mono, built lazily
+
     def __init__(self):
         spi = SPI(
             1,
@@ -183,6 +185,57 @@ class Display(api.Display):
             buf = bytearray(sprite[:w * h * 2])
         src = framebuf.FrameBuffer(buf, w, h, framebuf.RGB565)
         self._fb.blit(src, x, y, CHROMA_KEY)
+        self._dirty = True
+
+    def blit_mono(self, mask, x, y, w, h, color):
+        """Stamp a MONO_HLSB 1-bit mask in `color` (clear bits transparent).
+
+        One native framebuf.blit through a 2-entry palette: set bits map to
+        the colour, clear bits map to 0 and are skipped by key=0. Key 0 is
+        also the raw clear-bit value, so the result is the same whether the
+        port compares the key before or after the palette lookup. Black ink
+        would collide with the key, so it is nudged to the darkest non-zero
+        value.
+        """
+        pal = self._mono_pal
+        if pal is None:
+            self._mono_pal_buf = bytearray(4)
+            pal = framebuf.FrameBuffer(self._mono_pal_buf, 2, 1,
+                                       framebuf.RGB565)
+            self._mono_pal = pal
+        ink = _swap(color) or 0x0100
+        # pixel(x, y, c) writes; the two-argument form only reads.
+        pal.pixel(0, 0, 0)
+        pal.pixel(1, 0, ink)
+        # framebuf needs a writable buffer; font modules hold bytes, so
+        # callers on a hot path should hand over a cached bytearray.
+        if not isinstance(mask, bytearray):
+            mask = bytearray(mask)
+        src = framebuf.FrameBuffer(mask, w, h, framebuf.MONO_HLSB)
+        self._fb.blit(src, x, y, 0, pal)
+        self._dirty = True
+
+    def copy_rows(self, y, h):
+        """Snapshot full-width rows (one memcpy into a new bytearray)."""
+        stride = api.SCREEN_W * 2
+        return bytearray(memoryview(self._buf)[y * stride:(y + h) * stride])
+
+    def blit_rows(self, src, y, h, src_y=0):
+        """Opaque full-width row copy: a single memcpy (same slice-assign
+        path as blit_fullscreen), no pixel loop."""
+        stride = api.SCREEN_W * 2
+        if y < 0:
+            h += y
+            src_y -= y
+            y = 0
+        if y + h > api.SCREEN_H:
+            h = api.SCREEN_H - y
+        if h <= 0:
+            return
+        n = h * stride
+        s = src_y * stride
+        d = y * stride
+        self._buf[d:d + n] = memoryview(src)[s:s + n]
         self._dirty = True
 
     def blit_2x(self, sprite, x, y, w, h):
@@ -301,8 +354,15 @@ class Display(api.Display):
         stride = api.SCREEN_W * 2
         row_start = y * stride + x * 2
         row_len = w * 2
-        buf = self._buf
-        for _ in range(h):
-            p.spi.write(buf[row_start: row_start + row_len])
-            row_start += stride
+        buf = memoryview(self._buf)
+        if x == 0 and w == api.SCREEN_W:
+            # Full-width band: the rows are contiguous, so one write.
+            p.spi.write(buf[row_start: row_start + h * stride])
+        else:
+            for _ in range(h):
+                p.spi.write(buf[row_start: row_start + row_len])
+                row_start += stride
         p.cs(1)
+        # present() assumes the full-screen window set at init; put it back
+        # so the next full flush is not squeezed into this rectangle.
+        p.set_window(0, 0, api.SCREEN_W - 1, api.SCREEN_H - 1)

@@ -1,19 +1,11 @@
-"""Tests for the Oreo Badge flash layout and tools/fetch_freedoom.py."""
+"""Tests for the Oreo Badge flash layout."""
 
-import importlib.util
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 FLASH_SIZE = 16 * 1024 * 1024
 MMAP_PAGE = 0x10000
-
-
-def load_fetcher():
-    spec = importlib.util.spec_from_file_location("fetch_freedoom", ROOT / "tools" / "fetch_freedoom.py")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
 
 
 def partitions():
@@ -26,6 +18,10 @@ def partitions():
     return rows
 
 
+def by_name():
+    return {name: (off, size) for name, _, _, off, size in partitions()}
+
+
 class PartitionTest(unittest.TestCase):
     def test_layout_is_contiguous_and_fills_flash(self):
         rows = partitions()
@@ -34,21 +30,26 @@ class PartitionTest(unittest.TestCase):
         _, _, _, off, size = rows[-1]
         self.assertEqual(off + size, FLASH_SIZE)
 
-    def test_firmware_and_doom_are_mmap_aligned(self):
-        # Apps and memory-mapped data must start on a 64 KiB MMU page.
-        for name, _, _, off, size in partitions():
-            if name in ("factory", "doom"):
-                self.assertEqual(off % MMAP_PAGE, 0, name)
-                self.assertEqual(size % MMAP_PAGE, 0, name)
+    def test_firmware_is_mmap_aligned(self):
+        # The app partition must start on a 64 KiB MMU page.
+        off, size = by_name()["factory"]
+        self.assertEqual(off % MMAP_PAGE, 0)
+        self.assertEqual(size % MMAP_PAGE, 0)
 
-    def test_filesystem_partition_is_named_vfs(self):
-        # MicroPython finds its filesystem by this label.
-        self.assertIn("vfs", [row[0] for row in partitions()])
+    def test_filesystem_follows_firmware_to_end_of_flash(self):
+        # MicroPython finds its filesystem by the "vfs" label; it takes
+        # everything after the firmware.
+        parts = by_name()
+        self.assertIn("vfs", parts)
+        f_off, f_size = parts["factory"]
+        v_off, v_size = parts["vfs"]
+        self.assertEqual(v_off, f_off + f_size)
+        self.assertEqual(v_off + v_size, FLASH_SIZE)
+        self.assertEqual(partitions()[-1][0], "vfs")
 
-    def test_fetcher_reads_doom_partition(self):
-        fetcher = load_fetcher()
-        doom = [(off, size) for name, _, _, off, size in partitions() if name == "doom"]
-        self.assertEqual([fetcher.doom_partition()], doom)
+    def test_only_firmware_and_filesystem_partitions(self):
+        # No data partitions sit between the firmware and the filesystem.
+        self.assertEqual(set(by_name()), {"nvs", "phy_init", "factory", "vfs"})
 
 
 if __name__ == "__main__":

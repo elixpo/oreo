@@ -15,8 +15,11 @@ write decides when to "key" it on or off. Cost is sub-ms per frame.
 
 RX prefers the built-in ``_oreo_ir`` module, which uses ESP-IDF RMT RX to
 capture the demodulated envelope at 1 us resolution without depending on
-Python or display timing. Pin.irq() remains as an old-firmware fallback.
-Anything that doesn't decode as NEC still surfaces as a raw recording.
+Python or display timing. When the module is missing, or fails to start
+(for example firmware built before the issue #48 glitch-filter fix), RX
+falls back to Pin.irq() edge timing and rx_status() carries the native
+error so the UI can show it. Anything that doesn't decode as NEC still
+surfaces as a raw recording.
 
 API:
     ir.transmit_nec(code32, carrier_hz=38000)
@@ -24,6 +27,10 @@ API:
     ir.start_receive(on_packet, mode="focus"|"beacon")
     ir.stop_receive()
     ir.poll()    — call once per app frame; runs the decoder
+    ir.rx_status() — {"backend": "rmt"|"irq"|None, "warning": str|None, ...}
+
+TX pauses an active receiver and restarts it afterwards, so a caller can
+send without managing the RX lifecycle itself.
 
 on_packet(code_or_None, info_dict)
     code is the 32-bit NEC value, or None when a raw/unknown packet hit
@@ -121,46 +128,54 @@ def _release_rmt_tx():
     _rmt_carrier = 0
 
 
-def transmit_nec(code32, carrier_hz=38000):
-    """Encode a 32-bit NEC frame least-significant-bit first."""
-    global _last_error
+def nec_pulses(code32):
+    """Mark/space durations for one 32-bit NEC frame, LSB first."""
     pulses = [NEC_LEAD_HIGH, NEC_LEAD_LOW]
     for i in range(32):
         bit = (code32 >> i) & 1
         pulses.append(NEC_BIT_HIGH)
         pulses.append(NEC_BIT_LOW_1 if bit else NEC_BIT_LOW_0)
     pulses.append(NEC_TAIL_HIGH)
+    return pulses
+
+
+def _send(pulses, carrier_hz, timeout_ms):
+    """Key the carrier with `pulses`, pausing RX so we never capture our
+    own burst, then restore the receiver the caller had running."""
+    global _last_error
+    resume = _rx_callback if _rx_backend else None
+    resume_mode = _rx_mode
+    if resume:
+        stop_receive()
     try:
         rmt = _get_rmt(carrier_hz)
         rmt.write_pulses(pulses, 1)
-        if not rmt.wait_done(timeout=500):
+        if not rmt.wait_done(timeout=timeout_ms):
             raise RuntimeError("RMT transmit timeout")
     except Exception as exc:
         _last_error = "TX: %s" % exc
         raise
+    finally:
+        if resume:
+            start_receive(resume, mode=resume_mode)
     _last_error = None
     return True
 
 
+def transmit_nec(code32, carrier_hz=38000):
+    """Encode a 32-bit NEC frame least-significant-bit first."""
+    return _send(nec_pulses(code32), carrier_hz, 500)
+
+
 def transmit_raw(durations_us, carrier_hz=38000):
     """Replay captured mark/space durations, beginning with a carrier mark."""
-    global _last_error
     pulses = list(durations_us)
     if len(pulses) < 2:
         raise ValueError("raw IR frame is empty")
     for duration in pulses:
         if duration <= 0 or duration > 32767:
             raise ValueError("IR duration out of range: %s" % duration)
-    try:
-        rmt = _get_rmt(carrier_hz)
-        rmt.write_pulses(pulses, 1)
-        if not rmt.wait_done(timeout=1000):
-            raise RuntimeError("RMT transmit timeout")
-    except Exception as exc:
-        _last_error = "TX: %s" % exc
-        raise
-    _last_error = None
-    return True
+    return _send(pulses, carrier_hz, 1000)
 
 
 # ── RX ──────────────────────────────────────────────────────────────────────
@@ -168,6 +183,8 @@ def transmit_raw(durations_us, carrier_hz=38000):
 _rx_pin       = None
 _rx_callback  = None
 _rx_mode      = "focus"
+_rx_backend   = None      # "rmt", "irq" or None while stopped
+_rx_warning   = None      # why the native receiver was skipped, in full
 _MAX_PULSES   = 700
 _pulse_buf    = array("I", [0] * _MAX_PULSES)
 _spare_buf    = array("I", [0] * _MAX_PULSES)
@@ -207,38 +224,75 @@ def start_receive(on_packet, mode="focus"):
 
     `mode` is just a hint we pass through to the callback so the Quest
     app can render differently — the decoder runs the same in both.
+    Calling it again while listening just swaps the callback and mode.
     """
-    global _rx_pin, _rx_callback, _rx_mode, _pulse_count
-    global _pulse_overflow, _last_edge_us, _last_error
+    global _rx_pin, _rx_callback, _rx_mode, _pulse_count, _rx_backend
+    global _pulse_overflow, _last_edge_us, _last_error, _rx_warning
     _rx_callback  = on_packet
     _rx_mode      = mode
+    if _rx_backend is not None:
+        return
     _pulse_count  = 0
     _pulse_overflow = False
     _last_edge_us = 0
+    _last_error   = None
     if _HAVE_NATIVE_RX:
         # TX keeps its hardware channel after a send. Release the idle
         # transmitter before recreating RX during a SEND -> FOCUS switch.
         _release_rmt_tx()
-        _native_rx.start(pins.IR_RX)
-        _last_error = None
-        return
-    if _rx_pin is None:
-        _rx_pin = Pin(pins.IR_RX, Pin.IN, Pin.PULL_UP)
+        try:
+            _native_rx.start(pins.IR_RX)
+            _rx_backend = "rmt"
+            _rx_warning = None
+            return
+        except Exception as exc:
+            # Keep the full text; the edge-IRQ path still receives NEC.
+            _rx_warning = "RMT RX: %s" % exc
+            try:
+                _native_rx.stop()
+            except Exception:
+                pass
+    _rx_pin = Pin(pins.IR_RX, Pin.IN, Pin.PULL_UP)
     _rx_pin.irq(handler=_on_edge,
                 trigger=Pin.IRQ_FALLING | Pin.IRQ_RISING)
-    _last_error = None
+    _rx_backend = "irq"
 
 
 def stop_receive():
-    global _rx_pin, _rx_callback, _pulse_count, _pulse_overflow
-    if _HAVE_NATIVE_RX:
-        _native_rx.stop()
+    """Stop listening. Idempotent; always leaves the driver stopped even
+    if the native module reports a cleanup error (which is re-raised)."""
+    global _rx_pin, _rx_callback, _pulse_count, _pulse_overflow, _rx_backend
+    err = None
+    if _rx_backend == "rmt":
+        try:
+            _native_rx.stop()
+        except Exception as exc:
+            err = exc
     if _rx_pin is not None:
         _rx_pin.irq(handler=None)
     _rx_pin = None
     _rx_callback = None
+    _rx_backend = None
     _pulse_count = 0
     _pulse_overflow = False
+    if err is not None:
+        raise err
+
+
+def rx_status():
+    """Receiver diagnostics for UIs and the serial console."""
+    st = {"backend": _rx_backend, "warning": _rx_warning,
+          "native": _HAVE_NATIVE_RX}
+    if _HAVE_NATIVE_RX:
+        try:
+            info = _native_rx.info()
+            st["dma"] = info[2]
+            st["filter_ns"] = info[3]
+            st["stage"] = info[4]
+            st["esp_err"] = info[5]
+        except Exception:
+            pass          # firmware older than _oreo_ir.info()
+    return st
 
 
 def poll():
@@ -248,10 +302,16 @@ def poll():
     """
     global _pulse_buf, _spare_buf, _pulse_count, _pulse_overflow
     global _last_edge_us, _last_capture, _last_error
-    if _HAVE_NATIVE_RX:
+    if _rx_backend == "rmt":
         if not _rx_callback:
             return
-        pulses = _native_rx.poll()
+        try:
+            pulses = _native_rx.poll()
+        except Exception as exc:
+            # The native module already tore the channel down.
+            _last_error = "RX: %s" % exc
+            stop_receive()
+            raise
         if pulses is not None:
             _deliver_frame(pulses)
         return

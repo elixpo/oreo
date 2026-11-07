@@ -161,6 +161,9 @@ def _draw_speech_bubble(d, x, y, w, h, text, color):
 # ─── App ─────────────────────────────────────────────────────────────────────
 
 class App(oreoOS.App):
+    # C is one of this app's controls: a single C stays here and a
+    # double-tap of C opens the notification panel.
+    CAPTURES_C = True
     name         = "Oreo Pet"
     SHOW_LOADING = False
 

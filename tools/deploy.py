@@ -150,6 +150,8 @@ DEPLOY = [
     ("oreoOS/launcher.py",      "oreoOS/launcher.py"),
     ("oreoOS/power.py",         "oreoOS/power.py"),
     ("oreoOS/splash.py",        "oreoOS/splash.py"),
+    ("oreoOS/splash.bin",       "oreoOS/splash.bin"),   # tools/build_splash.py
+    ("oreoOS/wallpaper.bin",    "oreoOS/wallpaper.bin"),  # tools/build_splash.py
     ("oreoOS/theme.py",         "oreoOS/theme.py"),
     ("oreoOS/timeutil.py",      "oreoOS/timeutil.py"),
     ("oreoOS/widgets.py",       "oreoOS/widgets.py"),
@@ -158,6 +160,7 @@ DEPLOY = [
     ("oreoOS/ota.py",           "oreoOS/ota.py"),
     ("oreoOS/storage.py",       "oreoOS/storage.py"),
     ("oreoOS/store.py",         "oreoOS/store.py"),
+    ("oreoOS/store_io.py",      "oreoOS/store_io.py"),
     ("oreoOS/notifications.py", "oreoOS/notifications.py"),
     ("oreoOS/notif_panel.py",   "oreoOS/notif_panel.py"),
     ("oreoOS/pair_prompt.py",   "oreoOS/pair_prompt.py"),
@@ -356,6 +359,12 @@ def _progress_bar(cur, total, width=24):
     return "[" + "#" * filled + "-" * (width - filled) + "]"
 
 
+# mpremote mount reads: keep each request under the ESP32 stdin ring (260 B).
+SERIAL_BLOCK = 249
+# Device-side gather buffer: one flash write per FLASH_BLOCK bytes.
+FLASH_BLOCK = 4096
+
+
 def mpremote_batch(actions, label=""):
     """Stream changed files through mpremote's binary mounted-FS protocol.
 
@@ -365,10 +374,13 @@ def mpremote_batch(actions, label=""):
     A Gallery video can consequently take 10+ minutes.
 
     Mounting the repository at `/remote` uses mpremote's binary filesystem
-    channel instead. One device-side loop reads each local file and writes it
-    to flash in 249-byte blocks (mpremote's safe USB-stdin ring-buffer size).
-    Each destination is staged as `.part`, so an interrupted transfer does not
-    truncate the currently working file.
+    channel instead. One device-side loop reads each local file in 249-byte
+    blocks (mpremote's safe USB-stdin ring-buffer size: the ESP32 port's
+    stdin ring is 260 bytes and mpremote's mount protocol has no flow
+    control) and gathers them in a 4 KB buffer, so flash sees one write per
+    ~4 KB instead of one per 249 bytes. Each destination is staged as
+    `.part`, so an interrupted transfer does not truncate the currently
+    working file.
     """
     if label:
         print(label)
@@ -385,12 +397,12 @@ def mpremote_batch(actions, label=""):
         try:
             mounted_path = "/remote/" + local.relative_to(root).as_posix()
         except ValueError:
-            print("  ERROR: refusing to mount-copy a file outside the project: %s" % local)
+            print("  ERROR: refusing to mount-copy a file outside the project (device path %s)" % a[2])
             return 2
         try:
             size = local.stat().st_size
         except OSError as exc:
-            print("  ERROR: cannot stat %s: %s" % (local, exc))
+            print("  ERROR: cannot stat the file for %s: %s" % (a[2], exc.__class__.__name__))
             return 2
         remote = "/" + a[2].lstrip("/")
         copies.append((mounted_path, remote, size, a[1]))
@@ -398,7 +410,9 @@ def mpremote_batch(actions, label=""):
     # Keep this program compatible with MicroPython: no context managers,
     # pathlib, f-strings, or CPython-only APIs run on the badge.
     device_files = [(src, dst, size) for src, dst, size, _ in copies]
-    copy_script = "import os\nfiles=%r\nbuf=bytearray(249)\n" % (device_files,)
+    copy_script = ("import os\nfiles=%r\nB=%d\nbuf=bytearray(%d)\n"
+                   "mv=memoryview(buf)\n"
+                   % (device_files, SERIAL_BLOCK, FLASH_BLOCK))
     copy_script += (
         "for idx,item in enumerate(files):\n"
         " src,dst,size=item\n"
@@ -408,10 +422,15 @@ def mpremote_batch(actions, label=""):
         " inp=open(src,'rb')\n"
         " out=open(tmp,'wb')\n"
         " try:\n"
+        "  pos=0\n"
         "  while True:\n"
-        "   n=inp.readinto(buf)\n"
+        "   n=inp.readinto(mv[pos:pos+B])\n"
         "   if not n: break\n"
-        "   out.write(memoryview(buf)[:n])\n"
+        "   pos+=n\n"
+        "   if pos>len(buf)-B:\n"
+        "    out.write(mv[:pos])\n"
+        "    pos=0\n"
+        "  if pos: out.write(mv[:pos])\n"
         " finally:\n"
         "  inp.close()\n"
         "  out.close()\n"
@@ -463,8 +482,8 @@ def mpremote_batch(actions, label=""):
     return rc
 
 
-def write_secrets_local():
-    """Generate a local .secrets_tmp.py by importing the project's config.py.
+def write_device_config():
+    """Generate a local .cfg_snapshot.py by importing the project's config.py.
 
     config.py is the single source of truth: non-secret values are edited
     inline there, secrets come from .env. This function just snapshots every
@@ -472,7 +491,7 @@ def write_secrets_local():
     apps can `from secrets import GITHUB_USER, OWM_API_KEY, ...` with no
     filesystem dance at runtime.
 
-    Returns (path_to_tmp_file, wifi_ssid_for_logging).
+    Returns the path to the tmp file (no credential values leave this function).
     """
     # Import the project config from the repo root.
     import sys as _sys
@@ -524,9 +543,9 @@ def write_secrets_local():
         out.append(("%-18s = " + fmt) % (name, getattr(_cfg, name, "")))
     out.append("")
 
-    tmp = Path(".secrets_tmp.py")
+    tmp = Path(".cfg_snapshot.py")
     tmp.write_text("\n".join(out))
-    return tmp, getattr(_cfg, "WIFI_SSID", "")
+    return tmp
 
 
 # ── build directory set ────────────────────────────────────────────────────────
@@ -721,10 +740,10 @@ def main():
     # Generate secrets before comparing it with the cache. Hashing the rendered
     # file still notices .env changes, without unconditionally writing the same
     # tiny module on every deploy.
-    secrets_tmp, ssid = write_secrets_local()
-    secrets_hash = _hash_file(secrets_tmp)
+    cfg_snapshot = write_device_config()
+    secrets_hash = _hash_file(cfg_snapshot)
     if cache.get("secrets.py") != secrets_hash:
-        actions.append(("cp", str(secrets_tmp), "secrets.py"))
+        actions.append(("cp", str(cfg_snapshot), "secrets.py"))
         new_cache["secrets.py"] = secrets_hash
     else:
         skipped_pre += 1
@@ -758,6 +777,18 @@ def main():
             and (p / "manifest.json").exists()
             and not p.name.startswith("_")
     })
+    # Apps the App Store installs (apps_market/index.json) live under apps/
+    # too but are not in the repo's apps/: never prune them. Their market
+    # folder names stay as well, so the Store can migrate an older install
+    # saved under that name (e.g. "Oreo Pet") to its id.
+    store_apps = set()
+    try:
+        for e in json.loads(Path("apps_market/index.json").read_text())["apps"]:
+            store_apps.add(e["id"])
+            store_apps.add(e["path"].split("/", 1)[1])
+    except (OSError, ValueError, KeyError, IndexError):
+        pass
+    repo_apps = sorted(set(repo_apps) | store_apps)
     apps_prune = (
         "import os\n"
         "keep = set(%r)\n"
@@ -819,7 +850,7 @@ def main():
                          _human_size(deficit)))
                 print("  Free up space (delete photos / documents / caches) "
                       "or rerun with --no-free-guard to override.")
-                secrets_tmp.unlink(missing_ok=True)
+                cfg_snapshot.unlink(missing_ok=True)
                 sys.exit(2)
     print()
 
@@ -835,7 +866,7 @@ def main():
             print("No changed files to push.")
             rc = 0
     finally:
-        secrets_tmp.unlink(missing_ok=True)
+        cfg_snapshot.unlink(missing_ok=True)
     push_elapsed = _t.time() - push_t0
     print("  binary stream took %.1fs" % push_elapsed)
 
@@ -849,7 +880,7 @@ def main():
 
     elapsed = _t.time() - t0
     if rc == 0:
-        print("\nDone in %.1fs.  WIFI_SSID=%r" % (elapsed, ssid or "<unset>"))
+        print("\nDone in %.1fs." % elapsed)
         print("Resetting device...")
         mpremote("reset")
         print("Oreo OS is booting.")

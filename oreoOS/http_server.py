@@ -49,7 +49,12 @@ except ImportError:
 
 PORT          = 80
 MAX_BODY      = 8 * 1024 * 1024   # videos stream to flash; never buffered in RAM
-READ_CHUNK    = 2048
+READ_CHUNK    = 2048              # header / small-request reads
+UPLOAD_BUF    = 16 * 1024         # one preallocated buffer per upload:
+                                  # recv straight into it, flush to flash
+UPLOAD_FLUSH  = 12 * 1024         # in ~12 KB writes (was: one alloc + one
+                                  # write per 2 KB recv)
+WIFI_BODY_MAX = 512               # /wifi handoff JSON body cap
 RECV_TIMEOUT       = 3            # seconds — per-recv() during streaming
 HEADER_RECV_TIMEOUT = 0.05        # never stall the badge input loop on an
                                   # accepted browser socket with no data yet
@@ -219,8 +224,13 @@ def _safe_filename(raw):
     return "".join(out)[:64] or "upload"
 
 
-def _validate_uploaded_asset(path, kind):
-    """Reject truncated/wrong-format files before the atomic commit."""
+def _validate_uploaded_asset(path, kind, name=None):
+    """Reject truncated/wrong-format files before the atomic commit.
+
+    `path` is the staged `.part` file; `name` is the final destination
+    name used for extension checks (the `.part` suffix used to make every
+    document upload fail validation)."""
+    lname = (name or path).lower()
     try:
         size = _os.stat(path)[6]
         with open(path, "rb") as f:
@@ -238,9 +248,9 @@ def _validate_uploaded_asset(path, kind):
                     return 0 < w <= 320 and 0 < h <= 240 and size == 6 + w * h * 2
                 return False
             if kind == "document":
-                if path.lower().endswith((".mdz", ".txtz")):
+                if lname.endswith((".mdz", ".txtz")):
                     return len(head) >= 8 and head[:4] == b"ODZ\x01"
-                return path.lower().endswith((".md", ".txt"))
+                return lname.endswith((".md", ".txt"))
             if len(head) != 12 or head[:3] != b"RV5" or head[3] not in (1, 2, 3, 4, 5, 6):
                 return False
             w = head[4] | (head[5] << 8)
@@ -641,7 +651,9 @@ def tick():
             cli.close()
         except Exception:
             pass
-    gc.collect()
+    # No gc.collect() here: a full collect on the PSRAM heap costs tens of
+    # ms and used to run after every 500 ms beacon from every sender.
+    # Uploads (the only large allocators) collect explicitly.
 
 
 # ── request handling ────────────────────────────────────────────────────
@@ -860,6 +872,11 @@ _UPLOAD_FORM = (
     b"font-size:12px;cursor:pointer;text-decoration:underline;"
     b"text-decoration-color:var(--bord);text-underline-offset:3px}"
     b".reset button:hover{color:var(--ink)}"
+    b".wifi{border-top:1px solid var(--bord);padding-top:14px}"
+    b".in{width:100%;padding:12px;border-radius:8px;border:1px solid var(--bord);"
+    b"background:var(--bg);color:var(--ink);font-size:15px;outline:none}"
+    b".in:focus{border-color:var(--pri)}"
+    b".chk{display:flex;align-items:center;gap:8px;color:var(--dim);font-size:13px}"
     b"</style></head><body>"
     b"<div class='brand'>"
     b"<img class='mascot' src='/mascot.png' alt='Oreo'>"
@@ -901,6 +918,23 @@ _UPLOAD_FORM = (
     b"<div class='progress'><div class='bar' id='bar'></div></div>"
     b"<div class='pct hide' id='pct'><span id='pctn'>0%</span>"
     b"<span id='pctb'>0 / 0 KB</span></div>"
+    # ── WiFi handoff: give the badge another network's credentials ──
+    b"<div class='wifi stack'>"
+    b"<button type='button' class='btn ghost' id='wbtn' onclick='wifiOpen()'>"
+    b"Share a WiFi network</button>"
+    b"<div id='wform' class='stack hide'>"
+    b"<h2>Share a WiFi network</h2>"
+    b"<p class='sub'>The badge saves it and can join it later from "
+    b"<b>Settings &rsaquo; WiFi</b>. Only send this on a network you trust: "
+    b"the badge page is plain HTTP on your local network.</p>"
+    b"<input id='wssid' class='in' list='wlist' maxlength='32' autocomplete='off' "
+    b"autocapitalize='off' placeholder='Network name (SSID)'>"
+    b"<datalist id='wlist'></datalist>"
+    b"<input id='wpw' class='in' type='password' maxlength='64' autocomplete='off' "
+    b"placeholder='Password (leave blank if open)'>"
+    b"<label class='chk'><input type='checkbox' onchange='wpwShow(this)'>Show password</label>"
+    b"<button type='button' class='btn' id='wgo' onclick='wifiSend()'>Save to badge</button>"
+    b"<p class='err-msg' id='wmsg2'></p></div></div>"
     b"<div class='reset'><button type='button' onclick='resetAll()'>"
     b"Reset transaction</button></div></div>"
     # ── Stage 4: done ──
@@ -972,6 +1006,9 @@ _UPLOAD_FORM = (
     b"      const j=await r.json();"
     b"      if(typeof j.free==='number')freeBytes=j.free;"
     b"      if(j.state==='approved'){approved=true;clearInterval(beaconTimer);"
+    # Slow keep-alive after approval so the session does not idle out
+    # (SESSION_TTL_MS) while the user picks a file or types a password.
+    b"        beaconTimer=setInterval(keep,15000);"
     b"        $('wait').classList.add('hide');$('form').classList.remove('hide');}"
     b"      else if(j.state==='denied'){clearInterval(beaconTimer);"
     b"        $('wait').innerHTML=\"<h2>Denied</h2><p class='sub'>The badge "
@@ -984,6 +1021,30 @@ _UPLOAD_FORM = (
     # for too long" — surfaces the modal once so the user knows to
     # check WiFi rather than staring at a frozen yellow dot.
     b""
+    b"async function keep(){try{const r=await fetch('/beacon?id='+did);"
+    b"  if(r.status===410){clearInterval(beaconTimer);return;}"
+    b"  const j=await r.json();if(typeof j.free==='number')freeBytes=j.free;}catch(e){}}"
+    b"function wpwShow(c){$('wpw').type=c.checked?'text':'password';}"
+    b"async function wifiOpen(){$('wbtn').classList.add('hide');$('wform').classList.remove('hide');"
+    b"  try{const r=await fetch('/wifi/nearby?token='+did);if(!r.ok)return;const j=await r.json();"
+    b"    const dl=$('wlist');dl.innerHTML='';"
+    b"    (j.networks||[]).forEach(n=>{const o=document.createElement('option');o.value=n.ssid;"
+    b"      o.label=(n.secure?'secured':'open')+(n.saved?' \\u00b7 saved':'');dl.appendChild(o);});}"
+    b"  catch(e){}}"
+    b"async function wifiSend(){"
+    b"  const ssid=$('wssid').value,pw=$('wpw').value,m=$('wmsg2');m.style.color='';"
+    b"  if(!ssid){m.textContent='Enter the network name.';return;}"
+    b"  if(pw&&(pw.length<8||pw.length>64)){m.textContent='WiFi passwords are 8 to 63 characters.';return;}"
+    b"  $('wgo').disabled=true;m.textContent='Saving\\u2026';"
+    b"  try{const r=await fetch('/wifi?token='+did,{method:'POST',"
+    b"      headers:{'Content-Type':'application/json'},body:JSON.stringify({ssid:ssid,password:pw})});"
+    b"    const j=await r.json().catch(()=>({}));"
+    b"    if(r.ok){m.style.color='var(--teal)';$('wpw').value='';"
+    b"      m.textContent=(j.updated?'Updated ':'Saved ')+ssid+'. Join it on the badge: Settings \\u203a WiFi \\u203a Saved.';}"
+    b"    else if(r.status===403){m.textContent='This device is no longer approved. Reset and pair again.';}"
+    b"    else{m.textContent=j.error||('Badge returned '+r.status);}}"
+    b"  catch(e){m.textContent='Badge unreachable. Check both devices are on the same WiFi.';}"
+    b"  finally{$('wgo').disabled=false;}}"
     # ── file picker / preview / browser-side media conversion ──
     b"function mediaKind(file){"
     b"  const n=file.name.toLowerCase();"
@@ -1317,6 +1378,12 @@ def _handle(sock):
     if method == "POST" and path == "/upload":
         _handle_upload(sock, headers, after_head, qs)
         return
+    if method == "POST" and path == "/wifi":
+        _handle_wifi_share(sock, headers, after_head, qs)
+        return
+    if method == "GET" and path == "/wifi/nearby":
+        _handle_wifi_nearby(sock, qs)
+        return
 
     _send_status(sock, 404, "Not Found", _NOT_FOUND_PAGE)
 
@@ -1444,6 +1511,228 @@ def _handle_beacon(sock, qs, peer_addr):
     _send_status(sock, 200, "OK", body, content_type="application/json")
 
 
+# ── WiFi credential handoff ─────────────────────────────────────────────
+#
+# A phone/laptop that went through the normal pairing handshake (badge
+# code -> prefill -> owner presses A, i.e. an "approved" session) can hand
+# the badge the SSID + password of another network. The badge only stores
+# it in Saved networks (/wifi.json); the owner joins it later from
+# Settings -> WiFi. Unauthenticated requests get 403, the password is
+# never printed or echoed back, and no endpoint ever returns a saved
+# password.
+
+def _approved_token(qs):
+    token = qs.get("token", "")
+    # Drop sessions whose beacon went quiet first: nothing else prunes
+    # while the badge sits outside the Send Files page, and an expired
+    # approval must not keep authorising credential writes.
+    _prune_sessions()
+    s = _sessions.get(token) if token else None
+    if s is None or s.get("state") != "approved":
+        return None
+    return token
+
+
+def _json_reply(sock, code, reason, obj):
+    import json
+    _send_status(sock, code, reason, json.dumps(obj).encode(),
+                 content_type="application/json")
+
+
+def _read_body(sock, prefix, clen):
+    """Exactly `clen` body bytes (prefix first), or None on short read."""
+    buf = bytearray(prefix[:clen])
+    while len(buf) < clen:
+        try:
+            chunk = sock.recv(min(READ_CHUNK, clen - len(buf)))
+        except OSError:
+            return None
+        if not chunk:
+            return None
+        buf.extend(chunk)
+    return bytes(buf)
+
+
+def wifi_credentials_error(ssid, password):
+    """None when (ssid, password) is storable, else a short reason.
+
+    SSID: 1-32 bytes of UTF-8 without control characters. Password: empty
+    (open network), 8-63 printable ASCII characters (WPA/WPA2/WPA3
+    passphrase) or exactly 64 hex digits (raw PSK).
+    """
+    if not isinstance(ssid, str) or not isinstance(password, str):
+        return "ssid and password must be text"
+    if not ssid:
+        return "network name is empty"
+    if len(ssid.encode()) > 32:
+        return "network name is longer than 32 bytes"
+    for ch in ssid:
+        o = ord(ch)
+        if o < 32 or o == 127:
+            return "network name has control characters"
+    n = len(password)
+    if n == 0:
+        return None
+    if n == 64:
+        for ch in password:
+            if ch not in "0123456789abcdefABCDEF":
+                return "a 64-character password must be hex"
+        return None
+    if n < 8 or n > 63:
+        return "password must be 8-63 characters"
+    for ch in password:
+        o = ord(ch)
+        if o < 32 or o > 126:
+            return "password must be printable ASCII"
+    return None
+
+
+def _handle_wifi_share(sock, headers, body_prefix, qs):
+    """POST /wifi?token=<approved session>  {"ssid": .., "password": ..}"""
+    token = _approved_token(qs)
+    if token is None:
+        _json_reply(sock, 403, "Forbidden", {"error": "not approved"})
+        return
+    try:
+        clen = int(headers.get("content-length", "0"))
+    except ValueError:
+        clen = 0
+    if clen <= 0 or clen > WIFI_BODY_MAX:
+        _json_reply(sock, 413, "Payload Too Large", {"error": "bad length"})
+        return
+    body = _read_body(sock, body_prefix, clen)
+    if body is None:
+        _json_reply(sock, 400, "Bad Request", {"error": "truncated"})
+        return
+    try:
+        import json
+        data = json.loads(body.decode("utf-8"))
+        ssid = data.get("ssid", "")
+        pw = data.get("password", "")
+    except Exception:
+        _json_reply(sock, 400, "Bad Request", {"error": "expected JSON"})
+        return
+    body = data = None
+    err = wifi_credentials_error(ssid, pw)
+    if err:
+        pw = None
+        _json_reply(sock, 422, "Unprocessable Content", {"error": err})
+        return
+    try:
+        from oreoWare import wifi
+        old = wifi.get_saved(ssid)
+        if old is None:
+            ok = wifi.add_saved(ssid, pw, priority=10)
+        else:
+            ok = wifi.add_saved(ssid, pw,
+                                priority=int(old.get("priority", 10)),
+                                metered=bool(old.get("metered")))
+    except Exception:
+        old = None
+        ok = False
+    pw = None
+    if not ok:
+        _json_reply(sock, 500, "Internal Error", {"error": "could not save"})
+        return
+    try:
+        print("[http] wifi handoff: saved a network")
+    except Exception:
+        pass
+    try:
+        from oreoOS import notifications
+        notifications.push("wifi", "WiFi network saved", ssid[:24],
+                           target="wifi")
+    except Exception:
+        pass
+    _json_reply(sock, 200, "OK", {"ok": True, "ssid": ssid,
+                                  "updated": old is not None})
+
+
+def _handle_wifi_nearby(sock, qs):
+    """GET /wifi/nearby?token=..  — SSIDs the badge can hear, so the
+    sender's page can offer them in a picker. Names only, no secrets."""
+    if _approved_token(qs) is None:
+        _json_reply(sock, 403, "Forbidden", {"error": "not approved"})
+        return
+    out = []
+    cur = None
+    try:
+        from oreoWare import wifi
+        saved = wifi.saved_ssids()
+        for n in wifi.nearby():
+            out.append({"ssid": n.get("ssid", ""), "rssi": n.get("rssi", 0),
+                        "secure": bool(n.get("secure", True)),
+                        "saved": n.get("ssid", "") in saved})
+        cur = wifi.ssid()
+    except Exception:
+        pass
+    _json_reply(sock, 200, "OK", {"networks": out, "current": cur})
+
+
+def _recv_into(sock, mv, nbytes):
+    """socket.readinto on MicroPython, recv_into on CPython (host tests)."""
+    try:
+        return sock.readinto(mv, nbytes)
+    except AttributeError:
+        return sock.recv_into(mv, nbytes)
+
+
+def _stream_part(sock, f, rest, body_left, closing, progress=None):
+    """Copy one multipart part body from `sock` into file `f`.
+
+    `rest` holds the bytes already read past the part header; `body_left`
+    is how many request-body bytes are still on the wire. Stops at the
+    `closing` delimiter (CRLF + "--boundary"). Returns bytes written.
+
+    One buffer for the whole upload: recv lands straight in it (no
+    per-chunk bytes objects), the delimiter search only covers the newly
+    arrived bytes, and the file sees ~UPLOAD_FLUSH-sized writes instead of
+    one write per 2 KB recv. The last len(closing)-1 bytes are held back
+    each flush because they could be the start of the delimiter.
+    """
+    keep = len(closing) - 1
+    size = max(UPLOAD_BUF, len(rest) + 4096)
+    flush_at = size - (UPLOAD_BUF - UPLOAD_FLUSH)
+    buf = bytearray(size)
+    mv = memoryview(buf)
+    n = len(rest)
+    buf[:n] = rest
+    scan = 0            # delimiter search resumes here
+    written = 0
+    while True:
+        idx = buf.find(closing, scan, n)
+        if idx >= 0:
+            f.write(mv[:idx])
+            return written + idx
+        scan = max(0, n - keep)
+        if body_left <= 0:
+            f.write(mv[:n])
+            return written + n
+        if n >= flush_at:
+            cut = n - keep
+            f.write(mv[:cut])
+            written += cut
+            buf[:keep] = mv[cut:n]
+            n = keep
+            scan = 0
+            if written > MAX_BODY:
+                return written
+        try:
+            k = _recv_into(sock, mv[n:], min(size - n, body_left))
+        except OSError:
+            k = 0
+        if not k:
+            # Sender went away without a closing delimiter: keep what we
+            # have; validation before the atomic rename rejects a
+            # truncated asset.
+            f.write(mv[:n])
+            return written + n
+        n += k
+        body_left -= k
+        if progress is not None:
+            progress["received"] = written + n
+
+
 def _handle_upload(sock, headers, body_prefix, qs):
     """Stream a single multipart part to disk. Phones POST exactly one
     file per share, so we don't try to handle multi-part bodies — we
@@ -1560,13 +1849,9 @@ def _handle_upload(sock, headers, body_prefix, qs):
         except OSError:
             pass
 
-    # Stream the rest of the body into the file, scanning for the
-    # closing boundary. The "tail buffer" trick: keep the last
-    # (len(boundary)+8) bytes unwritten until we're sure they're not
-    # the start of the closing marker.
+    # Stream the rest of the body into a .part file until the closing
+    # boundary (see _stream_part), validate, then rename atomically.
     closing = b"\r\n" + boundary_marker
-    tail_keep = len(closing) + 4
-    written = 0
     part_path = dst_path + ".part"
     try:
         try:
@@ -1587,42 +1872,13 @@ def _handle_upload(sock, headers, body_prefix, qs):
     _progress = {"id": token, "filename": fname,
                  "received": 0, "total": clen}
 
+    written = 0
+    write_err = False
     try:
-        buf = bytearray(rest)
-        body_left = clen - bytes_read  # bytes still on the wire after we filled head_buf
-        while True:
-            # If `buf` contains the closing boundary, flush up to it and stop.
-            idx = buf.find(closing)
-            if idx >= 0:
-                f.write(bytes(buf[:idx]))
-                written += idx
-                break
-            # Otherwise flush all but the last tail_keep bytes (they
-            # might be the start of the boundary).
-            if len(buf) > tail_keep:
-                cut = len(buf) - tail_keep
-                f.write(bytes(buf[:cut]))
-                written += cut
-                buf = buf[cut:]
-            if body_left <= 0 and not buf:
-                f.write(bytes(buf))
-                written += len(buf)
-                break
-            try:
-                chunk = sock.recv(READ_CHUNK)
-            except OSError:
-                break
-            if not chunk:
-                f.write(bytes(buf))
-                written += len(buf)
-                break
-            body_left -= len(chunk)
-            buf.extend(chunk)
-            # Live progress update — the WiFi UI samples this at 4 Hz
-            # so an O(1) dict assignment per chunk is fine.
-            _progress["received"] = written + max(0, len(buf) - tail_keep)
-            if written > MAX_BODY:
-                break
+        written = _stream_part(sock, f, rest, clen - bytes_read, closing,
+                               _progress)
+    except Exception:
+        write_err = True          # flash full / FS error mid-stream
     finally:
         try:
             f.close()
@@ -1654,6 +1910,15 @@ def _handle_upload(sock, headers, body_prefix, qs):
     except Exception:
         pass
 
+    if write_err:
+        try:
+            _os.remove(part_path)
+        except Exception:
+            pass
+        _send_status(sock, 500, "Internal Error",
+                     b"write failed (out of space?)")
+        return
+
     if written <= 0:
         try:
             _os.remove(part_path)
@@ -1662,7 +1927,7 @@ def _handle_upload(sock, headers, body_prefix, qs):
         _send_status(sock, 400, "Bad Request", b"empty upload")
         return
 
-    if not _validate_uploaded_asset(part_path, kind):
+    if not _validate_uploaded_asset(part_path, kind, dst_path):
         try:
             _os.remove(part_path)
         except Exception:

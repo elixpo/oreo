@@ -16,6 +16,23 @@ Format for a new entry (add to the top, push, CI does the rest):
 
 ---
 
+## v2.0.0 — 2026-11-07
+
+Diwali release: the App Store, a smoother shell, Wi-Fi handoff and Patakha.
+
+- **App Store** (was Store): Discover page with a featured card, icons, taglines, categories, sizes and Install / Open / Update; app pages; B opens Installed, where apps uninstall after a confirm step and reinstall from Discover. The catalogue is one file (apps_market/index.json), cached on the badge and refreshed in the background. Installs stream into a staging folder and swap in only when complete; updates keep an app's saved files.
+- **Smaller default image**: About, Badge, Commits, Gallery, Gamepad, Identity, Reader, Settings, App Store and Storage (plus Launcher, Updates and Wi-Fi). Bluetooth, Flappy, Gestures, IR Quest, Racer, Snake, Weather, Pet and Colors install from the App Store.
+- **Doom removed**: the engine is gone from the firmware and the game from the App Store, and its 7 MB flash partition now belongs to the filesystem (about 13.7 MB, was 6.7 MB). This takes effect after a full flash: `./deploy --full` erases the badge, while OTA updates keep the old partition table.
+- **Patakha** (new, App Store): Diwali firecracker shooter with firework bursts, speed-ups every 100 points, rocket barrages at 250/500/1000 and a UFO power-up (#97).
+- **New look**: dark wallpaper on the splash and a light liquid-glass wallpaper on Home (full 320x240). The splash shows the logo top left, "hello" rolling through 16 languages three times a second in their own scripts (anti-aliased Inter / Noto Sans) and a loader, runs on its own thread so it never freezes while the OS loads, and hands over to Home with a swipe of big chevrons in the light wallpaper's colours.
+- **Shell**: eased scrolling and partial redraws in the apps grid, home and lists; full-height notification panel with Torch (white screen, Home returns) and Update tiles.
+- **Wi-Fi**: boot connects in the background and never blocks the splash; the Wi-Fi page scans live with progress, signal bars and lock icons, shows connect progress with clear failure reasons, and lists Saved networks to join or forget. A paired phone or laptop can send the badge a new network's password from the Send Files page.
+- **Faster transfers**: larger buffers and fewer flash writes for LAN uploads; OTA patches stream to flash over a reused connection; deploys batch flash writes.
+- **Bluetooth**: status page and stalled-transfer reset; docs/BLUETOOTH.md documents what works today and the next steps.
+- **Notification panel over apps that use C** (Wi-Fi's nearby rescan, Pet, Bluetooth): single C goes to the app, double-tap C opens the panel.
+- **Fixes**: App Store apps show their own icon in the launcher after install; Patakha has a dimmer sky, a bigger launcher, tilt steering by default and a harder curve; Racer traffic can spawn kerb to kerb, so hugging the edge no longer avoids crashes; IR Quest arms RMT RX on the ESP32-S3 (glitch filter within the S3 limit, #48), every tab shares one receive lifecycle, errors show in full, new DIAG tab (needs the new firmware); Gamepad's C no longer opens the notification panel; About and Badge open instantly from cache and refresh in the background.
+- **Tooling**: OTA releases now ship apps' src/ code; tools/build_store_index.py builds and checks the catalogue.
+
 ## v1.4.19 — 2026-05-16
 
 - **Fix**: Updates page no longer hangs forever — OTA's `check`,

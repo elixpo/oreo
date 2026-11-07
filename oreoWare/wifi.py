@@ -35,6 +35,18 @@ Usage:
     wifi.add_saved(ssid, pw, priority=10, metered=False)
     wifi.remove_saved(ssid)
     wifi.is_metered()                 # current link metered?
+
+Non-blocking API (OreoOS 2.0). Nothing below ever waits for the radio;
+callers poll from their update()/run-loop tick instead:
+
+    wifi.scan_start()                 # background scan (own thread)
+    wifi.scan_poll()                  # "busy" | "done" | "error" | "idle"
+    wifi.nearby()                     # last scan, strongest first; falls
+                                      # back to /wifi_seen.json from an
+                                      # earlier scan so UIs paint instantly
+    wifi.connect_begin(ssid, pw)      # starts association, returns at once
+    wifi.connect_poll()               # CONN_* result string
+    wifi.auto_begin() / auto_tick()   # boot auto-connect state machine
 """
 
 import network
@@ -161,7 +173,16 @@ def radio_on():
 def radio_off():
     """Power the radio fully down. Releases any active connection
     cleanly and saves the ~70 mA the WiFi MAC pulls in idle. Pairs
-    with `radio_on()` so a UI toggle has a real on/off semantic."""
+    with `radio_on()` so a UI toggle has a real on/off semantic.
+
+    Also stops a pending non-blocking join and the boot auto-connect
+    machine; otherwise the next auto_tick() would call connect_begin()
+    or scan_start(), both of which power the radio straight back on."""
+    global _auto_state, _auto_refresh, _conn_ssid, _conn_result
+    _auto_state   = AUTO_OFF
+    _auto_refresh = False
+    _conn_ssid    = None
+    _conn_result  = CONN_IDLE
     try:
         wlan = _get_wlan()
         try: wlan.disconnect()
@@ -416,15 +437,25 @@ def save_saved(networks):
 def add_saved(ssid, password, priority=10, metered=False):
     """Add or update a single saved network. Matched by SSID; existing
     entries are overwritten so the user doesn't accumulate duplicates
-    if they re-enter the same network."""
+    if they re-enter the same network. The "last connected" marker
+    survives an update so the boot fast path keeps working."""
     nets = _load_saved_raw() or _bootstrap_from_secrets()
-    out  = [n for n in nets if n.get("ssid") != ssid]
-    out.append({
+    last = False
+    out  = []
+    for n in nets:
+        if n.get("ssid") == ssid:
+            last = bool(n.get("last"))
+        else:
+            out.append(n)
+    entry = {
         "ssid":     ssid,
         "password": password or "",
         "priority": int(priority),
         "metered":  bool(metered),
-    })
+    }
+    if last:
+        entry["last"] = True
+    out.append(entry)
     return _save_raw(out)
 
 
@@ -522,8 +553,7 @@ def connect_from_config(pump_cb=None):
             continue
         pw = n.get("password") or ""
         try:
-            print("[wifi] try %s (p=%s)" %
-                  (ssid_, n.get("priority", "?")))
+            print("[wifi] trying a saved network")
             ok = connect(ssid_, pw,
                          timeout_ms=_PER_NET_TIMEOUT,
                          pump_cb=pump_cb)
@@ -531,7 +561,7 @@ def connect_from_config(pump_cb=None):
             print("[wifi] connect raised:", e)
             ok = False
         if ok:
-            print("[wifi] associated:", ssid_)
+            print("[wifi] associated")
             return True
         # If the user cancelled mid-search, stop trying further
         # networks — they explicitly asked us to give up. Without
@@ -645,7 +675,7 @@ def speed_test(bytes_=200_000, timeout_s=10, pump_cb=None):
     """
     try:
         import socket as _s
-        import ssl    as _ssl
+        from oreoOS._http import tls_wrap as _tls_wrap
     except ImportError:
         return (False, 0, 0)
     if not is_connected():
@@ -686,7 +716,7 @@ def speed_test(bytes_=200_000, timeout_s=10, pump_cb=None):
         try: raw.settimeout(timeout_s)   # connect can take a while
         except Exception: pass
         raw.connect(addr)
-        s = _ssl.wrap_socket(raw, server_hostname=host)
+        s = _tls_wrap(raw, host)
         try: s.settimeout(PER_READ_S)
         except Exception: pass
         req = ("GET %s HTTP/1.1\r\nHost: %s\r\n"
@@ -859,3 +889,614 @@ def get_power_mode():
         return "balanced"
     except Exception:
         return "balanced"
+
+
+# ═════════════════════════════════════════════════════════════════════════
+# Non-blocking scan / connect / boot auto-connect (OreoOS 2.0)
+# ═════════════════════════════════════════════════════════════════════════
+#
+# Everything below returns immediately. A scan runs in a short-lived
+# `_thread` worker: MicroPython's ESP32 port releases the GIL around
+# esp_wifi_scan_start(), so the UI keeps drawing while the radio hops
+# channels (~1.5-2.5 s). Builds without `_thread` fall back to a
+# synchronous scan, which costs one ~2 s hitch but is otherwise identical.
+#
+# The worker only touches `_scan_raw` / `_scan_err` / `_scan_busy`; all
+# parsing, flash writes and state changes happen on the main thread in
+# scan_poll(), so there is no shared mutable state beyond three scalars.
+
+_SEEN_PATH     = "/wifi_seen.json"
+_SEEN_MAX      = 16          # networks remembered from the last scan
+_SCAN_TIMEOUT  = 8000        # ms; a worker that never reports is abandoned
+
+# Association results returned by connect_poll().
+CONN_IDLE     = "idle"
+CONN_BUSY     = "connecting"
+CONN_OK       = "ok"
+CONN_BAD_PW   = "bad_password"
+CONN_NO_AP    = "not_found"
+CONN_TIMEOUT  = "timeout"
+CONN_FAIL     = "failed"
+
+# Driver status codes (network.STAT_* on the ESP32 port). Hard-coded so
+# the classifier also works on the host and on builds that do not export
+# every constant.
+_ST_NO_AP     = (201, 210, 211, 212)    # NO_AP_FOUND (+ threshold variants)
+_ST_BAD_PW    = (202, 15, 204)          # AUTH_FAIL / 4-way handshake timeout
+_BAD_HOLD_MS  = 2500                    # a bad status must persist this long
+
+_scan_busy    = False
+_scan_raw     = None
+_scan_err     = None
+_scan_t0      = 0
+_scan_seq     = 0            # bumps on every completed scan
+_nearby       = None         # parsed list from the most recent scan
+_nearby_live  = False        # True once a scan finished this boot
+
+
+def _now():
+    return time.ticks_ms()
+
+
+def _decode_ssid(raw):
+    """Scan SSIDs are bytes and may not be valid UTF-8. Never raise."""
+    if isinstance(raw, str):
+        return raw
+    try:
+        return raw.decode("utf-8")
+    except Exception:
+        return "".join(chr(b) if 32 <= b < 127 else "?" for b in raw)
+
+
+def parse_scan(raw, limit=_SEEN_MAX):
+    """wlan.scan() tuples -> [{ssid, rssi, secure, ch}], strongest first.
+
+    Hidden networks (empty SSID) are dropped and an SSID broadcast by
+    several access points is kept once, with its strongest signal.
+    Pure function: host-tested in tests/test_wifi_logic.py.
+    """
+    best = {}
+    for r in raw or ():
+        try:
+            ssid = _decode_ssid(r[0])
+            rssi = int(r[3])
+            auth = int(r[4])
+            ch   = int(r[2])
+        except Exception:
+            continue
+        if not ssid:
+            continue
+        cur = best.get(ssid)
+        if cur is None or rssi > cur["rssi"]:
+            best[ssid] = {"ssid": ssid, "rssi": rssi,
+                          "secure": auth != 0, "ch": ch}
+    out = sorted(best.values(), key=lambda n: -n["rssi"])
+    return out[:limit]
+
+
+def signal_level(rssi):
+    """RSSI (dBm) -> 0..4 bars. Same thresholds the WiFi app always used."""
+    if rssi is None:
+        return 0
+    if rssi >= -50:
+        return 4
+    if rssi >= -65:
+        return 3
+    if rssi >= -75:
+        return 2
+    if rssi >= -85:
+        return 1
+    return 0
+
+
+def classify_status(code):
+    """wlan.status() -> CONN_BAD_PW / CONN_NO_AP, or None (still trying
+    / connected / unknown)."""
+    try:
+        code = int(code)
+    except Exception:
+        return None
+    if code in _ST_BAD_PW:
+        return CONN_BAD_PW
+    if code in _ST_NO_AP:
+        return CONN_NO_AP
+    return None
+
+
+def pick_candidates(saved, visible, exclude=()):
+    """Saved networks worth trying, best first.
+
+    With a scan in hand only networks that are actually on the air are
+    returned, ordered by (priority, strongest signal). Without one
+    (`visible` is None, e.g. the scan failed) every saved network is
+    returned in priority order so the badge still tries something.
+    """
+    def _pri(n):
+        try:
+            return int(n.get("priority", 999))
+        except Exception:
+            return 999
+    if visible is None:
+        nets = [n for n in saved
+                if n.get("ssid") and n.get("ssid") not in exclude]
+        return sorted(nets, key=_pri)
+    rssi = {}
+    for v in visible:
+        rssi[v["ssid"]] = v["rssi"]
+    nets = [n for n in saved
+            if n.get("ssid") in rssi and n.get("ssid") not in exclude]
+    return sorted(nets, key=lambda n: (_pri(n), -rssi[n["ssid"]]))
+
+
+def _scan_worker():
+    global _scan_raw, _scan_err, _scan_busy
+    wlan = _get_wlan()
+    try:
+        try:
+            res = wlan.scan()
+        except OSError:
+            # IDF refuses to scan while the driver is retrying a failed
+            # association ("sta is connecting"). Stop that loop and retry
+            # once; never touch a link that is actually up.
+            if wlan.isconnected():
+                raise
+            try:
+                wlan.disconnect()
+            except Exception:
+                pass
+            time.sleep_ms(50)
+            res = wlan.scan()
+        _scan_raw = res
+    except Exception as e:
+        _scan_err = str(e) or "scan failed"
+    _scan_busy = False
+
+
+def scan_start():
+    """Start a background scan. Returns True if one is running now."""
+    global _scan_busy, _scan_raw, _scan_err, _scan_t0
+    if _scan_busy:
+        return True
+    try:
+        _apply_global_hostname()
+        wlan = _get_wlan()
+        if not wlan.active():
+            wlan.active(True)
+    except Exception as e:
+        _scan_err = str(e) or "radio error"
+        return False
+    _scan_raw  = None
+    _scan_err  = None
+    _scan_busy = True
+    _scan_t0   = _now()
+    try:
+        import _thread
+        _thread.start_new_thread(_scan_worker, ())
+    except Exception:
+        _scan_worker()           # no threads: synchronous fallback
+    return True
+
+
+def scan_busy():
+    return _scan_busy
+
+
+def scan_seq():
+    """Counter that increases each time fresh scan results land."""
+    return _scan_seq
+
+
+def scan_error():
+    return _scan_err
+
+
+def scan_elapsed_ms():
+    if not _scan_busy:
+        return 0
+    return time.ticks_diff(_now(), _scan_t0)
+
+
+def scan_poll():
+    """Collect a finished scan. Main thread only. Returns "busy",
+    "done" (fresh results just landed), "error" or "idle"."""
+    global _scan_raw, _scan_busy, _scan_err, _scan_seq, _nearby, _nearby_live
+    if _scan_busy:
+        if time.ticks_diff(_now(), _scan_t0) > _SCAN_TIMEOUT:
+            # Worker wedged; abandon it (its late result is ignored on
+            # the next scan_start, which resets _scan_raw).
+            _scan_busy = False
+            _scan_err  = "scan timed out"
+            return "error"
+        return "busy"
+    raw = _scan_raw
+    if raw is not None:
+        _scan_raw    = None
+        _nearby      = parse_scan(raw)
+        _nearby_live = True
+        _scan_seq   += 1
+        _save_seen(_nearby)
+        return "done"
+    if _scan_err:
+        return "error"
+    return "idle"
+
+
+def nearby():
+    """Networks from the most recent scan (this boot), else the list
+    remembered on flash from an earlier one. Strongest first."""
+    global _nearby
+    if _nearby is None:
+        _nearby = _load_seen()
+    return _nearby
+
+
+def nearby_is_live():
+    """False while nearby() is still showing the remembered list."""
+    return _nearby_live
+
+
+def _load_seen():
+    if _json is None or not _exists(_SEEN_PATH):
+        return []
+    try:
+        with open(_SEEN_PATH) as f:
+            data = _json.loads(f.read())
+        if isinstance(data, list):
+            return [d for d in data if isinstance(d, dict) and d.get("ssid")]
+    except Exception:
+        pass
+    return []
+
+
+_seen_sig = None
+
+
+def _save_seen(nets):
+    """Persist the scan so the next boot's Settings page paints
+    instantly. Only rewritten when the set of SSIDs changes, so the
+    flash is not worn by every periodic scan."""
+    global _seen_sig
+    if _json is None:
+        return
+    sig = ",".join(sorted(n["ssid"] for n in nets))
+    if _seen_sig is None:
+        _seen_sig = ",".join(sorted(n.get("ssid", "") for n in _load_seen()))
+    if sig == _seen_sig:
+        return
+    try:
+        with open(_SEEN_PATH, "w") as f:
+            f.write(_json.dumps(
+                [{"ssid": n["ssid"], "rssi": n["rssi"],
+                  "secure": n["secure"]} for n in nets]))
+        _seen_sig = sig
+    except Exception:
+        pass
+
+
+def saved_ssids():
+    """Set-like dict of saved SSIDs, for "is this network known?" checks."""
+    out = {}
+    for n in _load_saved_raw():
+        s = n.get("ssid")
+        if s:
+            out[s] = True
+    return out
+
+
+def get_saved(ssid):
+    for n in _load_saved_raw():
+        if n.get("ssid") == ssid:
+            return dict(n)
+    return None
+
+
+def _mark_last(ssid):
+    """Remember which network connected so the next boot tries it first
+    without scanning. Writes only when the marker moves."""
+    nets = _load_saved_raw()
+    changed = False
+    for n in nets:
+        want = n.get("ssid") == ssid
+        if bool(n.get("last")) != want:
+            if want:
+                n["last"] = True
+            else:
+                n.pop("last", None)
+            changed = True
+    if changed:
+        _save_raw(nets)
+
+
+def last_connected(saved=None):
+    """The saved entry that connected most recently, or None."""
+    for n in (saved if saved is not None else _load_saved_raw()):
+        if n.get("last") and n.get("ssid"):
+            return n
+    return None
+
+
+# ── non-blocking association ────────────────────────────────────────────
+
+_conn_ssid    = None
+_conn_t0      = 0
+_conn_timeout = 12000
+_conn_bad     = None     # classify_status() result currently held
+_conn_bad_t0  = 0
+_conn_stale   = None     # failure code left over from an earlier attempt
+_conn_result  = CONN_IDLE
+
+
+def connect_begin(ssid, password, timeout_ms=12000):
+    """Start associating with `ssid` and return at once. Poll
+    connect_poll() for the outcome. The password is never printed."""
+    global _conn_ssid, _conn_t0, _conn_timeout, _conn_bad, _conn_result
+    global _conn_stale
+    if not ssid:
+        _conn_result = CONN_FAIL
+        return False
+    wlan = _get_wlan()
+    _apply_global_hostname()
+    try:
+        wlan.active(True)
+        # Same flush as connect(): cancel IDF's own NVS auto-connect
+        # (or a previous retry loop) before configuring a new target.
+        try:
+            wlan.disconnect()
+        except Exception:
+            pass
+        time.sleep_ms(30)
+        _apply_hostname(wlan)
+        _apply_power_cap(wlan)
+        wlan.connect(ssid, password or "")
+    except Exception as e:
+        print("[wifi] connect_begin failed:", e)
+        _conn_ssid   = None
+        _conn_result = CONN_FAIL
+        return False
+    # The ESP32 port only overwrites its disconnect reason on the next
+    # disconnect event or on GOT_IP, so wlan.status() can keep reporting
+    # the previous attempt's AUTH_FAIL / NO_AP_FOUND for the whole of a
+    # healthy new handshake. Remember that code and ignore it until the
+    # driver reports something else (see connect_poll()).
+    try:
+        code = wlan.status()
+        _conn_stale = code if classify_status(code) else None
+    except Exception:
+        _conn_stale = None
+    print("[wifi] connecting")
+    _conn_ssid    = ssid
+    _conn_t0      = _now()
+    _conn_timeout = int(timeout_ms)
+    _conn_bad     = None
+    _conn_result  = CONN_BUSY
+    return True
+
+
+def connect_target():
+    """SSID currently being joined, or None."""
+    return _conn_ssid
+
+
+def connect_elapsed_ms():
+    if _conn_ssid is None:
+        return 0
+    return time.ticks_diff(_now(), _conn_t0)
+
+
+def connect_cancel():
+    global _conn_ssid, _conn_result
+    if _conn_ssid is None:
+        return
+    _conn_ssid = None
+    _conn_result = CONN_IDLE
+    try:
+        _get_wlan().disconnect()
+    except Exception:
+        pass
+
+
+def connect_poll():
+    """Advance the association started by connect_begin()."""
+    global _conn_ssid, _conn_bad, _conn_bad_t0, _conn_result, _conn_stale
+    if _conn_ssid is None:
+        return _conn_result
+    wlan = _get_wlan()
+    now  = _now()
+    try:
+        up = wlan.isconnected()
+    except Exception:
+        up = False
+    if up:
+        ssid = _conn_ssid
+        _conn_ssid   = None
+        _conn_result = CONN_OK
+        try:
+            _apply_power_cap(wlan)
+        except Exception:
+            pass
+        try:
+            _mark_last(ssid)
+        except Exception:
+            pass
+        print("[wifi] associated")
+        return CONN_OK
+    try:
+        code = wlan.status()
+    except Exception:
+        code = None
+    bad = classify_status(code)
+    if bad is not None and _conn_stale is not None and code == _conn_stale:
+        # Possibly the previous attempt's reason; only a timeout ends
+        # this attempt, and then it is reported as that reason.
+        stale_bad, bad = bad, None
+    else:
+        stale_bad = None
+        if code != _conn_stale:
+            _conn_stale = None      # driver has moved on: trust new codes
+    fail = None
+    if bad is None:
+        _conn_bad = None
+    elif bad != _conn_bad:
+        _conn_bad, _conn_bad_t0 = bad, now
+    elif time.ticks_diff(now, _conn_bad_t0) >= _BAD_HOLD_MS:
+        fail = bad
+    if fail is None and time.ticks_diff(now, _conn_t0) > _conn_timeout:
+        fail = stale_bad or CONN_TIMEOUT
+    if fail is None:
+        return CONN_BUSY
+    print("[wifi] connect failed: %s" % fail)
+    _conn_ssid   = None
+    _conn_result = fail
+    try:
+        wlan.disconnect()       # stop the driver's endless retry loop
+    except Exception:
+        pass
+    return fail
+
+
+# ── boot auto-connect state machine ─────────────────────────────────────
+#
+#   auto_begin()  — returns immediately. Fast path: if a saved network
+#                   connected last time, start joining it with no scan.
+#                   Otherwise start a background scan first.
+#   auto_tick()   — call every frame (cheap: rate-limited). Returns True
+#                   exactly once, on the tick the badge gets an IP, so the
+#                   caller can start the HTTP server / NTP sync.
+#
+# After connecting, one background scan refreshes the nearby list (and
+# /wifi_seen.json) so Settings shows nearby networks immediately. When no
+# saved network is in range, the scan still runs and its results are kept.
+
+AUTO_OFF   = "off"
+AUTO_TRY   = "connecting"
+AUTO_SCAN  = "scanning"
+AUTO_DONE  = "connected"
+AUTO_FAIL  = "no_network"
+
+_auto_state   = AUTO_OFF
+_auto_queue   = []
+_auto_tried   = []
+_auto_scanned = False
+_auto_refresh = False     # post-connect nearby scan still to do
+_auto_next_ms = 0
+_auto_seq     = 0         # scan_seq() when this machine started its scan
+_AUTO_TICK_MS = 150
+
+
+def auto_state():
+    return _auto_state
+
+
+def auto_stop():
+    """Hand the radio to the user: the WiFi app calls this before a
+    manual connect so the boot sequence does not fight it."""
+    global _auto_state
+    if _auto_state in (AUTO_TRY, AUTO_SCAN):
+        _auto_state = AUTO_OFF
+
+
+def _auto_scan():
+    global _auto_state, _auto_scanned, _auto_seq
+    _auto_scanned = True
+    _auto_seq = _scan_seq
+    _auto_state = AUTO_SCAN if scan_start() else AUTO_FAIL
+
+
+def _auto_try_next():
+    global _auto_state
+    while _auto_queue:
+        n = _auto_queue.pop(0)
+        ssid = n.get("ssid") or ""
+        if not ssid or ssid in _auto_tried:
+            continue
+        _auto_tried.append(ssid)
+        if connect_begin(ssid, n.get("password") or ""):
+            _auto_state = AUTO_TRY
+            return True
+    return False
+
+
+def auto_begin():
+    """Kick off boot auto-connect without blocking. Safe to call again
+    (e.g. from the WiFi app) — it restarts the sequence."""
+    global _auto_state, _auto_queue, _auto_tried, _auto_scanned, _auto_refresh
+    try:
+        _sync_secrets_into_saved()
+    except Exception as e:
+        print("[wifi] secrets sync failed:", e)
+    saved = list_saved()
+    _auto_queue   = []
+    _auto_tried   = []
+    _auto_scanned = False
+    _auto_refresh = True
+    if is_connected():
+        _auto_state = AUTO_DONE
+        return
+    last = last_connected(saved)
+    if last is not None:
+        _auto_queue.append(last)
+        if _auto_try_next():
+            return
+    _auto_scan()
+
+
+def auto_tick():
+    """Advance auto-connect. True exactly once when the link comes up."""
+    global _auto_state, _auto_queue, _auto_scanned, _auto_refresh, _auto_next_ms
+    if _auto_state == AUTO_OFF:
+        return False
+    now = _now()
+    if time.ticks_diff(now, _auto_next_ms) < 0:
+        return False
+    _auto_next_ms = time.ticks_add(now, _AUTO_TICK_MS)
+
+    if _auto_state == AUTO_TRY:
+        r = connect_poll()
+        if r == CONN_BUSY:
+            return False
+        if r == CONN_OK:
+            _auto_state = AUTO_DONE
+            return True
+        if _auto_try_next():
+            return False
+        if not _auto_scanned:
+            _auto_scan()
+            return False
+        _auto_state = AUTO_FAIL
+        return False
+
+    if _auto_state == AUTO_SCAN:
+        s = scan_poll()
+        if s == "busy":
+            return False
+        # Another poller (the WiFi app) may have collected the results
+        # first; a moved scan_seq means they are fresh all the same.
+        fresh = s == "done" or _scan_seq != _auto_seq
+        visible = nearby() if fresh else None
+        saved = list_saved()
+        _auto_queue = pick_candidates(saved, visible, _auto_tried)
+        if _auto_try_next():
+            return False
+        if not saved:
+            # Nothing to join: power down like the old boot path did.
+            radio_off()
+        _auto_state = AUTO_FAIL
+        _auto_refresh = False
+        return False
+
+    if _auto_state == AUTO_DONE and _auto_refresh:
+        # One post-connect scan so Settings shows what is around. Runs in
+        # the background thread; skipped silently on thread-less builds
+        # (a synchronous 2 s scan here would stall the home screen).
+        if not _scan_busy:
+            try:
+                import _thread  # noqa: F401 (availability probe)
+                _auto_refresh = False
+                scan_start()
+            except Exception:
+                _auto_refresh = False
+        return False
+
+    if _scan_busy or _scan_raw is not None:
+        scan_poll()       # collect the post-connect refresh scan
+    return False

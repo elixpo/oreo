@@ -11,6 +11,9 @@ enough to notice.
 HOME button:
   • Single tap registers like any other (does NOT exit).
   • Double tap within 400 ms returns to the apps drawer.
+
+C button: registers like any other. The app sets CAPTURES_C, so the OS
+does not open the notification panel on C while the tester is up.
 """
 
 import time
@@ -36,6 +39,10 @@ HEADER_BG    = api.rgb( 30,  34,  46)
 
 class App(oreoOS.App):
     name = "Gamepad"
+    # C is one of the buttons under test: keep the OS-wide C hotkey (the
+    # notification panel) out of the way while this app is in front.
+    CAPTURES_C = True
+    C_DOUBLE_TAP = False     # fast C presses are part of the test
 
     def on_enter(self, os):
         self._os         = os

@@ -65,7 +65,8 @@ class App(oreoOS.App):
             self._wifi = None
             self._bt   = None
 
-        self._brightness = 100   # logical brightness (0..100), backlight is pure HIGH for now
+        # Same value the notification panel's slider uses (100% after boot).
+        self._brightness = getattr(os, "_last_brightness", 100)
 
         # Power-manager settings live in the SETTINGS dict in oreoOS.power.
         # Default to "on, 120 s" if the module isn't importable for any reason.
@@ -130,11 +131,12 @@ class App(oreoOS.App):
         if not self._wifi:
             return
         if on:
+            # Non-blocking: the run loop finishes the join (boot
+            # auto-connect state machine) so Settings never freezes.
             try:
-                self._wifi.radio_on()
+                self._wifi.auto_begin()
             except Exception:
                 pass
-            self._wifi.connect_from_config()
         else:
             try:
                 self._wifi.radio_off()
@@ -148,6 +150,7 @@ class App(oreoOS.App):
             setter = getattr(self._os.display, "set_brightness", None)
             if setter:
                 setter(self._brightness)
+            self._os._last_brightness = self._brightness
         except Exception:
             pass
 
@@ -244,7 +247,8 @@ class App(oreoOS.App):
     # WiFi / Bluetooth. The summary string gives a glanceable status.
     def _open_gestures(self):
         try:
-            self._os.launch("gestures")
+            from oreoOS import store
+            store.open_app(self._os, "gestures")
         except Exception:
             pass
 
@@ -294,8 +298,12 @@ class App(oreoOS.App):
             return "—"
         try:
             if self._wifi.is_connected():
-                ip = self._wifi.ip() or ""
-                return ip or "on"
+                return self._wifi.ssid() or self._wifi.ip() or "on"
+            try:
+                if self._wifi.connect_target():
+                    return "joining..."
+            except Exception:
+                pass
             try:
                 if self._wifi.is_radio_on():
                     return "on"
@@ -307,7 +315,8 @@ class App(oreoOS.App):
 
     def _open_bt(self):
         try:
-            self._os.launch("bt")
+            from oreoOS import store
+            store.open_app(self._os, "bt")
         except Exception:
             pass
 
