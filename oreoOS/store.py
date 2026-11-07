@@ -61,7 +61,7 @@ USER_AGENT  = "OreoBadge-AppStore"
 T_API       = 8           # seconds, catalogue / icon requests
 
 # Apps that ship on every badge and cannot be uninstalled from the Store.
-# Keep in sync with the directories under apps/ (tests/test_store_index.py
+# Keep in sync with the directories under apps/ (tests/test_store.py
 # checks it).
 DEFAULT_APPS = (
     "about", "badge", "commits", "gallery", "gamepad", "identity", "reader",
@@ -188,14 +188,21 @@ def _read_json(path):
 
 # ── catalogue validation ────────────────────────────────────────────────
 
+_ID_FIRST = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_"
+_ID_CHARS = _ID_FIRST + "0123456789"
+
+
 def valid_id(value):
-    """An importable package name: the on-badge app directory."""
+    """An importable package name: the on-badge app directory.
+
+    ASCII only, checked against explicit character sets: MicroPython's str
+    has no isalnum(), and its isalpha() accepts nothing beyond ASCII."""
     if not isinstance(value, str) or not value or len(value) > 32:
         return False
-    if not (value[0].isalpha() or value[0] == "_"):
+    if value[0] not in _ID_FIRST:
         return False
     for ch in value:
-        if not (ch.isalnum() or ch == "_"):
+        if ch not in _ID_CHARS:
             return False
     return True
 
