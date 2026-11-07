@@ -277,3 +277,330 @@ def _dechunk(body):
         out.extend(body[i:i + n])
         i += n + 2
     return bytes(out)
+
+
+# ═════════════════════════════════════════════════════════════════════════
+# Streaming downloads with connection reuse (OTA)
+# ═════════════════════════════════════════════════════════════════════════
+#
+# get_url() buffers a whole response in a growing bytearray, then copies it
+# twice (head/body slices) before the caller writes it out: ~3x the file
+# size in RAM and a fresh TLS handshake per request. An OTA patch touches
+# many files, and every release asset is a github.com 302 followed by a
+# GET on release-assets.githubusercontent.com, so that was two handshakes
+# (each hundreds of ms of ECDHE on the ESP32-S3) per file.
+#
+# download_to_file() instead:
+#   * keeps one HTTP/1.1 keep-alive connection per host open across calls
+#     (close_pool() when the batch is done), retrying once on a stale one;
+#   * reads into one preallocated buffer and writes straight to flash,
+#     hashing on the fly, so RAM use is flat regardless of file size;
+#   * understands Content-Length and chunked bodies (and drains redirect
+#     bodies so the connection stays reusable).
+
+DL_BUF_BYTES = 16 * 1024
+_REDIRECTS = (301, 302, 303, 307, 308)
+
+_pool = {}          # (host, port) -> (raw_socket, tls_socket)
+_dl_buf = None
+
+
+def _buf():
+    global _dl_buf
+    if _dl_buf is None:
+        _dl_buf = bytearray(DL_BUF_BYTES)
+    return _dl_buf
+
+
+def _sock_readinto(s, mv):
+    try:
+        return s.readinto(mv)
+    except AttributeError:          # CPython socket (host tests)
+        return s.recv_into(mv)
+
+
+def _sock_write(s, data):
+    try:
+        w = s.write
+    except AttributeError:
+        s.sendall(data)
+        return
+    view = memoryview(data)
+    while view:
+        n = w(view)
+        if n is None:
+            n = len(view)
+        if n <= 0:
+            raise OSError("write failed")
+        view = view[n:]
+
+
+def _close_conn(conn):
+    for h in (conn[1], conn[0]):
+        try:
+            if h is not None:
+                h.close()
+        except Exception:
+            pass
+
+
+def close_pool():
+    """Close every kept-alive connection. Call after a download batch."""
+    for k in list(_pool):
+        _close_conn(_pool.pop(k))
+
+
+def _open_conn(host, port, timeout_s):
+    addr = _socket.getaddrinfo(host, port)[0][-1]
+    raw = _socket.socket()
+    try:
+        raw.settimeout(timeout_s)
+        raw.connect(addr)
+        s = _ssl.wrap_socket(raw, server_hostname=host)
+        try:
+            s.settimeout(timeout_s)
+        except Exception:
+            pass
+    except Exception:
+        try:
+            raw.close()
+        except Exception:
+            pass
+        raise
+    return (raw, s)
+
+
+class _Reader:
+    """Minimal buffered reader for one HTTP response on a socket."""
+
+    def __init__(self, sock, buf, deadline):
+        self.s = sock
+        self.buf = buf
+        self.mv = memoryview(buf)
+        self.a = 0          # first unread byte
+        self.b = 0          # end of valid data
+        self.deadline = deadline
+
+    def fill(self):
+        if time.ticks_diff(self.deadline, time.ticks_ms()) <= 0:
+            raise OSError("deadline")
+        if self.a == self.b:
+            self.a = self.b = 0
+        elif self.b == len(self.buf):
+            n = self.b - self.a
+            self.buf[:n] = self.mv[self.a:self.b]
+            self.a, self.b = 0, n
+            if n == len(self.buf):
+                raise OSError("line too long")
+        n = _sock_readinto(self.s, self.mv[self.b:])
+        if not n:
+            raise OSError("eof")
+        self.b += n
+
+    def until(self, sep, limit):
+        """Bytes before `sep` (consumed together with it)."""
+        while True:
+            i = self.buf.find(sep, self.a, self.b)
+            if i >= 0:
+                out = bytes(self.mv[self.a:i])
+                self.a = i + len(sep)
+                return out
+            if self.b - self.a > limit:
+                raise OSError("header too long")
+            self.fill()
+
+    def chunk(self, n):
+        """A memoryview of 1..n buffered bytes (fills when empty)."""
+        if self.a == self.b:
+            self.fill()
+        k = min(n, self.b - self.a)
+        out = self.mv[self.a:self.a + k]
+        self.a += k
+        return out
+
+    def leftover(self):
+        return self.b - self.a
+
+
+def _parse_head(head):
+    """(status, {lower-case header: value}) from raw response-head bytes."""
+    lines = head.split(b"\r\n")
+    status = 0
+    parts = lines[0].split(b" ", 2)
+    if len(parts) >= 2:
+        try:
+            status = int(parts[1])
+        except ValueError:
+            status = 0
+    hdrs = {}
+    for ln in lines[1:]:
+        k, sep, v = ln.partition(b":")
+        if sep:
+            hdrs[k.strip().lower().decode()] = v.strip().decode()
+    return status, hdrs
+
+
+def _stream_body(rd, hdrs, sink):
+    """Feed the body to sink(memoryview). Returns True if the connection
+    is still positioned at a message boundary (reusable)."""
+    if "chunked" in hdrs.get("transfer-encoding", "").lower():
+        while True:
+            line = rd.until(b"\r\n", 1024)
+            try:
+                size = int(line.split(b";")[0].strip(), 16)
+            except ValueError:
+                raise OSError("bad chunk size")
+            if size == 0:
+                while rd.until(b"\r\n", 4096):   # trailers, if any
+                    pass
+                return True
+            while size:
+                mv = rd.chunk(size)
+                sink(mv)
+                size -= len(mv)
+            if rd.until(b"\r\n", 2):
+                raise OSError("bad chunk end")
+    cl = hdrs.get("content-length")
+    if cl is not None:
+        left = int(cl)
+        while left > 0:
+            mv = rd.chunk(left)
+            sink(mv)
+            left -= len(mv)
+        return True
+    # Neither: body runs to EOF and the connection cannot be reused.
+    try:
+        while True:
+            sink(rd.chunk(len(rd.buf)))
+    except OSError:
+        pass
+    return False
+
+
+def _hexdigest(h):
+    import binascii
+    return binascii.hexlify(h.digest()).decode()
+
+
+def download_to_file(url, dest, expected_sha=None, timeout_s=25,
+                     max_bytes=4 * 1024 * 1024, keep_alive=True):
+    """GET `url` (following HTTPS redirects) straight into file `dest`.
+
+    Returns True only on HTTP 200 with a complete body whose SHA-256
+    matches `expected_sha` (hex) when one is given; otherwise removes any
+    partial file and returns False. Connections are kept for reuse by the
+    next call unless keep_alive is False; call close_pool() when done.
+    """
+    if not _OK:
+        return False
+    try:
+        import hashlib
+    except ImportError:
+        hashlib = None
+    current = url
+    auth = None
+    allow_auto_auth = True
+    buf = _buf()
+    for _hop in range(MAX_REDIRECTS + 1):
+        parsed = _split_https_url(current)
+        if parsed is None:
+            return False
+        host, port, path = parsed
+        req_auth = auth
+        if allow_auto_auth and req_auth is None and (
+                host in ("github.com", "api.github.com")
+                or host.endswith(".githubusercontent.com")):
+            try:
+                from oreoOS.config import GH_TOKEN as _TOK
+                if _TOK:
+                    req_auth = "Bearer " + _TOK
+            except Exception:
+                pass
+        req = ("GET %s HTTP/1.1\r\nHost: %s\r\nUser-Agent: %s\r\n"
+               "Accept: */*\r\nAccept-Encoding: identity\r\n%s"
+               "Connection: %s\r\n\r\n") % (
+                   path, host, USER_AGENT,
+                   ("Authorization: " + req_auth + "\r\n") if req_auth else "",
+                   "keep-alive" if keep_alive else "close")
+        deadline = time.ticks_add(time.ticks_ms(), int(timeout_s * 1000))
+        key = (host, port)
+        conn = rd = None
+        status = 0
+        hdrs = {}
+        for attempt in (0, 1):
+            conn = _pool.pop(key, None)
+            reused = conn is not None
+            try:
+                if conn is None:
+                    _bc("connect " + host)
+                    conn = _open_conn(host, port, timeout_s)
+                _sock_write(conn[1], req.encode())
+                rd = _Reader(conn[1], buf, deadline)
+                status, hdrs = _parse_head(rd.until(b"\r\n\r\n", 8192))
+                break
+            except Exception as e:
+                if conn is not None:
+                    _close_conn(conn)
+                conn = None
+                if reused and attempt == 0:
+                    continue        # server dropped the idle connection
+                _bc("FAIL " + host + ": " + str(e))
+                return False
+        reusable = False
+        try:
+            if status in _REDIRECTS:
+                reusable = _stream_body(rd, hdrs, lambda mv: None)
+                location = hdrs.get("location")
+            elif status == 200:
+                h = hashlib.sha256() if (hashlib and expected_sha) else None
+                total = [0]
+                f = open(dest, "wb")
+                try:
+                    def sink(mv):
+                        total[0] += len(mv)
+                        if total[0] > max_bytes:
+                            raise OSError("too large")
+                        f.write(mv)
+                        if h is not None:
+                            h.update(mv)
+                    reusable = _stream_body(rd, hdrs, sink)
+                finally:
+                    f.close()
+                if h is not None and _hexdigest(h) != expected_sha:
+                    raise OSError("sha256 mismatch")
+            else:
+                _bc("HTTP %d %s" % (status, host))
+                return False
+        except Exception as e:
+            _bc("download failed: " + str(e))
+            reusable = False
+            if status == 200:
+                try:
+                    import os as _o
+                    _o.remove(dest)
+                except Exception:
+                    pass
+            return False
+        finally:
+            if (keep_alive and reusable and rd is not None
+                    and rd.leftover() == 0 and
+                    hdrs.get("connection", "").lower() != "close"):
+                old = _pool.pop(key, None)
+                if old is not None:
+                    _close_conn(old)
+                _pool[key] = conn
+            elif conn is not None:
+                _close_conn(conn)
+        if status == 200:
+            return True
+        nxt = _redirect_url(current, location)
+        if nxt is None:
+            return False
+        nh = _split_https_url(nxt)
+        if nh is None:
+            return False
+        if nh[0] != host:
+            auth = None
+            allow_auto_auth = False
+        current = nxt
+    return False

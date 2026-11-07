@@ -445,6 +445,14 @@ def run_app(os_obj, app):
             # transfers; we'll move to a background worker later if
             # uploads ever grow above a few hundred KB).
             if not realtime:
+                # Boot WiFi auto-connect runs here, not in boot(), so the
+                # splash -> home hand-off never waits for the radio.
+                try:
+                    from oreoWare import wifi as _wifi
+                    if _wifi.auto_tick():
+                        _on_wifi_up(os_obj)
+                except Exception:
+                    pass
                 try:
                     from oreoOS import http_server as _hs
                     _hs.tick()
@@ -636,6 +644,22 @@ class _NoSplash:
         pass
 
 
+def _on_wifi_up(os_obj):
+    """Called once by the run loop when boot auto-connect gets an IP:
+    open the LAN file-transfer listener and sync the clock."""
+    _bc("wifi up")
+    try:
+        from oreoOS import http_server as _hs
+        _hs.start(os_obj)
+    except Exception:
+        pass
+    try:
+        from oreoOS import timeutil
+        timeutil.sync_from_ntp()
+    except Exception as e:
+        _bc("ntp sync FAILED: %s" % e)
+
+
 def boot():
     _bc("entered boot()")
     from oreoWare.os import OS
@@ -710,6 +734,12 @@ def boot():
             wifi_ok_to_try = False
     except Exception:
         pass
+    # Settings -> WiFi -> Auto-connect (previously stored but never read).
+    try:
+        if not os_obj.settings_get("wifi_autoconnect", True):
+            wifi_ok_to_try = False
+    except Exception:
+        pass
     try:
         import machine
         # MicroPython exposes BROWNOUT_RESET on most ports; treat unknown
@@ -724,21 +754,11 @@ def boot():
     try:
         from oreoWare import wifi, bt
         if wifi_ok_to_try:
-            _bc("wifi.connect_from_config begin")
-            try:
-                wifi.connect_from_config(pump_cb=splash.pump)
-            except TypeError:
-                wifi.connect_from_config()
-            _bc("wifi.connect_from_config done")
-            splash.progress(0.6)
-            # Bring up the LAN file-upload server now that we have an
-            # IP. Listener is non-blocking + idempotent; the run-loop
-            # tick handles accept(). No-op if WiFi failed.
-            try:
-                from oreoOS import http_server as _hs
-                _hs.start(os_obj)
-            except Exception:
-                pass
+            # Non-blocking: joins the last-good network (or scans first)
+            # while Home is already on screen. run_app() ticks it and
+            # calls _on_wifi_up() once the badge has an IP.
+            _bc("wifi.auto_begin")
+            wifi.auto_begin()
         else:
             _bc("wifi skipped")
         splash.progress(0.7)
@@ -746,14 +766,6 @@ def boot():
         bt.init_from_config()
         _bc("bt.init_from_config done")
         splash.progress(0.85)
-        if wifi_ok_to_try and wifi.is_connected():
-            _bc("ntp sync begin")
-            try:
-                from oreoOS import timeutil
-                timeutil.sync_from_ntp()
-            except Exception as e:
-                _bc("ntp sync FAILED: %s" % e)
-            _bc("ntp sync done")
     except Exception as e:
         _bc("wifi/bt block FAILED: %s" % e)
     splash.finish()

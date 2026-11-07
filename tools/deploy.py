@@ -357,6 +357,12 @@ def _progress_bar(cur, total, width=24):
     return "[" + "#" * filled + "-" * (width - filled) + "]"
 
 
+# mpremote mount reads: keep each request under the ESP32 stdin ring (260 B).
+SERIAL_BLOCK = 249
+# Device-side gather buffer: one flash write per FLASH_BLOCK bytes.
+FLASH_BLOCK = 4096
+
+
 def mpremote_batch(actions, label=""):
     """Stream changed files through mpremote's binary mounted-FS protocol.
 
@@ -366,10 +372,13 @@ def mpremote_batch(actions, label=""):
     A Gallery video can consequently take 10+ minutes.
 
     Mounting the repository at `/remote` uses mpremote's binary filesystem
-    channel instead. One device-side loop reads each local file and writes it
-    to flash in 249-byte blocks (mpremote's safe USB-stdin ring-buffer size).
-    Each destination is staged as `.part`, so an interrupted transfer does not
-    truncate the currently working file.
+    channel instead. One device-side loop reads each local file in 249-byte
+    blocks (mpremote's safe USB-stdin ring-buffer size: the ESP32 port's
+    stdin ring is 260 bytes and mpremote's mount protocol has no flow
+    control) and gathers them in a 4 KB buffer, so flash sees one write per
+    ~4 KB instead of one per 249 bytes. Each destination is staged as
+    `.part`, so an interrupted transfer does not truncate the currently
+    working file.
     """
     if label:
         print(label)
@@ -399,7 +408,9 @@ def mpremote_batch(actions, label=""):
     # Keep this program compatible with MicroPython: no context managers,
     # pathlib, f-strings, or CPython-only APIs run on the badge.
     device_files = [(src, dst, size) for src, dst, size, _ in copies]
-    copy_script = "import os\nfiles=%r\nbuf=bytearray(249)\n" % (device_files,)
+    copy_script = ("import os\nfiles=%r\nB=%d\nbuf=bytearray(%d)\n"
+                   "mv=memoryview(buf)\n"
+                   % (device_files, SERIAL_BLOCK, FLASH_BLOCK))
     copy_script += (
         "for idx,item in enumerate(files):\n"
         " src,dst,size=item\n"
@@ -409,10 +420,15 @@ def mpremote_batch(actions, label=""):
         " inp=open(src,'rb')\n"
         " out=open(tmp,'wb')\n"
         " try:\n"
+        "  pos=0\n"
         "  while True:\n"
-        "   n=inp.readinto(buf)\n"
+        "   n=inp.readinto(mv[pos:pos+B])\n"
         "   if not n: break\n"
-        "   out.write(memoryview(buf)[:n])\n"
+        "   pos+=n\n"
+        "   if pos>len(buf)-B:\n"
+        "    out.write(mv[:pos])\n"
+        "    pos=0\n"
+        "  if pos: out.write(mv[:pos])\n"
         " finally:\n"
         "  inp.close()\n"
         "  out.close()\n"
