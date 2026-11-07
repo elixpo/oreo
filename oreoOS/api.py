@@ -112,6 +112,43 @@ class Display(ABC):
                 self.rect(x + col * scale, y + row * scale,
                           scale, scale, rgb(r, g, b), fill=True)
 
+    def blit_mono(self, mask, x, y, w, h, color):
+        """Stamp a 1-bit MONO_HLSB mask (rows padded to whole bytes, MSB is
+        the leftmost pixel) in `color`; clear bits stay transparent.
+
+        Backends override this with a native framebuf blit. The portable
+        fallback emits one rect per horizontal run of set bits.
+        """
+        stride = (w + 7) >> 3
+        for row in range(h):
+            base = row * stride
+            run = -1
+            for col in range(w + 1):
+                on = col < w and (mask[base + (col >> 3)] & (0x80 >> (col & 7)))
+                if on and run < 0:
+                    run = col
+                elif not on and run >= 0:
+                    self.rect(x + run, y + row, col - run, 1, color, fill=True)
+                    run = -1
+
+    def copy_rows(self, y, h):
+        """Return a copy of full-width framebuffer rows y..y+h as RGB565
+        big-endian bytes, or None when the backend cannot read pixels back.
+
+        Lets animations snapshot a static backdrop once and restore just
+        the band they repaint, instead of redrawing the whole scene.
+        """
+        return None
+
+    def blit_rows(self, src, y, h, src_y=0):
+        """Copy h opaque full-width rows from a full-width RGB565 big-endian
+        buffer (starting at its row src_y) to screen rows y..y+h. Backends
+        override this with an opaque memcpy; this portable fallback goes
+        through blit(), so it still honours the chroma key."""
+        stride = SCREEN_W * 2
+        start = src_y * stride
+        self.blit(bytearray(src[start:start + h * stride]), 0, y, SCREEN_W, h)
+
     @abstractmethod
     def present(self):
         """Flush the framebuffer to the panel. The OS calls this — apps don't."""
