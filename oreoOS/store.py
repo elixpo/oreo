@@ -688,7 +688,10 @@ def install(app_id, progress_cb=None):
     if data and not data_ready(entry):
         part = data["partition"]
         _report(progress_cb, 0, total, "Checking game data")
-        if store_io.partition_matches(part, data["size"], data["sha256"]):
+        def _cp(received, _t):
+            _report(progress_cb, received, total, "Checking game data")
+        if store_io.partition_matches(part, data["size"], data["sha256"],
+                                      on_progress=_cp):
             ok, msg = True, "ok"
         else:
             def _dp(received, _t):
@@ -751,11 +754,37 @@ def install(app_id, progress_cb=None):
                 pass
         _rm_tree(stage)
         return False, "could not write app"
+    # Saves the app wrote into its own folder (high scores, pet state)
+    # move across to the new version before the old copy is deleted.
+    _carry_user_files(old, target)
     _rm_tree(old)
     forget_installed()
     _invalidate_launcher()
     gc.collect()
     return True, "installed"
+
+
+def _carry_user_files(src, dst, rel=""):
+    """Move files from an app's previous copy that are not part of the
+    package (anything device_file() rejects) into the new copy."""
+    try:
+        names = _os.listdir(src + ("/" + rel if rel else ""))
+    except OSError:
+        return
+    for name in names:
+        r = rel + "/" + name if rel else name
+        if name == "__pycache__":
+            continue
+        s, d = src + "/" + r, dst + "/" + r
+        if _isdir(s):
+            _carry_user_files(src, dst, r)
+        elif not device_file(r) and not _exists(d):
+            try:
+                if "/" in r:
+                    _ensure_dir(d.rsplit("/", 1)[0])
+                _os.rename(s, d)
+            except OSError:
+                pass
 
 
 def uninstall(app_id):

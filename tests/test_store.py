@@ -171,6 +171,14 @@ class InstallTest(unittest.TestCase):
         self.assertTrue(os.path.exists("apps/racer/src/app.py"))
         self.assertEqual(store.app_state(entry), store.OPEN)
 
+        # The app's own saves survive an update.
+        with open("apps/racer/hi.txt", "w") as f:
+            f.write("42")
+        ok, msg = store.install("racer")
+        self.assertTrue(ok, msg)
+        with open("apps/racer/hi.txt") as f:
+            self.assertEqual(f.read(), "42")
+
         entry["version"] = "0.3"
         self.assertEqual(store.app_state(entry), store.UPDATE)
         # A failed update keeps the installed version intact.
