@@ -383,8 +383,18 @@ def run_app(os_obj, app):
                     os_obj.display.present()
                     present_hook(time.ticks_diff(
                         time.ticks_us(), present_start_us))
+                if getattr(os_obj, "_splash_faded", False):
+                    from oreoOS.splash import fade_in
+                    fade_in(os_obj)
                 frame_errs = 0
             except Exception as e:
+                # Never leave the screen dark after the splash fade-out.
+                if getattr(os_obj, "_splash_faded", False):
+                    try:
+                        from oreoOS.splash import fade_in
+                        fade_in(os_obj)
+                    except Exception:
+                        pass
                 # Per-frame exception swallow + counter. Logging via
                 # print keeps a breadcrumb on the USB serial console for
                 # post-mortem; we don't draw anything because the

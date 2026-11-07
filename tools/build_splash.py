@@ -1,9 +1,12 @@
 """Render the boot splash's artwork into oreoOS/splash.bin.
 
 The badge has no font engine for anti-aliased type or complex scripts, so
-the greetings ("hello" in many languages, each in its own script), the
-small "OreoOS" line and the logo are rendered here, on the host, already
-blended onto the splash background. oreoOS/splash.py only copies rows.
+the greetings ("hello" in many languages, each in its own script) are
+rendered here as 16-level coverage masks, and the static parts (the dimmed
+photo backdrop, the logo top left and the small "OreoOS" line) are baked
+into one 320x240 frame. On the badge, oreoOS/splash.py restores the
+greeting band from that frame and draws two masks per frame with
+framebuf's palette blit (C), so words roll smoothly over the photo.
 
     python3 tools/build_splash.py               # writes oreoOS/splash.bin
     python3 tools/build_splash.py --preview out.png
@@ -13,34 +16,44 @@ Latin and Cyrillic, Noto Sans Bold for Indic scripts and Arabic, Noto Sans
 CJK Bold for Japanese, Chinese and Korean. Pillow must be built with libraqm
 so Devanagari, Bengali, Tamil and Arabic are shaped correctly.
 
-splash.bin layout (little-endian header, pixels are big-endian RGB565, the
+splash.bin layout (little-endian header; pixels are big-endian RGB565, the
 panel's byte order):
 
-    "OSP1" | u8 count | u8 0 | u16 band_h | u16 bg565
-    u16 logo_w | u16 logo_h | logo pixels
-    u16 tag_w  | u16 tag_h  | tag pixels
-    count x ( u16 w | w * band_h pixels )
+    "OSP2" | u8 count | u8 0
+    u16 band_y | u16 band_h
+    u16 bar_x | u16 bar_y | u16 bar_w | u16 bar_h | u16 bar_track | u16 bar_fill
+    u16 key                       palette entry 0 as framebuf reads it
+    16 x 2 bytes                  palette: coverage 0..15 -> colour (BE)
+    320 x 240 x 2 bytes           backdrop with logo and "OreoOS" baked in
+    count x ( u16 w | (w / 2) * band_h bytes GS4_HMSB mask )   (w is even)
 """
 
 import argparse
 import struct
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont, features
+from PIL import Image, ImageDraw, ImageFont, ImageStat, features
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "oreoOS" / "splash.bin"
 LOGO_SRC = ROOT / "oreo.elixpo" / "public" / "favicon.ico"
+BG_SRC = ROOT / "assets" / "sprites" / "raw" / "splash_bg.jpg"
 
-BG = (255, 248, 235)      # theme.BG
-INK = (38, 38, 48)        # theme.DARK
-TAG = (255, 93, 104)      # theme.PRIMARY
+SW, SH = 320, 240
+BG_DIM = 0.30                   # backdrop brightness (as the old splash)
+INK = (250, 246, 236)           # greeting: warm cream on the dark photo
+TAG = (255, 140, 150)           # "OreoOS": light theme pink
+BAR_TRACK = (40, 46, 70)
+BAR_FILL = (255, 190, 30)       # theme.GOLD
 
 BAND_H = 64
+BAND_Y = (SH - BAND_H) // 2 - 10
 MAX_W = 300
 SIZE = 44
 LOGO = 36
 TAG_SIZE = 15
+BAR_W, BAR_H = SW - 100, 4
+BAR_X, BAR_Y = (SW - BAR_W) // 2, SH - 28
 
 INTER = "/usr/share/fonts/opentype/inter/Inter-SemiBold.otf"
 INTER_TAG = "/usr/share/fonts/opentype/inter/Inter-Bold.otf"
@@ -68,44 +81,93 @@ GREETINGS = [
 ]
 
 
+def c565(rgb):
+    r, g, b = rgb[:3]
+    return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3)
+
+
 def rgb565_be(img):
     out = bytearray()
     pixels = img.get_flattened_data() if hasattr(img, "get_flattened_data") else img.getdata()
-    for r, g, b in pixels:
-        v = ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3)
-        out += struct.pack(">H", v)
+    for px in pixels:
+        out += struct.pack(">H", c565(px))
     return bytes(out)
 
 
-def render_text(text, path, index, lang, size, colour, height=None):
-    """Text shaped and anti-aliased onto BG, tightly cropped in width and
+def _font(path, size, index):
+    return ImageFont.truetype(path, size, index=index,
+                              layout_engine=ImageFont.Layout.RAQM)
+
+
+def coverage(text, path, index, lang, size, height=None):
+    """Greyscale coverage image (L), tightly cropped in width (even) and
     centred on its ink in a band of `height` rows (or cropped if None)."""
+    kw = {"language": lang} if lang else {}
     while True:
-        font = ImageFont.truetype(path, size, index=index,
-                                  layout_engine=ImageFont.Layout.RAQM)
-        kw = {"language": lang} if lang else {}
+        font = _font(path, size, index)
         x0, y0, x1, y1 = font.getbbox(text, **kw)
         if x1 - x0 <= MAX_W or size <= 20:
             break
         size -= 2
     w = x1 - x0 + 4
+    w += w & 1
     h = (y1 - y0 + 4) if height is None else height
-    img = Image.new("RGB", (w, h), BG)
+    img = Image.new("L", (w, h), 0)
     ImageDraw.Draw(img).text((2 - x0, (h - (y1 - y0)) // 2 - y0), text,
-                             font=font, fill=colour, **kw)
+                             font=font, fill=255, **kw)
     return img
 
 
-def render_logo():
+def gs4_hmsb(mask):
+    """Pack an L image (even width) into framebuf GS4_HMSB: two pixels per
+    byte, the left pixel in the high nibble; 0 = transparent."""
+    w, h = mask.size
+    px = mask.load()
+    out = bytearray()
+    for y in range(h):
+        for x in range(0, w, 2):
+            a = (px[x, y] * 15 + 127) // 255
+            b = (px[x + 1, y] * 15 + 127) // 255
+            out.append((a << 4) | b)
+    return bytes(out)
+
+
+def backdrop():
+    src = Image.open(BG_SRC).convert("RGB")
+    scale = max(SW / src.width, SH / src.height)
+    src = src.resize((round(src.width * scale), round(src.height * scale)), Image.LANCZOS)
+    left, top = (src.width - SW) // 2, (src.height - SH) // 2
+    img = src.crop((left, top, left + SW, top + SH))
+    return Image.eval(img, lambda v: int(v * BG_DIM))
+
+
+def logo():
     src = Image.open(LOGO_SRC)
     sizes = getattr(src, "info", {}).get("sizes")
     if sizes:
         src.size = max(sizes)
     src = src.convert("RGBA")
     src.thumbnail((LOGO, LOGO), Image.LANCZOS)
-    img = Image.new("RGB", (LOGO, LOGO), BG)
-    img.paste(src, ((LOGO - src.width) // 2, (LOGO - src.height) // 2), src)
-    return img
+    return src
+
+
+def palette_for(bg_img):
+    """16 colours from the band's average backdrop colour to INK, so mask
+    edges blend into the photo; entry 0 is the transparent key."""
+    band = bg_img.crop((0, BAND_Y, SW, BAND_Y + BAND_H))
+    avg = tuple(int(v) for v in ImageStat.Stat(band).mean)
+    cols = [(255, 0, 255)]
+    for i in range(1, 16):
+        t = i / 15
+        cols.append(tuple(round(avg[k] + (INK[k] - avg[k]) * t) for k in range(3)))
+    values = [c565(c) for c in cols]
+    # Entry 0 must be a colour no real entry uses: framebuf compares the
+    # palette output with the key.
+    while values[0] in values[1:]:
+        values[0] ^= 0x0001
+    pal = b"".join(struct.pack(">H", v) for v in values)
+    key = struct.unpack("<H", pal[:2])[0]     # how framebuf reads it back
+    return pal, key, values
 
 
 def main():
@@ -116,29 +178,49 @@ def main():
     if not features.check("raqm"):
         raise SystemExit("Pillow needs libraqm to shape Indic and Arabic text")
 
-    logo = render_logo()
-    tag = render_text("OreoOS", INTER_TAG, 0, "en", TAG_SIZE, TAG)
-    words = [render_text(t, f, i, lang, SIZE, INK, BAND_H)
-             for t, f, i, lang in GREETINGS]
+    bg = backdrop()
+    pal, key, pal_values = palette_for(bg)
 
-    bg565 = ((BG[0] & 0xF8) << 8) | ((BG[1] & 0xFC) << 3) | (BG[2] >> 3)
-    blob = bytearray(b"OSP1" + struct.pack("<BBHH", len(words), 0, BAND_H, bg565))
-    blob += struct.pack("<HH", logo.width, logo.height) + rgb565_be(logo)
-    blob += struct.pack("<HH", tag.width, tag.height) + rgb565_be(tag)
-    for img in words:
-        blob += struct.pack("<H", img.width) + rgb565_be(img)
+    frame = bg.copy()
+    lg = logo()
+    frame.paste(lg, (12, 12), lg)
+    tag = coverage("OreoOS", INTER_TAG, 0, "en", TAG_SIZE)
+    tag_y = BAND_Y + BAND_H + 2
+    frame.paste(Image.new("RGB", tag.size, TAG), ((SW - tag.width) // 2, tag_y), tag)
+
+    masks = [coverage(t, f, i, lang, SIZE, BAND_H) for t, f, i, lang in GREETINGS]
+
+    blob = bytearray(b"OSP2" + struct.pack("<BB", len(masks), 0))
+    blob += struct.pack("<HH", BAND_Y, BAND_H)
+    blob += struct.pack("<HHHHHH", BAR_X, BAR_Y, BAR_W, BAR_H,
+                        c565(BAR_TRACK), c565(BAR_FILL))
+    blob += struct.pack("<H", key) + pal
+    blob += rgb565_be(frame)
+    for m in masks:
+        blob += struct.pack("<H", m.width) + gs4_hmsb(m)
     args.out.write_bytes(blob)
-    print("wrote %s: %d greetings, %.1f KB" % (args.out, len(words), len(blob) / 1024))
+    print("wrote %s: %d greetings, %.1f KB" % (args.out, len(masks), len(blob) / 1024))
 
     if args.preview:
-        sheet = Image.new("RGB", (320, 240 + BAND_H * len(words)), BG)
-        sheet.paste(logo, (12, 12))
-        y_band = (240 - BAND_H) // 2 - 6
-        sheet.paste(words[0], ((320 - words[0].width) // 2, y_band))
-        sheet.paste(tag, ((320 - tag.width) // 2, y_band + BAND_H + 2))
-        ImageDraw.Draw(sheet).line((0, 240, 320, 240), fill=(200, 160, 140))
-        for k, img in enumerate(words):
-            sheet.paste(img, ((320 - img.width) // 2, 240 + k * BAND_H))
+        def expand(v):
+            return (((v >> 11) & 31) * 255 // 31, ((v >> 5) & 63) * 255 // 63, (v & 31) * 255 // 31)
+        cols = [expand(v) for v in pal_values]
+        sheets = []
+        for k in (0, 1, 5):
+            shot = frame.copy()
+            m = masks[k]
+            q = m.point(lambda v: (v * 15 + 127) // 255)
+            layer = Image.new("RGB", m.size)
+            qd = q.get_flattened_data() if hasattr(q, "get_flattened_data") else q.getdata()
+            layer.putdata([cols[v] for v in qd])
+            shot.paste(layer, ((SW - m.width) // 2, BAND_Y), q.point(lambda v: 255 if v else 0))
+            d = ImageDraw.Draw(shot)
+            d.rectangle([BAR_X, BAR_Y, BAR_X + BAR_W - 1, BAR_Y + BAR_H - 1], fill=BAR_TRACK)
+            d.rectangle([BAR_X, BAR_Y, BAR_X + BAR_W * (k + 2) // 8, BAR_Y + BAR_H - 1], fill=BAR_FILL)
+            sheets.append(shot)
+        sheet = Image.new("RGB", (SW, SH * len(sheets)))
+        for i, s in enumerate(sheets):
+            sheet.paste(s, (0, i * SH))
         sheet.save(args.preview)
 
 

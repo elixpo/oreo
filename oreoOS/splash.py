@@ -1,18 +1,21 @@
 """Boot splash and the OTA "updating" screen, 320x240 landscape.
 
-Boot splash: the logo sits top left, "hello" rolls through languages in
-the middle (each word in its own script, anti-aliased), with a small
-"OreoOS" under it. The artwork is pre-rendered by tools/build_splash.py
-into oreoOS/splash.bin, already blended onto the background, so drawing
-is only row copies into the framebuffer and one SPI write per frame.
+Boot splash: the dimmed photo backdrop with the logo top left, "hello"
+rolling through languages in the middle (each word in its own script,
+anti-aliased, light on the dark photo), a small "OreoOS" under it and a
+loader along the bottom. tools/build_splash.py renders it all into
+oreoOS/splash.bin: the static frame, plus one 16-level coverage mask per
+greeting. Each frame restores the greeting band from the static frame and
+draws two masks with framebuf's palette blit, then flushes only the band
+(and the loader when it moves).
 
-The roll runs on its own thread, so it keeps moving while boot imports
+The animation runs on its own thread, so it keeps moving while boot imports
 modules and starts the radios; boot code never has to call into it.
 
     sp = Splash(os_obj)
     sp.intro()          # first frame, starts the animation thread
-    ...boot work...
-    sp.finish()         # waits for a minimum show time and a word boundary
+    sp.progress(0.5)    # optional: the loader's target as boot advances
+    sp.finish()         # minimum show time, fills the loader, word boundary
 
 Without _thread (or without splash.bin) it degrades to pump() calls or a
 static frame. Splash must never break boot: every method swallows errors.
@@ -23,20 +26,51 @@ import time
 from oreoOS import api
 from oreoOS import theme
 
+try:
+    import framebuf
+except ImportError:          # host tests
+    framebuf = None
+
 SW = api.SCREEN_W
 SH = api.SCREEN_H
 
 BIN_PATH     = "oreoOS/splash.bin"
-LOGO_X       = 12
-LOGO_Y       = 12
-TAG_GAP      = 2            # px between the greeting band and "OreoOS"
 
-HOLD_MS      = 850          # a word rests in place
-ROLL_MS      = 380          # the roll to the next word
+HOLD_MS      = 150          # a word rests in place
+ROLL_MS      = 183          # the roll to the next word: 3 words a second
 CYCLE_MS     = HOLD_MS + ROLL_MS
-FRAME_MS     = 15           # animation thread tick
+FRAME_MS     = 12           # animation thread tick
 MIN_TOTAL_MS = 2600         # finish() never returns earlier than this
-FINISH_MAX_MS = 1500        # extra wait for a word boundary, at most
+FILL_MS      = 300          # finish() runs the loader to full over this
+FADE_OUT_MS  = 200          # backlight down at the end of the splash
+FADE_IN_MS   = 250          # and back up once the OS has drawn (fade_in)
+
+
+def _ramp(display, start, end, ms):
+    """Ease the backlight from start% to end% over ms."""
+    t0 = _ms()
+    while True:
+        t = _diff(_ms(), t0)
+        p = ease(t / ms) if ms > 0 else 1.0
+        display.set_brightness(start + (end - start) * p)
+        if t >= ms:
+            return
+        time.sleep_ms(10)
+
+
+def fade_in(os_obj):
+    """Bring the backlight back after the splash faded out. The launcher
+    calls this once, right after the first OS frame is on the panel."""
+    if not getattr(os_obj, "_splash_faded", False):
+        return
+    os_obj._splash_faded = False
+    try:
+        _ramp(os_obj.display, 0, getattr(os_obj, "_last_brightness", 100), FADE_IN_MS)
+    except Exception:
+        try:
+            os_obj.display.set_brightness(getattr(os_obj, "_last_brightness", 100))
+        except Exception:
+            pass
 
 
 def _ms():
@@ -74,66 +108,83 @@ def roll_state(t_ms, count, band_h):
     return k, nxt, min(band_h, int(p * band_h + 0.5))
 
 
-def compose_band(fb, stride, band_y, band_h, bg_row, cur, cur_w, nxt, nxt_w, off):
-    """Write one frame of the roll into framebuffer rows band_y..+band_h.
-    cur rows move up by off; nxt rows follow band_h below them."""
-    cx = ((SW - cur_w) // 2) * 2
-    nx = ((SW - nxt_w) // 2) * 2
-    cl = cur_w * 2
-    nl = nxt_w * 2
-    base = band_y * stride
-    for y in range(band_h):
-        d = base + y * stride
-        fb[d:d + stride] = bg_row
-        r = y + off
-        if r < band_h:
-            if cur is not None:
-                s = r * cl
-                fb[d + cx:d + cx + cl] = cur[s:s + cl]
-        else:
-            r -= band_h
-            if nxt is not None:
-                s = r * nl
-                fb[d + nx:d + nx + nl] = nxt[s:s + nl]
+def loader_frac(t_ms, target, done_ms=None):
+    """Loader fill 0..1: follows the clock towards MIN_TOTAL_MS but never
+    past the boot's reported progress `target`; after finish() starts
+    (done_ms) it runs to full over FILL_MS."""
+    f = t_ms / MIN_TOTAL_MS
+    if f > target:
+        f = target
+    if done_ms is not None:
+        g = f + (1.0 - f) * min(1.0, (t_ms - done_ms) / FILL_MS)
+        f = g
+    return 0.0 if f < 0.0 else (1.0 if f > 1.0 else f)
+
+
+def blit_gs4(dst, dst_w, dst_h, src, w, h, x, y, pal, key):
+    """Pure-Python twin of framebuf's GS4_HMSB palette blit with a key,
+    used when framebuf is unavailable (host tests). dst is big-endian
+    RGB565 rows; pal holds 16 big-endian entries; key is entry 0 read as
+    framebuf reads it (little-endian), so it is never drawn."""
+    row_b = (w + 1) >> 1
+    for sy in range(h):
+        dy = y + sy
+        if dy < 0 or dy >= dst_h:
+            continue
+        for sx in range(w):
+            dx = x + sx
+            if dx < 0 or dx >= dst_w:
+                continue
+            b = src[sy * row_b + (sx >> 1)]
+            v = (b >> 4) if (sx & 1) == 0 else (b & 15)
+            if pal[2 * v] | (pal[2 * v + 1] << 8) == key:
+                continue
+            o = (dy * dst_w + dx) * 2
+            dst[o] = pal[2 * v]
+            dst[o + 1] = pal[2 * v + 1]
 
 
 class _Art:
-    """Reads oreoOS/splash.bin: header, logo, tag and greeting offsets.
-    Greetings are loaded on demand into reusable buffers."""
+    """Reads oreoOS/splash.bin (OSP2). Greeting masks load on demand."""
 
     def __init__(self, path):
         f = open(path, "rb")
         self._f = f
-        hdr = f.read(10)
-        if hdr[:4] != b"OSP1":
+        if f.read(4) != b"OSP2":
             raise ValueError("bad splash.bin")
-        self.count, _, self.band_h, self.bg565 = struct.unpack("<BBHH", hdr[4:])
-        self.logo_w, self.logo_h = struct.unpack("<HH", f.read(4))
-        self.logo = f.read(self.logo_w * self.logo_h * 2)
-        self.tag_w, self.tag_h = struct.unpack("<HH", f.read(4))
-        self.tag = f.read(self.tag_w * self.tag_h * 2)
+        self.count, _ = struct.unpack("<BB", f.read(2))
+        self.band_y, self.band_h = struct.unpack("<HH", f.read(4))
+        (self.bar_x, self.bar_y, self.bar_w, self.bar_h,
+         self.bar_track, self.bar_fill) = struct.unpack("<HHHHHH", f.read(12))
+        self.key = struct.unpack("<H", f.read(2))[0]
+        self.pal = bytearray(f.read(32))
+        self.bg_pos = f.tell()
+        pos = self.bg_pos + SW * SH * 2
         self.offsets = []
         self.widths = []
-        pos = 10 + 4 + len(self.logo) + 4 + len(self.tag)
         max_w = 0
         for _ in range(self.count):
             f.seek(pos)
             w = struct.unpack("<H", f.read(2))[0]
             self.widths.append(w)
             self.offsets.append(pos + 2)
-            pos += 2 + w * self.band_h * 2
+            pos += 2 + (w >> 1) * self.band_h
             if w > max_w:
                 max_w = w
-        self._size = max_w * self.band_h * 2
+        self.size = pos
+        self._mask_bytes = (max_w >> 1) * self.band_h
+
+    def read_bg(self, buf):
+        self._f.seek(self.bg_pos)
+        self._f.readinto(buf)
 
     def buffer(self):
-        return bytearray(self._size)
+        return bytearray(self._mask_bytes)
 
     def load(self, k, buf):
-        n = self.widths[k] * self.band_h * 2
+        n = (self.widths[k] >> 1) * self.band_h
         self._f.seek(self.offsets[k])
         self._f.readinto(memoryview(buf)[:n])
-        return buf
 
     def close(self):
         try:
@@ -152,16 +203,24 @@ class Splash:
         self._threaded = False
         self._last = None
         self._loaded = (-1, -1)
+        self._target = 0.15
+        self._done_ms = None
+        self._bar_px = -1
         try:
-            self._art = _Art(BIN_PATH)
-            a = self._art
-            self._band_y = (SH - a.band_h) // 2 - 8
-            self._bufs = [a.buffer(), a.buffer()]
-            bg = struct.pack(">H", a.bg565)
-            self._bg_row = bg * SW
+            a = _Art(BIN_PATH)
+            self._art = a
+            self._bg = bytearray(SW * SH * 2)
+            a.read_bg(self._bg)
+            self._masks = [a.buffer(), a.buffer()]
+            self._mfb = [None, None]
+            self._band0 = a.band_y * SW * 2
+            self._band1 = (a.band_y + a.band_h) * SW * 2
+            self._band_fb = None
+            self._pal_fb = None
         except Exception as e:
             print("[splash] art unavailable:", e)
             self._art = None
+            self._bg = None
 
     # -- public API (all calls are safe to make; errors never escape) -----
 
@@ -177,7 +236,8 @@ class Splash:
             print("[splash] intro:", e)
 
     def progress(self, frac):
-        pass        # the roll is time-based; kept for boot() compatibility
+        if frac > self._target:
+            self._target = frac
 
     def pump(self):
         """Draw one frame when no animation thread is running. Returns False
@@ -192,25 +252,38 @@ class Splash:
     def finish(self):
         try:
             if self._art is not None:
-                deadline = None
+                self._target = 1.0
+                while _diff(_ms(), self._start) < MIN_TOTAL_MS - FILL_MS:
+                    self._tick_wait()
+                self._done_ms = _diff(_ms(), self._start)
+                limit = self._done_ms + FILL_MS + CYCLE_MS
                 while True:
                     t = _diff(_ms(), self._start)
-                    if t >= MIN_TOTAL_MS:
-                        if deadline is None:
-                            deadline = t + FINISH_MAX_MS
-                        k, n, off = roll_state(t, self._art.count, self._art.band_h)
-                        if off == 0 or t >= deadline:
-                            break
-                    if not self._threaded:
-                        self._frame()
-                    time.sleep_ms(FRAME_MS)
+                    full = t >= self._done_ms + FILL_MS
+                    rest = roll_state(t, self._art.count, self._art.band_h)[2] == 0
+                    if (full and rest) or t >= limit:
+                        break
+                    self._tick_wait()
+                if not self._threaded:
+                    self._frame()
             self._stop = True
             waited = 0
             while self._alive and waited < 500:
                 time.sleep_ms(5)
                 waited += 5
+            if self._art is not None:
+                # Fade to black; the launcher fades the OS in (fade_in) once
+                # Home's first frame is on the panel.
+                _ramp(self._os.display,
+                      getattr(self._os, "_last_brightness", 100), 0, FADE_OUT_MS)
+                self._os._splash_faded = True
         except Exception as e:
             print("[splash] finish:", e)
+            try:
+                self._os.display.set_brightness(
+                    getattr(self._os, "_last_brightness", 100))
+            except Exception:
+                pass
         self.release()
 
     def release(self):
@@ -218,69 +291,109 @@ class Splash:
         if self._art is not None:
             self._art.close()
         self._art = None
-        self._bufs = None
+        self._bg = None
+        self._masks = None
+        self._mfb = None
+        self._band_fb = None
 
     # -- drawing ----------------------------------------------------------
 
+    def _tick_wait(self):
+        if not self._threaded:
+            self._frame()
+        time.sleep_ms(FRAME_MS)
+
     def _static(self):
         d = self._os.display
-        d.clear(theme.BG)
-        d.text("hello", (SW - 5 * 24) // 2, SH // 2 - 20, theme.TEXT_BRIGHT, scale=3)
+        d.clear(api.rgb(12, 18, 32))
+        d.text("hello", (SW - 5 * 24) // 2, SH // 2 - 20, api.WHITE, scale=3)
         d.text("OreoOS", (SW - 6 * 8) // 2, SH // 2 + 12, theme.PRIMARY)
         d.present()
-
-    def _blit_rows(self, data, x, y, w, h):
-        fb = self._os.display._buf
-        stride = SW * 2
-        rl = w * 2
-        for r in range(h):
-            d = (y + r) * stride + x * 2
-            fb[d:d + rl] = data[r * rl:(r + 1) * rl]
 
     def _first_frame(self):
         a = self._art
         d = self._os.display
-        fb = d._buf
-        stride = SW * 2
-        for y in range(SH):
-            fb[y * stride:(y + 1) * stride] = self._bg_row
-        self._blit_rows(a.logo, LOGO_X, LOGO_Y, a.logo_w, a.logo_h)
-        tag_y = self._band_y + a.band_h + TAG_GAP
-        self._blit_rows(a.tag, (SW - a.tag_w) // 2, tag_y, a.tag_w, a.tag_h)
+        d._buf[:] = self._bg
+        if framebuf is not None:
+            mv = memoryview(d._buf)
+            self._band_fb = framebuf.FrameBuffer(mv[self._band0:self._band1],
+                                                 SW, a.band_h, framebuf.RGB565)
+            self._pal_fb = framebuf.FrameBuffer(a.pal, 16, 1, framebuf.RGB565)
         self._ensure(0, 1)
-        compose_band(fb, stride, self._band_y, a.band_h, self._bg_row,
-                     self._bufs[0], a.widths[0], self._bufs[1], a.widths[1], 0)
+        self._draw_band(0, 1, 0)
         self._last = (0, 0)
+        self._draw_bar(0.0)
         d._dirty = True
         d.present()
 
     def _ensure(self, k, n):
-        """Have word k in buffer 0 and word n in buffer 1."""
+        """Have word k in mask slot 0 and word n in slot 1."""
         lk, ln = self._loaded
         a = self._art
         if lk != k:
             if ln == k:
-                self._bufs[0], self._bufs[1] = self._bufs[1], self._bufs[0]
+                self._masks.reverse()
+                self._mfb.reverse()
                 ln = -1
             else:
-                a.load(k, self._bufs[0])
+                a.load(k, self._masks[0])
+                self._mfb[0] = self._mask_fb(0, k)
         if ln != n:
-            a.load(n, self._bufs[1])
+            a.load(n, self._masks[1])
+            self._mfb[1] = self._mask_fb(1, n)
         self._loaded = (k, n)
+
+    def _mask_fb(self, slot, k):
+        if framebuf is None:
+            return None
+        return framebuf.FrameBuffer(self._masks[slot], self._art.widths[k],
+                                    self._art.band_h, framebuf.GS4_HMSB)
+
+    def _draw_band(self, k, n, off):
+        a = self._art
+        d = self._os.display
+        b0, b1, bh = self._band0, self._band1, a.band_h
+        d._buf[b0:b1] = memoryview(self._bg)[b0:b1]
+        wk, wn = a.widths[k], a.widths[n]
+        xk, xn = (SW - wk) // 2, (SW - wn) // 2
+        if self._band_fb is not None:
+            self._band_fb.blit(self._mfb[0], xk, -off, a.key, self._pal_fb)
+            self._band_fb.blit(self._mfb[1], xn, bh - off, a.key, self._pal_fb)
+        else:
+            band = memoryview(d._buf)[b0:b1]
+            blit_gs4(band, SW, bh, self._masks[0], wk, bh, xk, -off, a.pal, a.key)
+            blit_gs4(band, SW, bh, self._masks[1], wn, bh, xn, bh - off, a.pal, a.key)
+
+    def _draw_bar(self, frac):
+        a = self._art
+        px = int(a.bar_w * frac)
+        if px == self._bar_px:
+            return False
+        self._bar_px = px
+        fb = self._os.display._buf
+        stride = SW * 2
+        track = struct.pack(">H", a.bar_track)
+        fill = struct.pack(">H", a.bar_fill)
+        for r in range(a.bar_h):
+            o = (a.bar_y + r) * stride + a.bar_x * 2
+            fb[o:o + px * 2] = fill * px
+            fb[o + px * 2:o + a.bar_w * 2] = track * (a.bar_w - px)
+        return True
 
     def _frame(self):
         a = self._art
+        d = self._os.display
         t = _diff(_ms(), self._start)
         k, n, off = roll_state(t, a.count, a.band_h)
-        self._ensure(k, n)
-        if (k, off) == self._last:
-            return
-        self._last = (k, off)
-        d = self._os.display
-        compose_band(d._buf, SW * 2, self._band_y, a.band_h, self._bg_row,
-                     self._bufs[0], a.widths[k], self._bufs[1], a.widths[n], off)
-        d._dirty = True
-        d.present_rect(0, self._band_y, SW, a.band_h)
+        if (k, off) != self._last:
+            self._ensure(k, n)
+            self._last = (k, off)
+            self._draw_band(k, n, off)
+            d._dirty = True
+            d.present_rect(0, a.band_y, SW, a.band_h)
+        if self._draw_bar(loader_frac(t, self._target, self._done_ms)):
+            d._dirty = True
+            d.present_rect(a.bar_x, a.bar_y, a.bar_w, a.bar_h)
 
     def _run(self):
         try:

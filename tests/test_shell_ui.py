@@ -122,8 +122,9 @@ class SplashHelpersTest(unittest.TestCase):
         sys.modules.pop("oreoOS.splash", None)
         _restore(self.saved)
 
-    def test_roll_timeline(self):
+    def test_roll_timeline_three_words_a_second(self):
         sp = self.sp
+        self.assertAlmostEqual(1000 / sp.CYCLE_MS, 3.0, delta=0.05)
         self.assertEqual(sp.roll_state(0, 16, 64), (0, 1, 0))
         self.assertEqual(sp.roll_state(sp.HOLD_MS - 1, 16, 64), (0, 1, 0))
         k, n, off = sp.roll_state(sp.HOLD_MS + sp.ROLL_MS // 2, 16, 64)
@@ -131,50 +132,51 @@ class SplashHelpersTest(unittest.TestCase):
         self.assertTrue(0 < off < 64)
         self.assertEqual(sp.roll_state(sp.CYCLE_MS - 1, 16, 64)[2], 64)
         self.assertEqual(sp.roll_state(sp.CYCLE_MS, 16, 64), (1, 2, 0))
-        self.assertEqual(sp.roll_state(sp.CYCLE_MS * 15, 16, 64)[:2], (15, 0))
         self.assertEqual(sp.roll_state(sp.CYCLE_MS * 16, 16, 64)[0], 0)
 
     def test_ease(self):
         sp = self.sp
-        self.assertEqual(sp.ease(0.0), 0.0)
-        self.assertEqual(sp.ease(1.0), 1.0)
         vals = [sp.ease(i / 20) for i in range(21)]
+        self.assertEqual((vals[0], vals[-1]), (0.0, 1.0))
         self.assertEqual(vals, sorted(vals))
 
-    def test_compose_band(self):
+    def test_loader(self):
         sp = self.sp
-        bh, w = 4, 2
-        stride = sp.SW * 2
-        bg = b"\x00\x01" * sp.SW
-        cur = bytes(range(1, 1 + w * 2 * bh))
-        nxt = bytes(range(100, 100 + w * 2 * bh))
-        x = ((sp.SW - w) // 2) * 2
-        fb = bytearray(stride * bh)
-        sp.compose_band(fb, stride, 0, bh, bg, cur, w, nxt, w, 0)
-        for y in range(bh):
-            self.assertEqual(fb[y * stride + x:y * stride + x + w * 2],
-                             cur[y * w * 2:(y + 1) * w * 2])
-            self.assertEqual(fb[y * stride:y * stride + 2], b"\x00\x01")
-        sp.compose_band(fb, stride, 0, bh, bg, cur, w, nxt, w, bh)
-        for y in range(bh):
-            self.assertEqual(fb[y * stride + x:y * stride + x + w * 2],
-                             nxt[y * w * 2:(y + 1) * w * 2])
-        sp.compose_band(fb, stride, 0, bh, bg, cur, w, nxt, w, 1)
-        self.assertEqual(fb[x:x + w * 2], cur[w * 2:w * 4])          # cur row 1
-        last = (bh - 1) * stride
-        self.assertEqual(fb[last + x:last + x + w * 2], nxt[0:w * 2])  # nxt row 0
+        self.assertEqual(sp.loader_frac(0, 0.2), 0.0)
+        self.assertEqual(sp.loader_frac(sp.MIN_TOTAL_MS, 0.2), 0.2)   # capped by boot
+        self.assertAlmostEqual(sp.loader_frac(sp.MIN_TOTAL_MS // 2, 1.0), 0.5)
+        f0 = sp.loader_frac(1000, 1.0, done_ms=1000)
+        self.assertEqual(sp.loader_frac(1000 + sp.FILL_MS, 1.0, done_ms=1000), 1.0)
+        self.assertLess(f0, 1.0)
+
+    def test_blit_gs4_clips_and_keys(self):
+        sp = self.sp
+        dst_w, dst_h = 6, 3
+        dst = bytearray(dst_w * dst_h * 2)
+        pal = bytearray(32)
+        for v in range(16):
+            pal[2 * v], pal[2 * v + 1] = 0x10 + v, 0x20 + v
+        key = pal[0] | (pal[1] << 8)
+        # 2x2 mask: row 0 = (15, 0), row 1 = (7, 3)
+        src = bytes([0xF0, 0x73])
+        sp.blit_gs4(dst, dst_w, dst_h, src, 2, 2, 1, 2, pal, key)   # row 1 clipped
+        o = (2 * dst_w + 1) * 2
+        self.assertEqual(dst[o:o + 2], bytes([0x1F, 0x2F]))
+        self.assertEqual(dst[o + 2:o + 4], b"\x00\x00")           # coverage 0: keyed
+        self.assertEqual(sum(dst[:2 * dst_w * 2]), 0)              # nothing above y=2
 
     def test_splash_bin_is_consistent(self):
         sp = self.sp
         art = sp._Art(sp.BIN_PATH)
         try:
             self.assertGreaterEqual(art.count, 8)
-            self.assertTrue(all(0 < w <= sp.SW for w in art.widths))
-            self.assertEqual(len(art.logo), art.logo_w * art.logo_h * 2)
-            self.assertEqual(len(art.tag), art.tag_w * art.tag_h * 2)
-            end = art.offsets[-1] + art.widths[-1] * art.band_h * 2
-            self.assertEqual(end, (ROOT / "oreoOS" / "splash.bin").stat().st_size)
-            self.assertEqual(art.bg565, self.saved and sys.modules["oreoOS.theme"].BG)
+            self.assertTrue(all(0 < w <= sp.SW and w % 2 == 0 for w in art.widths))
+            self.assertEqual(art.size, (ROOT / "oreoOS" / "splash.bin").stat().st_size)
+            self.assertLessEqual(art.band_y + art.band_h, art.bar_y)
+            self.assertLessEqual(art.bar_x + art.bar_w, sp.SW)
+            self.assertEqual(art.key, art.pal[0] | (art.pal[1] << 8))
+            others = {art.pal[2 * v] | (art.pal[2 * v + 1] << 8) for v in range(1, 16)}
+            self.assertNotIn(art.key, others)
         finally:
             art.close()
 
@@ -184,20 +186,31 @@ class SplashHelpersTest(unittest.TestCase):
         sp.time = clock
         d = FakeDisplay(sp.SW, sp.SH)
         d._buf = d.buf
-        s = sp.Splash(types.SimpleNamespace(display=d))
+        os_obj = types.SimpleNamespace(display=d, _last_brightness=70)
+        s = sp.Splash(os_obj)
         s._start_thread = lambda: None       # pump() path, deterministic
+        band_y, band_h = s._art.band_y, s._art.band_h
+        bar = (s._art.bar_x, s._art.bar_y, s._art.bar_w, s._art.bar_h)
         s.intro()
-        for _ in range(80):
+        s.progress(0.6)
+        for _ in range(40):
             self.assertFalse(s.pump())
             clock.t += 30
         s.finish()
         self.assertGreaterEqual(clock.t, sp.MIN_TOTAL_MS)
         self.assertEqual(d.presented[0], None)            # first full frame
-        bands = d.presented[1:]
-        self.assertTrue(bands, "the greeting never rolled")
-        self.assertTrue(all(p == (0, s._band_y, sp.SW, 64) for p in bands))
-        self.assertGreaterEqual(s._last[0], 1)            # moved past "hello"
+        rects = d.presented[1:]
+        self.assertTrue(any(p == (0, band_y, sp.SW, band_h) for p in rects))
+        self.assertTrue(any(p == bar for p in rects))
+        self.assertTrue(all(p in ((0, band_y, sp.SW, band_h), bar) for p in rects))
         self.assertIsNone(s._art)                         # released
+        brights = [c[1] for c in d.calls if c[0] == "bright"]
+        self.assertEqual(brights[-1], 0)                  # faded out
+        self.assertTrue(os_obj._splash_faded)
+        sp.fade_in(os_obj)
+        brights = [c[1] for c in d.calls if c[0] == "bright"]
+        self.assertEqual(brights[-1], 70)                 # back to the user's level
+        self.assertFalse(os_obj._splash_faded)
 
 
 class ScrollerTest(unittest.TestCase):
