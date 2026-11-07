@@ -684,6 +684,12 @@ def boot():
             wifi_ok_to_try = False
     except Exception:
         pass
+    # Settings -> WiFi -> Auto-connect (previously stored but never read).
+    try:
+        if not os_obj.settings_get("wifi_autoconnect", True):
+            wifi_ok_to_try = False
+    except Exception:
+        pass
     try:
         import machine
         # MicroPython exposes BROWNOUT_RESET on most ports; treat unknown
