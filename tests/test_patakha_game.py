@@ -232,6 +232,19 @@ class _FakeTime:
 
 class AppSmokeTest(unittest.TestCase):
     def test_full_round_draws_without_errors(self):
+        # Other tests leave stub "oreoOS" packages in sys.modules; load the
+        # real package for this test and put theirs back afterwards.
+        saved = {k: v for k, v in sys.modules.items()
+                 if k == "oreoOS" or k.startswith("oreoOS.")}
+        for k in saved:
+            del sys.modules[k]
+
+        def restore():
+            for k in [k for k in sys.modules
+                      if k == "oreoOS" or k.startswith("oreoOS.")]:
+                del sys.modules[k]
+            sys.modules.update(saved)
+        self.addCleanup(restore)
         sys.path.insert(0, str(ROOT))
         try:
             mod = importlib.import_module("apps_market.patakha.src.app")

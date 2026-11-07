@@ -10,9 +10,21 @@
       "description": "Diwali special: shoot firecrackers, light up the sky.",
       "category": "Games",
       "author": "Circuit-Overtime",
-      "version": "1.0",
+      "version": "0.1",
       "icon": "patakha_icon.png",
-      "size": 0
+      "size": 50659,
+      "files": [
+        ["__init__.py", 0],
+        ["assets/__init__.py", 0],
+        ["assets/optimized/__init__.py", 0],
+        ["assets/optimized/patakha_icon.py", 8807],
+        ["main.py", 243],
+        ["manifest.json", 224],
+        ["src/__init__.py", 0],
+        ["src/app.py", 10710],
+        ["src/game.py", 18676],
+        ["src/render.py", 11999]
+      ]
     },
     {
       "id": "doom",
@@ -44,7 +56,7 @@
       "author": "Circuit-Overtime",
       "version": "0.1",
       "icon": "racer_icon.png",
-      "size": 129553,
+      "size": 133047,
       "files": [
         ["__init__.py", 0],
         ["assets/__init__.py", 0],
@@ -58,7 +70,8 @@
         ["main.py", 241],
         ["manifest.json", 172],
         ["src/__init__.py", 0],
-        ["src/app.py", 24074]
+        ["src/app.py", 24852],
+        ["src/spawn.py", 2716]
       ]
     },
     {
@@ -156,7 +169,7 @@
       "author": "Circuit-Overtime",
       "version": "0.1",
       "icon": "IR_Quest_icon.png",
-      "size": 15240,
+      "size": 20060,
       "files": [
         ["__init__.py", 0],
         ["assets/__init__.py", 0],
@@ -164,7 +177,8 @@
         ["main.py", 241],
         ["manifest.json", 180],
         ["src/__init__.py", 0],
-        ["src/app.py", 14819]
+        ["src/app.py", 18318],
+        ["src/text.py", 1321]
       ]
     },
     {
@@ -177,13 +191,13 @@
       "author": "Circuit-Overtime",
       "version": "0.1",
       "icon": "bluetooth_icon.png",
-      "size": 2272,
+      "size": 7423,
       "files": [
         ["__init__.py", 0],
         ["main.py", 238],
-        ["manifest.json", 184],
+        ["manifest.json", 181],
         ["src/__init__.py", 0],
-        ["src/app.py", 1850]
+        ["src/app.py", 7004]
       ]
     },
     {

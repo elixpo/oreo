@@ -507,14 +507,17 @@ class NotifPanel:
                     self._os.display.present()
                 except Exception:
                     pass
-                # Pump button input through the wait so the panel can
-                # still react if the user changes their mind. Older
-                # wifi.py without pump_cb support falls through to the
-                # plain blocking call.
-                try:
-                    wifi.connect_from_config(pump_cb=self._wifi_cancel_pump)
-                except TypeError:
-                    wifi.connect_from_config()
+                # Non-blocking: the run loop ticks wifi.auto_tick() and
+                # starts the file-transfer server once the link is up.
+                # Older wifi.py without auto_begin falls back to the
+                # blocking connect, pumping input so a press cancels it.
+                if hasattr(wifi, "auto_begin"):
+                    wifi.auto_begin()
+                else:
+                    try:
+                        wifi.connect_from_config(pump_cb=self._wifi_cancel_pump)
+                    except TypeError:
+                        wifi.connect_from_config()
         except Exception:
             pass
         self._dirty = True

@@ -108,9 +108,6 @@ SHIP_GLOBS = [
     "apps/*/assets/__init__.py",
     "apps/*/assets/optimized/__init__.py",
     "apps/*/assets/optimized/*.py",
-    # App code under src/ (the modular-app convention). Without this an OTA
-    # updated main.py/manifest but never the code it imports.
-    "apps/*/src/*.py",
 ]
 
 
