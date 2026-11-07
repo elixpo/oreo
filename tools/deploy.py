@@ -491,7 +491,7 @@ def write_secrets_local():
     apps can `from secrets import GITHUB_USER, OWM_API_KEY, ...` with no
     filesystem dance at runtime.
 
-    Returns (path_to_tmp_file, wifi_ssid_for_logging).
+    Returns the path to the tmp file (no credential values leave this function).
     """
     # Import the project config from the repo root.
     import sys as _sys
@@ -545,7 +545,7 @@ def write_secrets_local():
 
     tmp = Path(".secrets_tmp.py")
     tmp.write_text("\n".join(out))
-    return tmp, getattr(_cfg, "WIFI_SSID", "")
+    return tmp
 
 
 # ── build directory set ────────────────────────────────────────────────────────
@@ -740,7 +740,7 @@ def main():
     # Generate secrets before comparing it with the cache. Hashing the rendered
     # file still notices .env changes, without unconditionally writing the same
     # tiny module on every deploy.
-    secrets_tmp, ssid = write_secrets_local()
+    secrets_tmp = write_secrets_local()
     secrets_hash = _hash_file(secrets_tmp)
     if cache.get("secrets.py") != secrets_hash:
         actions.append(("cp", str(secrets_tmp), "secrets.py"))
@@ -880,7 +880,7 @@ def main():
 
     elapsed = _t.time() - t0
     if rc == 0:
-        print("\nDone in %.1fs.  WIFI_SSID=%r" % (elapsed, ssid or "<unset>"))
+        print("\nDone in %.1fs." % elapsed)
         print("Resetting device...")
         mpremote("reset")
         print("Oreo OS is booting.")

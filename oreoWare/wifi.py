@@ -553,8 +553,8 @@ def connect_from_config(pump_cb=None):
             continue
         pw = n.get("password") or ""
         try:
-            print("[wifi] try %s (p=%s)" %
-                  (ssid_, n.get("priority", "?")))
+            print("[wifi] trying a saved network (p=%s)" %
+                  n.get("priority", "?"))
             ok = connect(ssid_, pw,
                          timeout_ms=_PER_NET_TIMEOUT,
                          pump_cb=pump_cb)
@@ -562,7 +562,7 @@ def connect_from_config(pump_cb=None):
             print("[wifi] connect raised:", e)
             ok = False
         if ok:
-            print("[wifi] associated:", ssid_)
+            print("[wifi] associated")
             return True
         # If the user cancelled mid-search, stop trying further
         # networks — they explicitly asked us to give up. Without
@@ -676,7 +676,7 @@ def speed_test(bytes_=200_000, timeout_s=10, pump_cb=None):
     """
     try:
         import socket as _s
-        import ssl    as _ssl
+        from oreoOS._http import tls_wrap as _tls_wrap
     except ImportError:
         return (False, 0, 0)
     if not is_connected():
@@ -717,7 +717,7 @@ def speed_test(bytes_=200_000, timeout_s=10, pump_cb=None):
         try: raw.settimeout(timeout_s)   # connect can take a while
         except Exception: pass
         raw.connect(addr)
-        s = _ssl.wrap_socket(raw, server_hostname=host)
+        s = _tls_wrap(raw, host)
         try: s.settimeout(PER_READ_S)
         except Exception: pass
         req = ("GET %s HTTP/1.1\r\nHost: %s\r\n"
@@ -1264,7 +1264,7 @@ def connect_begin(ssid, password, timeout_ms=12000):
         _conn_stale = code if classify_status(code) else None
     except Exception:
         _conn_stale = None
-    print("[wifi] connecting to", ssid)
+    print("[wifi] connecting")
     _conn_ssid    = ssid
     _conn_t0      = _now()
     _conn_timeout = int(timeout_ms)
@@ -1319,7 +1319,7 @@ def connect_poll():
             _mark_last(ssid)
         except Exception:
             pass
-        print("[wifi] associated:", ssid)
+        print("[wifi] associated")
         return CONN_OK
     try:
         code = wlan.status()
@@ -1345,7 +1345,7 @@ def connect_poll():
         fail = stale_bad or CONN_TIMEOUT
     if fail is None:
         return CONN_BUSY
-    print("[wifi] connect %s: %s" % (fail, _conn_ssid))
+    print("[wifi] connect failed: %s" % fail)
     _conn_ssid   = None
     _conn_result = fail
     try:

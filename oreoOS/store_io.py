@@ -13,7 +13,7 @@ import gc
 
 try:
     import socket as _socket
-    import ssl as _ssl
+    from oreoOS._http import tls_wrap as _tls_wrap
     _NET = True
 except ImportError:
     _NET = False
@@ -70,7 +70,7 @@ def _open(host, port, path, timeout_s, auth):
     try:
         raw.settimeout(timeout_s)
         raw.connect(addr)
-        s = _ssl.wrap_socket(raw, server_hostname=host)
+        s = _tls_wrap(raw, host)
     except Exception:
         try:
             raw.close()

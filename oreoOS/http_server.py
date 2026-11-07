@@ -1635,7 +1635,7 @@ def _handle_wifi_share(sock, headers, body_prefix, qs):
         _json_reply(sock, 500, "Internal Error", {"error": "could not save"})
         return
     try:
-        print("[http] wifi handoff: saved %s (session %s)" % (ssid, token))
+        print("[http] wifi handoff: saved a network")
     except Exception:
         pass
     try:

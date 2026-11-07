@@ -34,6 +34,24 @@ except ImportError:
 
 
 USER_AGENT = "OreoBadge"
+
+
+def tls_wrap(raw, host):
+    """Wrap a connected socket in TLS 1.2+ as a client, with SNI.
+
+    One place for every HTTPS connection on the badge (OTA, App Store,
+    GitHub data, the WiFi speed test). The protocol is explicit
+    (PROTOCOL_TLS_CLIENT) rather than the deprecated wrap_socket() default.
+
+    Certificates are not verified yet: the badge carries no CA bundle, and
+    verification also needs a correct clock before the first request. This
+    matches the previous wrap_socket() behaviour (CERT_NONE); verifying
+    GitHub's chain is tracked separately. A fresh context per connection
+    keeps concurrent fetches (background refresh threads) independent.
+    """
+    ctx = _ssl.SSLContext(_ssl.PROTOCOL_TLS_CLIENT)
+    ctx.verify_mode = _ssl.CERT_NONE
+    return ctx.wrap_socket(raw, server_hostname=host)
 MAX_REDIRECTS = 3
 # The largest current OTA asset is ~490 KiB. Keep a hard ceiling so a bad or
 # hostile endpoint cannot consume the whole heap, while leaving useful room
@@ -192,7 +210,7 @@ def _get_once(url, accept, timeout_s, auth, allow_auto_auth=True,
         raw.connect(addr)
         _bc("ssl")
         _progress(on_progress, "tls")
-        s = _ssl.wrap_socket(raw, server_hostname=host)
+        s = tls_wrap(raw, host)
         # SSLSocket wraps raw — settimeout on raw doesn't always
         # propagate. Set it again on the wrapper so .read() honours it.
         try:
@@ -356,7 +374,7 @@ def _open_conn(host, port, timeout_s):
     try:
         raw.settimeout(timeout_s)
         raw.connect(addr)
-        s = _ssl.wrap_socket(raw, server_hostname=host)
+        s = tls_wrap(raw, host)
         try:
             s.settimeout(timeout_s)
         except Exception:
