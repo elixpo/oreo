@@ -73,7 +73,7 @@ CJK = "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc"
 # (text, font path, ttc index, language tag for shaping)
 GREETINGS = [
     ("hello", INTER, 0, "en"),
-    ("नमस्ते", NOTO % "Devanagari", 0, "hi"),
+    ("γεια σου", INTER, 0, "el"),
     ("hola", INTER, 0, "es"),
     ("নমস্কার", NOTO % "Bengali", 0, "bn"),
     ("bonjour", INTER, 0, "fr"),
