@@ -118,6 +118,10 @@ _OTA_BOOT_GRACE_S = 15 * 60   # 15 min — boot finishes in seconds, but
 
 # ── helpers ─────────────────────────────────────────────────────────────────
 
+# One reusable buffer for hashing local files (peek) and the copy fallback
+# in apply, instead of a fresh bytes object per 4 KB read.
+_COPY_BUF = None
+
 def _ensure_dir(path):
     """mkdir -p equivalent for MicroPython's tiny os module."""
     parts = path.split("/")
@@ -162,14 +166,18 @@ def _sha256_file(path):
     """SHA-256 of a file, hex-encoded. None if the file is missing."""
     if _hashlib is None:
         return None
+    global _COPY_BUF
+    if _COPY_BUF is None:
+        _COPY_BUF = bytearray(CHUNK_BYTES * 2)
+    mv = memoryview(_COPY_BUF)
     try:
         h = _hashlib.sha256()
         with open(path, "rb") as f:
             while True:
-                chunk = f.read(CHUNK_BYTES)
-                if not chunk:
+                n = f.readinto(_COPY_BUF)
+                if not n:
                     break
-                h.update(chunk)
+                h.update(mv[:n])
         return _hex(h.digest())
     except OSError:
         return None
@@ -402,19 +410,28 @@ def download(peeked, on_progress=None):
 
     changed = peeked["changed"]
     total   = len(changed)
-    for i, entry in enumerate(changed):
-        path = entry.get("path", "")
-        url  = entry.get("url", "")
-        want = entry.get("sha256", "")
-        if not (path and url):
-            return False
-        if not _download_file(url, path, want):
-            return False
-        if on_progress:
-            try:
-                on_progress(i + 1, total, path)
-            except Exception:
-                pass
+    try:
+        for i, entry in enumerate(changed):
+            path = entry.get("path", "")
+            url  = entry.get("url", "")
+            want = entry.get("sha256", "")
+            if not (path and url):
+                return False
+            if not _download_file(url, path, want,
+                                  int(entry.get("size", 0) or 0)):
+                return False
+            if on_progress:
+                try:
+                    on_progress(i + 1, total, path)
+                except Exception:
+                    pass
+    finally:
+        # Files above reuse one kept-alive TLS connection per host.
+        try:
+            from oreoOS import _http as _httpx
+            _httpx.close_pool()
+        except Exception:
+            pass
 
     # Manifest written LAST as the all-good marker. Until this file
     # exists, apply_pending() won't promote anything from staging.
@@ -426,8 +443,14 @@ def download(peeked, on_progress=None):
     return True
 
 
-def _download_file(url, dest_remote, expected_sha=None):
-    """Download into the staging area mirroring the eventual remote path."""
+def _download_file(url, dest_remote, expected_sha=None, size=0):
+    """Download into the staging area mirroring the eventual remote path.
+
+    Streams to flash through _http.download_to_file: flat RAM use, SHA-256
+    checked on the fly, and the TLS connections to github.com and its
+    asset CDN are reused across every file of the patch instead of two
+    fresh handshakes per file. A file that fails the hash is removed.
+    """
     stage_path = STAGE_DIR + "/" + dest_remote
     parent = stage_path.rsplit("/", 1)[0]
     _ensure_dir(parent)
@@ -435,22 +458,10 @@ def _download_file(url, dest_remote, expected_sha=None):
         from oreoOS import _http as _httpx
     except Exception:
         return False
-    body = _httpx.get_url(url, timeout_s=T_FILE)
-    if body is None:
-        return False
-    try:
-        with open(stage_path, "wb") as f:
-            f.write(body)
-    except Exception:
-        return False
-    if expected_sha and _hashlib is not None:
-        if _hex(_hashlib.sha256(body).digest()) != expected_sha:
-            try:
-                _os.remove(stage_path)
-            except Exception:
-                pass
-            return False
-    return True
+    cap = max(4 * 1024 * 1024, size + 64 * 1024)
+    return _httpx.download_to_file(url, stage_path,
+                                   expected_sha or None,
+                                   timeout_s=T_FILE, max_bytes=cap)
 
 
 def is_pending():
@@ -528,12 +539,35 @@ def apply_pending(on_progress=None):
 
 
 def _copy_file(src, dst):
+    """Move a staged file into place.
+
+    /_ota lives on the same littlefs volume, so a rename is a metadata
+    update: no data is copied and no flash pages are rewritten. If the
+    destination blocks the rename it is removed first; a power cut in
+    between leaves the staged file and the manifest, so the next boot
+    finishes the job. Falls back to a buffered copy if rename fails.
+    """
+    try:
+        _os.rename(src, dst)
+        return
+    except OSError:
+        pass
+    try:
+        _os.remove(dst)
+        _os.rename(src, dst)
+        return
+    except OSError:
+        pass
+    global _COPY_BUF
+    if _COPY_BUF is None:
+        _COPY_BUF = bytearray(CHUNK_BYTES * 2)
+    mv = memoryview(_COPY_BUF)
     with open(src, "rb") as fi, open(dst, "wb") as fo:
         while True:
-            chunk = fi.read(CHUNK_BYTES)
-            if not chunk:
+            n = fi.readinto(_COPY_BUF)
+            if not n:
                 break
-            fo.write(chunk)
+            fo.write(mv[:n])
 
 
 def discard_pending():
