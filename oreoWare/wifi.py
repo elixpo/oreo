@@ -173,7 +173,16 @@ def radio_on():
 def radio_off():
     """Power the radio fully down. Releases any active connection
     cleanly and saves the ~70 mA the WiFi MAC pulls in idle. Pairs
-    with `radio_on()` so a UI toggle has a real on/off semantic."""
+    with `radio_on()` so a UI toggle has a real on/off semantic.
+
+    Also stops a pending non-blocking join and the boot auto-connect
+    machine; otherwise the next auto_tick() would call connect_begin()
+    or scan_start(), both of which power the radio straight back on."""
+    global _auto_state, _auto_refresh, _conn_ssid, _conn_result
+    _auto_state   = AUTO_OFF
+    _auto_refresh = False
+    _conn_ssid    = None
+    _conn_result  = CONN_IDLE
     try:
         wlan = _get_wlan()
         try: wlan.disconnect()
@@ -1214,6 +1223,7 @@ _conn_t0      = 0
 _conn_timeout = 12000
 _conn_bad     = None     # classify_status() result currently held
 _conn_bad_t0  = 0
+_conn_stale   = None     # failure code left over from an earlier attempt
 _conn_result  = CONN_IDLE
 
 
@@ -1221,6 +1231,7 @@ def connect_begin(ssid, password, timeout_ms=12000):
     """Start associating with `ssid` and return at once. Poll
     connect_poll() for the outcome. The password is never printed."""
     global _conn_ssid, _conn_t0, _conn_timeout, _conn_bad, _conn_result
+    global _conn_stale
     if not ssid:
         _conn_result = CONN_FAIL
         return False
@@ -1243,6 +1254,16 @@ def connect_begin(ssid, password, timeout_ms=12000):
         _conn_ssid   = None
         _conn_result = CONN_FAIL
         return False
+    # The ESP32 port only overwrites its disconnect reason on the next
+    # disconnect event or on GOT_IP, so wlan.status() can keep reporting
+    # the previous attempt's AUTH_FAIL / NO_AP_FOUND for the whole of a
+    # healthy new handshake. Remember that code and ignore it until the
+    # driver reports something else (see connect_poll()).
+    try:
+        code = wlan.status()
+        _conn_stale = code if classify_status(code) else None
+    except Exception:
+        _conn_stale = None
     print("[wifi] connecting to", ssid)
     _conn_ssid    = ssid
     _conn_t0      = _now()
@@ -1277,7 +1298,7 @@ def connect_cancel():
 
 def connect_poll():
     """Advance the association started by connect_begin()."""
-    global _conn_ssid, _conn_bad, _conn_bad_t0, _conn_result
+    global _conn_ssid, _conn_bad, _conn_bad_t0, _conn_result, _conn_stale
     if _conn_ssid is None:
         return _conn_result
     wlan = _get_wlan()
@@ -1301,9 +1322,18 @@ def connect_poll():
         print("[wifi] associated:", ssid)
         return CONN_OK
     try:
-        bad = classify_status(wlan.status())
+        code = wlan.status()
     except Exception:
-        bad = None
+        code = None
+    bad = classify_status(code)
+    if bad is not None and _conn_stale is not None and code == _conn_stale:
+        # Possibly the previous attempt's reason; only a timeout ends
+        # this attempt, and then it is reported as that reason.
+        stale_bad, bad = bad, None
+    else:
+        stale_bad = None
+        if code != _conn_stale:
+            _conn_stale = None      # driver has moved on: trust new codes
     fail = None
     if bad is None:
         _conn_bad = None
@@ -1312,7 +1342,7 @@ def connect_poll():
     elif time.ticks_diff(now, _conn_bad_t0) >= _BAD_HOLD_MS:
         fail = bad
     if fail is None and time.ticks_diff(now, _conn_t0) > _conn_timeout:
-        fail = CONN_TIMEOUT
+        fail = stale_bad or CONN_TIMEOUT
     if fail is None:
         return CONN_BUSY
     print("[wifi] connect %s: %s" % (fail, _conn_ssid))
@@ -1448,11 +1478,11 @@ def auto_tick():
         _auto_queue = pick_candidates(saved, visible, _auto_tried)
         if _auto_try_next():
             return False
-        _auto_state = AUTO_FAIL
-        _auto_refresh = False
         if not saved:
             # Nothing to join: power down like the old boot path did.
             radio_off()
+        _auto_state = AUTO_FAIL
+        _auto_refresh = False
         return False
 
     if _auto_state == AUTO_DONE and _auto_refresh:

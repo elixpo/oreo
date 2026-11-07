@@ -175,6 +175,35 @@ class ConnectStateTest(unittest.TestCase):
         self.assertEqual(w.connect_poll(), w.CONN_BAD_PW)
         self.assertIsNone(w.connect_target())
 
+    def test_stale_failure_from_previous_attempt_is_ignored(self):
+        # The ESP32 port keeps the last disconnect reason until the next
+        # disconnect event or GOT_IP, so a healthy retry still reads 202.
+        w = self.w
+        self.wlan.status_code = 202
+        w.connect_begin("Home", "right")
+        for _ in range(5):
+            self.clock.ms += 1000
+            self.assertEqual(w.connect_poll(), w.CONN_BUSY)
+        self.wlan.connected = True
+        self.assertEqual(w.connect_poll(), w.CONN_OK)
+
+    def test_stale_failure_reported_at_timeout(self):
+        w = self.w
+        self.wlan.status_code = 202
+        w.connect_begin("Home", "still-wrong", timeout_ms=5000)
+        self.clock.ms += 5001
+        self.assertEqual(w.connect_poll(), w.CONN_BAD_PW)
+
+    def test_new_failure_after_stale_code_changes(self):
+        w = self.w
+        self.wlan.status_code = 201
+        w.connect_begin("Home", "bad")
+        self.assertEqual(w.connect_poll(), w.CONN_BUSY)
+        self.wlan.status_code = 202
+        self.assertEqual(w.connect_poll(), w.CONN_BUSY)
+        self.clock.ms += 3000
+        self.assertEqual(w.connect_poll(), w.CONN_BAD_PW)
+
     def test_timeout(self):
         w = self.w
         w.connect_begin("Home", "pw", timeout_ms=5000)
@@ -236,6 +265,19 @@ class AutoConnectTest(unittest.TestCase):
         self.wlan.status_code = 1001
         self.wlan.connected = True
         self.assertTrue(self.tick())
+
+    def test_radio_off_stops_auto_connect(self):
+        w = self.w
+        w.add_saved("Home", "pw", priority=1)
+        w._mark_last("Home")
+        w.auto_begin()
+        self.assertEqual(w.auto_state(), w.AUTO_TRY)
+        w.radio_off()
+        self.assertIsNone(w.connect_target())
+        self.tick(100)
+        self.assertFalse(self.wlan.active())
+        self.assertEqual(self.wlan.connect_calls, ["Home"])
+        self.assertEqual(self.wlan.scans, 0)
 
     def test_no_saved_networks_scans_and_powers_down(self):
         w = self.w
