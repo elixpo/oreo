@@ -396,7 +396,9 @@ class App(oreoOS.App):
             # Compact the list in place (no per-frame list allocation).
             enemies = self._enemies
             keep = 0
+            i = -1
             for e in enemies:
+                i += 1
                 e.y += (self._scroll_v + ENEMY_SELF_V) * dt
                 if e.y > PLAY_BOT:
                     self._score += 1
@@ -408,6 +410,9 @@ class App(oreoOS.App):
                         < HIT_HALF_X
                     and abs((e.y + ENEMY_H // 2) - (PLAYER_Y + CAR_H // 2))
                         < (CAR_H + ENEMY_H) // 2 - HIT_SLACK_PX):
+                    # Close the hole left by compaction so the frozen
+                    # crash scene holds each car exactly once.
+                    del enemies[keep:i]
                     self._on_crash()
                     return
                 enemies[keep] = e
