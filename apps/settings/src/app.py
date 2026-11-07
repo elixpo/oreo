@@ -244,7 +244,8 @@ class App(oreoOS.App):
     # WiFi / Bluetooth. The summary string gives a glanceable status.
     def _open_gestures(self):
         try:
-            self._os.launch("gestures")
+            from oreoOS import store
+            store.open_app(self._os, "gestures")
         except Exception:
             pass
 
@@ -307,7 +308,8 @@ class App(oreoOS.App):
 
     def _open_bt(self):
         try:
-            self._os.launch("bt")
+            from oreoOS import store
+            store.open_app(self._os, "bt")
         except Exception:
             pass
 
