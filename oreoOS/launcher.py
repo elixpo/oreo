@@ -210,6 +210,20 @@ def run_app(os_obj, app):
     next_repeat_ms = {b: 0 for b in AUTOREPEAT_BUTTONS}
     last_c_ms = None    # previous C press, for the double-tap panel gesture
 
+    # Timing (oreoOS.perf, read from the REPL) and the background network
+    # service (oreoOS.netsvc). Both are optional: a failed import leaves
+    # the loop as it was.
+    try:
+        from oreoOS import perf as _perf
+    except Exception:
+        _perf = None
+    try:
+        from oreoOS import netsvc as _net
+    except Exception:
+        _net = None
+    app_name = getattr(app, "name", "")
+    prev_work_ms = 0    # previous frame's cost: bounds a latched press's delay
+
     app.on_enter(os_obj)
     last = time.ticks_ms()
     try:
@@ -230,6 +244,8 @@ def run_app(os_obj, app):
                 for b in api.BUTTONS:
                     if os_obj.buttons.just_pressed(b):
                         if pm: pm.note_event()
+                        if _perf is not None:
+                            _perf.press(prev_work_ms)
 
                         # Pair-confirm prompt has top priority — when an
                         # SMP numeric comparison is in flight, NOTHING
@@ -388,6 +404,16 @@ def run_app(os_obj, app):
                     os_obj.display.present()
                     present_hook(time.ticks_diff(
                         time.ticks_us(), present_start_us))
+                if not getattr(os_obj, "_home_marked", False):
+                    # The first OS frame is on the panel (after the swipe,
+                    # or without one if the splash failed): start the
+                    # quiet window (#119).
+                    os_obj._home_marked = True
+                    _bc("first frame shown")
+                    if _perf is not None:
+                        _perf.home_shown()
+                    if _net is not None:
+                        _net.home_shown()
                 frame_errs = 0
             except Exception as e:
                 # A failed first frame keeps the swipe pending for the next
@@ -469,22 +495,30 @@ def run_app(os_obj, app):
             # duration of the upload (fine for sub-second photo
             # transfers; we'll move to a background worker later if
             # uploads ever grow above a few hundred KB).
+            #
+            # Wi-Fi auto-connect, keep-alive and the on-link-up jobs live
+            # in netsvc (#118): it only polls here; the clock sync runs on
+            # its worker thread and nothing starts in the quiet window
+            # after boot.
+            net_ms = 0
             if not realtime:
-                # Boot WiFi auto-connect runs here, not in boot(), so the
-                # splash -> home hand-off never waits for the radio.
-                try:
-                    from oreoWare import wifi as _wifi
-                    if _wifi.auto_tick():
-                        _on_wifi_up(os_obj)
-                except Exception:
-                    pass
+                net_t0 = time.ticks_ms()
+                if _net is not None:
+                    try:
+                        _net.tick(app_name)
+                    except Exception:
+                        pass
                 try:
                     from oreoOS import http_server as _hs
                     _hs.tick()
                 except Exception:
                     pass
+                net_ms = time.ticks_diff(time.ticks_ms(), net_t0)
 
             elapsed = time.ticks_diff(time.ticks_ms(), now)
+            prev_work_ms = elapsed
+            if _perf is not None:
+                _perf.frame(elapsed, net_ms)
             frame_floor = 1 if realtime else FRAME_MIN_MS
             if elapsed < frame_floor:
                 time.sleep_ms(frame_floor - elapsed)
@@ -650,7 +684,10 @@ def _bc(tag):
     in the run-loop hot path.
     """
     try:
-        print("[boot %d] %s" % (time.ticks_ms(), tag))
+        t = time.ticks_ms()
+        print("[boot %d] %s" % (t, tag))
+        from oreoOS import perf
+        perf.mark(tag, t)
     except Exception:
         pass
 
@@ -665,24 +702,75 @@ class _NoSplash:
     def pump(self):
         return False
 
-    def finish(self):
-        pass
+    def finish(self, settled=None, cap_ms=6000):
+        # No splash on screen: still give Wi-Fi a moment to start
+        # associating, but never hold boot past cap_ms.
+        if settled is None:
+            return
+        t0 = time.ticks_ms()
+        try:
+            while (not settled() and
+                   time.ticks_diff(time.ticks_ms(), t0) < cap_ms):
+                time.sleep_ms(20)
+        except Exception:
+            pass
 
 
-def _on_wifi_up(os_obj):
-    """Called once by the run loop when boot auto-connect gets an IP:
-    open the LAN file-transfer listener and sync the clock."""
-    _bc("wifi up")
+SAFE_HOLD_MS = 300      # HOME must stay down this long to mean safe mode
+
+
+def _safe_boot_requested(buttons, hold_ms=SAFE_HOLD_MS):
+    """True when HOME is held while the badge boots (safe mode).
+
+    HOME is GPIO9, not a strapping pin, so holding it at power-on does not
+    put the ESP32-S3 in download mode. The press is read once, then again
+    after hold_ms so a bounce or a stray tap does not count. Reading it
+    through update() also consumes the press edge, so Home does not see a
+    HOME press on its first frame."""
     try:
-        from oreoOS import http_server as _hs
-        _hs.start(os_obj)
+        buttons.update()
+        if not buttons.is_pressed(api.BTN_HOME):
+            return False
+        t0 = time.ticks_ms()
+        while time.ticks_diff(time.ticks_ms(), t0) < hold_ms:
+            time.sleep_ms(20)
+            buttons.update()
+            if not buttons.is_pressed(api.BTN_HOME):
+                return False
+        return True
+    except Exception:
+        return False
+
+
+def _warm_up(os_obj):
+    """Do behind the splash what the first frames would otherwise pay for
+    (#119): import the modules the run loop uses, build its singletons,
+    and load Home's wallpaper and dock icon into their caches."""
+    try:
+        from oreoOS import notif_panel, pair_prompt
+        notif_panel.get(os_obj)
+        pair_prompt.get(os_obj)
+    except Exception as e:
+        _bc("warm panel FAILED: %s" % e)
+    try:
+        if getattr(os_obj, "_power", None) is None:
+            from oreoOS.power import PowerManager
+            os_obj._power = PowerManager(os_obj)
     except Exception:
         pass
+    for mod in ("oreoOS.http_server", "oreoOS.ota", "oreoOS.netsvc",
+                "oreoOS.perf"):
+        try:
+            __import__(mod)
+        except Exception:
+            pass
     try:
-        from oreoOS import timeutil
-        timeutil.sync_from_ntp()
-    except Exception as e:
-        _bc("ntp sync FAILED: %s" % e)
+        from oreoOS import home as _home
+        _home._get_scaled_bg()
+        _home._load_apps_icon()
+    except Exception:
+        pass
+    gc.collect()
 
 
 def boot():
@@ -697,6 +785,12 @@ def boot():
     # machine.reset() after apply to guarantee the new drivers boot fresh.
     os_obj = OS()
     _bc("OS() constructed")
+    # Safe mode: HOME held while booting skips Wi-Fi and Bluetooth
+    # auto-start for this boot (the crash screen in entry.py points here).
+    safe = _safe_boot_requested(os_obj.buttons)
+    os_obj._safe_mode = safe
+    if safe:
+        _bc("SAFE MODE (HOME held): Wi-Fi and BT auto-start skipped")
     # Every boot starts at full brightness; the panel and Settings adjust it
     # for the session (both through _last_brightness), and the splash fades
     # back up to it.
@@ -753,54 +847,30 @@ def boot():
         splash = _NoSplash()
     _bc("splash intro done")
 
-    # Start WiFi and BT after splash. Two safety gates so a weak supply
-    # (e.g. powered from an FTDI's onboard 3V3 LDO @ ~100 mA) doesn't brown
-    # the chip out when the radio first powers up:
-    #   1. honour secrets.WIFI_AUTO_CONNECT — user can flip to False to
-    #      keep WiFi off entirely
-    #   2. skip WiFi for one boot after a brownout reset, so the device
-    #      can at least reach the home screen
-    wifi_ok_to_try = True
-    try:
-        from secrets import WIFI_AUTO_CONNECT
-        if not WIFI_AUTO_CONNECT:
-            wifi_ok_to_try = False
-    except Exception:
-        pass
-    # Settings -> WiFi -> Auto-connect (previously stored but never read).
-    try:
-        if not os_obj.settings_get("wifi_autoconnect", True):
-            wifi_ok_to_try = False
-    except Exception:
-        pass
-    try:
-        import machine
-        # MicroPython exposes BROWNOUT_RESET on most ports; treat unknown
-        # constants as "not a brownout" so this stays portable.
-        if hasattr(machine, "BROWNOUT_RESET"):
-            if machine.reset_cause() == machine.BROWNOUT_RESET:
-                wifi_ok_to_try = False
-    except Exception:
-        pass
+    # Start Wi-Fi and BT behind the splash. netsvc.begin() applies the
+    # Wi-Fi gates: secrets.WIFI_AUTO_CONNECT, Settings -> WiFi ->
+    # Auto-connect, one Wi-Fi-free boot after a brownout reset (a weak
+    # supply can still reach Home), and safe mode. Joining is
+    # non-blocking: the splash only waits for the association to start.
     splash.progress(0.2)
-
     try:
-        from oreoWare import wifi, bt
-        if wifi_ok_to_try:
-            # Non-blocking: joins the last-good network (or scans first)
-            # while Home is already on screen. run_app() ticks it and
-            # calls _on_wifi_up() once the badge has an IP.
-            _bc("wifi.auto_begin")
-            wifi.auto_begin()
-        else:
-            _bc("wifi skipped")
-        splash.progress(0.7)
-        _bc("bt.init_from_config begin")
-        bt.init_from_config()
-        _bc("bt.init_from_config done")
-        splash.progress(0.85)
+        from oreoOS import netsvc
+        _bc("wifi: %s" % netsvc.begin(os_obj, safe=safe))
     except Exception as e:
-        _bc("wifi/bt block FAILED: %s" % e)
+        netsvc = None
+        _bc("wifi block FAILED: %s" % e)
+    splash.progress(0.7)
+    if safe:
+        _bc("bt skipped (safe mode)")
+    else:
+        try:
+            from oreoWare import bt
+            _bc("bt.init_from_config begin")
+            bt.init_from_config()
+            _bc("bt.init_from_config done")
+        except Exception as e:
+            _bc("bt block FAILED: %s" % e)
+    splash.progress(0.85)
     # Build the first Home while the greeting is still rolling, so the
     # splash covers that loading too and hands straight over to Home.
     first = None
@@ -809,7 +879,20 @@ def boot():
         first = (apps, Home(apps))
     except Exception as e:
         _bc("first home FAILED: %s" % e)
-    splash.finish()
+    _warm_up(os_obj)
+    _bc("warm-up done")
+    if safe:
+        try:
+            from oreoOS import notifications
+            notifications.push("system", "Safe mode",
+                               "Wi-Fi and BT not started", target="wifi")
+        except Exception:
+            pass
+    # Keep the splash until boot has settled (Wi-Fi association started,
+    # driven from here while we wait), capped at splash.MAX_TOTAL_MS.
+    settled = netsvc.boot_settled if netsvc is not None else None
+    splash.finish(settled)
+    _bc("splash done")
     del splash
     gc.collect()
     _bc("entering main loop")
