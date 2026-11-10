@@ -241,15 +241,16 @@ strings "$MICROPY_IMAGE" | grep -F 'Oreo Badge' >/dev/null || fail \
   "Oreo Badge board identity is missing from the image"
 # A build directory configured before the 16 MiB layout keeps its old
 # sdkconfig; rebuild with --clean if this fails.
-# The table is 32-byte entries (magic 0xAA50, type, subtype, offset, size,
-# 16-byte name, flags); vfs must exist and reach the end of the 16 MiB flash.
+# The table is 32-byte entries (magic bytes AA 50, type, subtype, offset,
+# size, 16-byte name, flags); vfs must exist and reach the end of the 16 MiB
+# flash. Fields are little-endian, so the magic reads as 0x50AA.
 python3 - "$BUILD_DIR/partition_table/partition-table.bin" <<'PY' || fail \
   "partition table has no vfs partition reaching the end of 16 MiB (stale build config: rerun with --clean)"
 import struct, sys
 data = open(sys.argv[1], "rb").read()
 for i in range(0, len(data) - 31, 32):
     magic, _, _, offset, size, name, _ = struct.unpack("<HBBII16sI", data[i:i + 32])
-    if magic == 0xAA50 and name.rstrip(b"\0") == b"vfs":
+    if magic == 0x50AA and name.rstrip(b"\0") == b"vfs":
         sys.exit(0 if offset + size == 0x1000000 else 1)
 sys.exit(1)
 PY
