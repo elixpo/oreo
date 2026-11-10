@@ -2,6 +2,7 @@
 
 Everything in this folder is here for one of three audiences:
 
+- **People who have a badge** → start with [`USB.md`](USB.md): connect it, open the REPL, copy files
 - **People who want to build the badge** → start with [`HARDWARE.md`](HARDWARE.md)
 - **People who want to copy the design** → start with [`DATASHEET.md`](DATASHEET.md)
 - **People who want to read the dev journal** → the per-subsystem `.md` files (lcd, buttons, breadboard BOM, badge layout)
@@ -16,6 +17,7 @@ point — not this folder.
 
 | File | What it covers | Audience |
 |---|---|---|
+| [`USB.md`](USB.md) | Using the badge from a computer: which USB-C port, REPL, copying files, Send Files over Wi-Fi, deploying, flashing, troubleshooting | Everyone with a badge |
 | [`HARDWARE.md`](HARDWARE.md) | Narrative build guide — BOM, pinout, power, wake-from-sleep, soldering tips | Anyone building or repairing the badge |
 | [`DATASHEET.md`](DATASHEET.md) | Formal specs — electrical, mechanical, communication interfaces, component reference | Someone designing a PCB or porting OreoOS |
 | [`BADGE_LAYOUT.md`](BADGE_LAYOUT.md) | Mechanical layout drawings + dimensions | PCB designers, case-makers |
