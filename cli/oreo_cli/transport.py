@@ -53,6 +53,7 @@ class SerialLink:
         self.baudrate = baudrate
         self.t = None
         self._have_prompt = False   # we already read the raw REPL '>' prompt
+        self._busy = False          # code sent (or being sent) and not finished
         self.mounted = False
 
     # ── lifecycle ────────────────────────────────────────────────────
@@ -78,6 +79,7 @@ class SerialLink:
             raise OreoError("the badge did not answer on %s (%s)" % (self.device, e),
                             hint="unplug and replug the badge, then run `oreo doctor`")
         self._have_prompt = False
+        self._busy = False
 
     def close(self):
         if self.t is None:
@@ -93,6 +95,8 @@ class SerialLink:
         if self.t is None:
             return
         try:
+            if self._busy and self.t.in_raw_repl:
+                self._recover()
             if self.mounted:
                 try:
                     if self.t.in_raw_repl:
@@ -120,6 +124,29 @@ class SerialLink:
             pass
         finally:
             self.close()
+
+    def _recover(self, quiet=0.15, limit=2.0):
+        """Back to a clean raw REPL prompt after an exec was cut short (Ctrl-C
+        on the host, a timeout) while the badge was still reading the code
+        or running it.
+
+        Ctrl-C ends a raw paste without compiling it, interrupts running
+        code, or clears a half-sent line in the plain raw REPL. Without it
+        the bytes restart() sends next would be read as more of the paste,
+        and the soft reset would never happen."""
+        ser = self.t.serial
+        ser.write(b"\x03\x03")
+        start = last = time.monotonic()
+        while time.monotonic() - last < quiet and time.monotonic() - start < limit:
+            n = ser.inWaiting()
+            if n:
+                ser.read(n)
+                last = time.monotonic()
+            else:
+                time.sleep(0.01)
+        self.t.enter_raw_repl(soft_reset=False)   # ctrl-A: banner + '>' again
+        self._have_prompt = False
+        self._busy = False
 
     # ── raw REPL execution ───────────────────────────────────────────
     def _resync(self):
@@ -199,10 +226,14 @@ class SerialLink:
     def exec(self, code, timeout=15, consumer=None):
         if self.t is None or not self.t.in_raw_repl:
             self.enter()
+        elif self._busy:     # the previous exec was cut short (Ctrl-C)
+            self._recover()
         if isinstance(code, str):
             code = code.encode("utf-8")
+        self._busy = True
         self._send(code)
         out, err = self._follow(timeout, consumer)
+        self._busy = False
         if err:
             text = err.decode("utf-8", "replace")
             last = text.strip().splitlines()[-1] if text.strip() else "error"

@@ -216,8 +216,9 @@ oreo rm -r /apps/myapp               # asks first
 - `push` checks free space before writing anything. Each file is written to
   a temporary `.part` file, renamed into place, then checked by size and
   SHA-256 (`--no-verify` skips the hash).
-- `rm` refuses OreoOS's own files (`/oreoOS`, `/oreoWare`, `/main.py`, the
-  built-in apps, ...) unless you add `--force`; removing them can stop the
+- `rm` refuses OreoOS's own files (`/oreoOS`, `/oreoWare`, `/assets`, the
+  built-in apps, `/main.py`, `/secrets.py`, `/wifi.json`, ...) and anything
+  inside those folders unless you add `--force`; removing them can stop the
   badge booting.
 
 ### `oreo add` — photos, videos and documents

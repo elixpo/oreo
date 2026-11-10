@@ -131,5 +131,75 @@ class RestartTest(unittest.TestCase):
         self.assertEqual(self.fake.restarts, ["soft"])
 
 
+class NonUtf8OutputTest(unittest.TestCase):
+    """A Windows pipe or redirect is cp1252, not UTF-8: the marks and rich's
+    rules must not crash a command there (the release smoke test runs
+    `oreo devs` that way and expects exit code 3)."""
+
+    def _cp1252(self):
+        return io.TextIOWrapper(io.BytesIO(), encoding="cp1252", newline="\n")
+
+    def _restore_marks(self):
+        from oreo_cli import ui
+        saved = {k: getattr(ui, k) for k in ui._ASCII_MARKS}
+        self.addCleanup(lambda: [setattr(ui, k, v) for k, v in saved.items()])
+
+    def test_devs_on_cp1252_stdout(self):
+        import sys
+        from unittest import mock
+        from oreo_cli.main import main
+        self._restore_marks()
+        out, err = self._cp1252(), self._cp1252()
+        with mock.patch.object(sys, "stdout", out), mock.patch.object(sys, "stderr", err):
+            rc = main(["--no-color", "devs"], comports=lambda: [])
+            out.flush()
+        self.assertEqual(rc, 3)
+        text = out.buffer.getvalue().decode("cp1252")
+        self.assertIn("no badge connected", text)
+        self.assertIn("* oreo", text)            # ASCII brand mark
+
+    def test_doctor_marks_on_cp1252_stdout(self):
+        import sys
+        from unittest import mock
+        from oreo_cli import ui
+        self._restore_marks()
+        out = self._cp1252()
+        self.assertTrue(ui.adapt_stdio((out, None)))
+        self.assertEqual(ui.MARK_OK, "+")
+        u = ui.UI(file=out, color=False, width=80)
+        u.header("doctor")
+        u.ok("fine \u2713 \u2582\u2584")     # anything else unencodable becomes '?'
+        u.error("bad")
+        out.flush()
+        text = out.buffer.getvalue().decode("cp1252")
+        self.assertIn("+ fine ? ??", text)
+        self.assertIn("x bad", text)
+
+    def test_utf8_stdout_keeps_the_marks(self):
+        from oreo_cli import ui
+        self._restore_marks()
+        out = io.TextIOWrapper(io.BytesIO(), encoding="utf-8")
+        self.assertFalse(ui.adapt_stdio((out, out)))
+        self.assertEqual(ui.MARK_OK, "\u2713")
+
+    def test_cli_process_with_cp1252_pipe(self):
+        """What CI's Windows smoke job does, on any OS."""
+        import os
+        import subprocess
+        import sys
+        try:
+            import serial.tools.list_ports  # noqa: F401
+        except ImportError:
+            self.skipTest("pyserial is not installed")
+        cli_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        env = dict(os.environ, PYTHONIOENCODING="cp1252",
+                   PYTHONPATH=cli_dir + os.pathsep + os.environ.get("PYTHONPATH", ""))
+        env.pop("OREO_PORT", None)
+        p = subprocess.run([sys.executable, "-m", "oreo_cli", "--no-color", "devs"],
+                           env=env, capture_output=True, timeout=60)
+        self.assertNotIn(b"Traceback", p.stderr + p.stdout)
+        self.assertIn(p.returncode, (0, 3), p.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -21,6 +21,7 @@ from oreo_cli.badge import Badge
 REPO = Path(__file__).resolve().parents[2]
 WIFI = REPO / "oreoWare" / "wifi.py"
 STORAGE = REPO / "oreoOS" / "storage.py"
+STORE = REPO / "oreoOS" / "store.py"
 
 
 class FakeWLAN:
@@ -158,6 +159,22 @@ class RealStorageContractTest(unittest.TestCase):
         self.assertEqual(buckets["gallery"]["bytes"], 1000)
         self.assertEqual(buckets["documents"]["bytes"], 300)
         self.assertGreater(info["storage"]["stats"]["free"], 0)
+
+
+@unittest.skipUnless(STORE.exists(), "not inside an OreoOS checkout")
+class DefaultAppsContractTest(unittest.TestCase):
+    def test_rm_protects_exactly_the_built_in_apps(self):
+        import ast
+        from oreo_cli import commands
+        tree = ast.parse(STORE.read_text(encoding="utf-8"))
+        found = None
+        for node in tree.body:
+            if isinstance(node, ast.Assign) and any(
+                    isinstance(t, ast.Name) and t.id == "DEFAULT_APPS" for t in node.targets):
+                found = ast.literal_eval(node.value)
+        self.assertIsNotNone(found, "DEFAULT_APPS not found in oreoOS/store.py")
+        self.assertEqual(sorted(commands.DEFAULT_APPS), sorted(found))
+        self.assertEqual(len(set(commands.DEFAULT_APPS)), len(commands.DEFAULT_APPS))
 
 
 if __name__ == "__main__":

@@ -148,5 +148,63 @@ class AddCommandTest(unittest.TestCase):
         self.assertFalse(small.exists("/documents/notes.txtz"))
 
 
+# Stands in for ffmpeg: floods stderr well past a pipe's buffer before it
+# writes a single frame, as ffmpeg does with a damaged file.
+NOISY_FFMPEG = r"""
+import sys
+for i in range(4000):
+    sys.stderr.write("[h264 @ 0x55] error while decoding MB %d 7, bytestream -5\n" % i)
+sys.stderr.flush()
+frame = bytes(8 * 6 * 2)
+sys.stdout.buffer.write(frame * 3)
+"""
+
+
+class FfmpegPipeTest(unittest.TestCase):
+    def test_lots_of_ffmpeg_errors_do_not_hang(self):
+        import subprocess
+        import sys
+        import threading
+        real_popen = subprocess.Popen
+        seen = {}
+
+        def popen(cmd, **kw):
+            seen["cmd"] = cmd
+            return real_popen([sys.executable, "-c", NOISY_FFMPEG], **kw)
+        result = {}
+
+        def work():
+            try:
+                result["blob"] = media.encode_video("bad.mp4", seconds=0.3, fps=10,
+                                                    width=8, height=6)
+            except BaseException as e:   # pragma: no cover - reported below
+                result["error"] = e
+        with mock.patch.object(media, "have_ffmpeg", return_value=True), \
+                mock.patch.object(media.subprocess, "Popen", side_effect=popen):
+            t = threading.Thread(target=work, daemon=True)
+            t.start()
+            t.join(20)
+        self.assertFalse(t.is_alive(), "encode_video hung on a full stderr pipe")
+        self.assertNotIn("error", result, result.get("error"))
+        blob = result["blob"]
+        self.assertEqual(struct.unpack_from("<H", blob, 10)[0], 3)
+        self.assertIn("-nostdin", seen["cmd"])
+
+    def test_ffmpeg_failure_shows_its_last_error(self):
+        import subprocess
+        import sys
+        real_popen = subprocess.Popen
+        script = "import sys; sys.stderr.write('a\\nInvalid data found\\n'); sys.exit(1)"
+
+        def popen(cmd, **kw):
+            return real_popen([sys.executable, "-c", script], **kw)
+        with mock.patch.object(media, "have_ffmpeg", return_value=True), \
+                mock.patch.object(media.subprocess, "Popen", side_effect=popen):
+            with self.assertRaises(OreoError) as cm:
+                media.encode_video("bad.mp4", seconds=0.3, fps=10, width=8, height=6)
+        self.assertIn("rc=1", cm.exception.message)
+        self.assertEqual(cm.exception.hint, "Invalid data found")
+
+
 if __name__ == "__main__":
     unittest.main()

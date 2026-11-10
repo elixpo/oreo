@@ -12,7 +12,7 @@ import sys
 from . import __version__, commands, discovery
 from .badge import Badge
 from .errors import Cancelled, OreoError
-from .ui import UI, esc
+from .ui import UI, adapt_stdio, esc
 
 HOME = "https://oreo.elixpo.com/docs"
 
@@ -42,8 +42,9 @@ HELP = {
              "  oreo pull /wifi_seen.json\n"
              "  oreo pull -r /apps/pet ./pet-backup"),
     "rm": ("Remove files from the badge",
-           "Folders need -r. OreoOS's own files (/oreoOS, /oreoWare, /apps,\n"
-           "/main.py, ...) also need --force.\n\n"
+           "Folders need -r. OreoOS's own files and anything inside them\n"
+           "(/oreoOS, /oreoWare, /assets, built-in apps, /main.py, /secrets.py,\n"
+           "/wifi.json, ...) also need --force.\n\n"
            "  oreo rm /documents/old.mdz\n  oreo rm -r /apps/myapp"),
     "add": ("Add a photo, video or document (Gallery / Reader)",
             "Converts the file to the format OreoOS reads, checks it fits, and\n"
@@ -242,6 +243,8 @@ class Ctx:
 
 
 def main(argv=None, ui=None, comports=None, link_factory=None, runner=None):
+    if ui is None:
+        adapt_stdio()   # a non-UTF-8 pipe (Windows) must not crash on the marks
     parser = build_parser()
     argv = sys.argv[1:] if argv is None else list(argv)
     args = parser.parse_args(argv)

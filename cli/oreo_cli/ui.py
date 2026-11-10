@@ -45,6 +45,52 @@ MARK_ERR = "✗"    # ballot x
 MARK_STEP = "→"   # right arrow
 MARK_BRAND = "◆"  # black diamond
 
+# Every kind of non-ASCII character the CLI prints (marks, rich's rules and
+# boxes, the Wi-Fi signal bars, separators). If stdout cannot encode these it
+# is not UTF-8: a Windows pipe or redirect uses the ANSI code page (cp1252).
+_PROBE = "✓✗→◆─│╭▂▄▆█·…"
+_ASCII_MARKS = {"MARK_OK": "+", "MARK_ERR": "x", "MARK_STEP": ">", "MARK_BRAND": "*"}
+
+
+def _can_encode(stream, text=_PROBE):
+    enc = getattr(stream, "encoding", None) or "ascii"
+    try:
+        text.encode(enc)
+        return True
+    except (UnicodeError, LookupError):
+        return False
+
+
+def adapt_stdio(streams=None):
+    """Make output safe on a terminal or pipe that is not UTF-8.
+
+    Without this, printing a mark raises UnicodeEncodeError and the command
+    dies (`oreo devs > out.txt` on Windows). A stream that cannot encode the
+    marks gets errors="replace", so no character can crash a command, and
+    if stdout is one of them the marks switch to ASCII so ok/error lines
+    still read. Returns True if it changed anything.
+    """
+    if streams is None:
+        streams = (sys.stdout, sys.stderr)
+    changed = False
+    for i, stream in enumerate(streams):
+        if stream is None or _can_encode(stream):
+            continue
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            try:
+                reconfigure(errors="replace")
+            except Exception:
+                pass
+        if i == 0:
+            use_ascii_marks()
+        changed = True
+    return changed
+
+
+def use_ascii_marks():
+    globals().update(_ASCII_MARKS)
+
 _TAG = re.compile(r"\[/?[a-zA-Z#][^\[\]]*\]")
 
 

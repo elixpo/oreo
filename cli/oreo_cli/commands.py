@@ -8,7 +8,8 @@ from pathlib import Path
 from . import discovery, doctor as doctor_mod, media, repo
 from .badge import PROTECTED, norm
 from .errors import Cancelled, OreoError
-from .ui import MARK_ERR, MARK_OK, esc, human
+from . import ui as ui_mod
+from .ui import esc, human
 
 HANDLERS = {}
 
@@ -308,15 +309,32 @@ def cmd_pull(ctx):
         ui.ok("saved %d file(s) under %s" % (len(jobs), esc(local)))
 
 
-def is_protected(path):
-    p = norm(path)
-    return p in PROTECTED or any(p.startswith(x + "/") for x in ("/oreoOS", "/oreoWare")) \
-        or (p.startswith("/apps/") and p.count("/") == 2 and p.split("/")[2] in DEFAULT_APPS)
+# Folders whose whole contents belong to OreoOS: removing anything inside
+# them can stop the badge booting. "/" and "/apps" themselves are protected
+# (see badge.PROTECTED) but not everything under them, so `oreo rm -r
+# /apps/myapp` or `oreo rm /documents/x` still works without --force.
+SYSTEM_TREES = ("/oreoOS", "/oreoWare", "/assets")
+# Single files OreoOS needs or keeps the owner's settings in.
+SYSTEM_FILES = ("/secrets.py", "/wifi.json")
 
-
-# Built-in apps: keep in step with DEFAULT_APPS in oreoOS/store.py.
+# Built-in apps: must equal DEFAULT_APPS in oreoOS/store.py (a contract
+# test in cli/tests/test_contract.py checks this inside the repo).
 DEFAULT_APPS = ("about", "badge", "commits", "gallery", "gamepad", "identity", "reader",
                 "settings", "store", "storage", "launcher", "updates", "wifi")
+
+
+def _inside(p, root):
+    return p == root or p.startswith(root + "/")
+
+
+def is_protected(path):
+    p = norm(path)
+    if p in PROTECTED or p in SYSTEM_FILES:
+        return True
+    if any(_inside(p, x) for x in SYSTEM_TREES):
+        return True
+    parts = p.split("/")
+    return len(parts) >= 3 and parts[1] == "apps" and parts[2] in DEFAULT_APPS
 
 
 @command("rm")
@@ -633,8 +651,8 @@ def cmd_flash(ctx):
 def cmd_doctor(ctx):
     ui = ctx.ui
     ui.header("doctor")
-    marks = {doctor_mod.OK: "[ok]%s[/]" % MARK_OK, doctor_mod.WARN: "[warn]![/]",
-             doctor_mod.FAIL: "[err]%s[/]" % MARK_ERR}
+    marks = {doctor_mod.OK: "[ok]%s[/]" % ui_mod.MARK_OK, doctor_mod.WARN: "[warn]![/]",
+             doctor_mod.FAIL: "[err]%s[/]" % ui_mod.MARK_ERR}
     worst = doctor_mod.OK
     for status, title, msg, hint in doctor_mod.run_checks(
             ctx.args.port or os.environ.get("OREO_PORT"), ctx.comports,

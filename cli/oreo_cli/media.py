@@ -16,6 +16,7 @@ proxy for stored size.
 import shutil
 import struct
 import subprocess
+import tempfile
 import zlib
 from pathlib import Path
 
@@ -135,30 +136,39 @@ def encode_video(source, seconds=10.0, fps=24, width=180, height=135, start=0.0,
     frame_size = width * height * 2
     vf = ("fps=%d,scale=%d:%d:force_original_aspect_ratio=increase:"
           "flags=lanczos,crop=%d:%d,format=rgb565be" % (fps, width, height, width, height))
-    cmd = ["ffmpeg", "-v", "error", "-ss", str(start), "-i", str(source),
+    cmd = ["ffmpeg", "-nostdin", "-nostats", "-v", "error", "-ss", str(start), "-i", str(source),
            "-t", str(seconds), "-an", "-vf", vf, "-pix_fmt", "rgb565be",
            "-f", "rawvideo", "-"]
     expected = max(1, int(seconds * fps))
     out = bytearray(b"RV5\x06" + struct.pack("<HHBBH", width, height, fps, 0, 0))
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    frames = 0
-    try:
-        while True:
-            frame = _read_exact(proc.stdout, frame_size)
-            if not frame:
-                break
-            if len(frame) != frame_size:
-                raise OreoError("ffmpeg returned a partial frame")
-            packed = zlib.compress(frame, 1)
-            out += struct.pack("<I", len(packed)) + packed
-            frames += 1
-            if progress:
-                progress(frames, expected)
-    finally:
-        if proc.stdout:
-            proc.stdout.close()
-    err = proc.stderr.read().decode("utf-8", "replace") if proc.stderr else ""
-    rc = proc.wait()
+    # ffmpeg's errors go to a temporary file, not a pipe: a damaged video
+    # can print more than a pipe holds (about 64 KiB) before stdout ends,
+    # and ffmpeg would then block on stderr while we block on stdout.
+    with tempfile.TemporaryFile() as errfile:
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=errfile)
+        frames = 0
+        try:
+            while True:
+                frame = _read_exact(proc.stdout, frame_size)
+                if not frame:
+                    break
+                if len(frame) != frame_size:
+                    raise OreoError("ffmpeg returned a partial frame")
+                packed = zlib.compress(frame, 1)
+                out += struct.pack("<I", len(packed)) + packed
+                frames += 1
+                if progress:
+                    progress(frames, expected)
+        except BaseException:
+            proc.kill()
+            proc.wait()
+            raise
+        finally:
+            if proc.stdout:
+                proc.stdout.close()
+        rc = proc.wait()
+        errfile.seek(0)
+        err = errfile.read().decode("utf-8", "replace")
     if rc != 0 or frames == 0:
         raise OreoError("ffmpeg could not convert %s (rc=%d, frames=%d)"
                         % (Path(source).name, rc, frames),

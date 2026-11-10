@@ -26,7 +26,8 @@ problems with `oreo doctor` output attached.
 - Files: `oreo ls`, `push` (folders with `-r`), `pull` and `rm`. Pushes go
   to a temporary `.part` file, are renamed into place and checked by size
   and SHA-256; free space is checked first. `rm` refuses OreoOS's own files
-  without `--force`, and `rm -r` asks first.
+  and anything inside its folders (`/oreoOS`, `/oreoWare`, `/assets`, the
+  built-in apps) without `--force`, and `rm -r` asks first.
 - `oreo add`: photos and videos into the Gallery (`.rz565` / `.rv565`),
   `.md` / `.txt` into the Reader (`.mdz` / `.txtz`), after a space check.
   Videos need `ffmpeg`.
@@ -44,7 +45,10 @@ problems with `oreo doctor` output attached.
   checkout's `./deploy`; erasing always asks first.
 - The interactive view (`oreo` with no command): status, files, apps,
   Wi-Fi, media and shell.
-- OreoOS is restarted after every command (`--reset soft|hard|none`).
+- OreoOS is restarted after every command (`--reset soft|hard|none`),
+  also when the command is stopped with Ctrl-C.
+- Output falls back to ASCII marks on a console or pipe that is not UTF-8
+  (for example a redirect on Windows) instead of crashing.
 - Release packaging: wheel and sdist on GitHub Releases with SHA-256
   checksums and build-provenance attestations, and `install.sh` /
   `install.ps1`, which verify the checksum and install with pipx or uv.

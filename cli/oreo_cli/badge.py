@@ -332,7 +332,7 @@ class Badge:
                 " os.remove(%(d)s)\n"
                 " os.rename(%(t)s,%(d)s)\n"
                 "_e({'size':os.stat(%(d)s)[6]})\n" % {"t": lit(tmp), "d": lit(dest)})
-        except Exception:
+        except BaseException:   # Ctrl-C too: do not leave a .part file behind
             try:
                 self.link.exec("try:\n _f.close()\nexcept Exception:\n pass\n"
                                "try:\n os.remove(%s)\nexcept Exception:\n pass\n" % lit(tmp))

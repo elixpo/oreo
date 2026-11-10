@@ -179,6 +179,38 @@ class FileCommandsTest(unittest.TestCase):
         self.assertEqual(r.rc, 0, r.out)
         self.assertFalse(self.fake.exists("/documents/old"))
 
+    def test_rm_protects_inside_system_folders(self):
+        from oreo_cli.commands import is_protected
+        for p in ("/apps/launcher/main.py", "/apps/settings", "/apps/wifi/ui/x.py",
+                  "/assets", "/assets/fonts", "/assets/fonts/a.bin", "/oreoOS",
+                  "/oreoWare/wifi.py", "/secrets.py", "/wifi.json", "/main.py",
+                  ":apps/store/main.py", "/", "/apps"):
+            self.assertTrue(is_protected(p), p)
+        for p in ("/apps/myapp", "/apps/myapp/main.py", "/apps/launcherx",
+                  "/assetsx", "/documents/a.txt", "/oreoOS.bak", "/wifi_seen.json"):
+            self.assertFalse(is_protected(p), p)
+
+    def test_rm_child_of_builtin_app_needs_force(self):
+        self.fake.put("/apps/launcher/main.py", b"x")
+        self.fake.put("/assets/fonts/a.bin", b"f")
+        for argv in (["rm", "/apps/launcher/main.py"], ["rm", "-r", "/assets/fonts"]):
+            r = run_cli(argv, fake=self.fake)
+            self.assertEqual(r.rc, 1, argv)
+            self.assertIn("belongs to OreoOS", r.out)
+        self.assertTrue(self.fake.exists("/apps/launcher/main.py"))
+        self.assertTrue(self.fake.exists("/assets/fonts/a.bin"))
+        self.assertEqual(self.fake.sent, [])
+        r = run_cli(["--yes", "rm", "--force", "/apps/launcher/main.py"], fake=self.fake)
+        self.assertEqual(r.rc, 0, r.out)
+        self.assertFalse(self.fake.exists("/apps/launcher/main.py"))
+
+    def test_rm_user_app_needs_no_force(self):
+        self.fake.put("/apps/myapp/main.py", b"x")
+        r = run_cli(["rm", "-r", "/apps/myapp"], fake=self.fake, interactive=True,
+                    inputs=["y"])
+        self.assertEqual(r.rc, 0, r.out)
+        self.assertFalse(self.fake.exists("/apps/myapp"))
+
     def test_rm_file(self):
         self.fake.put("/documents/a.txt", b"a")
         r = run_cli(["rm", "/documents/a.txt"], fake=self.fake)
