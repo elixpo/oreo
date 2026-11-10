@@ -158,6 +158,41 @@ class WifiAppTest(unittest.TestCase):
         self.assertIn("Wrong password", self.screen())
         self.assertIn("code 15:4WAY_HANDSHAKE_TIMEOUT", self.screen())
 
+    def test_timeout_does_not_show_neutral_code(self):
+        self.w.add_saved("Slow", "pw", priority=1)
+        self.d.scan_result = [drv.ap("Slow", -50)]
+        self.d.plans["Slow"] = [None]           # attempt never resolves
+        self.open_nearby()
+        self.app._near_sel = 0
+        self.app.on_button_press(self.api.BTN_A)
+        for _ in range(400):
+            self.frame()
+            if self.app._c_state != "busy":
+                break
+        self.assertEqual(self.app._c_state, "timeout")
+        self.assertEqual(self.app._c_code, "")
+        self.assertNotIn("code ", self.screen())
+
+    def test_failed_begin_does_not_show_previous_code(self):
+        self.w._conn_last_code = 15             # left by an earlier join
+        self.d.connect_raises = 2               # this join is refused
+        self.app._start_connect("Home", "pw", "main")
+        self.assertEqual(self.app._c_state, "failed")
+        self.assertEqual(self.app._c_code, "")
+
+    def test_home_mid_join_is_finished_by_auto_tick(self):
+        self.d.plans["Home"] = ["ok"]
+        seq = self.w.link_seq()
+        self.app._start_connect("Home", "pw", "main")
+        self.assertEqual(self.w.connect_target(), "Home")
+        # HOME: the launcher leaves the app; only the run loop ticks now.
+        for _ in range(40):
+            self.clock.ms += 100
+            self.w.auto_tick()
+        self.assertIsNone(self.w.connect_target())
+        self.assertEqual(self.w.link_seq(), seq + 1)
+        self.assertEqual(self.d.conf, 0)        # retry forever again
+
     def test_scan_error_note_names_the_cause(self):
         self.d.plans["Home"] = [None]
         self.w.connect_begin("Home", "pw")      # join holds the radio

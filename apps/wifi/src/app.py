@@ -519,9 +519,12 @@ class App(oreoOS.App):
         self._c_done_ms = time.ticks_ms()
         self._c_code = ""
         if state not in ("ok", "cancelled"):
+            # Only a real disconnect reason is worth showing; a timeout
+            # usually ends on a neutral status (IDLE / CONNECTING).
             try:
                 code = self._wifi.connect_last_code()
-                if code is not None:
+                if (code is not None and
+                        self._wifi.classify_status(code) is not None):
                     self._c_code = "code " + self._wifi.status_name(code)
             except Exception:
                 pass

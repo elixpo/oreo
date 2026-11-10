@@ -364,6 +364,58 @@ class ScanTest(Base):
         self.assertFalse(d.requested)
         self.assertEqual(d.scans, 2)
 
+    def _drop_link(self):
+        """The AP goes away under an established link: the driver's
+        STA_DISCONNECTED handler keeps retrying (reconnects=-1)."""
+        d = self.wlan
+        d.connected = False
+        d.reason = 200                           # BEACON_TIMEOUT
+        d.plan = [200] * 100
+        d._start_attempt()
+
+    def test_scan_during_link_recovery_keeps_driver_retrying(self):
+        w, d = self.w, self.wlan
+        d.plans["Home"] = ["ok"]
+        w.connect_begin("Home", "pw")
+        self.assertEqual(self.poll_until_done(), w.CONN_OK)
+        d.scan_result = [ap("Cafe", -50)]
+        w.scan_start()
+        self.assertEqual(w.scan_poll(), "done")
+        before = list(w.nearby())
+        self._drop_link()
+        self.assertTrue(w.scan_start())
+        self.assertEqual(w.scan_poll(), "error")
+        self.assertEqual(w.scan_error(), "radio busy reconnecting")
+        self.assertTrue(d.requested)             # recovery not stopped
+        self.assertEqual(d.conf, 0)              # still retrying forever
+        self.assertEqual(w.nearby(), before)
+
+    def test_scan_after_link_recovery_from_legacy_connect(self):
+        w, d = self.w, self.wlan
+        d.plans["Home"] = ["ok"]
+        self.assertTrue(w.connect("Home", "pw"))
+        self.assertEqual(d.conf, 0)
+        self._drop_link()
+        w.scan_start()
+        self.assertEqual(w.scan_poll(), "error")
+        self.assertTrue(d.requested)
+
+    def test_deliberate_disconnect_lets_scan_stop_leftover_loop(self):
+        # After the link is replaced on purpose (here: radio toggled off
+        # and on, then an outside connect), a stray loop is ours to stop.
+        w, d = self.w, self.wlan
+        d.plans["Home"] = ["ok"]
+        w.connect_begin("Home", "pw")
+        self.assertEqual(self.poll_until_done(), w.CONN_OK)
+        w.radio_off()
+        d.active(True)
+        d.scan_result = [ap("Cafe", -50)]
+        d.connect("Gone", "pw")
+        d.plan = [201] * 100
+        w.scan_start()
+        self.assertEqual(w.scan_poll(), "done")
+        self.assertFalse(d.requested)
+
     def test_scan_during_join_reports_busy_and_keeps_join(self):
         w, d = self.w, self.wlan
         d.scan_result = [ap("Cafe", -50)]
@@ -497,6 +549,42 @@ class AutoDriverTest(Base):
         w.auto_begin()
         self.assertTrue(self.tick_until(lambda: w.auto_state() == w.AUTO_DONE))
         self.assertEqual([s for s, _ in d.connect_log], ["A", "B"])
+
+    def test_unpolled_manual_join_finished_by_auto_tick(self):
+        w, d = self.w, self.wlan
+        d.plans["Home"] = ["ok"]
+        seq = w.link_seq()
+        w.connect_begin("Home", "pw")
+        w.auto_stop()
+        self.assertEqual(w.auto_state(), w.AUTO_OFF)
+        for _ in range(40):
+            self.clock.ms += 100
+            self.assertFalse(w.auto_tick())
+        self.assertIsNone(w.connect_target())
+        self.assertEqual(d.conf, 0)              # reconnects == -1
+        self.assertEqual(w.link_seq(), seq + 1)
+        self.assertEqual(w.connect_poll(), w.CONN_OK)
+
+    def test_unpolled_manual_join_failure_stops_driver(self):
+        w, d = self.w, self.wlan
+        d.plans["Home"] = [15] * 10
+        w.connect_begin("Home", "wrong")
+        for _ in range(300):
+            self.clock.ms += 100
+            w.auto_tick()
+        self.assertIsNone(w.connect_target())
+        self.assertEqual(w.connect_poll(), w.CONN_BAD_PW)
+        self.assertFalse(d.requested)
+
+    def test_new_join_clears_previous_last_code(self):
+        w, d = self.w, self.wlan
+        d.plans["Home"] = [15, 15, 15]
+        w.connect_begin("Home", "wrong")
+        self.poll_until_done()
+        self.assertEqual(w.connect_last_code(), 15)
+        d.plans["Home"] = [None]
+        w.connect_begin("Home", "right")
+        self.assertIsNone(w.connect_last_code())
 
     def test_adopts_join_already_in_flight(self):
         w, d = self.w, self.wlan

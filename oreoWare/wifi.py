@@ -182,11 +182,12 @@ def radio_off():
     Also stops a pending non-blocking join and the boot auto-connect
     machine; otherwise the next auto_tick() would call connect_begin()
     or scan_start(), both of which power the radio straight back on."""
-    global _auto_state, _auto_refresh, _conn_ssid, _conn_result
+    global _auto_state, _auto_refresh, _conn_ssid, _conn_result, _link_ssid
     _auto_state   = AUTO_OFF
     _auto_refresh = False
     _conn_ssid    = None
     _conn_result  = CONN_IDLE
+    _link_ssid    = None
     _dbg("radio off")
     try:
         wlan = _get_wlan()
@@ -226,6 +227,7 @@ def connect(ssid, password, timeout_ms=6000, pump_cb=None):
     SEARCH" trap: the wait loop calls it ~12 times per second and
     bails immediately if it returns truthy.
     """
+    global _link_ssid
     wlan = _get_wlan()
     # Set the global hostname BEFORE bringing the radio up. The mDNS
     # responder in ESP-IDF reads it during interface init; setting
@@ -243,6 +245,7 @@ def connect(ssid, password, timeout_ms=6000, pump_cb=None):
     # without it the next wlan.config()/wlan.connect() returns "sta is
     # connecting, cannot set config" and the radio never associates to
     # the credentials we actually want.
+    _link_ssid = None
     try:
         wlan.disconnect()
     except Exception:
@@ -297,6 +300,10 @@ def connect(ssid, password, timeout_ms=6000, pump_cb=None):
             except Exception:
                 pass
         time.sleep_ms(80)
+    # Established: let the driver recover short drops on its own (a
+    # previous connect_begin() may have left the retries bounded).
+    _set_reconnects(wlan, -1)
+    _link_ssid = ssid
     try:
         _apply_power_cap(wlan)
     except Exception:
@@ -596,6 +603,8 @@ def connect_from_config(pump_cb=None):
 
 
 def disconnect():
+    global _link_ssid
+    _link_ssid = None
     wlan = _get_wlan()
     wlan.disconnect()
     wlan.active(False)
@@ -858,10 +867,12 @@ def set_power_mode(mode):
     'balanced' → 11 dBm, PM_POWERSAVE (matches existing default)
     'max'      → 19 dBm, PM_NONE
     """
+    global _link_ssid
     if mode not in POWER_MODES:
         return False
     wlan = _get_wlan()
     if mode == "off":
+        _link_ssid = None
         try:
             wlan.disconnect()
         except Exception:
@@ -1209,14 +1220,19 @@ def _scan_worker(gen):
     """Runs wlan.scan() (in the worker thread when there is one).
 
     MicroPython 1.28 turns an IDF refusal into an empty list, so an empty
-    result is retried once. Before the retry, a driver retry loop left
-    over from an earlier failed join is stopped, but only when nothing is
-    being joined right now (connect_begin() owns the radio then) and the
-    link is not up."""
+    result is retried once. Before the retry, a driver retry loop that
+    nothing here owns (e.g. left over from a join made outside this
+    module) is stopped. It is left alone when a join is in progress
+    (connect_poll() owns the radio then), when the link is up, and when
+    an established link has dropped and the driver is bringing it back:
+    stopping that would end the recovery for good, since nothing restarts
+    it. While joining or recovering, an empty result is reported as busy
+    rather than as "nothing around", so callers keep the list they have."""
     global _scan_raw, _scan_err, _scan_busy
     res = None
     err = None
     joining = False
+    recovering = False
     try:
         wlan = _get_wlan()
         for attempt in range(_SCAN_TRIES):
@@ -1233,7 +1249,9 @@ def _scan_worker(gen):
                 up = wlan.isconnected()
             except Exception:
                 up = False
-            if not up and not joining:
+            # Link we established is down and the driver is retrying it.
+            recovering = not up and not joining and _link_ssid is not None
+            if not up and not joining and not recovering:
                 _dbg("scan empty/refused (%s), stopping driver retries"
                      % (err or "0 results"))
                 try:
@@ -1248,6 +1266,9 @@ def _scan_worker(gen):
             # is around: report it so callers keep the list they have.
             res = None
             err = "radio busy joining"
+        elif not res and res is not None and recovering:
+            res = None
+            err = "radio busy reconnecting"
     except Exception as e:
         res = None
         err = str(e) or "scan failed"
@@ -1452,6 +1473,8 @@ _conn_result    = CONN_IDLE
 _conn_code      = None     # last status code seen by connect_poll()
 _conn_last_code = None     # status code at the end of the last attempt
 _link_seq       = 0        # bumps every time a join succeeds
+_link_ssid      = None     # network we joined and want the driver to keep;
+                           # cleared by every deliberate disconnect
 
 
 def connect_timeout_ms():
@@ -1475,7 +1498,7 @@ def connect_begin(ssid, password, timeout_ms=_JOIN_TIMEOUT):
     """Start associating with `ssid` and return at once. Poll
     connect_poll() for the outcome. The password is never printed."""
     global _conn_ssid, _conn_t0, _conn_timeout, _conn_bad, _conn_result
-    global _conn_stale, _conn_code, _conn_last_code
+    global _conn_stale, _conn_code, _conn_last_code, _link_ssid
     if not ssid:
         _conn_result = CONN_FAIL
         return False
@@ -1483,6 +1506,10 @@ def connect_begin(ssid, password, timeout_ms=_JOIN_TIMEOUT):
          % (ssid, "yes" if password else "no", _scan_busy))
     wlan = _get_wlan()
     _apply_global_hostname()
+    # A new attempt: the previous one's code must not be shown for it, and
+    # the old link (if any) is being replaced on purpose.
+    _conn_last_code = None
+    _link_ssid = None
     try:
         wlan.active(True)
         # Same flush as connect(): stop a previous join or retry loop
@@ -1548,11 +1575,12 @@ def connect_elapsed_ms():
 
 
 def connect_cancel():
-    global _conn_ssid, _conn_result
+    global _conn_ssid, _conn_result, _link_ssid
     if _conn_ssid is None:
         return
     _dbg("join %r cancelled" % _conn_ssid)
     _conn_ssid = None
+    _link_ssid = None
     _conn_result = CONN_IDLE
     try:
         _get_wlan().disconnect()
@@ -1563,7 +1591,7 @@ def connect_cancel():
 def connect_poll():
     """Advance the association started by connect_begin()."""
     global _conn_ssid, _conn_bad, _conn_bad_t0, _conn_result, _conn_stale
-    global _conn_code, _conn_last_code, _link_seq
+    global _conn_code, _conn_last_code, _link_seq, _link_ssid
     if _conn_ssid is None:
         return _conn_result
     wlan = _get_wlan()
@@ -1578,6 +1606,7 @@ def connect_poll():
         _conn_result = CONN_OK
         _conn_last_code = _STAT_GOT_IP
         _link_seq += 1
+        _link_ssid = ssid
         # Back to "retry forever" so a short drop of an established link
         # still recovers on its own, as before.
         _set_reconnects(wlan, -1)
@@ -1748,15 +1777,26 @@ def auto_begin():
 
 
 def auto_tick():
-    """Advance auto-connect. True exactly once when the link comes up."""
+    """Advance auto-connect. True exactly once when the link comes up.
+
+    Also finishes a join this machine does not own (a manual join from
+    the WiFi app, left when the user pressed HOME mid-connect): without a
+    poller its CONN_OK bookkeeping (retry-forever, link_seq, last-network
+    marker) would never run. That case returns False; the outcome stays
+    readable through connect_poll() and link_seq()."""
     global _auto_queue, _auto_refresh, _auto_next_ms, _auto_refresh_at
     global _auto_retry_last
-    if _auto_state == AUTO_OFF:
+    orphan = _conn_ssid is not None and _auto_state != AUTO_TRY
+    if _auto_state == AUTO_OFF and not orphan:
         return False
     now = _now()
     if time.ticks_diff(now, _auto_next_ms) < 0:
         return False
     _auto_next_ms = time.ticks_add(now, _AUTO_TICK_MS)
+
+    if orphan:
+        connect_poll()
+        return False
 
     if _auto_state == AUTO_TRY:
         target = _conn_ssid
