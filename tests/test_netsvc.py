@@ -60,6 +60,21 @@ class FakeWifi(types.ModuleType):
         self.saved = [{"ssid": "Home"}]
         self.begins = 0
         self.up_once = False
+        self.target = None          # SSID of a join in flight
+        self.polls = 0
+        self.poll_result = None     # what connect_poll() does: None = busy
+
+    def connect_target(self):
+        return self.target
+
+    def connect_poll(self):
+        self.polls += 1
+        if self.poll_result is not None:
+            ok = self.poll_result == "ok"
+            self.target = None
+            self.connected = ok
+            return self.poll_result
+        return "busy"
 
     def is_connected(self):
         return self.connected
@@ -258,6 +273,16 @@ class NetsvcLinkTest(unittest.TestCase):
         self.assertEqual(len(self.env.thread.started), 1)
         self.assertEqual(self.env.thread.size, 4096)       # stack restored
 
+    def test_unset_stack_size_restored(self):
+        # stack_size() returns 0 when it was never set (no splash thread).
+        self.env.thread.size = 0
+        self.net.home_shown()
+        self.env.clock.t += self.net.QUIET_MS
+        self._link_up()
+        self.env.tick()
+        self.assertEqual(len(self.env.thread.started), 1)
+        self.assertEqual(self.env.thread.size, 0)
+
     def test_ntp_failure_backs_off(self):
         self.env.tu.results = [(False, "ntp timeout"), (False, "ntp timeout")]
         self.net.home_shown()
@@ -340,6 +365,92 @@ class NetsvcLinkTest(unittest.TestCase):
         self.assertEqual(self.net.status(), ("offline", 0))
 
 
+class NetsvcManualJoinTest(unittest.TestCase):
+    """The WiFi app calls auto_stop() before a manual join (state "off")."""
+
+    def setUp(self):
+        self.env = Env()
+        self.net = self.env.net
+        self.net.begin(self.env.os)
+        self.wifi = self.env.wifi
+
+    def tearDown(self):
+        self.env.close()
+
+    def test_auto_stop_then_failed_join_retries_after_app(self):
+        self.wifi.auto_stop()                 # boot join was "connecting"
+        self.wifi.target = "Cafe"             # manual join in the app
+        self.env.tick(self.net.POLL_MS * 5, fg="WiFi")
+        self.assertEqual(self.wifi.polls, 0)  # the app polls its own join
+        self.wifi.target = None               # ... and it failed
+        for _ in range(30):
+            self.env.tick(self.net.POLL_MS, fg="WiFi")
+        self.assertEqual(self.wifi.begins, 1)     # never under the app
+        self.env.tick(self.net.POLL_MS, fg="Home")
+        self.assertEqual(self.wifi.begins, 2)
+        self.assertEqual(self.net.status(), ("connecting", 0))
+
+    def test_off_without_saved_networks_stays_offline(self):
+        self.wifi.saved = []
+        self.wifi.auto_stop()
+        self.env.tick(self.net.POLL_MS * 100)
+        self.assertEqual(self.wifi.begins, 1)
+        self.assertEqual(self.net.status(), ("offline", 0))
+
+    def test_join_left_behind_is_finished_outside_the_app(self):
+        self.wifi.auto_stop()
+        self.wifi.target = "Cafe"
+        self.env.tick(self.net.POLL_MS, fg="Home")
+        self.assertEqual(self.wifi.polls, 1)
+        self.assertEqual(self.net.status(), ("connecting", 0))
+        self.env.tick(self.net.POLL_MS * 20, fg="Home")
+        self.assertEqual(self.wifi.begins, 1)     # no auto join over it
+        self.wifi.poll_result = "ok"
+        self.env.tick(self.net.POLL_MS, fg="Home")
+        self.env.tick(self.net.POLL_MS, fg="Home")
+        self.assertEqual(self.net.status(), ("connected", 0))
+        self.assertTrue(self.net._link)
+
+    def test_join_left_behind_times_out_then_retries(self):
+        self.wifi.auto_stop()
+        self.wifi.target = "Cafe"
+        self.env.tick(self.net.POLL_MS, fg="Home")
+        self.wifi.poll_result = "timeout"
+        self.env.tick(self.net.POLL_MS, fg="Home")
+        self.assertIsNone(self.wifi.target)
+        self.env.tick(self.net.POLL_MS, fg="Home")
+        self.assertEqual(self.net.status()[0], "retrying")
+        self.env.tick(self.net.REJOIN_S[0] * 1000, fg="Home")
+        self.assertEqual(self.wifi.begins, 2)
+
+
+class NetsvcBackgroundOkTest(unittest.TestCase):
+    def test_grace_in_ticks_after_home(self):
+        env = Env()
+        try:
+            net = env.net
+            self.assertFalse(net.background_ok())    # before Home
+            net.home_shown()
+            env.clock.t += net.QUIET_MS
+            self.assertFalse(net.background_ok())
+            env.clock.t += net.BG_GRACE_MS - net.QUIET_MS - 1
+            self.assertFalse(net.background_ok())
+            env.clock.t += 1
+            self.assertTrue(net.background_ok())
+        finally:
+            env.close()
+
+    def test_launcher_gates_ota_probe(self):
+        src = (ROOT / "oreoOS/launcher.py").read_text()
+        i = src.index("_ota.background_check(os_obj)")
+        head = src[:i]
+        self.assertIn("_net.background_ok()", head[-600:])
+        # Inside the timed network tail, so perf's net_ms covers it.
+        self.assertGreater(i, src.index("net_t0 = time.ticks_ms()"))
+        self.assertLess(i, src.index(
+            "net_ms = time.ticks_diff(time.ticks_ms(), net_t0)"))
+
+
 class NetsvcHoldTest(unittest.TestCase):
     def tearDown(self):
         self.env.close()
@@ -413,7 +524,8 @@ class PerfTest(unittest.TestCase):
         import contextlib
         with contextlib.redirect_stdout(io.StringIO()) as out:
             p.report()
-        self.assertIn("first press handled at +200 ms", out.getvalue())
+        self.assertIn("first press read at +200 ms", out.getvalue())
+        self.assertIn("at most 80 ms", out.getvalue())
 
     def test_marks_capped(self):
         for i in range(self.perf.MAX_MARKS + 10):

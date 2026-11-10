@@ -222,15 +222,20 @@ def run_app(os_obj, app):
     except Exception:
         _net = None
     app_name = getattr(app, "name", "")
-    prev_work_ms = 0    # previous frame's cost: bounds a latched press's delay
+    # perf's first-press bound: a press latched at any point of the loop
+    # period before this frame is read here, and acts by the end of this
+    # frame, so period + this frame's work bounds its delay.
+    period_ms = 0
 
     app.on_enter(os_obj)
     last = time.ticks_ms()
     try:
         while not os_obj._quit_requested:
             now = time.ticks_ms()
-            dt  = time.ticks_diff(now, last) / 1000.0
+            period_ms = time.ticks_diff(now, last)
+            dt  = period_ms / 1000.0
             last = now
+            press_seen = False
 
             os_obj.buttons.update()
 
@@ -244,8 +249,7 @@ def run_app(os_obj, app):
                 for b in api.BUTTONS:
                     if os_obj.buttons.just_pressed(b):
                         if pm: pm.note_event()
-                        if _perf is not None:
-                            _perf.press(prev_work_ms)
+                        press_seen = True
 
                         # Pair-confirm prompt has top priority — when an
                         # SMP numeric comparison is in flight, NOTHING
@@ -457,17 +461,6 @@ def run_app(os_obj, app):
                     pm.note_event()      # torch on: never doze mid-use
                 pm.tick(app)
 
-            # Background OTA probe — cheap, rate-limited internally to one
-            # call every 6 hours, and only fires when WiFi is up. The call
-            # itself is bounded by T_GH_API so a slow GitHub can never
-            # stall the frame loop.
-            if not realtime:
-                try:
-                    from oreoOS import ota as _ota
-                    _ota.background_check(os_obj)
-                except Exception:
-                    pass
-
             # Gestures are NOT polled in the OS run loop. The IMU is
             # opt-in per app: an app that wants tilt / tap / shake
             # imports oreoOS.gestures itself and ticks the engine on
@@ -513,12 +506,27 @@ def run_app(os_obj, app):
                     _hs.tick()
                 except Exception:
                     pass
+                # Background OTA probe: rate-limited inside ota to one
+                # check every 6 h, only with Wi-Fi up. check() is still a
+                # blocking GitHub GET (up to T_GH_API plus DNS), so it is
+                # gated on a ticks-based grace after Home here: ota's own
+                # grace compares time.time() against a stamp taken before
+                # the clock sync, and the first sync after a cold boot
+                # jumps the clock by years and defeats it. Timed with the
+                # network tail so perf reports it.
+                if _net is None or _net.background_ok():
+                    try:
+                        from oreoOS import ota as _ota
+                        _ota.background_check(os_obj)
+                    except Exception:
+                        pass
                 net_ms = time.ticks_diff(time.ticks_ms(), net_t0)
 
             elapsed = time.ticks_diff(time.ticks_ms(), now)
-            prev_work_ms = elapsed
             if _perf is not None:
                 _perf.frame(elapsed, net_ms)
+                if press_seen:
+                    _perf.press(period_ms + elapsed, now)
             frame_floor = 1 if realtime else FRAME_MIN_MS
             if elapsed < frame_floor:
                 time.sleep_ms(frame_floor - elapsed)
@@ -801,9 +809,11 @@ def boot():
         pass
 
     # Stamp the boot timestamp on the OS object so OTA can refuse to
-    # probe inside the first minute of uptime — without this the very
+    # probe inside the first minutes of uptime — without this the very
     # first run-loop frame fires a synchronous GitHub API GET, freezing
     # whichever transition the user triggers (e.g. "press A on home").
+    # This stamp is wall-clock and is taken before the clock sync, so the
+    # run loop also gates the probe on netsvc.background_ok() (ticks).
     try:
         os_obj._boot_ts_s = int(time.time())
     except Exception:

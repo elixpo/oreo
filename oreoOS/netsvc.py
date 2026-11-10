@@ -44,6 +44,10 @@ NTP_RETRY_S   = (15, 60, 180, 600, 1800)
 NTP_RESYNC_S  = 6 * 3600
 NTP_FRESH_S   = 30 * 60         # a re-join this soon after a sync skips NTP
 WORKER_STACK  = 8 * 1024
+# Inline background work that can still block a frame (the OTA probe's
+# GitHub GET) waits this long after Home. Measured in ticks, so the first
+# clock sync (which can jump time.time() by years) cannot cut it short.
+BG_GRACE_MS   = 15 * 60 * 1000
 # Foreground apps that drive the radio themselves (manual join, scans):
 # keep-alive never calls auto_begin() under them.
 RADIO_OWNERS  = ("WiFi",)
@@ -175,6 +179,16 @@ def in_quiet(now=None):
     return time.ticks_diff(now, _home_ms) < QUIET_MS
 
 
+def background_ok(now=None):
+    """True once Home has been up for BG_GRACE_MS (so also past the quiet
+    window). The run loop gates the OTA background probe on this."""
+    if _home_ms is None:
+        return False
+    if now is None:
+        now = time.ticks_ms()
+    return time.ticks_diff(now, _home_ms) >= BG_GRACE_MS
+
+
 # ── run loop ────────────────────────────────────────────────────────────
 
 def tick(foreground=None, now=None):
@@ -251,6 +265,15 @@ def _may_rejoin():
         return False
 
 
+def _joining():
+    """A join is in flight, including a manual one from the WiFi app
+    (which runs with auto-connect stopped, auto_state() "off")."""
+    try:
+        return bool(_wifi().connect_target())
+    except Exception:
+        return False
+
+
 def _keep_alive(now, foreground):
     """Not connected: schedule or fire a re-join."""
     global _rejoin_at, _rejoin_n
@@ -262,12 +285,26 @@ def _keep_alive(now, foreground):
         return
     if state in ("connecting", "scanning"):
         return              # a join or scan is already running
+    if _joining():
+        # A manual join (auto-connect stopped). Outside the WiFi app no
+        # one else polls it, so advance it here (non-blocking) until it
+        # connects or times out; then the usual retry applies.
+        if foreground not in RADIO_OWNERS:
+            try:
+                _wifi().connect_poll()
+            except Exception:
+                pass
+        return
     if _rejoin_at is None:
-        # Boot auto-connect (or the last re-join) gave up: try again later.
-        if state == "no_network" and _may_rejoin():
+        # Nothing scheduled and nothing running: boot auto-connect (or the
+        # last re-join) gave up ("no_network"), or the WiFi app stopped it
+        # with auto_stop() for a manual join that then failed ("off"), or
+        # the link came and went between two polls ("connected"). Try
+        # again later; _may_rejoin() covers the switch, holds and radio.
+        if _may_rejoin():
             secs = REJOIN_S[min(_rejoin_n, len(REJOIN_S) - 1)]
             _rejoin_at = _later(now, secs)
-            _log("no network, re-join in %d s" % secs)
+            _log("offline (%s), re-join in %d s" % (state, secs))
         return
     if not _due(now, _rejoin_at):
         return
@@ -330,7 +367,8 @@ def _start_ntp(now):
         _busy = False
         _ntp_finished(now, False, "no thread: %s" % e)
     finally:
-        if old:
+        # stack_size() returns 0 when it was never set: restore that too.
+        if old is not None:
             try:
                 _thread.stack_size(old)
             except Exception:
@@ -390,7 +428,8 @@ def status(now=None):
             return ("connected", 0)
         if not wifi.is_radio_on():
             return ("off", 0)
-        if wifi.auto_state() in ("connecting", "scanning"):
+        if (wifi.auto_state() in ("connecting", "scanning") or
+                _joining()):
             return ("connecting", 0)
     except Exception:
         return ("offline", 0)

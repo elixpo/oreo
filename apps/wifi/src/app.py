@@ -1131,8 +1131,9 @@ class App(oreoOS.App):
         """
         if self._wifi:
             try:
-                # Non-blocking; the run loop finishes the join and starts
-                # the server via launcher._on_wifi_up().
+                # Non-blocking; netsvc.tick() in the run loop finishes the
+                # join and, after the boot quiet window, starts the server
+                # in netsvc._run_link_jobs().
                 if not self._wifi.is_connected() and not self._joining():
                     self._wifi.auto_begin()
             except Exception:

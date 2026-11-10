@@ -124,8 +124,12 @@ def sync_from_ntp(timezone_offset_h=None):
     can never block longer than that — bypasses MicroPython's stock
     ntptime, whose recvfrom doesn't honour timeouts on this build.
 
-    The OS calls this from netsvc's worker thread, never from a UI frame
-    (#118). Only one sync runs at a time; a second caller gets
+    The automatic syncs (on link-up, retries, the 6-hourly re-sync) run on
+    netsvc's worker thread, not in a UI frame (#118). The manual "Sync"
+    rows in the notification panel and in Settings still call this
+    directly on the UI thread and can block a frame for the DNS lookup
+    plus up to 2.5 s; moving them to netsvc.request_sync() is still to
+    do. Only one sync runs at a time; a second caller gets
     (False, "busy") instead of a second socket.
     """
     global _busy
