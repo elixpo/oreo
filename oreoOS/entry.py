@@ -15,6 +15,11 @@ reset the next boot tries again from scratch.
 """
 
 
+# Each line fits 36 columns at scale 1 from x=16 on the 320 px panel.
+SAFE_HINT = ("if this loops, hold HOME while it",
+             "boots: safe mode, no Wi-Fi or BT")
+
+
 def _crash_message(err):
     """Try to surface the error on the LCD. Best-effort — if drawing
     itself fails (display not initialized, OOM, etc.) we silently fall
@@ -30,8 +35,10 @@ def _crash_message(err):
         # at scale=1 (≈8 px/glyph on a 320 px-wide screen).
         msg = (str(err) or "(no message)")[:36]
         d.text(msg, 16, 100, api.WHITE, scale=1)
-        d.text("if this loops, hold HOME on power",
-               16, 200, api.WHITE, scale=1)
+        # Safe mode is real: launcher._safe_boot_requested() checks HOME
+        # at boot and skips Wi-Fi/BT auto-start (the usual loop causes).
+        for i, line in enumerate(SAFE_HINT):
+            d.text(line, 16, 196 + i * 12, api.WHITE, scale=1)
         d.present()
     except Exception:
         pass

@@ -161,6 +161,7 @@ class App(oreoOS.App):
         self._c_save    = None        # (ssid, pw) to save once joined
         self._c_ip      = ""
         self._c_pending = None        # (ssid, pw) waiting for a scan to end
+        self._c_code    = ""          # raw driver reason shown on failure
         self._pw_ssid   = ""
         self._n_saved   = 0
         self._count_saved()
@@ -516,6 +517,17 @@ class App(oreoOS.App):
     def _finish_connect(self, state):
         self._c_state = state
         self._c_done_ms = time.ticks_ms()
+        self._c_code = ""
+        if state not in ("ok", "cancelled"):
+            # Only a real disconnect reason is worth showing; a timeout
+            # usually ends on a neutral status (IDLE / CONNECTING).
+            try:
+                code = self._wifi.connect_last_code()
+                if (code is not None and
+                        self._wifi.classify_status(code) is not None):
+                    self._c_code = "code " + self._wifi.status_name(code)
+            except Exception:
+                pass
         self._snap = self._read()
         if state == "ok":
             self._c_ip = self._snap.get("ip") or ""
@@ -647,9 +659,15 @@ class App(oreoOS.App):
                 if seq != self._scan_seq:
                     self._scan_seq = seq
                     self._reload_near()
+                    if not self._scan_want:
+                        self._scan_note = ""
                     self._dirty = True
                 if st == "error" and m == "nearby":
-                    note = "scan failed - C to retry"
+                    try:
+                        why = w.scan_error() or "scan failed"
+                    except Exception:
+                        why = "scan failed"
+                    note = _clip(why, 24) + " - C to retry"
                     if note != self._scan_note:
                         self._scan_note = note
                         self._dirty = True
@@ -883,14 +901,15 @@ class App(oreoOS.App):
                 on = (t // 250) % 3 == k
                 d.rect(cx - 20 + k * 16, y + 44, 8, 8,
                        theme.PRIMARY if on else theme.MUTED2, fill=True)
-            el = 0
+            el, total = 0, 15000
             try:
                 el = self._wifi.connect_elapsed_ms()
+                total = max(1, self._wifi.connect_timeout_ms())
             except Exception:
                 pass
             bw = SW - 80
             d.rect(40, y + 70, bw, 4, theme.MUTED2, fill=True)
-            d.rect(40, y + 70, min(bw, bw * el // 12000), 4,
+            d.rect(40, y + 70, min(bw, bw * el // total), 4,
                    theme.PRIMARY, fill=True)
             widgets.draw_hint(d, "B=cancel")
             return
@@ -913,6 +932,11 @@ class App(oreoOS.App):
             d.text(title, cx - len(title) * 8, y + 40, theme.PRIMARY, scale=2)
             d.text(ssid, cx - len(ssid) * 4, y + 64, theme.TEXT_BRIGHT)
             d.text(sub, cx - len(sub) * 4, y + 80, theme.TEXT_DIM)
+            if self._c_code:
+                # Raw driver reason, so a failure on the badge can be
+                # matched against wifi.debug_dump() / the IDF reason list.
+                code = _clip(self._c_code, 38)
+                d.text(code, cx - len(code) * 4, y + 96, theme.MUTED)
         widgets.draw_hint(d, "any key to continue")
 
     def _draw_pwhelp(self, d):
@@ -1131,8 +1155,9 @@ class App(oreoOS.App):
         """
         if self._wifi:
             try:
-                # Non-blocking; the run loop finishes the join and starts
-                # the server via launcher._on_wifi_up().
+                # Non-blocking; netsvc.tick() in the run loop finishes the
+                # join and, after the boot quiet window, starts the server
+                # in netsvc._run_link_jobs().
                 if not self._wifi.is_connected() and not self._joining():
                     self._wifi.auto_begin()
             except Exception:

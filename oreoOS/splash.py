@@ -17,6 +17,7 @@ modules and starts the radios; boot code never has to call into it.
     sp.intro()          # first frame, starts the animation thread
     sp.progress(0.5)    # optional: the loader's target as boot advances
     sp.finish()         # minimum show time, fills the loader, word boundary
+    sp.finish(settled)  # also wait (up to MAX_TOTAL_MS) for settled() -> True
 
 Without _thread (or without splash.bin) it degrades to pump() calls or a
 static frame. Splash must never break boot: every method swallows errors.
@@ -42,6 +43,7 @@ ROLL_MS      = 183          # the roll to the next word: 3 words a second
 CYCLE_MS     = HOLD_MS + ROLL_MS
 FRAME_MS     = 12           # animation thread tick
 MIN_TOTAL_MS = 4000         # finish() never returns earlier than this
+MAX_TOTAL_MS = 6000         # ...nor later, while it waits for boot to settle
 FILL_MS      = 300          # finish() runs the loader to full over this
 
 # Swipe into the OS: big chevrons (tip pointing left) in the light
@@ -376,8 +378,12 @@ class Splash:
                 pass
         return False
 
-    def finish(self):
+    def finish(self, settled=None, cap_ms=MAX_TOTAL_MS):
+        """Hold the splash for MIN_TOTAL_MS, and longer while `settled()`
+        returns False, up to cap_ms in all. `settled` is called about
+        every FRAME_MS and may do a little boot work itself (#119)."""
         try:
+            self.wait_settled(settled, cap_ms)
             if self._art is not None:
                 self._target = 1.0
                 while _diff(_ms(), self._start) < MIN_TOTAL_MS - FILL_MS:
@@ -410,6 +416,27 @@ class Splash:
         except Exception as e:
             print("[splash] finish:", e)
         self.release()
+
+    def wait_settled(self, settled, cap_ms=MAX_TOTAL_MS):
+        """Return once settled() is True or cap_ms has passed since the
+        splash started (leaving FILL_MS for the loader). True if settled."""
+        if settled is None:
+            return True
+        limit = cap_ms - (FILL_MS if self._art is not None else 0)
+        while True:
+            try:
+                if settled():
+                    return True
+            except Exception as e:
+                print("[splash] settled:", e)
+                return True
+            if _diff(_ms(), self._start) >= limit:
+                print("[splash] boot not settled after %d ms" % cap_ms)
+                return False
+            if self._art is not None:
+                self._tick_wait()
+            else:
+                time.sleep_ms(FRAME_MS)
 
     def release(self):
         self._stop = True
