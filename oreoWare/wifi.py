@@ -47,6 +47,10 @@ callers poll from their update()/run-loop tick instead:
     wifi.connect_begin(ssid, pw)      # starts association, returns at once
     wifi.connect_poll()               # CONN_* result string
     wifi.auto_begin() / auto_tick()   # boot auto-connect state machine
+
+Diagnostics (REPL): wifi.debug_dump() prints a ring buffer of scan / join
+/ auto-connect transitions with the driver's status codes; wifi.diag()
+returns a snapshot of the radio state. Passwords are never logged.
 """
 
 import network
@@ -183,6 +187,7 @@ def radio_off():
     _auto_refresh = False
     _conn_ssid    = None
     _conn_result  = CONN_IDLE
+    _dbg("radio off")
     try:
         wlan = _get_wlan()
         try: wlan.disconnect()
@@ -267,6 +272,14 @@ def connect(ssid, password, timeout_ms=6000, pump_cb=None):
     start = time.ticks_ms()
     while not wlan.isconnected():
         if time.ticks_diff(time.ticks_ms(), start) > timeout_ms:
+            # The driver retries forever by default; left running it holds
+            # the radio in "connecting" and every later scan() comes back
+            # empty (MicroPython 1.28 swallows the IDF refusal).
+            _dbg("legacy connect timeout st=%s" % _status_name(_safe_status(wlan)))
+            try:
+                wlan.disconnect()
+            except Exception:
+                pass
             return False
         # Pump first so the very-first frame of "searching..." can be
         # cancelled. Sleep duration is intentionally short (~80 ms) so
@@ -276,6 +289,10 @@ def connect(ssid, password, timeout_ms=6000, pump_cb=None):
             try:
                 if pump_cb():
                     print("[wifi] connect cancelled by pump_cb")
+                    try:
+                        wlan.disconnect()
+                    except Exception:
+                        pass
                     return False
             except Exception:
                 pass
@@ -903,11 +920,35 @@ def get_power_mode():
 #
 # The worker only touches `_scan_raw` / `_scan_err` / `_scan_busy`; all
 # parsing, flash writes and state changes happen on the main thread in
-# scan_poll(), so there is no shared mutable state beyond three scalars.
+# scan_poll(). Each scan carries a generation number so a worker that was
+# abandoned (scan_poll timeout) can never publish into a later scan.
+#
+# How the MicroPython 1.28 ESP32 driver behaves (ports/esp32/network_wlan.c),
+# which everything here is written against:
+#
+#   • wlan.scan() does NOT raise when IDF refuses to scan (for example
+#     ESP_ERR_WIFI_STATE while the STA is connecting or retrying): it
+#     returns an empty list. An empty scan is therefore "maybe refused",
+#     not "nothing nearby".
+#   • wlan.status() returns NO_AP_FOUND (201/210/211/212) and AUTH_FAIL
+#     (202, also used for CONNECTION_FAIL 205) as soon as one attempt
+#     fails, even while the driver is still retrying, and keeps returning
+#     it until the next disconnect event or GOT_IP. A new connect() does
+#     not clear it.
+#   • Every other failure reason (4-way handshake timeout 15, handshake
+#     timeout 204, assoc fail 203, ...) is hidden behind STAT_CONNECTING
+#     until the configured reconnects are used up. The default is to retry
+#     forever, so with defaults a wrong password usually never shows up.
+#   • After our own wlan.disconnect() the reason becomes ASSOC_LEAVE (8),
+#     which status() reports as STAT_IDLE (1000), during the next join too.
+#   • wlan.config(reconnects=n) means n retries after the first attempt;
+#     -1 restores "retry forever".
 
 _SEEN_PATH     = "/wifi_seen.json"
 _SEEN_MAX      = 16          # networks remembered from the last scan
 _SCAN_TIMEOUT  = 8000        # ms; a worker that never reports is abandoned
+_SCAN_TRIES    = 2           # an empty / refused scan is retried once
+_SCAN_RETRY_MS = 300
 
 # Association results returned by connect_poll().
 CONN_IDLE     = "idle"
@@ -918,17 +959,38 @@ CONN_NO_AP    = "not_found"
 CONN_TIMEOUT  = "timeout"
 CONN_FAIL     = "failed"
 
-# Driver status codes (network.STAT_* on the ESP32 port). Hard-coded so
-# the classifier also works on the host and on builds that do not export
-# every constant.
+# Driver status codes (network.STAT_* and IDF disconnect reasons on the
+# ESP32 port). Hard-coded so the classifier also works on the host and on
+# builds that do not export every constant.
+_STAT_IDLE       = 1000
+_STAT_CONNECTING = 1001
+_STAT_GOT_IP     = 1010
 _ST_NO_AP     = (201, 210, 211, 212)    # NO_AP_FOUND (+ threshold variants)
 _ST_BAD_PW    = (202, 15, 204)          # AUTH_FAIL / 4-way handshake timeout
-_BAD_HOLD_MS  = 2500                    # a bad status must persist this long
+_ST_NEUTRAL   = (0, 8, _STAT_IDLE, _STAT_CONNECTING, _STAT_GOT_IP)
+# Codes status() reports while the driver may still be retrying; only
+# these need to persist before they count (see connect_poll()).
+_ST_EARLY     = _ST_NO_AP + (202,)
+_BAD_HOLD_MS  = 2500                    # an early code must persist this long
+_JOIN_RECONNECTS = 1                    # driver retries per join (2 attempts)
+_JOIN_TIMEOUT    = 15000
+
+_STAT_NAMES = {
+    0: "NONE", 2: "AUTH_EXPIRE", 3: "AUTH_LEAVE", 4: "ASSOC_EXPIRE",
+    8: "ASSOC_LEAVE", 15: "4WAY_HANDSHAKE_TIMEOUT", 200: "BEACON_TIMEOUT",
+    201: "NO_AP_FOUND", 202: "AUTH_FAIL", 203: "ASSOC_FAIL",
+    204: "HANDSHAKE_TIMEOUT", 205: "CONNECTION_FAIL",
+    210: "NO_AP_FOUND_W_COMPATIBLE_SECURITY",
+    211: "NO_AP_FOUND_IN_AUTHMODE_THRESHOLD",
+    212: "NO_AP_FOUND_IN_RSSI_THRESHOLD",
+    1000: "IDLE", 1001: "CONNECTING", 1010: "GOT_IP",
+}
 
 _scan_busy    = False
 _scan_raw     = None
 _scan_err     = None
 _scan_t0      = 0
+_scan_gen     = 0            # bumps on every scan_start()
 _scan_seq     = 0            # bumps on every completed scan
 _nearby       = None         # parsed list from the most recent scan
 _nearby_live  = False        # True once a scan finished this boot
@@ -936,6 +998,115 @@ _nearby_live  = False        # True once a scan finished this boot
 
 def _now():
     return time.ticks_ms()
+
+
+# ── diagnostics ring buffer ─────────────────────────────────────────────
+#
+# A fixed ring of (ticks_ms, text) entries for state transitions and
+# driver status codes. Nothing is recorded while idle; connect_poll()
+# only records a status code when it changes. Passwords are never
+# recorded (only whether one was given). From the REPL:
+#
+#     >>> from oreoWare import wifi
+#     >>> wifi.debug_dump()          # print the log, oldest first
+#     >>> wifi.diag()                # one-shot snapshot of driver state
+
+_DBG_N   = 48
+_dbg_buf = [None] * _DBG_N
+_dbg_i   = 0
+
+
+def _dbg(msg):
+    global _dbg_i
+    try:
+        _dbg_buf[_dbg_i % _DBG_N] = (time.ticks_ms(), msg)
+        _dbg_i += 1
+    except Exception:
+        pass
+
+
+def debug_log():
+    """The diagnostics ring as a list of "t=<ms> <event>" strings, oldest
+    first. Safe to call at any time; never contains a password."""
+    out = []
+    n = _dbg_i
+    start = n - _DBG_N if n > _DBG_N else 0
+    for k in range(start, n):
+        e = _dbg_buf[k % _DBG_N]
+        if e is not None:
+            out.append("t=%d %s" % (e[0], e[1]))
+    return out
+
+
+def debug_dump():
+    for line in debug_log():
+        print(line)
+
+
+def debug_clear():
+    global _dbg_i
+    for k in range(_DBG_N):
+        _dbg_buf[k] = None
+    _dbg_i = 0
+
+
+def _status_name(code):
+    try:
+        return "%d:%s" % (code, _STAT_NAMES.get(code, "?"))
+    except Exception:
+        return str(code)
+
+
+def status_name(code):
+    """Readable name for a wlan.status() code, e.g. "202:AUTH_FAIL"."""
+    return _status_name(code)
+
+
+def _safe_status(wlan):
+    try:
+        return wlan.status()
+    except Exception:
+        return None
+
+
+def diag():
+    """Snapshot of the radio and of this module's state machines, for the
+    REPL and the CLI. Reads only; never touches the radio."""
+    out = {"active": None, "connected": None, "status": None,
+           "reconnects": None, "joining": _conn_ssid,
+           "conn_result": _conn_result, "last_code": _conn_last_code,
+           "auto": _auto_state, "scan_busy": _scan_busy,
+           "scan_err": _scan_err, "scan_seq": _scan_seq,
+           "nearby": len(_nearby) if _nearby is not None else None,
+           "link_seq": _link_seq}
+    try:
+        wlan = _get_wlan()
+        try:
+            out["active"] = bool(wlan.active())
+        except Exception:
+            pass
+        try:
+            out["connected"] = bool(wlan.isconnected())
+        except Exception:
+            pass
+        st = _safe_status(wlan)
+        out["status"] = _status_name(st) if st is not None else None
+        try:
+            out["reconnects"] = wlan.config("reconnects")
+        except Exception:
+            pass
+    except Exception:
+        pass
+    return out
+
+
+def _set_reconnects(wlan, n):
+    try:
+        wlan.config(reconnects=n)
+        return True
+    except Exception as e:
+        _dbg("config reconnects=%d failed: %s" % (n, e))
+        return False
 
 
 def _decode_ssid(raw):
@@ -990,8 +1161,12 @@ def signal_level(rssi):
 
 
 def classify_status(code):
-    """wlan.status() -> CONN_BAD_PW / CONN_NO_AP, or None (still trying
-    / connected / unknown)."""
+    """wlan.status() -> CONN_BAD_PW / CONN_NO_AP / CONN_FAIL, or None
+    (still trying, idle, connected, or not a number).
+
+    Any other numeric disconnect reason (assoc fail, beacon timeout,
+    auth expired, ...) is CONN_FAIL. ASSOC_LEAVE (8) is our own
+    disconnect() and is never a failure."""
     try:
         code = int(code)
     except Exception:
@@ -1000,7 +1175,9 @@ def classify_status(code):
         return CONN_BAD_PW
     if code in _ST_NO_AP:
         return CONN_NO_AP
-    return None
+    if code in _ST_NEUTRAL:
+        return None
+    return CONN_FAIL
 
 
 def pick_candidates(saved, visible, exclude=()):
@@ -1028,33 +1205,65 @@ def pick_candidates(saved, visible, exclude=()):
     return sorted(nets, key=lambda n: (_pri(n), -rssi[n["ssid"]]))
 
 
-def _scan_worker():
+def _scan_worker(gen):
+    """Runs wlan.scan() (in the worker thread when there is one).
+
+    MicroPython 1.28 turns an IDF refusal into an empty list, so an empty
+    result is retried once. Before the retry, a driver retry loop left
+    over from an earlier failed join is stopped, but only when nothing is
+    being joined right now (connect_begin() owns the radio then) and the
+    link is not up."""
     global _scan_raw, _scan_err, _scan_busy
-    wlan = _get_wlan()
+    res = None
+    err = None
+    joining = False
     try:
-        try:
-            res = wlan.scan()
-        except OSError:
-            # IDF refuses to scan while the driver is retrying a failed
-            # association ("sta is connecting"). Stop that loop and retry
-            # once; never touch a link that is actually up.
-            if wlan.isconnected():
-                raise
+        wlan = _get_wlan()
+        for attempt in range(_SCAN_TRIES):
             try:
-                wlan.disconnect()
+                res = wlan.scan()
+                err = None
+            except OSError as e:
+                res = None
+                err = str(e) or "scan failed"
+            if res or gen != _scan_gen or attempt + 1 >= _SCAN_TRIES:
+                break
+            joining = _conn_ssid is not None
+            try:
+                up = wlan.isconnected()
             except Exception:
-                pass
-            time.sleep_ms(50)
-            res = wlan.scan()
-        _scan_raw = res
+                up = False
+            if not up and not joining:
+                _dbg("scan empty/refused (%s), stopping driver retries"
+                     % (err or "0 results"))
+                try:
+                    wlan.disconnect()
+                except Exception:
+                    pass
+            else:
+                _dbg("scan empty/refused (%s), retrying" % (err or "0 results"))
+            time.sleep_ms(_SCAN_RETRY_MS)
+        if not res and res is not None and (joining or _conn_ssid is not None):
+            # Empty because a join holds the radio, not because nothing
+            # is around: report it so callers keep the list they have.
+            res = None
+            err = "radio busy joining"
     except Exception as e:
-        _scan_err = str(e) or "scan failed"
+        res = None
+        err = str(e) or "scan failed"
+    if gen != _scan_gen:
+        _dbg("abandoned scan #%d finished late" % gen)
+        return
+    if res is None:
+        _scan_err = err or "scan failed"
+    else:
+        _scan_raw = res
     _scan_busy = False
 
 
 def scan_start():
     """Start a background scan. Returns True if one is running now."""
-    global _scan_busy, _scan_raw, _scan_err, _scan_t0
+    global _scan_busy, _scan_raw, _scan_err, _scan_t0, _scan_gen
     if _scan_busy:
         return True
     try:
@@ -1064,16 +1273,21 @@ def scan_start():
             wlan.active(True)
     except Exception as e:
         _scan_err = str(e) or "radio error"
+        _dbg("scan_start radio error: %s" % _scan_err)
         return False
+    _scan_gen += 1
+    gen = _scan_gen
+    _scan_err_logged[0] = None
     _scan_raw  = None
     _scan_err  = None
     _scan_busy = True
     _scan_t0   = _now()
+    _dbg("scan #%d start%s" % (gen, " (joining)" if _conn_ssid else ""))
     try:
         import _thread
-        _thread.start_new_thread(_scan_worker, ())
+        _thread.start_new_thread(_scan_worker, (gen,))
     except Exception:
-        _scan_worker()           # no threads: synchronous fallback
+        _scan_worker(gen)        # no threads: synchronous fallback
     return True
 
 
@@ -1100,12 +1314,15 @@ def scan_poll():
     """Collect a finished scan. Main thread only. Returns "busy",
     "done" (fresh results just landed), "error" or "idle"."""
     global _scan_raw, _scan_busy, _scan_err, _scan_seq, _nearby, _nearby_live
+    global _scan_gen
     if _scan_busy:
         if time.ticks_diff(_now(), _scan_t0) > _SCAN_TIMEOUT:
-            # Worker wedged; abandon it (its late result is ignored on
-            # the next scan_start, which resets _scan_raw).
+            # Worker wedged; abandon it. Bumping the generation makes
+            # sure its late result can never land in a later scan.
+            _scan_gen += 1
             _scan_busy = False
             _scan_err  = "scan timed out"
+            _dbg("scan timed out, worker abandoned")
             return "error"
         return "busy"
     raw = _scan_raw
@@ -1114,11 +1331,19 @@ def scan_poll():
         _nearby      = parse_scan(raw)
         _nearby_live = True
         _scan_seq   += 1
-        _save_seen(_nearby)
+        _dbg("scan done: %d raw, %d listed" % (len(raw), len(_nearby)))
+        if _nearby:
+            _save_seen(_nearby)
         return "done"
     if _scan_err:
+        if _scan_err != _scan_err_logged[0]:
+            _scan_err_logged[0] = _scan_err
+            _dbg("scan error: %s" % _scan_err)
         return "error"
     return "idle"
+
+
+_scan_err_logged = [None]
 
 
 def nearby():
@@ -1217,29 +1442,51 @@ def last_connected(saved=None):
 
 # ── non-blocking association ────────────────────────────────────────────
 
-_conn_ssid    = None
-_conn_t0      = 0
-_conn_timeout = 12000
-_conn_bad     = None     # classify_status() result currently held
-_conn_bad_t0  = 0
-_conn_stale   = None     # failure code left over from an earlier attempt
-_conn_result  = CONN_IDLE
+_conn_ssid      = None
+_conn_t0        = 0
+_conn_timeout   = _JOIN_TIMEOUT
+_conn_bad       = None     # early failure class currently held
+_conn_bad_t0    = 0
+_conn_stale     = None     # failure code left over from an earlier attempt
+_conn_result    = CONN_IDLE
+_conn_code      = None     # last status code seen by connect_poll()
+_conn_last_code = None     # status code at the end of the last attempt
+_link_seq       = 0        # bumps every time a join succeeds
 
 
-def connect_begin(ssid, password, timeout_ms=12000):
+def connect_timeout_ms():
+    """Timeout of the join in progress (or the default), for progress bars."""
+    return _conn_timeout
+
+
+def connect_last_code():
+    """Raw wlan.status() code the last finished join ended on, or None."""
+    return _conn_last_code
+
+
+def link_seq():
+    """Counter that bumps every time connect_poll() reports CONN_OK, from
+    any caller (boot auto-connect or a manual join). Lets background work
+    (time sync, keep-alive) notice a new link without owning the join."""
+    return _link_seq
+
+
+def connect_begin(ssid, password, timeout_ms=_JOIN_TIMEOUT):
     """Start associating with `ssid` and return at once. Poll
     connect_poll() for the outcome. The password is never printed."""
     global _conn_ssid, _conn_t0, _conn_timeout, _conn_bad, _conn_result
-    global _conn_stale
+    global _conn_stale, _conn_code, _conn_last_code
     if not ssid:
         _conn_result = CONN_FAIL
         return False
+    _dbg("join %r begin (pw=%s, scan_busy=%s)"
+         % (ssid, "yes" if password else "no", _scan_busy))
     wlan = _get_wlan()
     _apply_global_hostname()
     try:
         wlan.active(True)
-        # Same flush as connect(): cancel IDF's own NVS auto-connect
-        # (or a previous retry loop) before configuring a new target.
+        # Same flush as connect(): stop a previous join or retry loop
+        # before configuring a new target.
         try:
             wlan.disconnect()
         except Exception:
@@ -1247,27 +1494,44 @@ def connect_begin(ssid, password, timeout_ms=12000):
         time.sleep_ms(30)
         _apply_hostname(wlan)
         _apply_power_cap(wlan)
-        wlan.connect(ssid, password or "")
+        # Bounded retries: with the default (forever) the driver keeps the
+        # radio busy, scans come back empty, and handshake failures are
+        # never reported (status() stays STAT_CONNECTING).
+        _set_reconnects(wlan, _JOIN_RECONNECTS)
+        try:
+            wlan.connect(ssid, password or "")
+        except OSError as e:
+            # "Wifi Internal State Error": IDF still busy with the previous
+            # attempt or a scan. Give it a moment and try once more.
+            _dbg("connect raised %s, retrying once" % e)
+            try:
+                wlan.disconnect()
+            except Exception:
+                pass
+            time.sleep_ms(150)
+            wlan.connect(ssid, password or "")
     except Exception as e:
         print("[wifi] connect_begin failed:", e)
+        _dbg("join %r refused: %s" % (ssid, e))
         _conn_ssid   = None
         _conn_result = CONN_FAIL
+        _conn_last_code = None
         return False
     # The ESP32 port only overwrites its disconnect reason on the next
     # disconnect event or on GOT_IP, so wlan.status() can keep reporting
     # the previous attempt's AUTH_FAIL / NO_AP_FOUND for the whole of a
     # healthy new handshake. Remember that code and ignore it until the
     # driver reports something else (see connect_poll()).
-    try:
-        code = wlan.status()
-        _conn_stale = code if classify_status(code) else None
-    except Exception:
-        _conn_stale = None
+    code = _safe_status(wlan)
+    _conn_stale = code if classify_status(code) else None
+    _dbg("join %r started, status %s%s" % (
+        ssid, _status_name(code), " (stale)" if _conn_stale else ""))
     print("[wifi] connecting")
     _conn_ssid    = ssid
     _conn_t0      = _now()
     _conn_timeout = int(timeout_ms)
     _conn_bad     = None
+    _conn_code    = code
     _conn_result  = CONN_BUSY
     return True
 
@@ -1287,6 +1551,7 @@ def connect_cancel():
     global _conn_ssid, _conn_result
     if _conn_ssid is None:
         return
+    _dbg("join %r cancelled" % _conn_ssid)
     _conn_ssid = None
     _conn_result = CONN_IDLE
     try:
@@ -1298,6 +1563,7 @@ def connect_cancel():
 def connect_poll():
     """Advance the association started by connect_begin()."""
     global _conn_ssid, _conn_bad, _conn_bad_t0, _conn_result, _conn_stale
+    global _conn_code, _conn_last_code, _link_seq
     if _conn_ssid is None:
         return _conn_result
     wlan = _get_wlan()
@@ -1310,6 +1576,11 @@ def connect_poll():
         ssid = _conn_ssid
         _conn_ssid   = None
         _conn_result = CONN_OK
+        _conn_last_code = _STAT_GOT_IP
+        _link_seq += 1
+        # Back to "retry forever" so a short drop of an established link
+        # still recovers on its own, as before.
+        _set_reconnects(wlan, -1)
         try:
             _apply_power_cap(wlan)
         except Exception:
@@ -1318,12 +1589,13 @@ def connect_poll():
             _mark_last(ssid)
         except Exception:
             pass
+        _dbg("join %r ok after %d ms" % (ssid, time.ticks_diff(now, _conn_t0)))
         print("[wifi] associated")
         return CONN_OK
-    try:
-        code = wlan.status()
-    except Exception:
-        code = None
+    code = _safe_status(wlan)
+    if code != _conn_code:
+        _conn_code = code
+        _dbg("join status %s" % _status_name(code))
     bad = classify_status(code)
     if bad is not None and _conn_stale is not None and code == _conn_stale:
         # Possibly the previous attempt's reason; only a timeout ends
@@ -1336,19 +1608,25 @@ def connect_poll():
     fail = None
     if bad is None:
         _conn_bad = None
+    elif code not in _ST_EARLY:
+        # Only reported once the driver's retries are used up: final.
+        fail = bad
     elif bad != _conn_bad:
         _conn_bad, _conn_bad_t0 = bad, now
     elif time.ticks_diff(now, _conn_bad_t0) >= _BAD_HOLD_MS:
         fail = bad
     if fail is None and time.ticks_diff(now, _conn_t0) > _conn_timeout:
-        fail = stale_bad or CONN_TIMEOUT
+        fail = _conn_bad or stale_bad or CONN_TIMEOUT
     if fail is None:
         return CONN_BUSY
     print("[wifi] connect failed: %s" % fail)
+    _dbg("join %r failed: %s (status %s, %d ms)" % (
+        _conn_ssid, fail, _status_name(code), time.ticks_diff(now, _conn_t0)))
     _conn_ssid   = None
     _conn_result = fail
+    _conn_last_code = code
     try:
-        wlan.disconnect()       # stop the driver's endless retry loop
+        wlan.disconnect()       # stop the driver's retry loop
     except Exception:
         pass
     return fail
@@ -1364,8 +1642,10 @@ def connect_poll():
 #                   caller can start the HTTP server / NTP sync.
 #
 # After connecting, one background scan refreshes the nearby list (and
-# /wifi_seen.json) so Settings shows nearby networks immediately. When no
-# saved network is in range, the scan still runs and its results are kept.
+# /wifi_seen.json) so Settings shows nearby networks immediately. It waits
+# _REFRESH_DELAY_MS so it does not take the radio off-channel while the
+# first requests on the new link (time sync, App Store) run. When no saved
+# network is in range, the scan still runs and its results are kept.
 
 AUTO_OFF   = "off"
 AUTO_TRY   = "connecting"
@@ -1376,11 +1656,22 @@ AUTO_FAIL  = "no_network"
 _auto_state   = AUTO_OFF
 _auto_queue   = []
 _auto_tried   = []
+_auto_fast    = None      # SSID tried on the no-scan fast path
+_auto_retry_last = None   # fast-path SSID to retry after the scan
 _auto_scanned = False
 _auto_refresh = False     # post-connect nearby scan still to do
+_auto_refresh_at = 0
 _auto_next_ms = 0
 _auto_seq     = 0         # scan_seq() when this machine started its scan
 _AUTO_TICK_MS = 150
+_REFRESH_DELAY_MS = 8000
+
+
+def _auto_set(state):
+    global _auto_state
+    if state != _auto_state:
+        _dbg("auto %s -> %s" % (_auto_state, state))
+        _auto_state = state
 
 
 def auto_state():
@@ -1390,20 +1681,18 @@ def auto_state():
 def auto_stop():
     """Hand the radio to the user: the WiFi app calls this before a
     manual connect so the boot sequence does not fight it."""
-    global _auto_state
     if _auto_state in (AUTO_TRY, AUTO_SCAN):
-        _auto_state = AUTO_OFF
+        _auto_set(AUTO_OFF)
 
 
 def _auto_scan():
-    global _auto_state, _auto_scanned, _auto_seq
+    global _auto_scanned, _auto_seq
     _auto_scanned = True
     _auto_seq = _scan_seq
-    _auto_state = AUTO_SCAN if scan_start() else AUTO_FAIL
+    _auto_set(AUTO_SCAN if scan_start() else AUTO_FAIL)
 
 
 def _auto_try_next():
-    global _auto_state
     while _auto_queue:
         n = _auto_queue.pop(0)
         ssid = n.get("ssid") or ""
@@ -1411,7 +1700,7 @@ def _auto_try_next():
             continue
         _auto_tried.append(ssid)
         if connect_begin(ssid, n.get("password") or ""):
-            _auto_state = AUTO_TRY
+            _auto_set(AUTO_TRY)
             return True
     return False
 
@@ -1419,7 +1708,8 @@ def _auto_try_next():
 def auto_begin():
     """Kick off boot auto-connect without blocking. Safe to call again
     (e.g. from the WiFi app) — it restarts the sequence."""
-    global _auto_state, _auto_queue, _auto_tried, _auto_scanned, _auto_refresh
+    global _auto_queue, _auto_tried, _auto_scanned, _auto_refresh
+    global _auto_fast, _auto_seq, _auto_retry_last
     try:
         _sync_secrets_into_saved()
     except Exception as e:
@@ -1427,13 +1717,30 @@ def auto_begin():
     saved = list_saved()
     _auto_queue   = []
     _auto_tried   = []
+    _auto_fast    = None
+    _auto_retry_last = None
     _auto_scanned = False
     _auto_refresh = True
+    _dbg("auto begin: %d saved" % len(saved))
     if is_connected():
-        _auto_state = AUTO_DONE
+        _auto_set(AUTO_DONE)
+        return
+    if _conn_ssid is not None:
+        # A join is already in flight (e.g. started from the WiFi app):
+        # adopt it instead of tearing it down.
+        _auto_tried.append(_conn_ssid)
+        _auto_set(AUTO_TRY)
+        return
+    if _scan_busy:
+        # A join now would be refused by IDF mid-scan (and burn the
+        # fast-path network); use the scan that is already running.
+        _auto_scanned = True
+        _auto_seq = _scan_seq
+        _auto_set(AUTO_SCAN)
         return
     last = last_connected(saved)
     if last is not None:
+        _auto_fast = last.get("ssid")
         _auto_queue.append(last)
         if _auto_try_next():
             return
@@ -1442,7 +1749,8 @@ def auto_begin():
 
 def auto_tick():
     """Advance auto-connect. True exactly once when the link comes up."""
-    global _auto_state, _auto_queue, _auto_scanned, _auto_refresh, _auto_next_ms
+    global _auto_queue, _auto_refresh, _auto_next_ms, _auto_refresh_at
+    global _auto_retry_last
     if _auto_state == AUTO_OFF:
         return False
     now = _now()
@@ -1451,18 +1759,30 @@ def auto_tick():
     _auto_next_ms = time.ticks_add(now, _AUTO_TICK_MS)
 
     if _auto_state == AUTO_TRY:
+        target = _conn_ssid
         r = connect_poll()
         if r == CONN_BUSY:
             return False
         if r == CONN_OK:
-            _auto_state = AUTO_DONE
+            _auto_set(AUTO_DONE)
+            _auto_refresh_at = time.ticks_add(now, _REFRESH_DELAY_MS)
             return True
+        if (target is not None and target == _auto_fast and
+                not _auto_scanned and r in (CONN_NO_AP, CONN_TIMEOUT)):
+            # The fast path joins without a scan, so "not found" may just
+            # be a missed beacon. Let the scan decide: if the network is
+            # on the air it is tried again, after the other candidates.
+            try:
+                _auto_tried.remove(target)
+            except ValueError:
+                pass
+            _auto_retry_last = target
         if _auto_try_next():
             return False
         if not _auto_scanned:
             _auto_scan()
             return False
-        _auto_state = AUTO_FAIL
+        _auto_set(AUTO_FAIL)
         return False
 
     if _auto_state == AUTO_SCAN:
@@ -1473,14 +1793,23 @@ def auto_tick():
         # first; a moved scan_seq means they are fresh all the same.
         fresh = s == "done" or _scan_seq != _auto_seq
         visible = nearby() if fresh else None
+        if not visible:
+            # An empty scan on 1.28 is as likely "refused" as "nothing
+            # around"; try every saved network rather than none.
+            visible = None
         saved = list_saved()
         _auto_queue = pick_candidates(saved, visible, _auto_tried)
+        if _auto_retry_last:
+            again = [n for n in _auto_queue if n.get("ssid") == _auto_retry_last]
+            _auto_queue = [n for n in _auto_queue
+                           if n.get("ssid") != _auto_retry_last] + again
+        _dbg("auto scan %s: %d candidates" % (s, len(_auto_queue)))
         if _auto_try_next():
             return False
         if not saved:
             # Nothing to join: power down like the old boot path did.
             radio_off()
-        _auto_state = AUTO_FAIL
+        _auto_set(AUTO_FAIL)
         _auto_refresh = False
         return False
 
@@ -1488,7 +1817,9 @@ def auto_tick():
         # One post-connect scan so Settings shows what is around. Runs in
         # the background thread; skipped silently on thread-less builds
         # (a synchronous 2 s scan here would stall the home screen).
-        if not _scan_busy:
+        if time.ticks_diff(now, _auto_refresh_at) < 0:
+            return False
+        if not _scan_busy and _conn_ssid is None:
             try:
                 import _thread  # noqa: F401 (availability probe)
                 _auto_refresh = False
