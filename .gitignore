@@ -29,3 +29,9 @@ firmware/*.bin
 .deploy_hashes.json
 dist/
 legal/
+
+# Doom game data (lives on the doom-edition branch; never commit WAD/OWZ files)
+oreoWare/doom/
+*.wad
+*.WAD
+*.owz
