@@ -89,12 +89,13 @@ WiFi, and fun to hack. These items close the gap.
 - [x] 🤖 **Hackaday.io** page text drafted (name, summary, description,
       details, components, links, tags, image list).
 - [ ] 🙋 Post it on hackaday.io with photos and the badge video.
-- [x] 🤖 **Own USB PID** under Espressif's VID: requested 0x83E9 in
+- [x] 🤖 **Own USB PID** under Espressif's VID: **0x83EC**, allocated in
       [espressif/usb-pids#425](https://github.com/espressif/usb-pids/pull/425)
-      (2026-11-02). Espressif grants PIDs to MicroPython boards routinely
-      (64 MicroPython entries in their list).
-- [ ] 🤖 When the PID is merged: set `MICROPY_HW_USB_VID 0x303A` and
-      `MICROPY_HW_USB_PID` in `firmware/boards/OREO_BADGE/mpconfigboard.h`.
+      (requested 2026-11-02, merged 2026-11-10; 0x83E9 went to another
+      project in the meantime).
+- [x] 🤖 Set `MICROPY_HW_USB_VID 0x303A` and `MICROPY_HW_USB_PID 0x83EC` in
+      `firmware/boards/OREO_BADGE/mpconfigboard.h`.
+- [ ] 🙋 Rebuild and flash the firmware; check `lsusb` shows `303a:83ec`.
 - [ ] 🤖 Submit "Elixpo Oreo Badge" to the Linux USB ID database (`usb.ids`,
       linux-usb.org), so plain `lsusb` and systemd's hwdb name the badge.
 - [ ] 🙋 A good photo of the badge (JPEG, plain background) for MicroPython's
@@ -121,10 +122,14 @@ WiFi, and fun to hack. These items close the gap.
       ([project 16187](https://www.bestpractices.dev/projects/16187), 2026-11-02).
       Answering it surfaced and fixed predictable Send Files codes
       ([oreo#78](https://github.com/elixpo/oreo/pull/78)).
-- [x] 🤖 **MicroPython upstream board** opened as a draft
-      ([micropython#19846](https://github.com/micropython/micropython/pull/19846)).
-- [ ] 🙋 Build it on MicroPython master, flash, check banner, Wi-Fi scan and
-      `I2C(0).scan()` (expect 0x68), send the badge photo, then mark ready.
+- [x] 🤖 **MicroPython upstream board** opened
+      ([micropython#19846](https://github.com/micropython/micropython/pull/19846)),
+      now out of draft.
+- [x] 🤖 Add the allocated USB VID/PID (0x303A:0x83EC) to the upstream board.
+- [ ] 🙋 Build it on MicroPython master, flash, check banner, Wi-Fi scan,
+      `I2C(0).scan()` (expect 0x68) and `lsusb` (`303a:83ec`).
+- [ ] 🙋 Send the badge photo to `micropython/micropython-media`, then ask
+      for review on the PR.
 - [x] 🤖 **MicroPython Show and tell** post
       ([discussions#19847](https://github.com/orgs/micropython/discussions/19847)).
 
