@@ -17,17 +17,36 @@ oreo help <command>
 
 ## Install
 
-From a checkout, for now (GitHub releases, `install.sh` / `install.ps1`
-with SHA-256 checks, and `pipx` / `uv tool` installs from the release
-come in the release stage of #117):
+Needs Python 3.9+ and [uv](https://docs.astral.sh/uv/) or
+[pipx](https://pipx.pypa.io/). The installers download the wheel from the
+latest `cli-v*` GitHub release, check its SHA-256 and install it with
+whichever of the two is present.
 
 ```sh
-pipx install ./cli          # or: pip install -e cli/
+# Linux, macOS
+curl --proto '=https' --tlsv1.2 -LsSf \
+  https://raw.githubusercontent.com/elixpo/oreo/main/cli/install.sh | sh
 ```
 
-Needs Python 3.9+. Dependencies: `rich`, `pyserial`, `mpremote` 1.28.x
-(matching the badge's MicroPython 1.28), `Pillow`. Videos also need
-`ffmpeg` on your PATH.
+```powershell
+# Windows
+irm https://raw.githubusercontent.com/elixpo/oreo/main/cli/install.ps1 | iex
+```
+
+Pin a release with `OREO_CLI_VERSION=cli-v0.1.0`. Or download
+`oreo_cli-<version>-py3-none-any.whl` and `SHA256SUMS` from the
+[releases](https://github.com/elixpo/oreo/releases), check them, and run
+`pipx install oreo_cli-<version>-py3-none-any.whl`; each release also has a
+build-provenance attestation (`gh attestation verify <file> -R elixpo/oreo`).
+
+From a checkout: `pipx install ./cli` (or `pip install -e cli/`).
+
+Dependencies: `rich`, `pyserial`, `mpremote` 1.28.x (matching the badge's
+MicroPython 1.28), `Pillow`. Videos also need `ffmpeg` on your PATH.
+
+Full guide (every command, Wi-Fi setup, troubleshooting):
+[docs/CLI.md](https://github.com/elixpo/oreo/blob/main/docs/CLI.md).
+Changes: [CHANGELOG.md](https://github.com/elixpo/oreo/blob/main/cli/CHANGELOG.md).
 
 On Linux, opening the port needs the `dialout` group (`uucp` on Arch):
 `sudo usermod -aG dialout $USER`, then log out and back in. `oreo doctor`
@@ -89,3 +108,15 @@ runs them against the real `oreoWare/wifi.py` and `oreoOS/storage.py`.
 The media converters in `oreo_cli/media.py` are copied from
 `tools/media_ingest.py` and `tools/encode_video_benchmark.py`; keep the
 formats in step.
+
+`tests/test_release.py` runs `install.sh` against a local folder with a
+stub installer, and checks that the release workflow, both installers and
+this changelog agree on asset names and the version.
+
+## Releasing
+
+Set `__version__` in `oreo_cli/__init__.py`, add a `## [<version>]` section
+to `CHANGELOG.md`, merge, then push a `cli-v<version>` tag. The
+`cli-release` workflow tests, builds, checksums, attests and publishes the
+release; it never touches the OreoOS (`stable/`, `beta/`) releases. Details
+in [docs/CLI.md](https://github.com/elixpo/oreo/blob/main/docs/CLI.md#releasing).

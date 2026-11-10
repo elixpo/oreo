@@ -1,10 +1,11 @@
 # oreo-cli: the command-line tool for the Elixpo Oreo Badge (issue #117).
 #
 # Standalone package: it does not import anything from the OreoOS tree, so
-# it can be installed on its own from a GitHub release:
+# it can be installed on its own from a GitHub release (cli/install.sh,
+# cli/install.ps1, or by hand; see docs/CLI.md):
 #
-#     pipx install oreo-cli-<version>.whl
-#     uv tool install oreo-cli-<version>.whl
+#     pipx install oreo_cli-<version>-py3-none-any.whl
+#     uv tool install oreo_cli-<version>-py3-none-any.whl
 #
 # Development install from a checkout:
 #
@@ -49,6 +50,8 @@ oreo = "oreo_cli.main:main"
 Homepage      = "https://oreo.elixpo.com"
 Repository    = "https://github.com/elixpo/oreo"
 Issues        = "https://github.com/elixpo/oreo/issues"
+Documentation = "https://github.com/elixpo/oreo/blob/main/docs/CLI.md"
+Changelog     = "https://github.com/elixpo/oreo/blob/main/cli/CHANGELOG.md"
 
 [tool.setuptools]
 packages = ["oreo_cli"]
