@@ -1,0 +1,57 @@
+# oreo-cli: the command-line tool for the Elixpo Oreo Badge (issue #117).
+#
+# Standalone package: it does not import anything from the OreoOS tree, so
+# it can be installed on its own from a GitHub release:
+#
+#     pipx install oreo-cli-<version>.whl
+#     uv tool install oreo-cli-<version>.whl
+#
+# Development install from a checkout:
+#
+#     pip install -e cli/
+#     python3 -m unittest discover -s cli/tests -v
+
+[build-system]
+requires      = ["setuptools >= 68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name            = "oreo-cli"
+dynamic         = ["version"]
+description     = "oreo: find, control and update the Elixpo Oreo Badge over USB."
+readme          = "README.md"
+requires-python = ">=3.9"
+license         = { text = "MIT" }
+authors         = [{ name = "Elixpo", email = "hello@elixpo.com" }]
+keywords        = ["oreo", "oreoos", "elixpo", "badge", "micropython", "esp32-s3", "cli"]
+classifiers     = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Embedded Systems",
+]
+dependencies = [
+    "rich >= 13.0",
+    "pyserial >= 3.5",
+    # Same pin as oreoOS/requirements.txt: the raw-REPL / raw-paste
+    # transport must match the badge's MicroPython 1.28 firmware.
+    "mpremote >= 1.28.0, < 1.29",
+    "Pillow >= 10.0",
+]
+
+[project.scripts]
+oreo = "oreo_cli.main:main"
+
+[project.urls]
+Homepage      = "https://oreo.elixpo.com"
+Repository    = "https://github.com/elixpo/oreo"
+Issues        = "https://github.com/elixpo/oreo/issues"
+
+[tool.setuptools]
+packages = ["oreo_cli"]
+
+[tool.setuptools.dynamic]
+version = { attr = "oreo_cli.__version__" }
