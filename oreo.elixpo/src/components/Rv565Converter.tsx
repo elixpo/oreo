@@ -5,28 +5,58 @@ import {
   AlertTriangle, Download, FileCode, Film, Loader2, Pause, Play, ShieldCheck, Upload, X,
 } from "lucide-react";
 import {
-  buildContainer, checkSchedule, decodeFrame, parseContainer, rgb565beToRgba, rgbaToRgb565be,
-  toCArray, zlibCompress, type Rv565Clip, type ScheduleReport,
+  RV565_MAX_FPS, RV565_MAX_FPS_V6, Rv565Encoder, checkSchedule, convertPixels, decodeFrame, frameTypeCounts,
+  parseContainer, toCArray, toRgba, verify, type Codec, type PixelFormat, type Rv565Clip, type ScheduleReport,
 } from "@/lib/rv565";
 
 /* Video → RV565 converter. Everything runs in this tab: the video is decoded
  * by the browser's own <video> element, drawn to a canvas at the target size,
- * converted to RGB565 and compressed with CompressionStream. Nothing is
- * uploaded, so the size cap only protects the visitor's memory. */
+ * converted to the chosen pixel format and compressed with CompressionStream.
+ * Nothing is uploaded, so the size cap only protects the visitor's memory.
+ * An existing .rv565 file (version 6 or 7) dropped here is checked and played
+ * instead. */
 
 const MAX_INPUT_MB = 200;
 const MAX_SECONDS = 30;
 
 const SIZES = [
   { id: "180x135", w: 180, h: 135, label: "180×135", note: "Paper setting: scaled to 320×240, 24 FPS with zero misses on ESP32-S3" },
-  { id: "320x240", w: 320, h: 240, label: "320×240", note: "Full 2.0\" panel, no scaling" },
-  { id: "240x240", w: 240, h: 240, label: "240×240", note: "1.3\" and 1.54\" square panels" },
-  { id: "240x135", w: 240, h: 135, label: "240×135", note: "1.14\" panels, landscape" },
-  { id: "160x120", w: 160, h: 120, label: "160×120", note: "Smallest files" },
+  { id: "320x240", w: 320, h: 240, label: "320×240", note: "2.0\"–2.8\" TFTs (ST7789, ILI9341), no scaling" },
+  { id: "240x240", w: 240, h: 240, label: "240×240", note: "1.3\" and 1.54\" square TFTs, GC9A01 round" },
+  { id: "240x135", w: 240, h: 135, label: "240×135", note: "1.14\" TFTs, landscape" },
+  { id: "160x128", w: 160, h: 128, label: "160×128", note: "1.8\" ST7735 TFTs" },
+  { id: "128x128", w: 128, h: 128, label: "128×128", note: "1.44\" ST7735 TFTs, SSD1327 OLEDs" },
+  { id: "256x64", w: 256, h: 64, label: "256×64", note: "SSD1322 grayscale OLEDs" },
+  { id: "128x64", w: 128, h: 64, label: "128×64", note: "SSD1306 and SH1106 OLEDs, ST7567 LCDs" },
+  { id: "128x32", w: 128, h: 32, label: "128×32", note: "0.91\" SSD1306 OLEDs" },
 ] as const;
 
+/* Labels name the panels that take each format natively (docs/FORMAT.md). */
+const FORMATS: ReadonlyArray<{ id: PixelFormat; label: string; note: string }> = [
+  { id: "rgb565be", label: "RGB565 (ST7789/ILI9341 SPI)", note: "16-bit, high byte first: ST7789, ST7735, ILI9341, GC9A01 and most SPI TFTs." },
+  { id: "rgb565le", label: "RGB565 little-endian (parallel/MIPI, LVGL)", note: "16-bit, low byte first: RGB parallel and MIPI panels, frame buffers in memory, LVGL without byte swap." },
+  { id: "rgb444", label: "RGB444 12-bit (ST7789/ST7735 COLMOD 0x03)", note: "Two pixels in three bytes: a quarter less to send over SPI than RGB565." },
+  { id: "rgb666", label: "RGB666 18-bit (ILI9488/ST7796 SPI)", note: "One byte per channel, top 6 bits used: ILI9341, ILI9488 and ST7796 in 18-bit SPI mode." },
+  { id: "rgb888", label: "RGB888 24-bit (24-bit panels)", note: "Full colour, three bytes per pixel: 24-bit panels and host tools." },
+  { id: "gray8", label: "Grayscale 8-bit", note: "One byte per pixel: grayscale displays and intermediate buffers." },
+  { id: "gray4", label: "Grayscale 4-bit (SSD1322/SSD1327 OLED)", note: "16 levels, two pixels per byte: SSD1322, SSD1327 and SSD1362 OLEDs." },
+  { id: "mono", label: "Monochrome rows (e-paper, Sharp memory LCD)", note: "1 bit per pixel in rows, 1 = lit: e-paper, Sharp memory LCDs, ST7920." },
+  { id: "mono_vpage", label: "Monochrome page (SSD1306 OLED)", note: "1 bit per pixel in 8-row pages, the SSD1306, SH1106 and ST7567 RAM layout." },
+];
+
 type Fit = "fill" | "fit";
-type Result = { clip: Rv565Clip; container: Uint8Array; report: ScheduleReport; serial: ScheduleReport; name: string };
+type KeyMode = "second" | "every" | "custom";
+type Result = {
+  clip: Rv565Clip; container: Uint8Array; report: ScheduleReport; serial: ScheduleReport; name: string;
+  counts: { key: number; delta: number; repeat: number }; opened: boolean;
+};
+
+function makeResult(clip: Rv565Clip, name: string, opened: boolean): Result {
+  return {
+    clip, container: clip.data, name, opened, counts: frameTypeCounts(clip),
+    report: checkSchedule(clip, true), serial: checkSchedule(clip, false),
+  };
+}
 
 function waitFor(el: HTMLMediaElement, event: string) {
   return new Promise<void>((resolve, reject) => {
@@ -60,6 +90,11 @@ export default function Rv565Converter() {
   const [start, setStart] = useState(0);
   const [seconds, setSeconds] = useState(10);
   const [fit, setFit] = useState<Fit>("fill");
+  const [v6, setV6] = useState(false);
+  const [pixelFormat, setPixelFormat] = useState<PixelFormat>("rgb565be");
+  const [codec, setCodec] = useState<Codec>("zlib");
+  const [keyMode, setKeyMode] = useState<KeyMode>("second");
+  const [keyCustom, setKeyCustom] = useState(24);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -70,15 +105,33 @@ export default function Rv565Converter() {
   const cancelRef = useRef(false);
   const previewRef = useRef<HTMLCanvasElement>(null);
   const size = SIZES.find((s) => s.id === sizeId)!;
+  const format = FORMATS.find((f) => f.id === pixelFormat)!;
+  const maxFps = v6 ? RV565_MAX_FPS_V6 : RV565_MAX_FPS;
   const frameCount = Math.max(1, Math.floor(Math.min(seconds, Math.max(0, duration - start)) * fps));
+  // Version 6 is RGB565 big-endian, zlib, every frame a keyframe.
+  const keyframeInterval = v6 || keyMode === "every" ? 1 : keyMode === "second" ? Math.min(255, fps) : keyCustom;
 
   useEffect(() => () => { if (videoUrl) URL.revokeObjectURL(videoUrl); }, [videoUrl]);
 
-  const choose = useCallback((f: File | undefined) => {
+  const choose = useCallback(async (f: File | undefined) => {
     setError(null);
     setResult(null);
     if (!f) return;
-    if (!f.type.startsWith("video/")) { setError("Choose a video file (MP4, WebM or MOV)."); return; }
+    if (/\.rv565$/i.test(f.name)) {
+      // Check and play an existing file: decode every frame before showing it.
+      try {
+        const clip = parseContainer(new Uint8Array(await f.arrayBuffer()));
+        await verify(clip);
+        setFile(null);
+        setVideoUrl(null);
+        setResult(makeResult(clip, f.name.replace(/\.rv565$/i, ""), true));
+        setPlaying(true);
+      } catch (e) {
+        setError(`${f.name} is not a valid RV565 file: ${e instanceof Error ? e.message : String(e)}`);
+      }
+      return;
+    }
+    if (!f.type.startsWith("video/")) { setError("Choose a video file (MP4, WebM or MOV), or an .rv565 file to check."); return; }
     if (f.size > MAX_INPUT_MB * 1024 * 1024) { setError(`That file is ${formatBytes(f.size)}; the limit is ${MAX_INPUT_MB} MB. Trim it first.`); return; }
     setFile(f);
     setVideoUrl(URL.createObjectURL(f));
@@ -111,7 +164,9 @@ export default function Rv565Converter() {
       const dw = vw * scale, dh = vh * scale;
       const dx = (size.w - dw) / 2, dy = (size.h - dh) / 2;
 
-      const payloads: Uint8Array[] = [];
+      const encoder = new Rv565Encoder(size.w, size.h, fps, {
+        version: v6 ? 6 : 7, pixelFormat: v6 ? "rgb565be" : pixelFormat, codec: v6 ? "zlib" : codec, keyframeInterval,
+      });
       for (let i = 0; i < frameCount; i++) {
         if (cancelRef.current) throw new Error("Cancelled.");
         const t = start + i / fps;
@@ -124,34 +179,35 @@ export default function Rv565Converter() {
         ctx.fillRect(0, 0, size.w, size.h);
         ctx.drawImage(video, dx, dy, dw, dh);
         const pixels = ctx.getImageData(0, 0, size.w, size.h).data;
-        payloads.push(await zlibCompress(rgbaToRgb565be(pixels)));
+        await encoder.add(convertPixels(pixels, size.w, size.h, encoder.pixelFormat, 4));
         setProgress((i + 1) / frameCount);
       }
 
-      const container = buildContainer(size.w, size.h, fps, payloads);
-      const clip = parseContainer(container);
+      const clip = parseContainer(encoder.finish());
       const name = file.name.replace(/\.[^.]+$/, "") || "clip";
-      setResult({ clip, container, report: checkSchedule(clip, true), serial: checkSchedule(clip, false), name });
+      setResult(makeResult(clip, name, false));
       setPlaying(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
-  }, [videoUrl, file, size, fit, fps, start, frameCount]);
+  }, [videoUrl, file, size, fit, fps, start, frameCount, v6, pixelFormat, codec, keyframeInterval]);
 
-  // Preview: inflate each frame on the fly, as the microcontroller does.
+  // Preview: decode each frame on the fly, as the microcontroller does, then
+  // show it as RGB (grayscale and monochrome formats as white on black).
   useEffect(() => {
     const canvas = previewRef.current;
     if (!result || !canvas || !playing) return;
     const { clip } = result;
+    const { width, height, pixelFormat: fmt } = clip.header;
     const ctx = canvas.getContext("2d")!;
     const image = ctx.createImageData(clip.header.width, clip.header.height);
     let frame = 0, stopped = false, timer = 0;
     const tick = async () => {
       if (stopped) return;
       const t0 = performance.now();
-      rgb565beToRgba(await decodeFrame(clip, frame), image.data);
+      toRgba(await decodeFrame(clip, frame), width, height, fmt, image.data);
       if (stopped) return;
       ctx.putImageData(image, 0, 0);
       frame = (frame + 1) % clip.header.frames;
@@ -161,7 +217,9 @@ export default function Rv565Converter() {
     return () => { stopped = true; clearTimeout(timer); };
   }, [result, playing]);
 
-  const modelApplies = result && result.clip.header.width === 180 && result.clip.header.height === 135;
+  const header = result?.clip.header;
+  const rgb565zlib = header?.pixelFormat === "rgb565be" && header.codec === "zlib";
+  const modelApplies = rgb565zlib && header.width === 180 && header.height === 135;
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
@@ -173,7 +231,7 @@ export default function Rv565Converter() {
           onDrop={(e) => { e.preventDefault(); setDragging(false); choose(e.dataTransfer.files[0]); }}
           className={`flex cursor-pointer flex-col items-center justify-center rounded-[1.1rem] border-2 border-dashed px-6 py-10 text-center transition-colors ${dragging ? "border-text bg-bg" : "border-border bg-bg/60 hover:border-text"}`}
         >
-          <input type="file" accept="video/*" className="sr-only" onChange={(e) => choose(e.target.files?.[0])} />
+          <input type="file" accept="video/*,.rv565" className="sr-only" onChange={(e) => choose(e.target.files?.[0])} />
           {file ? (
             <>
               <Film className="h-7 w-7" />
@@ -187,6 +245,7 @@ export default function Rv565Converter() {
               <Upload className="h-7 w-7" />
               <span className="mt-3 font-semibold">Drop a video here, or click to choose</span>
               <span className="mt-1 text-xs text-muted">MP4, WebM or MOV · up to {MAX_INPUT_MB} MB · stays on your device</span>
+              <span className="mt-1 text-xs text-muted">Or drop an .rv565 file (version 6 or 7) to check and play it</span>
             </>
           )}
         </label>
@@ -209,10 +268,63 @@ export default function Rv565Converter() {
         </fieldset>
 
         <fieldset className="mt-8 grid gap-5 sm:grid-cols-2" disabled={busy}>
+          <legend className="eyebrow mb-3">Display and file format</legend>
+          <label className="block text-sm sm:col-span-2">
+            <span className="eyebrow">Pixel format</span>
+            <select value={v6 ? "rgb565be" : pixelFormat} disabled={v6} onChange={(e) => setPixelFormat(e.target.value as PixelFormat)}
+                    className="mt-2 w-full rounded-pill border border-border bg-bg px-4 py-2">
+              {FORMATS.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}
+            </select>
+            <span className="mt-2 block text-xs leading-snug text-muted">
+              {v6 ? FORMATS[0].note : format.note} The page converts the colours, so the board only decodes and sends.
+            </span>
+          </label>
+          <label className="block text-sm">
+            <span className="eyebrow">Compression</span>
+            <select value={v6 ? "zlib" : codec} disabled={v6} onChange={(e) => setCodec(e.target.value as Codec)}
+                    className="mt-2 w-full rounded-pill border border-border bg-bg px-4 py-2">
+              <option value="zlib">zlib (smaller files)</option>
+              <option value="stored">Stored (no inflate on the board)</option>
+            </select>
+          </label>
+          <label className="block text-sm">
+            <span className="eyebrow">Keyframes</span>
+            <select value={v6 ? "every" : keyMode} disabled={v6} onChange={(e) => setKeyMode(e.target.value as KeyMode)}
+                    className="mt-2 w-full rounded-pill border border-border bg-bg px-4 py-2">
+              <option value="second">Every second ({Math.min(255, fps)} frames)</option>
+              <option value="every">Every frame</option>
+              <option value="custom">Every N frames…</option>
+            </select>
+            {keyMode === "custom" && !v6 && (
+              <input type="number" min={1} max={255} value={keyCustom} aria-label="Keyframe interval in frames"
+                     onChange={(e) => setKeyCustom(Math.min(255, Math.max(1, Math.round(+e.target.value) || 1)))}
+                     className="mt-2 w-full rounded-pill border border-border bg-bg px-4 py-2" />
+            )}
+          </label>
+          <p className="text-xs leading-relaxed text-muted sm:col-span-2">
+            Between keyframes, a frame identical to the one before is stored as a repeat, and any other as an XOR delta
+            only when that is smaller than a keyframe, so a frame never costs more than a keyframe would. A keyframe
+            every second keeps seeking to at most one second of frames. Stored files use repeats but no deltas, since a
+            stored delta is never smaller.
+          </p>
+          <label className="flex items-start gap-3 text-sm sm:col-span-2">
+            <input type="checkbox" checked={v6} className="mt-1 accent-[#142018]"
+                   onChange={(e) => { setV6(e.target.checked); if (e.target.checked) setFps((f) => Math.min(f, RV565_MAX_FPS_V6)); }} />
+            <span>
+              <span className="font-semibold">Version 6 file</span>
+              <span className="block text-xs leading-snug text-muted">
+                For players that read only version 6: the released RV565 1.x library and the Oreo badge Gallery.
+                RGB565, zlib, every frame a keyframe, up to 30 FPS.
+              </span>
+            </span>
+          </label>
+        </fieldset>
+
+        <fieldset className="mt-8 grid gap-5 sm:grid-cols-2" disabled={busy}>
           <label className="block text-sm">
             <span className="eyebrow">Frame rate</span>
             <span className="mt-2 flex items-center gap-3">
-              <input type="range" min={1} max={30} value={fps} onChange={(e) => setFps(+e.target.value)} className="w-full accent-[#142018]" />
+              <input type="range" min={1} max={maxFps} value={Math.min(fps, maxFps)} onChange={(e) => setFps(+e.target.value)} className="w-full accent-[#142018]" />
               <span className="w-14 text-right font-mono">{fps} FPS</span>
             </span>
           </label>
@@ -249,7 +361,7 @@ export default function Rv565Converter() {
             </button>
           )}
           <span className="text-xs text-muted">
-            {file ? `${frameCount} frames at ${size.label}` : "Choose a video to start"}
+            {file ? `${frameCount} frames at ${size.label}, ${v6 ? "version 6" : `${pixelFormat}, ${codec}`}` : "Choose a video to start"}
           </span>
         </div>
 
@@ -278,7 +390,7 @@ export default function Rv565Converter() {
             <canvas ref={previewRef} width={result.clip.header.width} height={result.clip.header.height}
                     className="h-full w-full object-contain [image-rendering:pixelated]" />
           ) : (
-            <p className="px-6 text-center text-xs text-white/60">The converted clip plays here, decoded from the RV565 file exactly as the board will.</p>
+            <p className="px-6 text-center text-xs text-white/60">The converted clip plays here, decoded from the RV565 file exactly as the board will, shown in RGB.</p>
           )}
         </div>
 
@@ -292,6 +404,17 @@ export default function Rv565Converter() {
                 {result.clip.header.width}×{result.clip.header.height} · {result.clip.header.fps} FPS · {result.clip.header.frames} frames · {formatBytes(result.container.length)}
               </span>
             </div>
+            <p className="mt-2 font-mono text-xs text-muted">
+              RV565 v{result.clip.header.version} · {result.clip.header.pixelFormat} · {result.clip.header.codec}
+              {" "}· keyframe every {result.clip.header.keyframeInterval} · {result.counts.key} key, {result.counts.delta} delta, {result.counts.repeat} repeat
+              {result.opened ? " · every frame verified" : ""}
+            </p>
+            {result.clip.header.version === 7 && (
+              <p className="mt-2 text-xs leading-relaxed text-muted">
+                Version 7 files need an RV565 2.0 player. The released RV565 1.x library and the Oreo badge Gallery read
+                version 6: tick &ldquo;Version 6 file&rdquo; for them.
+              </p>
+            )}
 
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
               <button type="button" className="btn-primary" onClick={() => download(result.container as BlobPart, `${result.name}.rv565`, "video/x-rv565")}>
@@ -304,7 +427,7 @@ export default function Rv565Converter() {
 
             <div className="mt-6 rounded-xl border border-border bg-bg p-4 text-sm">
               <p className="eyebrow">Will it play smoothly?</p>
-              {modelApplies ? (
+              {modelApplies && header ? (
                 <ul className="mt-2 space-y-1">
                   <li>
                     <span className="font-semibold">ESP32-S3, dual-core: </span>
@@ -318,12 +441,17 @@ export default function Rv565Converter() {
                       {result.serial.lateFrames ? `${result.serial.lateFrames} of ${result.clip.header.frames} frames late` : "yes"}
                     </span>
                   </li>
-                  <li className="text-xs text-muted">From the paper&apos;s decode-cost model, on a 320×240 panel at 40 MHz SPI.</li>
+                  <li className="text-xs text-muted">
+                    From the paper&apos;s decode-cost model, on a 320×240 panel at 40 MHz SPI.
+                    {result.counts.delta ? " Deltas add one XOR pass per frame, which the model does not include." : ""}
+                  </li>
                 </ul>
               ) : (
                 <p className="mt-2 text-xs leading-relaxed text-muted">
-                  The paper&apos;s cost model is fitted for 180×135 frames, so no prediction is shown for this size.
-                  Run <code className="font-mono">rv565_check_schedule()</code> with a model measured on your board.
+                  {rgb565zlib
+                    ? "The paper's cost model is fitted for 180×135 frames, so no prediction is shown for this size."
+                    : "The paper's cost model is fitted for RGB565 zlib frames, so no prediction is shown for this format."}
+                  {" "}Measure decode time on your board and fit its own model before relying on a frame rate.
                 </p>
               )}
             </div>

@@ -8,6 +8,10 @@ the CLI ships standalone. Keep the formats in step with those tools:
                        + per frame <I len> + zlib(RGB565 BE frame)
   document  -> .mdz / .txtz  "ODZ\\x01" + <I raw_len> + zlib(UTF-8)
 
+Videos stay on RV565 v6 even though RV565 format version 7 exists: the
+Gallery, the Transfer app's checks and the firmware's _oreo_rv565 module read
+only v6 until the firmware moves to the RV565 2.0 C library.
+
 Contract (same as media_ingest): detect -> convert -> validate the final
 file -> check the badge's space -> copy. Source size is never used as a
 proxy for stored size.
