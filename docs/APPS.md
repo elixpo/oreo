@@ -131,7 +131,7 @@ frame. Rules that keep the badge responsive:
 |---|---|---|
 | `name` | `"unnamed"` | Shown in headers and crash screens. |
 | `SHOW_LOADING` | `False` | Show the loading slide while `on_enter` runs. Set it when `on_enter` takes more than about 200 ms. |
-| `CAPTURES_C` | `False` | Deliver C to the app instead of opening the notification panel. A double-tap of C still opens the panel. May be changed on the instance at runtime, for example only during play. |
+| `CAPTURES_C` | `False` | Deliver C to the app instead of opening the notification panel. A double-tap of C still opens the panel. May be changed on the instance at runtime, for example only during play. See [The C key](#the-c-key). |
 | `BLOCK_IDLE` | `False` | Keep the badge from auto-sleeping while the app is open (video, a timer). |
 | `realtime_mode()` | `False` | Return True only while playing media or capturing; the OS then defers its housekeeping for lower latency. |
 | `on_home_press()` | not set | Return True to handle HOME yourself (for example to close a dialog). Otherwise HOME goes back to the Apps drawer. |
@@ -148,6 +148,24 @@ means across the OS; they are the same numbers as the physical names.
 | `BTN_PANEL` | `BTN_C` | notification panel, unless `CAPTURES_C` |
 | `BTN_HOME` | `BTN_HOME` | leaves the app; the OS handles it |
 | `BTN_UP/DOWN/LEFT/RIGHT` | same | D-pad; the OS auto-repeats held D-pad presses |
+
+### The C key
+
+C opens the notification panel from every app. If C is one of your app's
+controls (a fire button, a mode switch, a button tester):
+
+- set `CAPTURES_C = True` on the `App` class (or on the instance while C
+  is in use, for example only during play);
+- a single C then reaches `on_button_press`, and a quick double-tap of C
+  (two presses within 350 ms) opens the panel. The first press of the pair
+  has already reached your app; the second does not. Make a C action cheap
+  to repeat, or ignore a second C that follows within that time;
+- the double-tap cannot be turned off, so the panel is always reachable.
+  The old `C_DOUBLE_TAP = False` opt-out is ignored.
+
+`tests/test_c_key_rule.py` fails when an app under `apps/`,
+`apps_market/` or `app_templates/` mentions `BTN_C` or `BTN_PANEL` in its
+code without setting `CAPTURES_C = True`, or sets `C_DOUBLE_TAP`.
 
 For held buttons (steering, charging a jump) poll in `update()`:
 
