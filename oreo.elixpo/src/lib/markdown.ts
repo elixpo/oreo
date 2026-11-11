@@ -1,20 +1,27 @@
-/* Build-time Markdown → HTML for the guides in the repository's docs/
- * folder (CLI.md, USB.md, TRANSFER.md), so the website renders the same
- * files the repository reads instead of a copy that drifts.
+/* Build-time Markdown → HTML for Markdown files in the repository (the
+ * guides in docs/, the hacks in docs/hacks/, CONTRIBUTING.md), so the
+ * website renders the same files the repository reads instead of a copy
+ * that drifts.
  *
  * Runs only on the server, at `next build` (the site is a static export),
  * so none of this reaches the browser bundle.
  *
- * Supported subset, which is what those guides use:
+ * Supported subset, which is what those files use:
  *   • # to #### headings, with GitHub-style ids so "#anchor" links work
  *   • paragraphs, **bold**, *italic*, `code`, [links](url), \-escapes
  *   • bullet and numbered lists, nested by indentation, with code blocks
  *     and paragraphs inside items
  *   • fenced code blocks, blockquotes, tables (with \| inside cells), ---
+ *   • ```mermaid blocks, through an optional `diagram` hook that returns
+ *     ready-made SVG (see src/lib/diagrams.ts); without one, or when the
+ *     hook has no drawing for that source, the source is shown as code
  * Raw HTML in the source is escaped, never passed through.
  */
 
 export type LinkResolver = (href: string) => string;
+
+/** Returns the HTML for a ```mermaid block, or null to show its source. */
+export type DiagramHook = (source: string) => string | null;
 
 export type Heading = { level: number; id: string; text: string };
 
@@ -22,13 +29,28 @@ export type RenderedDoc = { html: string; headings: Heading[]; title: string };
 
 const REPO_BLOB = "https://github.com/elixpo/oreo/blob/main/";
 
-/** Map links written for GitHub (relative to docs/) to site URLs.
+/** Resolve `path` against the repository folder `dir` ("" is the root). */
+export function repoPath(dir: string, path: string): string {
+  const parts: string[] = dir.split("/").filter(Boolean);
+  for (const seg of path.split("/")) {
+    if (seg === "" || seg === ".") continue;
+    if (seg === "..") parts.pop();
+    else parts.push(seg);
+  }
+  return parts.join("/");
+}
+
+/** Map links written for GitHub to site URLs.
  *
- * `pages`: files rendered from Markdown on the site, so their "#anchor"
- * links work there too. `overviews`: files the site covers with a page of
- * its own wording; a bare link goes there, a link to a section goes to the
- * file on GitHub, where that section exists. */
-export function docsLinkResolver(
+ * `dir`: the repository folder of the file being rendered ("docs",
+ * "docs/hacks", "" for the root), which relative links start from.
+ * `pages`: repository paths rendered from Markdown on the site, so their
+ * "#anchor" links work there too. `overviews`: paths the site covers with
+ * a page of its own wording; a bare link goes there, a link to a section
+ * goes to the file on GitHub, where that section exists. Everything else
+ * goes to the file on GitHub. */
+export function repoLinkResolver(
+  dir: string,
   pages: Record<string, string>,
   overviews: Record<string, string> = {},
 ): LinkResolver {
@@ -36,17 +58,10 @@ export function docsLinkResolver(
     if (/^(https?:|mailto:|#)/.test(href)) return href;
     const [path, hash = ""] = href.split("#", 2);
     const anchor = hash ? "#" + hash : "";
-    if (pages[path] !== undefined) return pages[path] + anchor;
-    if (!hash && overviews[path] !== undefined) return overviews[path];
-    // Anything else in the repository: resolve against docs/ and send the
-    // reader to GitHub.
-    const parts: string[] = ["docs"];
-    for (const seg of path.split("/")) {
-      if (seg === "" || seg === ".") continue;
-      if (seg === "..") parts.pop();
-      else parts.push(seg);
-    }
-    return REPO_BLOB + parts.join("/") + anchor;
+    const target = repoPath(dir, path);
+    if (pages[target] !== undefined) return pages[target] + anchor;
+    if (!hash && overviews[target] !== undefined) return overviews[target];
+    return REPO_BLOB + target + anchor;
   };
 }
 
@@ -111,7 +126,12 @@ function splitRow(line: string): string[] {
   return row.split(/(?<!\\)\|/).map((cell) => cell.trim().replace(/\\\|/g, "|"));
 }
 
-type Ctx = { resolve: LinkResolver; headings: Heading[]; ids: Map<string, number> };
+type Ctx = {
+  resolve: LinkResolver;
+  diagram?: DiagramHook;
+  headings: Heading[];
+  ids: Map<string, number>;
+};
 
 function startsBlock(line: string): boolean {
   return (
@@ -133,6 +153,7 @@ function renderBlocks(lines: string[], ctx: Ctx, tight = false): string {
     // Fenced code
     if (FENCE.test(line)) {
       const pad = indentOf(line);
+      const lang = line.trim().slice(3).trim().toLowerCase();
       const body: string[] = [];
       i++;
       while (i < lines.length && !FENCE.test(lines[i])) {
@@ -140,6 +161,13 @@ function renderBlocks(lines: string[], ctx: Ctx, tight = false): string {
         i++;
       }
       i++; // closing fence
+      if (lang === "mermaid") {
+        const svg = ctx.diagram ? ctx.diagram(body.join("\n")) : null;
+        if (svg) {
+          out.push(svg);
+          continue;
+        }
+      }
       out.push(
         `<pre class="my-5 overflow-x-auto rounded-md border border-border bg-bg p-4 text-xs leading-relaxed text-text"><code>${escapeHtml(body.join("\n"))}</code></pre>`,
       );
@@ -287,7 +315,11 @@ function renderBlocks(lines: string[], ctx: Ctx, tight = false): string {
 
 /** Render a Markdown document. The first `# ` heading is returned as the
  * title and left out of the HTML, so the page can show its own hero. */
-export function renderMarkdown(src: string, resolve: LinkResolver): RenderedDoc {
+export function renderMarkdown(
+  src: string,
+  resolve: LinkResolver,
+  options: { diagram?: DiagramHook } = {},
+): RenderedDoc {
   const lines = src.replace(/\r\n/g, "\n").split("\n");
   let title = "";
   const h1 = lines.findIndex((l) => /^# /.test(l));
@@ -295,6 +327,6 @@ export function renderMarkdown(src: string, resolve: LinkResolver): RenderedDoc 
     title = plainText(lines[h1].slice(2).trim());
     lines.splice(h1, 1);
   }
-  const ctx: Ctx = { resolve, headings: [], ids: new Map() };
+  const ctx: Ctx = { resolve, diagram: options.diagram, headings: [], ids: new Map() };
   return { html: renderBlocks(lines, ctx), headings: ctx.headings, title };
 }

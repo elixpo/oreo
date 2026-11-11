@@ -15,7 +15,7 @@ export const metadata = pageMetadata({
 export default function TransferDocsPage() {
   return (
     <RepoDoc
-      file="TRANSFER.md"
+      file="docs/TRANSFER.md"
       chip="docs · Transfer"
       icon={Send}
       title="Transfer: files from a computer to the badge."

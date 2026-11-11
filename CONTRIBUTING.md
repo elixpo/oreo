@@ -31,6 +31,69 @@ How the pieces fit, and the rules we build by, are in
 the badge over USB through the `oreo` CLI, Bluetooth comes last, and the OS
 and the CLI must agree on a handful of contracts.
 
+### How the pieces connect
+
+```mermaid
+flowchart LR
+    subgraph computer["Your computer"]
+        checkout["OreoOS checkout:<br/>./deploy, tests"]
+        cli["oreo CLI"]
+    end
+    subgraph badge["Oreo badge"]
+        oreoos["OreoOS and apps"]
+        firmware["MicroPython firmware<br/>with the RV565 decoder"]
+    end
+    checkout -->|"USB: deploy"| oreoos
+    cli <-->|"USB: files, Transfer,<br/>setup, update"| oreoos
+    oreoos -->|"Wi-Fi: internet only"| internet["Internet: GitHub,<br/>App Store, OTA"]
+    rv565["RV565 library<br/>elixpo/rv565"] -.->|"video format"| cli
+    rv565 -.->|"video format"| firmware
+```
+
+A computer reaches the badge only over USB, through the `oreo` CLI or a
+deploy from a checkout. The badge uses Wi-Fi only for the internet: the App
+Store, OreoOS updates, GitHub data and the weather. Videos are RV565 files:
+the CLI encodes them and the firmware decodes them.
+
+## How a contribution goes
+
+```mermaid
+flowchart TD
+    start(["Pick a path"]) --> app["Write an app"]
+    start --> bug["Fix a bug"]
+    start --> hack["Write a hack"]
+    start --> osx["Improve the OS"]
+    app --> form["Open the matching issue form"]
+    bug --> form
+    hack --> form
+    osx --> form
+    form --> badge{"Have a badge?"}
+    badge -->|"no"| host["Host tests, validate_app.py,<br/>CLI tests with the fake badge"]
+    badge -->|"yes"| device["./deploy --board,<br/>then try it with oreo"]
+    host --> branch["Branch from main"]
+    device --> branch
+    branch --> checks["Run the checks"]
+    checks --> pr["Pull request: what you tested,<br/>what to check on a badge"]
+    pr --> review["Review"]
+    review -->|"changes requested"| branch
+    review -->|"approved"| merge(["Squash merge"])
+```
+
+Pick one of four paths and open its issue form. The form asks for what a
+reviewer needs, so we can agree on the approach before you spend time on
+it:
+
+| Path | Issue form | Start from |
+|---|---|---|
+| Write an app | [App proposal](https://github.com/elixpo/oreo/issues/new?template=app_proposal.yml) | [docs/APPS.md](docs/APPS.md), `oreo new` |
+| Fix a bug | [Bug report](https://github.com/elixpo/oreo/issues/new?template=bug_report.yml) | `oreo info`, `oreo doctor`, [good first issues](https://github.com/elixpo/oreo/issues?q=is%3Aopen+label%3A%22good+first+issue%22) |
+| Write a hack | [Hack proposal](https://github.com/elixpo/oreo/issues/new?template=hack_proposal.yml) | [docs/hacks/](docs/hacks/README.md) |
+| Improve the OS | [OS improvement](https://github.com/elixpo/oreo/issues/new?template=os_improvement.yml) | [AGENTS.md](AGENTS.md), [docs/OS_ROADMAP.md](docs/OS_ROADMAP.md) |
+
+Anything else (hardware, the website, tooling) goes in the
+[other idea form](https://github.com/elixpo/oreo/issues/new?template=feature_request.yml).
+A typo or a one-line fix can go straight to a pull request.
+
 ## Start without a badge
 
 Everything here runs on Linux, macOS or Windows (WSL) with Python 3.9 or
@@ -78,8 +141,9 @@ Building the firmware from source (`./build-firmware`) needs ESP-IDF; see
 
 ## Workflow
 
-1. For anything larger than a small fix, open or comment on an issue first,
-   so we can agree on the approach before you spend time on it.
+1. For anything larger than a small fix, open the issue form for your path
+   (above) or comment on an existing issue first, so we can agree on the
+   approach before you spend time on it.
 2. Fork the repository and branch from `main`
    (`git checkout -b fix/short-description`).
 3. Make the change, with tests. Keep pull requests small and about one

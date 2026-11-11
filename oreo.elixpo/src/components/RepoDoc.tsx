@@ -1,56 +1,74 @@
 import fs from "node:fs";
 import path from "node:path";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { ArrowRight, Github } from "lucide-react";
-import { docsLinkResolver, renderMarkdown } from "@/lib/markdown";
+import { HACK_GUIDES } from "@/data/hacks";
+import { mermaidDrawing } from "@/lib/diagrams";
+import { renderMarkdown, repoLinkResolver } from "@/lib/markdown";
 
-/* A guide from the repository's docs/ folder, rendered at build time.
+/* A Markdown file from the repository, rendered at build time.
  *
- * The Markdown files are the source: the site reads ../docs/<file> during
+ * The Markdown files are the source: the site reads ../<file> during
  * `next build` (tools/deploy.py --website and `npm run build` both run in
  * oreo.elixpo/ inside the repository checkout), so the website and GitHub
- * always show the same text. Edit docs/<file>, not this page.
+ * always show the same text. Edit the Markdown file, not the page.
  */
 
 const REPO = "https://github.com/elixpo/oreo";
 
-/** Guides rendered on the site; links between them stay on the site. */
+/** Repository files rendered on the site; links between them stay on the site. */
 export const SITE_DOCS: Record<string, string> = {
-  "CLI.md": "/docs/cli/",
-  "USB.md": "/docs/usb/",
-  "TRANSFER.md": "/docs/transfer/",
+  "docs/CLI.md": "/docs/cli/",
+  "docs/USB.md": "/docs/usb/",
+  "docs/TRANSFER.md": "/docs/transfer/",
+  "docs/hacks/README.md": "/hacks/",
+  "CONTRIBUTING.md": "/contribute/",
+  ...Object.fromEntries(HACK_GUIDES.map((h) => [`docs/hacks/${h.doc}`, `/hacks/${h.slug}/`])),
 };
 
 const OVERVIEWS: Record<string, string> = {
-  "APPS.md": "/docs/apps/",
+  "docs/APPS.md": "/docs/apps/",
 };
 
 export type QuickLink = { label: string; href: string };
 export type Related = { href: string; title: string; description: string };
 
+/** Read a file by its path in the repository ("docs/CLI.md"). */
 export function readRepoDoc(file: string): string {
-  const full = path.join(process.cwd(), "..", "docs", file);
+  const full = path.join(process.cwd(), "..", file);
   if (!fs.existsSync(full)) {
     throw new Error(
-      `docs/${file} not found at ${full}: build the site from oreo.elixpo/ inside the OreoOS repository`,
+      `${file} not found at ${full}: build the site from oreo.elixpo/ inside the OreoOS repository`,
     );
   }
   return fs.readFileSync(full, "utf8");
 }
 
 export default function RepoDoc({
-  file, chip, icon: Icon, title, lead, quickLinks = [], related = [],
+  file, chip, icon: Icon, title, lead, quickLinks = [], related = [], children,
+  bodyTitle,
 }: {
+  /** Path in the repository, e.g. "docs/CLI.md" or "CONTRIBUTING.md". */
   file: string;
   chip: string;
   icon: LucideIcon;
-  title: string;
+  title: ReactNode;
   lead: string;
   quickLinks?: QuickLink[];
   related?: Related[];
+  /** Shown between the links and the document (e.g. cards). */
+  children?: ReactNode;
+  /** A heading above the rendered document, when `children` come first. */
+  bodyTitle?: string;
 }) {
-  const doc = renderMarkdown(readRepoDoc(file), docsLinkResolver(SITE_DOCS, OVERVIEWS));
+  const dir = path.posix.dirname(file) === "." ? "" : path.posix.dirname(file);
+  const doc = renderMarkdown(
+    readRepoDoc(file),
+    repoLinkResolver(dir, SITE_DOCS, OVERVIEWS),
+    { diagram: mermaidDrawing },
+  );
   const toc = doc.headings.filter((h) => h.level === 2);
 
   return (
@@ -76,13 +94,19 @@ export default function RepoDoc({
               {q.label}
             </a>
           ))}
-          <a href={`${REPO}/blob/main/docs/${file}`} target="_blank" rel="noreferrer"
+          <a href={`${REPO}/blob/main/${file}`} target="_blank" rel="noreferrer"
              className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1 text-sm text-text-dim transition-colors hover:border-primary/50 hover:text-text">
-            <Github className="h-3.5 w-3.5" /> docs/{file}
+            <Github className="h-3.5 w-3.5" /> {file}
           </a>
         </div>
 
-        <div className="mt-12 grid gap-12 lg:grid-cols-[220px_minmax(0,1fr)]">
+        {children}
+
+        {bodyTitle && (
+          <h2 className="mt-20 font-display text-3xl tracking-tight">{bodyTitle}</h2>
+        )}
+
+        <div className={`${bodyTitle ? "mt-8" : "mt-12"} grid gap-12 lg:grid-cols-[220px_minmax(0,1fr)]`}>
           <aside className="hidden lg:block">
             <nav aria-label="On this page" className="sticky top-24 max-h-[calc(100vh-8rem)] overflow-y-auto text-sm">
               <p className="mb-3 font-display text-xs uppercase tracking-widest text-muted">On this page</p>
@@ -103,9 +127,9 @@ export default function RepoDoc({
 
             <p className="mt-16 text-sm text-muted">
               This page is built from{" "}
-              <a href={`${REPO}/blob/main/docs/${file}`} target="_blank" rel="noreferrer"
+              <a href={`${REPO}/blob/main/${file}`} target="_blank" rel="noreferrer"
                  className="text-primary underline decoration-primary/40 underline-offset-2">
-                docs/{file}
+                {file}
               </a>{" "}
               in the OreoOS repository. Corrections are welcome there.
             </p>
