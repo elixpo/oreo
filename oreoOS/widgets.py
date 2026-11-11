@@ -10,6 +10,8 @@ backgrounds) so the OS feels cohesive. Apps just call:
 and the look is consistent.
 """
 
+import sys as _sys
+
 from oreoOS import api, pixelfont
 from oreoOS import theme
 
@@ -38,9 +40,12 @@ CONNECTING_STEP_MS = 400         # one more bar every step while joining
 def _link_state(w):
     """netsvc's state ("connected", "connecting", "retrying", "off",
     "offline"), or one read from the driver when netsvc is missing."""
+    # Only a netsvc the launcher already imported: when it failed at boot
+    # the header must not retry a flash import every poll.
     try:
-        from oreoOS import netsvc
-        return netsvc.status()[0]
+        netsvc = _sys.modules.get("oreoOS.netsvc")
+        if netsvc is not None:
+            return netsvc.status()[0]
     except Exception:
         pass
     try:

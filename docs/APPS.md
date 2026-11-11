@@ -258,8 +258,9 @@ traceback with `oreoOS.crashlog`:
   oldest entries go first). Copy it to the computer with
   `oreo pull /crash.log`.
 
-A single bad frame does not crash the app: the OS prints that frame's
-traceback on the console only (no flash write) and carries on, and shows
+A single bad frame does not crash the app: the OS prints the traceback
+of the first bad frame in a run on the console only (no flash write; later
+bad frames print one line) and carries on, and shows
 the crash screen after 8 bad frames in a row. An error in `on_exit` is
 logged too, without hiding the crash that led to it. Crashes during boot
 go to the same log. `oreoOS.crashlog.record(err, "context")` does the
@@ -269,9 +270,11 @@ same from your own `except` blocks.
 
 When an app exits, the launcher removes `apps.<name>` and its submodules
 from `sys.modules` and runs `gc.collect()`. The next launch imports the
-files again, so code sent with `oreo push -r myapp /apps/myapp` (or
-installed from the Store) runs the next time you open the app, without a
-reboot. OS modules (`oreoOS`, `oreoWare`) and other apps are never
+files again, so an app installed or updated from the App Store while
+OreoOS runs, or a file you edit under a running `oreo dev` mount, runs the
+next time you open the app, without a reboot. (`oreo push` and
+`oreo apps install` already restart OreoOS when they finish, so their files
+are loaded fresh either way.) OS modules (`oreoOS`, `oreoWare`) and other apps are never
 unloaded; the drawer (`apps/launcher`) stays loaded because it opens on
 every HOME press. A copy of `oreoOS/` itself still needs a reboot.
 

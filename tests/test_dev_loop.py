@@ -215,12 +215,14 @@ class LauncherTest(_Stubbed):
         self.assertEqual(self.l.release_app("plain", object()), 1)
         self.assertEqual(self.l.release_app("plain", None), 0)  # gone already
 
-    def test_pushed_code_runs_on_the_next_launch(self):
+    def test_store_update_runs_on_the_next_launch(self):
         d = _app_tree(self.apps, "demo", "def v(self):\n    return 1")
         app = self.l.load_app("demo")
         self.assertEqual(app.v(), 1)
         self.assertEqual(app.author, "me")
-        # `oreo push` replaces the file while the app runs.
+        # A Store update (or a dev-mount edit) replaces the file while
+        # OreoOS runs. (`oreo push` restarts OreoOS, so it never needs
+        # this.)
         (d / "src" / "app.py").write_text(
             "class App:\n    name = 'demo'\n\n    def v(self):\n"
             "        return 2   # pushed\n")
@@ -279,6 +281,67 @@ class LauncherTest(_Stubbed):
         self.assertEqual(self.l.release_app("bad", None) >= 0, True)
         self.assertFalse([k for k in sys.modules
                           if k.startswith("apps.bad.")])
+
+    def test_str_package_path_is_used_and_restored(self):
+        # MicroPython keeps a package's __path__ as one str; the remote
+        # import must set a str and put the old str back, even on failure.
+        os.makedirs(self.remote)
+        _app_tree(self.remote, "demo", app_name="Dev Demo")
+        bad = _app_tree(self.remote, "bad")
+        (bad / "src" / "app.py").write_text("def broken(:\n")
+        seen = []
+        real = __import__
+
+        def spy(name, *a, **k):
+            if name.startswith("apps."):
+                seen.append(sys.modules["apps"].__path__)
+                # CPython needs a list to search; hand it one for the
+                # import itself, then put the str back as MicroPython has.
+                pkg = sys.modules["apps"]
+                p = pkg.__path__
+                pkg.__path__ = [p] if isinstance(p, str) else p
+                try:
+                    return real(name, *a, **k)
+                finally:
+                    pkg.__path__ = p
+            return real(name, *a, **k)
+
+        self.apps_pkg.__path__ = self.apps            # a str, as on the badge
+        with mock.patch("builtins.__import__", spy), _quiet():
+            app = self.l.load_app("demo")
+            self.assertEqual(app.name, "Dev Demo")
+            self.assertEqual(seen[-1], self.remote)
+            self.assertIsInstance(seen[-1], str)
+            self.assertEqual(self.apps_pkg.__path__, self.apps)
+            with self.assertRaises(SyntaxError):
+                self.l.load_app("bad")
+        self.assertEqual(self.apps_pkg.__path__, self.apps)
+
+    def test_package_without_path_gets_none_back(self):
+        os.makedirs(self.remote)
+        _app_tree(self.remote, "demo")
+        del self.apps_pkg.__path__
+        with mock.patch("builtins.__import__",
+                        side_effect=ImportError("x")):
+            with self.assertRaises(ImportError):
+                self.l._import_app("apps.demo.main", self.remote)
+        self.assertFalse(hasattr(self.apps_pkg, "__path__"))
+
+    # frame errors
+
+    def test_full_traceback_once_per_run(self):
+        calls = []
+        with mock.patch.object(self.l, "_log_crash",
+                               side_effect=lambda *a, **k: calls.append(k)), \
+                _quiet() as out:
+            printed = False
+            # Fails every other frame: frame_errs resets, the flag does not.
+            for _ in range(4):
+                printed = self.l._frame_error(types.SimpleNamespace(
+                    name="flaky"), ValueError("v"), printed)
+        self.assertEqual(calls, [{"save": False}])
+        self.assertTrue(printed)
+        self.assertEqual(out.getvalue().count("frame error in flaky"), 3)
 
     # crash screen
 
@@ -373,6 +436,36 @@ class WifiBarsTest(_Stubbed):
         sys.modules["oreoOS.netsvc"] = None
         wifi.is_connected = lambda: True
         self.assertEqual(self.w._poll_wifi()["state"], "connected")
+
+    def test_missing_netsvc_is_not_imported_again(self):
+        # netsvc failed to import at boot: the header reads the driver and
+        # never tries a fresh import of oreoOS.netsvc on its polls.
+        wifi = types.ModuleType("oreoWare.wifi")
+        wifi.is_connected = lambda: True
+        wifi.rssi = lambda: -40
+        wifi.is_metered = lambda: False
+        ow = types.ModuleType("oreoWare")
+        ow.__path__ = []
+        ow.wifi = wifi
+        sys.modules["oreoWare"] = ow
+        sys.modules["oreoWare.wifi"] = wifi
+        sys.modules.pop("oreoOS.netsvc", None)
+        if hasattr(self.pkg, "netsvc"):
+            del self.pkg.netsvc
+        real = __import__
+        tried = []
+
+        def spy(name, globals=None, locals=None, fromlist=(), level=0):
+            if name == "oreoOS.netsvc" or (
+                    name == "oreoOS" and "netsvc" in (fromlist or ())):
+                tried.append(name)
+            return real(name, globals, locals, fromlist, level)
+
+        self.w._time = None
+        with mock.patch("builtins.__import__", spy):
+            self.assertEqual(self.w._link_state(wifi), "connected")
+            self.assertEqual(self.w._poll_wifi()["state"], "connected")
+        self.assertEqual(tried, [])
 
 
 # ── store: icon halves ─────────────────────────────────────────────────

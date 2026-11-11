@@ -170,9 +170,9 @@ def load_app(app_dir):
 # ── unloading apps ───────────────────────────────────────────────────────────
 #
 # When an app exits its modules leave sys.modules, so the next launch
-# imports the files again: code sent with `oreo push` / `oreo app install`
-# (or edited under a dev mount) runs without a reboot, and the heap gets
-# the app's code and module globals back. Only apps.<name> and its
+# imports the files again: an App Store install or update made while
+# OreoOS runs (or an edit under an `oreo dev` mount) runs without a reboot,
+# and the heap gets the app's code and module globals back. Only apps.<name> and its
 # submodules are touched; oreoOS, oreoWare and other apps stay.
 #
 # An app that leaves work running after on_exit (a thread, a timer or IRQ
@@ -359,6 +359,10 @@ def run_app(os_obj, app):
     # error is sticky. Reset on every successful frame.
     frame_errs = 0
     FRAME_ERR_LIMIT = 8
+    # Whether this run already printed a frame's full traceback. Kept
+    # apart from frame_errs (which a good frame resets), so an app that
+    # fails every other frame prints one traceback, not one per failure.
+    tb_printed = False
 
     # Long-press auto-repeat for navigation buttons. Held UP/DOWN/LEFT/
     # RIGHT will fire on_button_press repeatedly at REPEAT_MS cadence
@@ -600,15 +604,7 @@ def run_app(os_obj, app):
                 # only: a flaky frame must not write flash every time);
                 # the rest print one line. A run that reaches the limit
                 # is logged to /crash.log by show_crash().
-                if frame_errs == 0:
-                    _log_crash(e, "frame " + str(getattr(app, "name", "?")),
-                               save=False)
-                else:
-                    try:
-                        print("frame error in", getattr(app, "name", "?"),
-                              ":", e)
-                    except Exception:
-                        pass
+                tb_printed = _frame_error(app, e, tb_printed)
                 frame_errs += 1
                 if frame_errs >= FRAME_ERR_LIMIT:
                     raise
@@ -700,6 +696,20 @@ def run_app(os_obj, app):
 
 
 # ── crash screen ──────────────────────────────────────────────────────────────
+
+def _frame_error(app, err, tb_printed):
+    """Report one failed frame: the full traceback (console only) the
+    first time in a run, one line after that. Returns the new tb_printed."""
+    name = getattr(app, "name", "?")
+    if not tb_printed:
+        _log_crash(err, "frame " + str(name), save=False)
+        return True
+    try:
+        print("frame error in", name, ":", err)
+    except Exception:
+        pass
+    return True
+
 
 def _log_crash(err, context, save=True):
     """oreoOS.crashlog.record(), or a minimal summary when even that
@@ -1160,7 +1170,8 @@ def boot():
                 break
             finally:
                 # Unload the app's modules (unless it asked to stay), so
-                # pushed code runs on its next launch without a reboot.
+                # files the Store or a dev mount changed load fresh next
+                # launch. (`oreo push` restarts OreoOS anyway.)
                 release_app(target, app)
                 app = None
 
