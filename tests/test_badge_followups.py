@@ -119,6 +119,9 @@ class FakeNet(types.ModuleType):
     def worker_busy(self):
         return self.busy
 
+    def fetch_busy(self):
+        return self.busy
+
 
 class FakeWifi(types.ModuleType):
     def __init__(self):
@@ -194,19 +197,60 @@ class NetsvcFollowupTest(unittest.TestCase):
         self.assertEqual(len(self.env.thread.started), 1)
         self._sync_once()
         # Drop and re-join inside one poll: is_connected() never False.
+        # The listener is closed first, so start() really rebinds.
         self.seq += 1
         self.env.tick(self.net.POLL_MS)
-        self.assertEqual(self.env.http.calls, ["start", "start"])
+        self.assertEqual(self.env.http.calls, ["start", "stop", "start"])
         # The clock was synced moments ago: no second NTP query.
         self.assertEqual(self.env.thread.started, [])
         # Same link, later polls: nothing re-runs.
         self.env.tick(self.net.POLL_MS)
-        self.assertEqual(self.env.http.calls, ["start", "start"])
+        self.assertEqual(self.env.http.calls, ["start", "stop", "start"])
         # A quick re-join once the last sync is stale re-syncs too.
         self.env.tick(self.net.NTP_FRESH_S * 1000 + 1000)
         self.seq += 1
         self.env.tick(self.net.POLL_MS)
         self.assertEqual(len(self.env.thread.started), 1)
+
+    def test_new_address_between_polls_rebinds(self):
+        # A driver-level reconnect: link_seq() does not move, but the
+        # station came back with a different DHCP lease.
+        self.ip = "10.0.0.2"
+        self.env.wifi.ip = lambda: self.ip
+        self._up()
+        self.env.tick()
+        self.ip = "10.0.0.9"
+        self.env.tick(self.net.POLL_MS)
+        self.assertEqual(self.env.http.calls, ["start", "stop", "start"])
+        # Same address on later polls: nothing re-runs.
+        self.env.tick(self.net.POLL_MS)
+        self.assertEqual(len(self.env.http.calls), 3)
+        # A driver without ip() never triggers it.
+        del self.env.wifi.ip
+        self.env.tick(self.net.POLL_MS)
+        self.assertEqual(len(self.env.http.calls), 3)
+
+    def test_fetch_busy_covers_ntp_and_ota_probe(self):
+        self.assertFalse(self.net.fetch_busy())
+        self._up()
+        self.env.tick()                       # clock-sync worker started
+        self.assertTrue(self.net.fetch_busy())
+        self._sync_once()
+        self.assertFalse(self.net.fetch_busy())
+        ota = types.ModuleType("oreoOS.ota")
+        ota.busy = True
+        ota.background_busy = lambda: ota.busy
+        saved = sys.modules.get("oreoOS.ota")
+        sys.modules["oreoOS.ota"] = ota
+        try:
+            self.assertTrue(self.net.fetch_busy())
+            ota.busy = False
+            self.assertFalse(self.net.fetch_busy())
+        finally:
+            if saved is None:
+                sys.modules.pop("oreoOS.ota", None)
+            else:
+                sys.modules["oreoOS.ota"] = saved
 
     def test_driver_without_link_seq_still_works(self):
         del self.env.wifi.link_seq
@@ -553,6 +597,22 @@ class OtaBackgroundTest(unittest.TestCase):
         self.assertEqual(self.calls, [])
         self.assertNotIn("ota_last_check_s", self.settings)
 
+    def test_result_dropped_while_updates_is_open(self):
+        # Probe started on Home; the user opens Updates before it lands.
+        self.assertFalse(self.ota.background_check(self.os, foreground=None))
+        self.assertTrue(self.ota.background_busy())
+        self.settings["ota_status"] = "available"     # Updates' own check
+        self.gate.set()
+        for _ in range(1000):
+            if not self.ota.background_busy():
+                break
+            threading.Event().wait(0.002)
+        self.assertFalse(self.ota.background_check(self.os,
+                                                   foreground="Updates"))
+        self.assertIsNone(self.ota._bg_job)
+        self.assertEqual(self.settings["ota_status"], "available")
+        self.assertEqual(self.notif.pushed, [])
+
 
 # ── Commits / Weather / App Store ────────────────────────────────────────
 
@@ -560,13 +620,21 @@ class AutoFetchTest(unittest.TestCase):
     def test_commits_gate(self):
         s = Stubs()
         try:
-            s.add("oreoOS.github", types.ModuleType("oreoOS.github"))
+            gh = s.add("oreoOS.github", types.ModuleType("oreoOS.github"))
+            gh.up = True
+            gh.online = lambda: gh.up
             m = _load("apps/commits/src/app.py", "under_test")
             net = FakeNet()
             self.assertTrue(m.auto_fetch_ok(net))
             net.quiet = True
             self.assertFalse(m.auto_fetch_ok(net))
             net.quiet, net.threads = False, False
+            self.assertFalse(m.auto_fetch_ok(net))
+            net.threads = True
+            net.busy = True                    # OTA probe / clock sync
+            self.assertFalse(m.auto_fetch_ok(net))
+            net.busy = False
+            gh.up = False                      # join still running
             self.assertFalse(m.auto_fetch_ok(net))
         finally:
             s.close()
@@ -605,11 +673,14 @@ class AutoFetchTest(unittest.TestCase):
             self.assertEqual(f.read(), body)
         self.assertTrue(store.refresh())
 
-    def test_store_app_uses_worker(self):
-        src = (ROOT / "apps/store/src/app.py").read_text()
-        self.assertIn("cache.Refresh(store.fetch_index)", src)
-        self.assertIn("store.refresh_due()", src)
-        self.assertNotIn("store.refresh()", src)
+    def test_store_refresh_waits_for_background_thread(self):
+        store = _load("oreoOS/store.py", "oreo_store_followups3")
+        net = FakeNet()
+        store._refreshed_ms = None
+        net.busy = True
+        self.assertFalse(store.refresh_due(net=net))
+        net.busy = False
+        self.assertTrue(store.refresh_due(net=net))
 
 
 class WeatherTest(unittest.TestCase):
@@ -628,6 +699,7 @@ class WeatherTest(unittest.TestCase):
         self.m.time = types.SimpleNamespace(
             ticks_ms=lambda: self.clock.t, ticks_diff=lambda a, b: a - b)
         self.m._last_data = self.m._last_ms = None
+        self.m._job = None
         self.gate = threading.Event()
         self.fetches = 0
 
@@ -683,9 +755,319 @@ class WeatherTest(unittest.TestCase):
         self.assertEqual(app2._data["city"], "Kolkata")
         self.assertEqual(self.fetches, 1)
 
+    def _until(self, cond):
+        for _ in range(1000):
+            if cond():
+                return
+            threading.Event().wait(0.002)
+        self.fail("timed out")
+
+    def _wait(self, app, cond):
+        for _ in range(1000):
+            app.update(0.016)
+            if cond():
+                return
+            threading.Event().wait(0.002)
+        self.fail("fetch never landed")
+
+    def test_reentry_reattaches_to_running_fetch(self):
+        app = self.m.App()
+        app.on_enter(object())
+        app.update(0.016)
+        self.assertTrue(app._job.busy())
+        self._until(lambda: self.fetches == 1)
+        app.on_exit()
+        # Re-open at once, fetch still in flight: no second fetch.
+        app2 = self.m.App()
+        app2.on_enter(object())
+        self.assertIs(app2._job, self.m._job)
+        for _ in range(5):
+            app2.update(0.016)
+        self.assertEqual(self.fetches, 1)
+        self.gate.set()
+        self._wait(app2, lambda: app2._data is not None)
+        self.assertEqual(app2._data["city"], "Kolkata")
+        self.assertEqual(self.m._last_ms, self.clock.t)
+        self.assertEqual(self.fetches, 1)
+
+    def test_result_landing_while_closed_is_kept(self):
+        app = self.m.App()
+        app.on_enter(object())
+        app.update(0.016)
+        app.on_exit()
+        self.gate.set()
+        job = self.m._job
+        for _ in range(1000):
+            if job.state != self.s.pkg.cache.RUNNING:
+                break
+            threading.Event().wait(0.002)
+        app2 = self.m.App()
+        app2.on_enter(object())
+        app2.update(0.016)
+        self.assertEqual(app2._data["city"], "Kolkata")
+        self.assertEqual(self.fetches, 1)
+
+    def test_auto_fetch_waits_for_background_thread(self):
+        app = self.m.App()
+        self.net.busy = True                  # OTA probe running
+        app.on_enter(object())
+        app.update(0.016)
+        self.assertEqual(self.fetches, 0)
+        self.net.busy = False
+        app.update(0.016)
+        self.assertTrue(app._job.busy())
+        self._until(lambda: self.fetches == 1)
+
     def test_no_urequests(self):
         src = (ROOT / "apps_market/weather/src/app.py").read_text()
         self.assertNotIn("urequests", src)
+
+
+# ── Updates app: waits for a background probe before its own check ───────
+
+class UpdatesWaitTest(unittest.TestCase):
+    def test_wait_background(self):
+        s = Stubs()
+        try:
+            m = _load("apps/updates/src/app.py", "under_test")
+            clock = FakeClock()
+
+            def sleep_ms(ms):
+                clock.t += ms
+                if clock.t >= 300:
+                    net.busy = False           # the probe's GET finished
+            m.time = types.SimpleNamespace(
+                ticks_ms=clock.ticks_ms, ticks_diff=clock.ticks_diff,
+                sleep_ms=sleep_ms)
+            net = FakeNet()
+            phases = []
+            self.assertTrue(m.wait_background(phases.append, net=net))
+            self.assertEqual(phases, [])       # nothing running: no wait
+            net.busy = True
+            self.assertTrue(m.wait_background(phases.append, net=net))
+            self.assertGreaterEqual(clock.t, 300)
+            self.assertEqual(set(phases), {"wait"})
+            # A probe that never finishes is waited out, not forever.
+            net.busy = True
+            clock.t = -10 ** 9
+            self.assertFalse(m.wait_background(None, limit_ms=200, net=net))
+        finally:
+            s.close()
+
+
+# ── Commits app: the deferred automatic refresh ──────────────────────────
+
+class CommitsAutoTest(unittest.TestCase):
+    def setUp(self):
+        self.s = Stubs()
+        self.net = self.s.add("oreoOS.netsvc", FakeNet())
+        gh = self.s.add("oreoOS.github", types.ModuleType("oreoOS.github"))
+        gh.up = True
+        gh.fetches = 0
+        gh.GRAPH_TTL_S = 3600
+        gh.online = lambda: gh.up
+        gh.user = lambda name: name
+        gh.cached_graph = lambda user: ([], None)
+        gh.stale = lambda age, ttl: True
+        self.gate = threading.Event()
+
+        def fetch_graph(user, progress=None):
+            gh.fetches += 1
+            self.gate.wait(5)
+            return None
+        gh.fetch_graph = fetch_graph
+        self.gh = gh
+        self.m = _load("apps/commits/src/app.py", "under_test")
+
+    def tearDown(self):
+        self.gate.set()
+        self.s.close()
+
+    def test_offline_after_quiet_keeps_the_request(self):
+        self.net.quiet = True
+        app = self.m.App()
+        app.on_enter(object())
+        self.assertTrue(app._auto)
+        # Quiet window over, but the boot join is still running.
+        self.net.quiet = False
+        self.gh.up = False
+        app.update(0.016)
+        self.assertTrue(app._auto)
+        self.assertEqual(self.gh.fetches, 0)
+        self.assertIsNone(app._note)          # an automatic try says nothing
+        self.gh.up = True
+        app.update(0.016)
+        self.assertFalse(app._auto)
+        self.assertTrue(app._job.busy())
+
+    def test_press_during_quiet_cancels_the_auto_fetch(self):
+        self.net.quiet = True
+        app = self.m.App()
+        app.on_enter(object())
+        app.on_button_press(self.m.api.BTN_A)
+        self.assertFalse(app._auto)
+        self.gate.set()
+        for _ in range(1000):
+            app.update(0.016)
+            if not app._job.busy():
+                break
+            threading.Event().wait(0.002)
+        self.net.quiet = False
+        for _ in range(5):
+            app.update(0.016)
+        self.assertEqual(self.gh.fetches, 1)
+
+
+# ── App Store app: the worker refresh ────────────────────────────────────
+
+class FakeStore(types.ModuleType):
+    INSTALL, OPEN, UPDATE = "install", "open", "update"
+
+    def __init__(self, net):
+        super().__init__("oreoOS.store")
+        self.net = net
+        self.entry = {"id": "snake", "name": "Snake", "icon": "",
+                      "version": "1", "size": 10, "files": []}
+        self.apps = [self.entry]
+        self.fresh = False
+        self.up = True
+        self.applied = []
+        self.fetch_threads = []
+        self.gate = threading.Event()
+        self.installs = 0
+        self.err = ""
+
+    # catalogue
+    def forget_installed(self): pass
+    def catalogue(self): return list(self.apps), []
+    def find(self, app_id):
+        return next((e for e in self.apps if e["id"] == app_id), None)
+    def list_installed(self): return []
+    def take_pending(self): return None
+    def wifi_up(self): return self.up
+    def needs_refresh(self): return not self.fresh
+
+    def refresh_due(self):
+        if not self.needs_refresh():
+            return False
+        return not self.net.in_quiet() and not self.net.fetch_busy()
+
+    def fetch_index(self):
+        self.fetch_threads.append(threading.current_thread())
+        self.gate.wait(5)
+        return b"{}", ([dict(self.entry), {"id": "pong", "name": "Pong",
+                                           "icon": "", "version": "1",
+                                           "size": 5, "files": []}], [])
+
+    def apply_index(self, result):
+        self.applied.append(threading.current_thread())
+        body, parsed = result
+        self.apps = parsed[0]
+        self.fresh = True
+        return True
+
+    def last_error(self): return self.err
+    # detail page
+    def is_default(self, app_id): return False
+    def is_installed(self, app_id): return False
+    def app_state(self, e): return self.INSTALL
+    def local_icon(self, k, icon): return None
+    def total_size(self, e): return 10
+
+    def install(self, app_id, cb):
+        self.installs += 1
+        return True, ""
+
+
+class StoreAppTest(unittest.TestCase):
+    def setUp(self):
+        self.s = Stubs()
+        self.net = self.s.add("oreoOS.netsvc", FakeNet())
+        self.store = self.s.add("oreoOS.store", FakeStore(self.net))
+        self.s.add("oreoOS._http", types.ModuleType("oreoOS._http"))
+        pkg = types.ModuleType("storeapp")
+        pkg.__path__ = [str(ROOT / "apps/store/src")]
+        self.saved_pkg = {k: sys.modules.get(k)
+                          for k in ("storeapp", "storeapp.app",
+                                    "storeapp.render")}
+        sys.modules["storeapp"] = pkg
+        self.s.pkg.App = type("App", (), {"on_enter": lambda self, os: None})
+        self.m = _load("apps/store/src/app.py", "storeapp.app")
+        self.m._inflight = None
+        self.os = types.SimpleNamespace(display=None)
+
+    def tearDown(self):
+        self.store.gate.set()
+        for k, v in self.saved_pkg.items():
+            if v is None:
+                sys.modules.pop(k, None)
+            else:
+                sys.modules[k] = v
+        self.s.close()
+
+    def _frames(self, app, n=3):
+        for _ in range(n):
+            app.update(0.016)
+
+    def _finish(self, app):
+        self.store.gate.set()
+        for _ in range(1000):
+            app.update(0.016)
+            if app._job is None:
+                return
+            threading.Event().wait(0.002)
+        self.fail("refresh never landed")
+
+    def test_quiet_window_then_worker_then_apply(self):
+        self.net.quiet = True
+        app = self.m.App()
+        app.on_enter(self.os)
+        self.assertTrue(app._auto)
+        self._frames(app, 5)
+        self.assertIsNone(app._job)           # no fetch in the quiet window
+        self.assertEqual(self.store.fetch_threads, [])
+        self.net.quiet = False
+        self.net.busy = True                  # OTA probe on its thread
+        self._frames(app, 3)
+        self.assertIsNone(app._job)
+        self.net.busy = False
+        self._frames(app, 2)
+        self.assertIsNotNone(app._job)        # started, update() returned
+        self.assertEqual(app._status, "UPDATING")
+        # Install is refused while the refresh runs.
+        app._open_detail(self.store.entry)
+        app.on_button_press(self.m.api.BTN_A)
+        self.assertIn("try again", app._note)
+        self.assertEqual(self.store.installs, 0)
+        app._back()
+        self._finish(app)
+        self.assertEqual(len(self.store.fetch_threads), 1)
+        self.assertIsNot(self.store.fetch_threads[0], threading.main_thread())
+        self.assertEqual(self.store.applied, [threading.main_thread()])
+        self.assertEqual([e["id"] for e in app._apps], ["snake", "pong"])
+        self.assertEqual(app._status, "")
+        self.assertIsNone(self.m._inflight)
+        # Fresh now: later frames start nothing.
+        self._frames(app, 5)
+        self.assertEqual(len(self.store.fetch_threads), 1)
+
+    def test_reentry_reattaches_to_running_refresh(self):
+        app = self.m.App()
+        app.on_enter(self.os)
+        self._frames(app, 3)
+        job = app._job
+        self.assertIsNotNone(job)
+        # Leave and come straight back while the fetch is in flight.
+        app2 = self.m.App()
+        app2.on_enter(self.os)
+        self.assertIs(app2._job, job)
+        self.assertFalse(app2._want_refresh)
+        self.assertFalse(app2._auto)
+        self._frames(app2, 5)
+        self._finish(app2)
+        self.assertEqual(len(self.store.fetch_threads), 1)
+        self.assertEqual(len(self.store.applied), 1)
+        self.assertEqual(len(app2._apps), 2)
 
 
 if __name__ == "__main__":

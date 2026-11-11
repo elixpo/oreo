@@ -207,16 +207,25 @@ def _fmt_count(n):
 
 
 def auto_fetch_ok(net=None):
-    """True when an automatic (not user-asked) fetch may start: past
-    netsvc's boot quiet window, and on a build with threads, where the
-    fetch runs off the UI loop. Without netsvc, always True."""
+    """True when an automatic (not user-asked) fetch may start: Wi-Fi up,
+    past netsvc's boot quiet window, on a build with threads (where the
+    fetch runs off the UI loop) and with no other background network
+    thread running (netsvc.fetch_busy()). Until then the request stays
+    pending, so a join still running after boot only delays it."""
+    if not github.online():
+        return False
     if net is None:
         try:
             from oreoOS import netsvc as net
         except Exception:
             return True
     try:
-        return net.has_threads() and not net.in_quiet()
+        if not net.has_threads() or net.in_quiet():
+            return False
+    except Exception:
+        return True
+    try:
+        return not net.fetch_busy()
     except Exception:
         return True
 
@@ -240,7 +249,6 @@ class App(oreoOS.App):
         # boot quiet window (update() starts it once that is over).
         self._auto = github.stale(age, github.GRAPH_TTL_S)
         if self._auto and auto_fetch_ok():
-            self._auto = False
             self._refresh(quiet=True)
 
     def on_exit(self):
@@ -314,6 +322,7 @@ class App(oreoOS.App):
                 self._dirty = True
             return
         self._note = None
+        self._auto = False            # this fetch covers a pending auto one
         self._reset_progress()
         job.start()
         self._dirty = True
@@ -350,7 +359,6 @@ class App(oreoOS.App):
         if job is None:
             return
         if self._auto and auto_fetch_ok():
-            self._auto = False
             self._refresh(quiet=True)
         if job.poll():
             if job.result:

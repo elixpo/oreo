@@ -8,7 +8,12 @@ inside a UI frame for longer than a poll:
     wifi.auto_begin(); tick() drives wifi.auto_tick() from the run loop.
   * link-up jobs: when the link comes up (however it came up: boot
     auto-connect, a re-join, or the WiFi app), the LAN upload server is
-    (re)bound and a clock sync is scheduled.
+    (re)bound and a clock sync is scheduled. A drop and re-join that
+    happens between two polls is still caught when the join went through
+    wifi.connect_poll() (auto-connect or a manual join: link_seq() moves)
+    or when the station came back with a different IP. A reconnect done
+    by the ESP-IDF driver itself, on the same IP, is not seen; nothing
+    needs to re-run for it (the listener is still bound to that IP).
   * time sync: timeutil.sync_from_ntp() (DNS lookup + UDP query, up to a
     few seconds) runs on a one-shot _thread worker, retries with backoff
     and re-syncs every NTP_RESYNC_S.
@@ -72,6 +77,7 @@ _ntp_last   = ""                # last result message
 _busy       = False             # worker thread running
 _result     = None              # (ok, msg) handed back by the worker
 _link_seen  = None              # wifi.link_seq() at the last link-up
+_link_ip    = None              # wifi.ip() at the last link-up
 _sync_seq   = 0                 # bumps on every finished sync attempt
 _sync_ok    = False             # outcome of that attempt
 
@@ -215,14 +221,19 @@ def tick(foreground=None, now=None):
         except Exception:
             conn = False
         seq = _seq(wifi)
+        ip = _ip(wifi) if conn else None
         if conn and not _link:
-            _link_up(now, seq)
-        elif conn and seq is not None and seq != _link_seen:
+            _link_up(now, seq, ip)
+        elif conn and ((seq is not None and seq != _link_seen) or
+                       (ip and _link_ip and ip != _link_ip)):
             # Dropped and re-joined between two polls: is_connected() was
-            # never seen False, but the join counter moved. Treat it as a
-            # new link so the link-up jobs run again.
+            # never seen False, but the join counter moved (a join through
+            # connect_poll()) or the address changed (a driver reconnect
+            # that got a new lease). Close the listener so the link-up
+            # jobs rebind it, and run them again.
             _log("re-joined between polls")
-            _link_up(now, seq)
+            _stop_http()
+            _link_up(now, seq, ip)
         elif not conn and _link:
             _link_down(now)
         if not conn:
@@ -242,11 +253,28 @@ def _seq(wifi):
         return None
 
 
-def _link_up(now, seq=None):
+def _ip(wifi):
+    """wifi.ip(), or None on a driver without it."""
+    try:
+        return wifi.ip() or None
+    except Exception:
+        return None
+
+
+def _stop_http():
+    try:
+        from oreoOS import http_server
+        http_server.stop()
+    except Exception:
+        pass
+
+
+def _link_up(now, seq=None, ip=None):
     global _link, _hold, _rejoin_at, _rejoin_n, _jobs_due, _ntp_at, _ntp_n
-    global _link_seen
+    global _link_seen, _link_ip
     _link = True
     _link_seen = seq
+    _link_ip = ip
     _hold = False           # connected, so the radio is evidently wanted
     _rejoin_at = None
     _rejoin_n = 0
@@ -270,11 +298,7 @@ def _link_down(now):
     _rejoin_n = 0
     _rejoin_at = _later(now, REJOIN_S[0])
     _log("link lost, re-join in %d s" % REJOIN_S[0])
-    try:
-        from oreoOS import http_server
-        http_server.stop()
-    except Exception:
-        pass
+    _stop_http()
 
 
 def _may_rejoin():
@@ -450,10 +474,25 @@ def sync_result():
 
 
 def worker_busy():
-    """True while the clock-sync worker thread runs. Other one-shot
-    network threads (the OTA probe) wait for it, so two TLS/DNS jobs
-    never share the heap."""
+    """True while the clock-sync worker thread runs. The OTA probe waits
+    for it before starting."""
     return _busy
+
+
+def fetch_busy():
+    """True while a background network thread runs: the clock-sync
+    worker or the OTA background probe. Apps' automatic fetches (Commits,
+    Weather, the App Store) and the Updates app's check wait for it, so
+    two TLS sessions never share the heap. ota is only looked up, never
+    imported here: if it was never loaded, no probe can be running."""
+    if _busy:
+        return True
+    try:
+        import sys
+        ota = sys.modules.get("oreoOS.ota")
+        return bool(ota is not None and ota.background_busy())
+    except Exception:
+        return False
 
 
 def has_threads():

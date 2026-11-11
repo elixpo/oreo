@@ -429,9 +429,10 @@ def needs_refresh(max_age_ms=15 * 60 * 1000):
 
 
 def refresh_due(max_age_ms=15 * 60 * 1000, net=None):
-    """needs_refresh(), and also past netsvc's boot quiet window: the
-    automatic refresh on opening the Store waits for it (a user's A
-    press does not)."""
+    """needs_refresh(), and also past netsvc's boot quiet window with no
+    other background network thread running (netsvc.fetch_busy(): the
+    clock sync or the OTA probe). The automatic refresh on opening the
+    Store waits for both; a user's A press does not."""
     if not needs_refresh(max_age_ms):
         return False
     if net is None:
@@ -440,7 +441,12 @@ def refresh_due(max_age_ms=15 * 60 * 1000, net=None):
         except Exception:
             return True
     try:
-        return not net.in_quiet()
+        if net.in_quiet():
+            return False
+    except Exception:
+        return True
+    try:
+        return not net.fetch_busy()
     except Exception:
         return True
 

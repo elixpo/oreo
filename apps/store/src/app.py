@@ -14,7 +14,10 @@ Speed: the catalogue cached on flash is drawn on the first frame; the
 refresh from GitHub (one small JSON file) runs on a worker thread
 (store.fetch_index() in an oreoOS.cache.Refresh job) and is applied by
 update() when it lands; the automatic one waits for netsvc's boot quiet
-window. Missing icons are fetched afterwards from update(), one request
+window and for any other background network thread
+(netsvc.fetch_busy(), via store.refresh_due()). The job is kept at module
+level, so leaving and re-opening the Store while it runs re-attaches to
+it instead of starting a second fetch. Missing icons are fetched afterwards from update(), one request
 per frame, while the cached list is already on screen. Selection moves
 repaint only the two rows involved.
 """
@@ -27,6 +30,9 @@ from . import render as R
 
 DISCOVER = 0
 INSTALLED = 1
+
+# The catalogue refresh in flight, kept across Store visits (see above).
+_inflight = None
 
 LABEL = {store.INSTALL: "INSTALL", store.OPEN: "OPEN",
          store.UPDATE: "UPDATE"}
@@ -75,6 +81,13 @@ class App(oreoOS.App):
             self._status = "OFFLINE" if self._apps else ""
             self._want_refresh = False
             self._auto = False
+        if _inflight is not None:
+            # A refresh from an earlier visit is still running (or ended
+            # while the Store was closed): collect it, start no other.
+            self._job = _inflight
+            self._want_refresh = False
+            self._auto = False
+            self._status = "UPDATING"
         # Settings may ask for an app's page (store.open_app). Without a
         # cached catalogue it is opened once the refresh has loaded one.
         self._pending = store.take_pending()
@@ -176,10 +189,13 @@ class App(oreoOS.App):
         if self._frames < 2:
             self._frames += 1        # let the cached list reach the screen
             return
+        global _inflight
         job = self._job
         if job is not None:
             if job.poll():
                 self._job = None
+                if _inflight is job:
+                    _inflight = None
                 self._refresh_done(job.result)
             return                   # no icon fetches during a refresh
         if self._auto and store.refresh_due():
@@ -199,6 +215,7 @@ class App(oreoOS.App):
 
     def _refresh(self):
         """Start the catalogue fetch on a worker; returns at once."""
+        global _inflight
         if self._job is not None:
             return
         self._status = "UPDATING"
@@ -211,7 +228,7 @@ class App(oreoOS.App):
             self._refresh_done(store.fetch_index())
             return
         job.start()
-        self._job = job
+        self._job = _inflight = job
 
     def _refresh_done(self, result):
         """UI thread: apply a fetch_index() result."""

@@ -190,7 +190,7 @@
       "author": "Circuit-Overtime",
       "version": "0.2",
       "icon": "wallpaper_icon.png",
-      "size": 326706,
+      "size": 327662,
       "files": [
         ["__init__.py", 0],
         ["assets/__init__.py", 0],
@@ -204,7 +204,7 @@
         ["main.py", 243],
         ["manifest.json", 186],
         ["src/__init__.py", 0],
-        ["src/app.py", 12859]
+        ["src/app.py", 13815]
       ]
     },
     {

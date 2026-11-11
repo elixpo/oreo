@@ -586,9 +586,15 @@ def discard_pending():
 # are written on the UI thread only, in _bg_apply().
 _bg_job = None
 # Foreground apps that already use the network (or the radio) heavily:
-# the probe waits until they are closed so two TLS sessions never share
-# the heap.
+# a probe does not start while one is open. The other direction is held
+# by the apps: their automatic fetches and the Updates app's check wait
+# while netsvc.fetch_busy() (this probe, or the clock sync) is True. A
+# user's A press in Commits, Weather or the Store does not wait, so a
+# manual fetch can still overlap a probe that started on Home.
 BG_SKIP_APPS = ("Updates", "App Store", "Commits", "Weather", "WiFi")
+# A probe result that lands while one of these is in the foreground is
+# dropped: the Updates app ran its own, newer check and owns ota_status.
+BG_DROP_APPS = ("Updates",)
 
 
 def _bg_gate(os_obj, min_interval_s):
@@ -674,7 +680,9 @@ def background_check(os_obj, min_interval_s=6 * 3600, foreground=None):
     """Periodic version probe, called from the OS run-loop tail every
     frame. Never blocks on the network (#118 follow-up):
 
-      * a finished probe is collected and applied first (UI thread);
+      * a finished probe is collected and applied first (UI thread),
+        unless Updates is open (BG_DROP_APPS): that app's own check is
+        newer, so the probe's result is dropped;
       * otherwise the cheap gates run: the `ota_bg_check` setting, the
         boot grace, the 6 h rate limit, Wi-Fi up and not metered, no
         network-heavy app in the foreground, the clock-sync worker idle;
@@ -693,6 +701,8 @@ def background_check(os_obj, min_interval_s=6 * 3600, foreground=None):
             return False
         if job.poll():
             _bg_job = None
+            if foreground in BG_DROP_APPS:
+                return False
             return _bg_apply(os_obj, job.result)
         _bg_job = None
 

@@ -27,8 +27,11 @@ Controls:
 Network: the fetch runs off the UI loop (oreoOS.cache.Refresh on a
 thread) through oreoOS._http, whose socket timeouts are honoured. The
 last reading is drawn at once on re-entry; the first automatic fetch
-waits for netsvc's boot quiet window and for Wi-Fi, and never runs
-inline on a build without threads (A still fetches there).
+waits for netsvc's boot quiet window, for Wi-Fi and for any other
+background network thread (netsvc.fetch_busy()), and never runs inline
+on a build without threads (A still fetches there). The fetch job lives
+at module level: leaving and re-opening Weather while a fetch is in
+flight re-attaches to it instead of starting a second one.
 """
 
 import time
@@ -46,6 +49,10 @@ T_FETCH     = 8             # seconds, DNS + TLS + GET
 # Last reading, kept across app entries so re-opening draws it at once.
 _last_data  = None
 _last_ms    = None
+# The fetch job and what it fetches, kept across entries (see above).
+_job        = None
+_cfg        = (12.97, 77.59, "")
+_try_ms     = None              # ticks_ms when the running fetch started
 
 
 def _bucket(code):
@@ -133,6 +140,12 @@ def _fetch_owm(lat, lon, api_key):
         return None
 
 
+def _fetch_cfg():
+    # Runs on the Refresh worker thread.
+    lat, lon, key = _cfg
+    return _fetch_owm(lat, lon, key)
+
+
 def _online():
     try:
         from oreoWare import wifi
@@ -155,6 +168,11 @@ def auto_fetch_ok(net=None):
                 return False
         except Exception:
             pass
+        try:
+            if net.fetch_busy():
+                return False
+        except Exception:
+            pass
     return _online()
 
 
@@ -163,6 +181,7 @@ class App(oreoOS.App):
     SHOW_LOADING = True
 
     def on_enter(self, os):
+        global _job, _cfg
         self._os = os
         try:
             from secrets import WEATHER_LAT, WEATHER_LON, OWM_API_KEY
@@ -185,22 +204,24 @@ class App(oreoOS.App):
         self._pandas = {k: _try_sprite("panda_" + k)
                         for k in ("sun", "cloud", "rain", "snow", "storm")}
 
+        _cfg = (self._lat, self._lon, self._key)
         self._data  = _last_data
         self._last  = _last_ms
-        self._job   = None
-        try:
-            from oreoOS import cache
-            self._job = cache.Refresh(self._fetch)
-        except Exception:
-            self._job = None
+        if _job is None:
+            try:
+                from oreoOS import cache
+                _job = cache.Refresh(_fetch_cfg)
+            except Exception:
+                _job = None
+        # A fetch started on an earlier visit may still be running (or
+        # finished while the app was closed): update() picks it up.
+        self._job = _job
         self._dirty = True
 
     def on_exit(self):
-        # A running fetch finishes on its own; its result is dropped.
+        # A running fetch finishes on its own; the module keeps the job,
+        # so the next visit collects its result instead of fetching again.
         self._job = None
-
-    def _fetch(self):
-        return _fetch_owm(self._lat, self._lon, self._key)
 
     def _due(self):
         return (self._last is None or
@@ -218,7 +239,8 @@ class App(oreoOS.App):
             from oreoOS import _http    # noqa: F401
         except Exception:
             pass
-        self._last = time.ticks_ms()
+        global _try_ms
+        self._last = _try_ms = time.ticks_ms()
         job.start()
         self._dirty = True
 
@@ -234,7 +256,8 @@ class App(oreoOS.App):
         if job.poll():
             if job.result is not None:
                 self._data = job.result
-                _last_data, _last_ms = self._data, self._last
+                _last_data, _last_ms = self._data, _try_ms
+                self._last = _try_ms
             self._dirty = True
         elif not job.busy() and self._key and self._due() and auto_fetch_ok():
             self._refresh()
