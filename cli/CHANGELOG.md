@@ -10,6 +10,13 @@ from its `## [<version>]` section below, so every release needs one.
 
 ## [Unreleased]
 
+### Added
+- `oreo transfer send <files>` (alias `oreo send`), `oreo transfer list` and
+  `oreo transfer rm`: send files to the badge's new Transfer app over USB,
+  authorised by the six-character code the badge shows. OreoOS keeps
+  running; files are converted like `oreo add` and checked on the badge
+  with SHA-256 before they are saved.
+
 ## [0.1.0] - 2026-11-10
 
 First release (#117). Not yet tested against a real badge; please report

@@ -10,6 +10,7 @@ import contextlib
 import sys
 
 from . import __version__, commands, discovery
+from . import transfer  # noqa: F401  registers `transfer` and `send`
 from .badge import Badge
 from .errors import Cancelled, OreoError
 from .ui import UI, adapt_stdio, esc
@@ -53,6 +54,15 @@ HELP = {
             "  oreo add holiday.jpg\n"
             "  oreo add clip.mp4 --seconds 8\n"
             "  oreo add talk-notes.md"),
+    "transfer": ("Send files to the badge's Transfer app (code shown on the badge)",
+                 "Open Transfer on the badge, run this, and type the code the badge\n"
+                 "shows. Files are converted like `oreo add`, sent over USB, checked\n"
+                 "with SHA-256 and land in the Gallery or Reader. OreoOS keeps running.\n\n"
+                 "  oreo transfer send holiday.jpg clip.mp4 notes.md\n"
+                 "  oreo transfer list\n"
+                 "  oreo transfer rm holiday.rz565"),
+    "send": ("Same as `oreo transfer send`",
+             "  oreo send holiday.jpg notes.md"),
     "apps": ("List, install, update and remove apps",
              "Uses the badge's App Store (oreoOS.store). Installing and updating\n"
              "download over the badge's Wi-Fi, so set that up first (`oreo wifi`).\n\n"
@@ -161,6 +171,9 @@ def build_parser():
     s.add_argument("--height", type=int, default=135, help="video height (default 135)")
     s.add_argument("--photo-max", type=int, default=240, help="longest photo side (default 240)")
     s.add_argument("--save", metavar="DIR", help="also keep the converted files here")
+
+    transfer.add_arguments(_sub(subs, "transfer"))
+    transfer.add_send_arguments(_sub(subs, "send"))
 
     s = _sub(subs, "apps")
     s.add_argument("action", nargs="?", default="list",

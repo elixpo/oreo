@@ -1,4 +1,9 @@
-"""WiFi — status, nearby networks, saved networks and Send Files.
+"""WiFi — status, nearby networks and saved networks.
+
+Wi-Fi on the badge is for the internet only (App Store, OTA, GitHub
+data, weather, time). Files arrive over USB through the Transfer app
+(apps/transfer) and `oreo transfer send`; new networks with a password
+are added from a computer with `oreo wifi connect`.
 
 Pages (self._mode):
 
@@ -15,9 +20,8 @@ Pages (self._mode):
   connect  : overlay while joining: animated progress, then a clear
              success (with IP) or failure message. B cancels.
   pwhelp   : an unknown secured network was picked. The badge has no
-             keyboard, so it explains how to send the password from a
-             phone (Send Files page -> "Share a WiFi network").
-  transfer : the Send Files page (pairing code, approvals, progress).
+             keyboard, so it explains how to add it over USB with
+             `oreo wifi connect`.
 
 Nothing here blocks: scans run in oreoWare.wifi's background worker and
 joins use connect_begin()/connect_poll(). Saved networks live in
@@ -112,9 +116,9 @@ class App(oreoOS.App):
     SHOW_LOADING = False
 
     (ROW_STATUS, ROW_NETWORK, ROW_IP, ROW_NEARBY, ROW_SAVED,
-     ROW_TRANSFER, ROW_SPEED, ROW_PING, ROW_POWER,
-     ROW_AUTOCONNECT) = range(10)
-    N_ROWS = 10
+     ROW_SPEED, ROW_PING, ROW_POWER,
+     ROW_AUTOCONNECT) = range(9)
+    N_ROWS = 9
 
     def on_enter(self, os_):
         super().on_enter(os_)
@@ -169,15 +173,6 @@ class App(oreoOS.App):
         self._speed_label = ""
         self._ping_label  = ""
         self._busy        = ""
-
-        # Send Files page state (see the transfer section below).
-        self._trans_sel = 0
-        self._lp_left_press_ms = 0
-        self._last_sess_count = 0
-        self._last_sess_sig   = ""
-        self._last_prog_sig   = ""
-        self._toast_seen_ts = 0
-        self._toast_name    = ""
 
     # ── data ────────────────────────────────────────────────────────────
     def _read(self):
@@ -254,8 +249,6 @@ class App(oreoOS.App):
             return self._on_button_connect(btn)
         if m == "pwhelp":
             return self._on_button_pwhelp(btn)
-        if m == "transfer":
-            return self._on_button_transfer(btn)
         return self._on_button_main(btn)
 
     def _on_button_main(self, btn):
@@ -295,7 +288,7 @@ class App(oreoOS.App):
                     pass
             else:
                 # Non-blocking: the run loop's auto_tick() joins the best
-                # saved network in range and starts the transfer server.
+                # saved network in range.
                 try:
                     self._wifi.auto_begin()
                 except Exception:
@@ -324,9 +317,6 @@ class App(oreoOS.App):
                                       not self._autoconnect())
             except Exception:
                 pass
-        elif r == self.ROW_TRANSFER:
-            self._trans_sel = 0
-            self._mode      = "transfer"
         elif r == self.ROW_SPEED:
             self._run_speed_test()
         elif r == self.ROW_PING:
@@ -401,10 +391,7 @@ class App(oreoOS.App):
             self._mode = "pwhelp"
 
     def _on_button_pwhelp(self, btn):
-        if btn == api.BTN_A:
-            self._trans_sel = 0
-            self._mode = "transfer"
-        elif btn in (api.BTN_B, api.BTN_HOME):
+        if btn in (api.BTN_A, api.BTN_B, api.BTN_HOME):
             self._mode = "nearby"
         else:
             return
@@ -538,12 +525,6 @@ class App(oreoOS.App):
                 except Exception:
                     pass
                 self._count_saved()
-            hs = self._http()
-            if hs is not None:
-                try:
-                    hs.start(self._os)
-                except Exception:
-                    pass
         self._c_save = None
         self._dirty = True
 
@@ -688,9 +669,6 @@ class App(oreoOS.App):
                 self._anim_next = time.ticks_add(now, ANIM_MS)
                 self._dirty = True
 
-        if m == "transfer":
-            self._update_transfer()
-
     # ── render ──────────────────────────────────────────────────────────
     def draw(self, d):
         if not self._dirty:
@@ -706,8 +684,6 @@ class App(oreoOS.App):
             self._draw_connect(d)
         elif m == "pwhelp":
             self._draw_pwhelp(d)
-        elif m == "transfer":
-            self._draw_transfer(d)
         else:
             self._draw_main(d)
 
@@ -736,7 +712,6 @@ class App(oreoOS.App):
             ("Nearby",       "scanning..." if scanning else
                              ("%d found" % n_near), theme.TEAL),
             ("Saved",        "%d saved" % n_saved, theme.TEXT_BRIGHT),
-            ("Send files",   self._transfer_summary(), theme.PRIMARY),
             ("Speed",        self._speed_label or "-", theme.TEAL),
             ("Ping",         self._ping_label or "-", theme.TEAL),
             ("Power",        POWER_LABELS.get(self._power_mode(), "?"),
@@ -844,12 +819,12 @@ class App(oreoOS.App):
         widgets.draw_header(d, "SAVED")
         if not self._nets:
             self._draw_status_strip(d, "No saved networks", theme.MUTED, False)
-            d.text("Join one from Nearby, or send", ROW_PAD_X,
+            d.text("Join one from Nearby, or add one", ROW_PAD_X,
                    NET_TOP_Y + 6, theme.TEXT_DIM)
-            d.text("one from your phone: Send files", ROW_PAD_X,
+            d.text("from a computer over USB:", ROW_PAD_X,
                    NET_TOP_Y + 20, theme.TEXT_DIM)
-            d.text("-> Share a WiFi network.", ROW_PAD_X,
-                   NET_TOP_Y + 34, theme.TEXT_DIM)
+            d.text("oreo wifi connect \"name\"", ROW_PAD_X,
+                   NET_TOP_Y + 34, theme.TEAL)
             widgets.draw_hint(d, "B=back")
             return
         if self._forget_ssid:
@@ -947,439 +922,18 @@ class App(oreoOS.App):
         d.text(ssid, ROW_PAD_X + 14, y + 2, theme.TEXT_BRIGHT)
         lines = (
             "This network needs a password.",
-            "The badge has no keyboard, so send",
-            "it from a phone or laptop on the",
-            "same WiFi as the badge:",
+            "The badge has no keyboard, so add",
+            "it from a computer over USB:",
             "",
-            "1. Open Send files (press A)",
-            "2. Pair with the code it shows",
-            "3. Tap 'Share a WiFi network'",
+            "1. Plug the badge in",
+            "2. Run: oreo wifi connect",
+            "   \"" + _clip(self._pw_ssid, 22) + "\"",
+            "3. Type the password there",
             "",
-            "It is saved here, then join it",
-            "from Nearby or Saved.",
+            "It is saved here and joined; next",
+            "time it joins on its own.",
         )
         for i, ln in enumerate(lines):
             d.text(ln, ROW_PAD_X, y + 22 + i * 13,
-                   theme.TEXT_DIM if not ln[:1].isdigit() else theme.TEAL)
-        widgets.draw_hint(d, "A=Send files  B=back")
-
-    def _update_transfer(self):
-        """Send Files repaint policy: redraw only when something visible
-        changed (session list, progress, toast), and immediately when a
-        new sender appears."""
-        hs = self._http()
-        if hs is None:
-            return
-        try:
-            sessions = hs.list_sessions()
-        except Exception:
-            sessions = []
-        sig = ",".join("%s:%s" % (s.get("id", ""), s.get("state", ""))
-                       for s in sessions)
-        if sig != self._last_sess_sig:
-            self._last_sess_sig   = sig
-            self._last_sess_count = len(sessions)
-            self._dirty = True
-        # Keep the small approval loader animated until the sender's
-        # next heartbeat acknowledges the one-press decision.
-        for s in sessions:
-            if s.get("state") == "approving":
-                self._dirty = True
-                break
-        prog = hs.progress()
-        if prog:
-            psig = "%s:%d" % (prog.get("id", ""), prog.get("received", 0))
-        else:
-            psig = ""
-        if psig != self._last_prog_sig:
-            self._last_prog_sig = psig
-            self._dirty = True
-        try:
-            ts, name = hs.last_upload()
-        except Exception:
-            ts, name = (0, "")
-        if ts and ts != self._toast_seen_ts:
-            self._toast_seen_ts = ts
-            self._toast_name    = name
-            self._dirty = True
-        if self._toast_seen_ts and self._toast_name:
-            try:
-                held = time.ticks_diff(time.ticks_ms(), self._toast_seen_ts)
-            except Exception:
-                held = 0
-            if held < self.TOAST_MS:
-                self._dirty = True
-            else:
-                self._toast_name = ""
-                self._dirty = True
-
-    # ── file-transfer sub-page ──────────────────────────────────────────
-    def _http(self):
-        try:
-            from oreoOS import http_server as _hs
-            return _hs
-        except Exception:
-            return None
-
-    def _transfer_summary(self):
-        """Compact value text for the main-page row: either the live
-        sender count, or the URL when idle. Reads the http_server's
-        cached state — no network call."""
-        hs = self._http()
-        if hs is None or not hs.is_running():
-            return "off"
-        try:
-            n = len(hs.list_sessions())
-        except Exception:
-            n = 0
-        if n:
-            return "%d active" % n
-        return "ready"
-
-    # ── long-press LEFT tracking ──
-    # Pressing LEFT once = deny the selected sender. Holding LEFT for
-    # LP_HOLD_MS = toggle the transfer-disabled master kill switch.
-    # We track the press timestamp on key-down and decide on key-up.
-    LP_HOLD_MS = 800
-
-    # Bottom 'Received' toast on the Send Files page — stays visible
-    # for this many ms after an upload completes. Kept short so it
-    # doesn't compete with the notification panel chip or hide the
-    # sender list, but long enough to read.
-    TOAST_MS = 2500
-
-    def _on_button_transfer(self, btn):
-        if btn in (api.BTN_HOME, api.BTN_B):
-            self._mode = "main"
-            self._dirty = True
-            return
-        hs = self._http()
-        if hs is None:
-            return
-
-        # Master kill switch on — only `A = re-enable` works in this state.
-        try:
-            disabled = (hasattr(hs, "is_transfer_enabled")
-                        and not hs.is_transfer_enabled())
-        except Exception:
-            disabled = False
-        if disabled:
-            if btn == api.BTN_A:
-                try: hs.set_transfer_enabled(True)
-                except Exception: pass
-                self._dirty = True
-            return
-
-        if btn == api.BTN_RIGHT:
-            # R = refresh the badge code. We deliberately overload R
-            # to ALSO retry the WiFi/HTTP reconnect (the previous
-            # behaviour) — both are "kick things back into shape"
-            # actions and combining them keeps the button budget low.
-            try:
-                if hasattr(hs, "refresh_code"):
-                    hs.refresh_code()
-            except Exception:
-                pass
-            self._refresh_transfer()
-            self._dirty = True
-            return
-
-        sessions = hs.list_sessions()
-        n = len(sessions)
-        if btn == api.BTN_UP and n:
-            self._trans_sel = (self._trans_sel - 1) % n
-        elif btn == api.BTN_DOWN and n:
-            self._trans_sel = (self._trans_sel + 1) % n
-        elif btn == api.BTN_A and n:
-            sid = sessions[self._trans_sel].get("id", "")
-            if sid:
-                hs.approve(sid)
-        elif btn == api.BTN_LEFT:
-            # Mark the press-start time on first-press only. Subsequent
-            # auto-repeat events skip this branch via the != 0 guard,
-            # so a long hold keeps the original timestamp and we can
-            # measure full duration in on_button_release. The actual
-            # tap-vs-hold decision happens there — firing both deny
-            # and toggle on a single press would be confusing.
-            if self._lp_left_press_ms == 0:
-                self._lp_left_press_ms = time.ticks_ms()
-            return     # don't mark dirty — visual state hasn't changed yet
-        else:
-            return
-        self._dirty = True
-
-    def on_button_release(self, btn):
-        # LEFT released on the Transfer page — decide tap vs hold and
-        # fire exactly one action. The press-start timestamp was
-        # captured in _on_button_transfer.
-        if self._mode != "transfer" or btn != api.BTN_LEFT:
-            return
-        start = self._lp_left_press_ms
-        self._lp_left_press_ms = 0
-        if start == 0:
-            return
-        held = time.ticks_diff(time.ticks_ms(), start)
-        hs = self._http()
-        if hs is None:
-            return
-        if held >= self.LP_HOLD_MS:
-            # Long press → toggle the master kill switch.
-            try:
-                cur = (hs.is_transfer_enabled()
-                       if hasattr(hs, "is_transfer_enabled") else True)
-                hs.set_transfer_enabled(not cur)
-            except Exception:
-                pass
-        else:
-            # Short tap → deny the focused sender, if any.
-            sessions = []
-            try:
-                sessions = hs.list_sessions()
-            except Exception:
-                pass
-            if sessions and 0 <= self._trans_sel < len(sessions):
-                sid = sessions[self._trans_sel].get("id", "")
-                if sid:
-                    try: hs.deny(sid)
-                    except Exception: pass
-        self._dirty = True
-
-    def _refresh_transfer(self):
-        """Reconcile the transfer page with the live network state.
-
-        Order: re-associate WiFi from saved networks (no-op if already
-        connected), then call http_server.start() which rebinds onto
-        the live IP (no-op if the IP hasn't changed). Both are cheap
-        and idempotent — we use them as a 'kick everything back to
-        life' button after a roaming WiFi event.
-        """
-        if self._wifi:
-            try:
-                # Non-blocking; netsvc.tick() in the run loop finishes the
-                # join and, after the boot quiet window, starts the server
-                # in netsvc._run_link_jobs().
-                if not self._wifi.is_connected() and not self._joining():
-                    self._wifi.auto_begin()
-            except Exception:
-                pass
-        hs = self._http()
-        if hs is not None:
-            try:
-                hs.start(self._os)
-            except Exception:
-                pass
-        # Pull a fresh snapshot so the URL line on the page repaints
-        # with the new IP if it changed.
-        self._snap = self._read()
-
-    def _draw_transfer(self, d):
-        widgets.draw_header(d, "SEND FILES")
-
-        hs = self._http()
-        running = bool(hs and hs.is_running())
-
-        # ── Master kill switch state — entire screen flips to a
-        # ── single "Transfer closed" panel.
-        try:
-            disabled = (running
-                        and hasattr(hs, "is_transfer_enabled")
-                        and not hs.is_transfer_enabled())
-        except Exception:
-            disabled = False
-        if disabled:
-            widgets.draw_hint(d, "A=re-enable  B=back")
-            y = ROW_TOP_Y + 40
-            label = "TRANSFER CLOSED"
-            d.text(label, (SW - len(label) * 16) // 2, y,
-                   theme.PRIMARY, scale=2)
-            sub = "File transfer disabled by you."
-            d.text(sub, (SW - len(sub) * 8) // 2, y + 28,
-                   theme.TEXT_DIM)
-            cta = "Tap A to re-enable."
-            d.text(cta, (SW - len(cta) * 8) // 2, y + 44,
-                   theme.MUTED)
-            return
-
-        widgets.draw_hint(d, "A=allow  L=deny  hold-L=close  R=refresh")
-
-        # ── Code header — big 6-char display + TTL countdown ──
-        y = ROW_TOP_Y
-        if running:
-            try:
-                code = hs.current_code()
-            except Exception:
-                code = "------"
-            try:
-                remain_ms = hs.code_remaining_ms()
-            except Exception:
-                remain_ms = 0
-            # "rotates in 4:32"
-            secs = max(0, remain_ms // 1000)
-            mins, ss = divmod(secs, 60)
-            label = "Type this code in the sender's browser:"
-            d.text(label, ROW_PAD_X, y, theme.TEXT_DIM)
-            # Big code — scale=3 so it dominates the page.
-            code_w = len(code) * 8 * 3
-            d.text(code, (SW - code_w) // 2, y + 14,
-                   theme.PRIMARY, scale=3)
-            # Tiny TTL countdown below the code, centred.
-            ttl = "rotates in %d:%02d" % (mins, ss)
-            d.text(ttl, (SW - len(ttl) * 8) // 2, y + 14 + 24 + 4,
-                   theme.GOLD if remain_ms > 30_000 else theme.PRIMARY)
-            # URL hints below the countdown. We show BOTH the mDNS
-            # form and the raw IP because multicast DNS is unreliable
-            # in the wild — on most networks oreo.local works, but
-            # the IP is the universal fallback the user can type into
-            # the website's address field.
-            url_local = hs.url()
-            url_ip    = hs.url_fallback()
-            d.text(url_local, ROW_PAD_X, y + 14 + 24 + 18,
-                   theme.TEXT_DIM)
-            d.text(url_ip,    ROW_PAD_X, y + 14 + 24 + 32,
-                   theme.MUTED)
-        else:
-            d.text("Server offline.", ROW_PAD_X, y, theme.MUTED, scale=1)
-            d.text("Connect WiFi to enable transfer.",
-                   ROW_PAD_X, y + 14, theme.MUTED2, scale=1)
-
-        # ── live transfer progress bar ──
-        # Header now spans: label (14) + code at scale=3 (~26) + TTL
-        # (12) + url_local (12) + url_ip (12). Push the body start
-        # past that block.
-        prog = hs.progress() if hs else None
-        prog_y = y + 92
-        if prog:
-            total = max(1, int(prog.get("total", 0)))
-            done  = min(total, int(prog.get("received", 0)))
-            pct   = int((done * 100) // total)
-            d.text("Receiving %s" % (prog.get("filename", "")[:22] or "?"),
-                   ROW_PAD_X, prog_y, theme.TEAL)
-            # bar
-            bar_x, bar_y, bar_w, bar_h = ROW_PAD_X, prog_y + 14, SW - 2 * ROW_PAD_X, 8
-            d.rect(bar_x, bar_y, bar_w, bar_h, theme.MUTED2, fill=True)
-            fill_w = int(bar_w * pct / 100)
-            d.rect(bar_x, bar_y, fill_w, bar_h, theme.PRIMARY, fill=True)
-            d.text("%d%%  %d / %d KB" % (pct, done // 1024, total // 1024),
-                   ROW_PAD_X, bar_y + 12, theme.TEXT_DIM)
-            list_y = bar_y + 28
-        else:
-            list_y = prog_y
-
-        # ── pending sender list ──
-        # Denied sessions are hidden from the on-badge list: the badge
-        # has already made its decision, and surfacing rejected
-        # devices is just visual noise. The phone-side page still
-        # gets the "denied" verdict from its next beacon poll so the
-        # user there can hit refresh and try again with a fresh ID.
-        sessions_all = hs.list_sessions() if hs else []
-        sessions = [s for s in sessions_all if s.get("state") != "denied"]
-        # Clamp the cursor in case a session disappeared between ticks.
-        if self._trans_sel >= len(sessions):
-            self._trans_sel = max(0, len(sessions) - 1)
-
-        d.rect(ROW_PAD_X, list_y, SW - 2 * ROW_PAD_X, 1, theme.MUTED2, fill=True)
-        list_y += 6
-        if not sessions:
-            d.text("no senders connected",
-                   ROW_PAD_X + 2, list_y, theme.MUTED2)
-            return
-
-        # State -> dot colour. RGB tuples instead of theme constants
-        # because we need a clean green, and the theme palette doesn't
-        # ship one — primary is pink-red, teal is too cyan.
-        # State → dot colour. State names changed in the new server
-        # protocol — "authed" = correct code typed but badge owner
-        # hasn't approved yet (yellow); "approving" = owner pressed A and
-        # browser acknowledgement is pending; "approved" = green; "denied"
-        # is filtered upstream so it shouldn't normally appear.
-        dot_color = {
-            "authed":   api.rgb(255, 209, 102),    # yellow
-            "approving": api.rgb(162, 155, 254),    # lilac
-            "approved": api.rgb( 61, 220, 151),    # green
-            "denied":   api.rgb(255,  93, 104),    # red (filtered)
-            # Legacy fallback for the old "pending" state name —
-            # remove once every device is on the new protocol.
-            "pending":  api.rgb(255, 209, 102),
-        }
-        DOT_SIZE   = 8
-        DOT_RIGHT  = ROW_PAD_X + 2   # pad from the right edge
-        BAR_PAD    = 8               # gap on either side of the bar
-        ROW_INNER  = ROW_H - 4
-
-        prog = hs.progress() if hs else None
-
-        for i, s in enumerate(sessions[:5]):
-            row_y = list_y + i * ROW_H
-            sel   = (i == self._trans_sel)
-            if sel:
-                d.rect(4, row_y - 2, SW - 8, ROW_H - 1,
-                       theme.DOCK_SEL, fill=True)
-                d.rect(4, row_y - 2, SW - 8, 1, theme.SEL_BORDER, fill=True)
-                d.rect(4, row_y + ROW_H - 4, SW - 8, 1,
-                       theme.SEL_BORDER, fill=True)
-            sid   = s.get("id", "------")
-            state = s.get("state", "pending")
-
-            # ID at scale=1 (smaller than before — the page got too
-            # busy with the old scale=2 codes once we added a progress
-            # bar and a status dot to the same row).
-            d.text(sid, ROW_PAD_X, row_y + 6, theme.TEXT_BRIGHT, scale=1)
-
-            if state == "approving":
-                # Immediate feedback for the same physical A press. Animate
-                # while the browser performs its next 500 ms heartbeat.
-                dots = "." * (1 + ((time.ticks_ms() // 180) % 3))
-                d.text("allowing" + dots, ROW_PAD_X + 58, row_y + 6,
-                       theme.PURPLE, scale=1)
-
-            # Status dot, right side, vertically centred in the row.
-            dx = SW - DOT_RIGHT - DOT_SIZE
-            dy = row_y + (ROW_INNER - DOT_SIZE) // 2 + 2
-            d.rect(dx, dy, DOT_SIZE, DOT_SIZE,
-                   dot_color.get(state, theme.MUTED), fill=True)
-
-            # Mid-row progress bar — only when THIS session is the one
-            # currently receiving. Spans the area between the ID text
-            # and the status dot.
-            if prog and prog.get("id") == sid:
-                # Approximate where the SID text ends. Codes are 6
-                # chars × 8 px at scale=1 = 48 px.
-                bar_x = ROW_PAD_X + 6 * 8 + BAR_PAD
-                bar_w = dx - BAR_PAD - bar_x
-                if bar_w > 8:
-                    total = max(1, int(prog.get("total", 0)))
-                    done  = min(total, int(prog.get("received", 0)))
-                    pct_w = int(bar_w * done / total)
-                    bar_y = row_y + (ROW_INNER - 4) // 2 + 2
-                    d.rect(bar_x, bar_y, bar_w, 4,
-                           theme.MUTED2, fill=True)
-                    d.rect(bar_x, bar_y, pct_w, 4,
-                           theme.PRIMARY, fill=True)
-
-        # ── Bottom 'Received' toast ──
-        # Renders for self.TOAST_MS after http_server records a
-        # completed upload. A subtle pill at the bottom edge of the
-        # screen — the full panel still gets the notification panel
-        # entry separately; this toast is the in-app cue.
-        if self._toast_seen_ts and self._toast_name:
-            try:
-                held = time.ticks_diff(time.ticks_ms(),
-                                       self._toast_seen_ts)
-            except Exception:
-                held = self.TOAST_MS
-            if held < self.TOAST_MS:
-                label = "Received  %s" % self._toast_name[:18]
-                # Centre the pill horizontally; sit a few pixels above
-                # the bottom edge so it doesn't collide with the OS hint
-                # bar on devices that draw one.
-                txt_w  = len(label) * 8
-                pad_x  = 10
-                pad_y  = 4
-                pill_w = txt_w + 2 * pad_x
-                pill_h = 14
-                pill_x = max(2, (SW - pill_w) // 2)
-                pill_y = SH - pill_h - 6
-                d.rect(pill_x, pill_y, pill_w, pill_h,
-                       theme.TEAL, fill=True)
-                d.text(label, pill_x + pad_x, pill_y + pad_y,
-                       theme.BG, scale=1)
+                   theme.TEAL if ln and ln[0] in "123 " else theme.TEXT_DIM)
+        widgets.draw_hint(d, "B=back")

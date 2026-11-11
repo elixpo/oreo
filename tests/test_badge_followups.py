@@ -190,22 +190,35 @@ class NetsvcFollowupTest(unittest.TestCase):
         self.env.thread.run_all()
         self.env.tick(10)
 
+    def _count_link_ups(self):
+        """Count netsvc._link_up() calls (the link-up jobs: time sync)."""
+        calls = []
+        real = self.net._link_up
+
+        def spy(*a, **k):
+            calls.append(a)
+            return real(*a, **k)
+        self.net._link_up = spy
+        self.addCleanup(setattr, self.net, "_link_up", real)
+        return calls
+
     def test_rejoin_between_polls_reruns_link_jobs(self):
+        ups = self._count_link_ups()
         self._up()
         self.env.tick()
-        self.assertEqual(self.env.http.calls, ["start"])
+        self.assertEqual(len(ups), 1)
         self.assertEqual(len(self.env.thread.started), 1)
         self._sync_once()
-        # Drop and re-join inside one poll: is_connected() never False.
-        # The listener is closed first, so start() really rebinds.
+        # Drop and re-join inside one poll: is_connected() never False,
+        # but link_seq() moved, so the link-up jobs run again.
         self.seq += 1
         self.env.tick(self.net.POLL_MS)
-        self.assertEqual(self.env.http.calls, ["start", "stop", "start"])
+        self.assertEqual(len(ups), 2)
         # The clock was synced moments ago: no second NTP query.
         self.assertEqual(self.env.thread.started, [])
         # Same link, later polls: nothing re-runs.
         self.env.tick(self.net.POLL_MS)
-        self.assertEqual(self.env.http.calls, ["start", "stop", "start"])
+        self.assertEqual(len(ups), 2)
         # A quick re-join once the last sync is stale re-syncs too.
         self.env.tick(self.net.NTP_FRESH_S * 1000 + 1000)
         self.seq += 1
@@ -215,20 +228,21 @@ class NetsvcFollowupTest(unittest.TestCase):
     def test_new_address_between_polls_rebinds(self):
         # A driver-level reconnect: link_seq() does not move, but the
         # station came back with a different DHCP lease.
+        ups = self._count_link_ups()
         self.ip = "10.0.0.2"
         self.env.wifi.ip = lambda: self.ip
         self._up()
         self.env.tick()
         self.ip = "10.0.0.9"
         self.env.tick(self.net.POLL_MS)
-        self.assertEqual(self.env.http.calls, ["start", "stop", "start"])
+        self.assertEqual(len(ups), 2)
         # Same address on later polls: nothing re-runs.
         self.env.tick(self.net.POLL_MS)
-        self.assertEqual(len(self.env.http.calls), 3)
+        self.assertEqual(len(ups), 2)
         # A driver without ip() never triggers it.
         del self.env.wifi.ip
         self.env.tick(self.net.POLL_MS)
-        self.assertEqual(len(self.env.http.calls), 3)
+        self.assertEqual(len(ups), 2)
 
     def test_fetch_busy_covers_ntp_and_ota_probe(self):
         self.assertFalse(self.net.fetch_busy())
@@ -253,11 +267,13 @@ class NetsvcFollowupTest(unittest.TestCase):
                 sys.modules["oreoOS.ota"] = saved
 
     def test_driver_without_link_seq_still_works(self):
+        ups = self._count_link_ups()
         del self.env.wifi.link_seq
         self.env.wifi.connected = True
         self.env.tick()
         self.env.tick(self.net.POLL_MS)
-        self.assertEqual(self.env.http.calls, ["start"])
+        self.assertEqual(len(ups), 1)
+        self.assertEqual(len(self.env.thread.started), 1)   # clock sync
 
     def test_sync_result_counts_attempts(self):
         self.assertEqual(self.net.sync_result(), (0, False, ""))

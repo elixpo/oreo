@@ -481,14 +481,6 @@ def run_app(os_obj, app):
                 except Exception:
                     pass
 
-            # LAN HTTP upload server tick. Non-blocking accept on the
-            # listening socket — costs one syscall per frame on the
-            # idle path. Handles one request synchronously when a
-            # phone POSTs, which briefly stalls the UI for the
-            # duration of the upload (fine for sub-second photo
-            # transfers; we'll move to a background worker later if
-            # uploads ever grow above a few hundred KB).
-            #
             # Wi-Fi auto-connect, keep-alive and the on-link-up jobs live
             # in netsvc (#118): it only polls here; the clock sync runs on
             # its worker thread and nothing starts in the quiet window
@@ -501,11 +493,6 @@ def run_app(os_obj, app):
                         _net.tick(app_name)
                     except Exception:
                         pass
-                try:
-                    from oreoOS import http_server as _hs
-                    _hs.tick()
-                except Exception:
-                    pass
                 # Background OTA probe: rate-limited inside ota to one
                 # check every 6 h, only with Wi-Fi up. The GitHub GET runs
                 # on its own thread; this call only starts it and, on a
@@ -767,8 +754,7 @@ def _warm_up(os_obj):
             os_obj._power = PowerManager(os_obj)
     except Exception:
         pass
-    for mod in ("oreoOS.http_server", "oreoOS.ota", "oreoOS.netsvc",
-                "oreoOS.perf"):
+    for mod in ("oreoOS.ota", "oreoOS.netsvc", "oreoOS.perf"):
         try:
             __import__(mod)
         except Exception:

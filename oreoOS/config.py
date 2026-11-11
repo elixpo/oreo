@@ -84,6 +84,6 @@ APP_CATEGORIES = (
     ("Games",  "cat_games",  ("flappy", "snake", "racer", "pet", "patakha")),
     ("GitHub", "cat_github", ("badge",  "identity", "commits")),
     ("Utils",  "cat_utils",  ("weather",)),
-    ("Tools",  "cat_tools",  ("gallery", "color_picker", "gamepad", "quest")),
+    ("Tools",  "cat_tools",  ("gallery", "transfer", "color_picker", "gamepad", "quest")),
     ("System", "cat_system", ("settings", "about")),
 )

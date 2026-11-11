@@ -62,6 +62,7 @@ checks this.
 | `oreo shell` | MicroPython REPL; OreoOS restarts when you leave (Ctrl-] / Ctrl-X) |
 | `oreo ls / push / pull / rm` | Files, with progress bars; pushes are atomic and SHA-256 checked |
 | `oreo add <file>...` | Photo/video into the Gallery, `.md`/`.txt` into the Reader, after a space check |
+| `oreo transfer send <file>...` (or `oreo send`) | Sends files to the badge's **Transfer** app with the code it shows; OreoOS keeps running. Also `oreo transfer list` / `rm` |
 | `oreo apps [list\|refresh\|install\|update\|remove]` | The badge's App Store, over the badge's Wi-Fi |
 | `oreo run <file>` | Runs a script and streams its output |
 | `oreo dev <folder>` | Mounts a folder at `/remote` for live editing |
@@ -86,6 +87,13 @@ OreoOS is restarted after a command; default `soft`), `--yes`, `--no-color`,
 - **Wi-Fi passwords** are read with `getpass` (or `--password-stdin`), sent
   to the badge once and never printed, logged, returned or stored on the
   computer. `oreo wifi saved` only lists names.
+- **`oreo transfer`** never stops OreoOS: open Transfer on the badge
+  (Tools), run the command and type the six-character code the badge
+  shows. Files are converted like `oreo add`, sent over USB in chunks,
+  checked on the badge with SHA-256 and their format header, then renamed
+  into place. Five wrong codes lock the badge for a minute; every session
+  gets a new code. Without the app open it waits (`--wait`, default 60 s)
+  and then explains; it never falls back to the raw REPL.
 - **Space** is checked before copying; converted media is validated before
   it is sent, and its stored size (not the source size) is what counts.
 - **Erasing** (`rm -r`, `apps remove`, `update --clean`, `flash`) asks
