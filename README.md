@@ -119,7 +119,7 @@ Bluetooth and WiFi don't get their own drawer tiles — they live inside **Setti
 
 ### 📦 App Store — install, update and remove apps on-device
 
-The badge ships a small default set (About, Badge, Commits, Gallery, Gamepad, Identity, Reader, Settings, Storage and the App Store, plus the system apps Apps, Updates and WiFi). Everything else lives under [`apps_market/`](apps_market/) and installs from the **App Store** tile: Racer, Flappy Oreo, Snake, Elixpo Pet, IR Quest, Bluetooth, Weather, Color, Gestures and the Diwali special, Patakha.
+The badge ships a small default set (About, Badge, Commits, Gallery, Gamepad, Identity, Reader, Settings, Storage, Transfer and the App Store, plus the system apps Apps, Updates and WiFi). Everything else lives under [`apps_market/`](apps_market/) and installs from the **App Store** tile: Racer, Flappy Oreo, Snake, Elixpo Pet, IR Quest, Bluetooth, Weather, Color, Gestures and the Diwali special, Patakha.
 
 - **Discover** (first page): a featured card plus every app with its icon, tagline, category, size and an **INSTALL / OPEN / UPDATE** button. **A** opens the app's page (author, version, size, description) where you install it, with a progress bar.
 - **Installed** (press **B**): every app on the badge. Built-in apps can only be opened; others can be updated or uninstalled behind a confirm dialog, and reinstalled from Discover any time.
@@ -148,6 +148,29 @@ git fetch origin doom-edition && git switch doom-edition
 ./build-firmware --clean      # or use the prebuilt oreoWare/firmware/OREO_BADGE-v1.28.0.bin
 ./deploy --full               # firmware, Freedoom data and OS
 ```
+
+## 💻 Use your badge from a computer
+
+Plug the badge in over USB and install **oreo-cli**, which gives you the
+`oreo` command. It finds the badge by itself, so you never need to look up a
+port name.
+
+```sh
+# Linux, macOS (Windows: irm https://raw.githubusercontent.com/elixpo/oreo/main/cli/install.ps1 | iex)
+curl --proto '=https' --tlsv1.2 -LsSf https://raw.githubusercontent.com/elixpo/oreo/main/cli/install.sh | sh
+
+oreo                                   # status and an interactive menu
+oreo transfer send photo.jpg notes.md  # with Tools > Transfer open on the badge; type the code it shows
+oreo wifi connect "Home Net"           # Wi-Fi is for the internet: App Store, updates, GitHub, weather, time
+oreo update                            # newest OreoOS, downloaded by the badge
+```
+
+- [`docs/CLI.md`](docs/CLI.md): the oreo-cli manual (every command, exit
+  codes, troubleshooting, FAQ).
+- [`docs/USB.md`](docs/USB.md): ports, drivers, permissions, and raw
+  `mpremote`.
+- [`docs/TRANSFER.md`](docs/TRANSFER.md): how the Transfer app and its code
+  exchange work.
 
 ## 🚀 Get going
 
