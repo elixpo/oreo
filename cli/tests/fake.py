@@ -26,7 +26,17 @@ from collections import namedtuple
 HERE = _host_os.path.dirname(_host_os.path.abspath(__file__))
 sys.path.insert(0, _host_os.path.dirname(HERE))
 
+from oreo_cli import avatar as _avatar  # noqa: E402
 from oreo_cli.errors import BadgeError  # noqa: E402
+
+
+def _offline(url):
+    """Tests never reach GitHub: `oreo setup` sees the avatar download fail
+    unless a test puts its own avatar._open in place."""
+    raise OSError("no network in tests")
+
+
+_avatar._open = _offline
 
 Uname = namedtuple("Uname", "sysname nodename release version machine")
 

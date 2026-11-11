@@ -14,6 +14,10 @@ The OpenWeatherMap key never comes back from the badge: the read snippet
 only reports whether one is set, and the merge happens on the badge, so
 the computer only ever holds a key the person has just typed. It is sent
 once and redacted from any error text.
+
+After the profile, setup makes sure /avatar.bin holds GITHUB_USER's GitHub
+avatar (avatar.py): fetched and converted on this computer, copied over
+USB, fetched again only when the user changed or --avatar asks for it.
 """
 
 import math
@@ -21,6 +25,7 @@ import re
 from pathlib import Path
 import sys
 
+from . import avatar
 from .badge import lit
 from .commands import command
 from .errors import BadgeError, Cancelled, OreoError, UsageError
@@ -458,14 +463,101 @@ def describe(updates):
     return parts
 
 
-def setup(ui, b, updates=None, show_only=False):
-    """Show the profile, collect changes (prompting when `updates` is None)
-    and write them. Returns True when /profile.json changed."""
+# ── the avatar ───────────────────────────────────────────────────────
+
+# auto: fetch when /avatar.bin is missing or made for another user;
+# refresh: fetch again anyway (--avatar); skip: leave it alone (--no-avatar)
+AVATAR_AUTO, AVATAR_REFRESH, AVATAR_SKIP = "auto", "refresh", "skip"
+
+
+def _avatar_owner_code():
+    return (
+        "u=None\n"
+        "x=0\n"
+        "try:\n"
+        " with open(%(p)s,'rb') as h:\n"
+        "  x=1\n"
+        "  b=h.read(%(n)d)\n"
+        " if b[:%(m)d]==%(g)s:\n"
+        "  u=str(b[%(h)d:%(h)d+b[%(h)d-1]],'ascii')\n"
+        "except Exception:\n"
+        " pass\n"
+        "_e({'exists':x,'user':u})\n"
+        % {"p": lit(avatar.PATH), "n": avatar.HEADER + 255, "m": len(avatar.MAGIC),
+           "g": lit(avatar.MAGIC), "h": avatar.HEADER})
+
+
+def avatar_owner(b):
+    """(exists, login) of /avatar.bin on the badge; login is None when the
+    file is missing or not an avatar file. Reads only its header."""
+    r = b.result(_avatar_owner_code())
+    return bool(r.get("exists")), r.get("user")
+
+
+def _remove_avatar(b):
+    b.result("import os\ntry:\n os.remove(%s)\nexcept OSError:\n pass\n_e({'ok':1})\n"
+             % lit(avatar.PATH))
+
+
+def _same(a, b):
+    """GitHub logins are case-insensitive."""
+    return bool(a) and bool(b) and a.lower() == b.lower()
+
+
+def sync_avatar(ui, b, user, mode=AVATAR_AUTO):
+    """Make /avatar.bin hold `user`'s GitHub avatar. Returns True when the
+    file on the badge changed. Never fails the setup: without the avatar
+    the Badge app draws the owner's initials."""
+    if mode == AVATAR_SKIP:
+        return False
+    exists, have = avatar_owner(b)
+    if not user:
+        if exists:
+            _remove_avatar(b)
+            ui.note("removed %s: no GitHub user is set" % avatar.PATH)
+        return exists
+    if mode == AVATAR_AUTO and _same(have, user):
+        ui.note("the avatar for @%s is on the badge (`oreo setup --avatar` fetches it again)"
+                % esc(user))
+        return False
+    try:
+        with ui.status("fetching @%s's avatar from GitHub" % user):
+            data = avatar.build(user)
+    except avatar.AvatarError as e:
+        stale = exists and not _same(have, user)
+        if stale:
+            _remove_avatar(b)       # never leave another user's face behind
+        ui.warn("no avatar: %s. The Badge app shows your initials; run "
+                "`oreo setup --avatar` to try again." % esc(str(e)))
+        return stale
+    with ui.status("copying the avatar to %s" % avatar.PATH):
+        b.write_file(data, avatar.PATH)
+    ui.ok("saved %s (@%s's GitHub avatar, %dx%d)" % (avatar.PATH, esc(user),
+                                                    avatar.SIZE, avatar.SIZE))
+    return True
+
+
+def _github_user(data):
+    value, _ = resolved(data)["GITHUB_USER"]
+    return str(value).lstrip("@") if value else ""
+
+
+def setup(ui, b, updates=None, show_only=False, avatar_mode=AVATAR_AUTO):
+    """Show the profile, collect changes (prompting when `updates` is None),
+    write them, then bring /avatar.bin in line with GITHUB_USER. Returns
+    True when /profile.json or /avatar.bin changed."""
     with ui.status("reading the profile"):
         data = read(b)
     show(ui, data, title="on the badge now")
     if show_only:
+        exists, have = avatar_owner(b)
+        if have:
+            ui.note("%s: avatar of @%s" % (avatar.PATH, esc(have)))
+        elif not exists:
+            ui.note("no %s yet: the Badge app shows your initials" % avatar.PATH)
         return False
+    if updates is not None and not updates and avatar_mode == AVATAR_REFRESH:
+        return sync_avatar(ui, b, _github_user(data), avatar_mode)   # --avatar alone
     prompted = updates is None
     if prompted:
         if not ui.interactive:
@@ -475,7 +567,7 @@ def setup(ui, b, updates=None, show_only=False):
         updates = ask_updates(ui, data)
     if not updates:
         ui.ok("nothing changed")
-        return False
+        return sync_avatar(ui, b, _github_user(data), avatar_mode)
     for line in describe(updates):
         ui.step(esc(line))
     # values typed as options are the answer already; prompted ones get a last look
@@ -492,6 +584,7 @@ def setup(ui, b, updates=None, show_only=False):
     if now.get("WEATHER_LAT") is None or now.get("WEATHER_LON") is None:
         ui.note("No weather location pinned: Weather finds the badge's location "
                 "from its network (set WEATHER_LAT and WEATHER_LON to pin one).")
+    sync_avatar(ui, b, _github_user(saved), avatar_mode)
     return True
 
 
@@ -518,18 +611,26 @@ def cmd_setup(ctx):
                                  ", ".join(sorted(got)) or "no profile values"))
         if ignored:
             ui.note("left alone (not profile keys): %s" % ", ".join(sorted(set(ignored))))
-    if args.show and (updates or getattr(args, "from_file", None) or getattr(args, "set", None)):
+    refresh = getattr(args, "avatar", False)
+    skip = getattr(args, "no_avatar", False)
+    if refresh and skip:
+        raise UsageError("--avatar and --no-avatar contradict each other")
+    if args.show and (updates or refresh or skip or getattr(args, "from_file", None)
+                      or getattr(args, "set", None)):
         raise UsageError("--show only prints the profile; leave out the other options")
     if args.owm_key is not None and args.owm_key.strip():
         ui.warn("a key given as --owm-key can end up in your shell history; "
                 "--owm-key-stdin or the prompt (oreo setup) avoids that")
-    if not updates and not args.show and not ui.interactive:
+    if not updates and not args.show and not refresh and not ui.interactive:
         raise UsageError("no terminal to ask for the profile",
                          hint="pass values as options, e.g. oreo setup --github-user "
                               "octocat --timezone 5.5 (see `oreo help setup`)")
+    mode = AVATAR_REFRESH if refresh else AVATAR_SKIP if skip else AVATAR_AUTO
     ui.header("setup", "owner profile in %s (docs/PROFILE.md)" % PATH)
     with ctx.session() as b:
-        changed = setup(ui, b, updates=updates or None, show_only=args.show)
+        # --avatar alone refreshes the avatar without asking for the profile
+        changed = setup(ui, b, updates=updates if (updates or refresh) else None,
+                        show_only=args.show, avatar_mode=mode)
     if changed:
         after_save(ui, ctx.args.reset)
     return 0
