@@ -223,14 +223,17 @@ def install_folder(ui, b, checked, force=False, verify=True):
                  len(blobs), human(total), target))
     if existing is not None:
         ui.note("%s is already on the badge; replacing it (saved data in /state stays)" % aid)
-    for rel, data in blobs:
-        with ui.progress(esc(rel), total=len(data)) as update:
-            b.write_file(data, posixpath.join(target, rel), progress=update, verify=verify,
-                         check_space=False)
-    new = {posixpath.join(target, rel) for rel, _ in blobs}
-    stale = sorted(p for p in old - new if not p.endswith(".part"))
-    for p in stale:
-        b.rm(p)
+    name = manifest.get("name") or aid
+    with b.showing():
+        for i, (rel, data) in enumerate(blobs):
+            with ui.progress(esc(rel), total=len(data)) as update:
+                b.write_file(data, posixpath.join(target, rel), progress=update, verify=verify,
+                             check_space=False, screen=("Installing %s" % name,
+                                                        "%s (%d of %d)" % (rel, i + 1, len(blobs))))
+        new = {posixpath.join(target, rel) for rel, _ in blobs}
+        stale = sorted(p for p in old - new if not p.endswith(".part"))
+        for p in stale:
+            b.rm(p)
     if stale:
         ui.note("removed %d file(s) left from the previous install" % len(stale))
     ui.ok("installed %s to %s" % (esc(manifest.get("name") or aid), target))

@@ -13,6 +13,7 @@ oreoWare.battery).
 
 import base64
 import binascii
+import contextlib
 import hashlib
 import json
 import posixpath
@@ -52,6 +53,52 @@ FREE_RESERVE = 64 * 1024  # keep this much flash free after a push
 
 NO_OREOOS_HINT = ("install OreoOS: `oreo flash --repo <checkout>` (firmware and OreoOS) "
                   "or `oreo update --repo <checkout>`; see `oreo doctor`")
+
+
+# The badge's progress screen while the computer drives it (oreoOS/hostui.py:
+# show(title, detail="", progress=None) and clear(), callable over the raw
+# REPL while OreoOS is paused; progress is 0.0-1.0 or None). An OreoOS
+# without it, or any error inside it, is ignored: the screen is a courtesy
+# and must never break the operation. The module is imported once per raw
+# REPL session (its globals survive between execs until the next soft
+# reset) and the calls ride along with execs that are sent anyway, so a
+# push costs no extra round trips for it.
+HOSTUI_IMPORT = (
+    "try:\n"
+    " _hu\n"
+    "except NameError:\n"
+    " try:\n"
+    "  from oreoOS import hostui as _hu\n"
+    " except Exception:\n"
+    "  _hu=None\n"
+)
+# _hs(title, detail, progress) for snippets that update the screen from a
+# loop or callback on the badge.
+HOSTUI_DEF = HOSTUI_IMPORT + (
+    "def _hs(t,d='',p=None):\n"
+    " if _hu:\n"
+    "  try:\n"
+    "   _hu.show(t,d,p)\n"
+    "  except Exception:\n"
+    "   pass\n"
+)
+
+
+def _fraction(progress):
+    if progress is None:
+        return None
+    return round(min(1.0, max(0.0, float(progress))), 3)
+
+
+def screen_code(title, detail="", progress=None):
+    """A snippet that shows (title, detail, progress) on the badge's
+    screen, or clears it when title is None."""
+    if title is None:
+        call = "  _hu.clear()\n"
+    else:
+        call = "  _hu.show(%s,%s,%s)\n" % (lit(str(title)), lit(str(detail or "")),
+                                            lit(_fraction(progress)))
+    return HOSTUI_IMPORT + "if _hu:\n try:\n" + call + " except Exception:\n  pass\n"
 
 
 def lit(value):
@@ -145,6 +192,7 @@ class Badge:
         self.on_text = on_text
         self.entered = False
         self._dirs = set()      # folders known to exist on the badge
+        self._screen = False    # something is shown on the badge's screen
 
     # ── session ──────────────────────────────────────────────────────
     def connect(self):
@@ -158,6 +206,47 @@ class Badge:
         if self.entered or getattr(self.link, "t", None) is not None:
             self.link.restart(mode)
         self.entered = False
+
+    # ── the badge's screen (oreoOS/hostui.py) ────────────────────────
+    def screen_code(self, title, detail="", progress=None):
+        """screen_code(), remembering that the screen needs clearing."""
+        self._screen = True
+        return screen_code(title, detail, progress)
+
+    def screen(self, title, detail="", progress=None):
+        """Show what the computer is doing on the badge's screen. Best
+        effort: nothing happens unless OreoOS is already paused, and an
+        OreoOS without hostui, or any failure, is ignored."""
+        if not self.entered:
+            return
+        try:
+            self.link.exec(self.screen_code(title, detail, progress), timeout=5)
+        except OreoError:
+            pass
+
+    def screen_clear(self):
+        """Clear the badge's screen if anything was shown on it."""
+        if not (self.entered and self._screen):
+            return
+        self._screen = False
+        try:
+            self.link.exec(screen_code(None), timeout=5)
+        except OreoError:
+            pass
+
+    @contextlib.contextmanager
+    def showing(self):
+        """Clear the badge's screen when the block ends, also after an
+        error (but not when the link is gone, or on Ctrl-C: the restart
+        that follows brings OreoOS's own screen back anyway)."""
+        try:
+            yield self
+        except LinkError:
+            raise
+        except Exception:
+            self.screen_clear()
+            raise
+        self.screen_clear()
 
     # ── exec helpers ─────────────────────────────────────────────────
     def run(self, code, timeout=15, on_event=None, on_data=None, secrets=()):
@@ -338,7 +427,7 @@ class Badge:
             p = posixpath.dirname(p)
 
     def write_file(self, data, remote, progress=None, verify=True,
-                   chunk=PUSH_CHUNK, reserve=FREE_RESERVE, check_space=True):
+                   chunk=PUSH_CHUNK, reserve=FREE_RESERVE, check_space=True, screen=None):
         """Copy bytes to `remote` atomically and verified.
 
         The bytes go to `<remote>.part`; the badge then checks its size (and
@@ -348,6 +437,9 @@ class Badge:
         with the check-and-rename, so a small file costs two execs (plus a
         space check unless the caller already made one, and a mkdir the
         first time a folder is used).
+
+        screen=(title, detail) also shows the progress on the badge's
+        screen, riding along with the execs above (no extra round trips).
         """
         dest = norm(remote)
         if check_space:
@@ -368,21 +460,27 @@ class Badge:
         def put(piece):
             return "_w(_d(%s))\n" % lit(base64.b64encode(piece)) if piece else ""
 
+        def shown():
+            if not screen:
+                return ""
+            return self.screen_code(screen[0], screen[1],
+                                    state["done"] / float(len(data)) if data else None)
+
         def advance(piece):
             state["done"] += len(piece)
             if progress:
                 progress(state["done"], len(data))
         try:
-            self.run("import os\n" + B64 +
+            self.run(shown() + "import os\n" + B64 +
                      "_f=open(%s,'wb')\n_w=_f.write\n_d=_b.a2b_base64\n" % lit(tmp)
                      + (put(pieces[0]) if len(pieces) > 1 else ""))
             if len(pieces) > 1:
                 advance(pieces[0])
             for piece in pieces[1:-1]:
-                self.link.exec(put(piece), timeout=15)
+                self.link.exec(shown() + put(piece), timeout=15)
                 advance(piece)
             r = self.result(
-                put(pieces[-1]) +
+                shown() + put(pieces[-1]) +
                 "_f.close()\n"
                 "_r={'size':os.stat(%(t)s)[6],'sha':None}\n"
                 "if %(v)s:\n"
@@ -449,7 +547,9 @@ class Badge:
             " _e({'sha':None})\n" % lit(norm(remote)), timeout=60)
         return r["sha"]
 
-    def read_file(self, remote, progress=None, chunk=PULL_CHUNK):
+    def read_file(self, remote, progress=None, chunk=PULL_CHUNK, screen=None):
+        """The file's bytes. screen=(title, detail): the badge shows its
+        progress on its screen every few chunks while it sends."""
         src = norm(remote)
         st = self.stat(src)
         if st is None:
@@ -463,15 +563,25 @@ class Badge:
             buf.extend(piece)
             if progress:
                 progress(len(buf), total)
+        show, step = "", ""
+        if screen:
+            self._screen = True
+            args = "%s,%s" % (lit(str(screen[0])), lit(str(screen[1] or "")))
+            show = HOSTUI_DEF + "_hs(%s,0.0)\n_k=0\n" % args
+            # every 8 chunks (24 KiB): drawing is slower than sending a line
+            step = (" _k+=1\n"
+                    " if _k%%8==0:\n"
+                    "  _hs(%s,min(1.0,_k*%d/%d))\n" % (args, chunk, max(1, total)))
         self.run(
-            B64 +
+            B64 + show +
             "_f=open(%s,'rb')\n"
             "while 1:\n"
             " c=_f.read(%d)\n"
             " if not c:\n"
             "  break\n"
-            " print('@B:'+_b.b2a_base64(c).decode().strip())\n"
-            "_f.close()\n" % (lit(src), chunk), on_data=on_data)
+            " print('@B:'+_b.b2a_base64(c).decode().strip())\n" % (lit(src), chunk)
+            + step +
+            "_f.close()\n", on_data=on_data)
         if len(buf) != total:
             raise OreoError("%s: received %d of %d bytes" % (src, len(buf), total))
         return bytes(buf)
@@ -651,14 +761,25 @@ class Badge:
             "_e({'ok':bool(ok),'error':S.last_error()})\n", timeout=60)
         return r["ok"], r.get("error") or ""
 
-    def app_install(self, app_id, progress=None):
+    def app_install(self, app_id, progress=None, screen=None):
         def on_event(ev):
             if progress and "p" in ev:
                 progress(ev["p"], ev.get("t") or 0)
+        show, step = "", ""
+        if screen:
+            self._screen = True
+            args = "%s,%s" % (lit(str(screen[0])), lit(str(screen[1] or "")))
+            show = HOSTUI_DEF + "_hq=[-1]\n_hs(%s,None)\n" % args
+            # redraw in 5 % steps, not for every block downloaded
+            step = (" q=int(a*20/t) if t else 0\n"
+                    " if q!=_hq[0]:\n"
+                    "  _hq[0]=q\n"
+                    "  _hs(%s,a/t if t else None)\n" % args)
         r = self.result(
+            show +
             "from oreoOS import store as S\n"
             "def _cb(a,t,l):\n"
-            " _e({'p':a,'t':t})\n"
+            " _e({'p':a,'t':t})\n" + step +
             "ok,msg=S.install(%s,_cb)\n"
             "_e({'ok':bool(ok),'msg':msg})\n" % lit(app_id),
             timeout=90, on_event=on_event)
@@ -730,15 +851,22 @@ class Badge:
             timeout=300)
         return r
 
-    def ota_download(self, progress=None):
+    def ota_download(self, progress=None, screen=None):
         """Download the changed files into /_ota. progress(i, total, path).
-        Returns True when the update is staged and sealed."""
+        Returns True when the update is staged and sealed. screen=title:
+        the badge shows each file on its screen."""
         def on_event(ev):
             if progress and "i" in ev:
                 progress(ev["i"], ev.get("t") or 0, ev.get("p") or "")
+        show, step = "", ""
+        if screen:
+            self._screen = True
+            show = HOSTUI_DEF
+            step = " _hs(%s,p,i/t if t else None)\n" % lit(str(screen))
         r = self.result(
+            show +
             "def _cb(i,t,p):\n"
-            " _e({'i':i,'t':t,'p':p})\n"
+            " _e({'i':i,'t':t,'p':p})\n" + step +
             "_ok=O.download(_pk,_cb)\n"
             "if not _ok:\n"
             " try:\n"
@@ -748,17 +876,24 @@ class Badge:
             "_e({'ok':bool(_ok)})\n", timeout=120, on_event=on_event)
         return bool(r.get("ok"))
 
-    def ota_apply(self, progress=None):
+    def ota_apply(self, progress=None, screen=None):
         """Move the staged files into place (what the badge does at boot).
         Returns the applied version, or None (the staged update stays and
-        the next boot retries it)."""
+        the next boot retries it). screen=title: the badge shows each file
+        on its screen (hostui is imported before any file moves)."""
         def on_event(ev):
             if progress and "a" in ev:
                 progress(ev["a"], ev.get("p") or "")
+        show, step = "", ""
+        if screen:
+            self._screen = True
+            show = HOSTUI_DEF + "_hs(%s,'',None)\n" % lit(str(screen))
+            step = " _hs(%s,p,None)\n" % lit(str(screen))
         r = self.result(
+            show +
             "from oreoOS import ota as O\n"
             "def _cb(i,p):\n"
-            " _e({'a':i,'p':p})\n"
+            " _e({'a':i,'p':p})\n" + step +
             "_e({'applied':O.apply_pending(_cb)})\n", timeout=120, on_event=on_event)
         return r.get("applied")
 
