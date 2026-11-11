@@ -10,6 +10,14 @@ Overrides:
     python tools/release.py v1.3.0           # explicit version
     python tools/release.py --channel beta   # prerelease
     python tools/release.py --dry-run        # preview every command
+    python tools/release.py --repo you/oreo  # publish to another repository
+
+The GitHub repository comes from OTA_REPO in oreoOS/ota.py, the one
+badges built from this checkout update from, so a fork that points
+OTA_REPO at itself publishes there with no other edit. --repo overrides
+it. Every GitHub step uses it: the manifest's download URLs and the gh
+release commands (`--repo`). `origin` must be that repository, since
+the tag is pushed there.
 
 The script auto-recovers from a half-failed previous run: if the tag
 is already on the remote it skips git + jumps to build + publish.
@@ -28,6 +36,7 @@ Requirements:
 """
 
 import argparse
+import ast
 import re
 import shutil
 import subprocess
@@ -37,7 +46,86 @@ from pathlib import Path
 
 REPO_ROOT  = Path(__file__).resolve().parent.parent
 CONFIG     = REPO_ROOT / "oreoOS" / "config.py"
+OTA        = REPO_ROOT / "oreoOS" / "ota.py"
 VERSION_RE = re.compile(r'(VERSION\s*=\s*")v\d+\.\d+\.\d+(")')
+# owner/name as GitHub allows them
+REPO_RE    = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})/[A-Za-z0-9._-]{1,100}$")
+ORIGIN_RE  = re.compile(r"github\.com[:/]+([^/\s]+/[^/\s]+?)(?:\.git)?/?$")
+
+
+# ── the repository ──────────────────────────────────────────────────────────
+
+def check_repo(repo, where):
+    """`repo` if it looks like owner/name, else exit naming `where`."""
+    repo = (repo or "").strip()
+    if not REPO_RE.match(repo) or repo.endswith((".", ".git")):
+        sys.exit("✗ %s: %r is not a GitHub repository (owner/name)" % (where, repo))
+    return repo
+
+
+def ota_repo(text):
+    """OTA_REPO from the source of oreoOS/ota.py, or None. Parsed, not
+    imported: ota.py needs the badge's modules."""
+    for node in ast.parse(text).body:
+        if isinstance(node, ast.Assign) and any(
+                isinstance(t, ast.Name) and t.id == "OTA_REPO" for t in node.targets):
+            try:
+                value = ast.literal_eval(node.value)
+            except ValueError:
+                return None
+            return value if isinstance(value, str) else None
+    return None
+
+
+def resolve_repo(override=None, ota_text=None):
+    """(repo, source): --repo when given, else OTA_REPO in oreoOS/ota.py."""
+    if override:
+        return check_repo(override, "--repo"), "--repo"
+    if ota_text is None:
+        ota_text = OTA.read_text()
+    found = ota_repo(ota_text)
+    if found is None:
+        sys.exit("✗ no OTA_REPO = \"owner/name\" in oreoOS/ota.py; pass --repo owner/name")
+    return check_repo(found, "OTA_REPO in oreoOS/ota.py"), "OTA_REPO in oreoOS/ota.py"
+
+
+def asset_base_url(repo, tag):
+    """Where GitHub serves the release's files, as the manifest lists them."""
+    return "https://github.com/%s/releases/download/%s/" % (repo, tag)
+
+
+def repo_from_url(url):
+    """owner/name from a GitHub remote URL (https, ssh or scp form), or None."""
+    m = ORIGIN_RE.search((url or "").strip())
+    return m.group(1) if m else None
+
+
+def _origin_repo():
+    """owner/name that `origin` points at, or None (no remote, not GitHub)."""
+    try:
+        r = subprocess.run(["git", "remote", "get-url", "origin"], cwd=REPO_ROOT,
+                           capture_output=True, text=True)
+    except OSError:
+        return None
+    return repo_from_url(r.stdout) if r.returncode == 0 else None
+
+
+def _check_origin(repo, dry):
+    """The tag is pushed to origin and the release made in `repo`: they
+    must be the same repository, or the release points at a missing tag."""
+    origin = _origin_repo()
+    if origin is None:
+        print("⚠ could not tell which GitHub repository `origin` is; the tag is "
+              "pushed there and the release made in %s" % repo)
+        return
+    if origin.lower() != repo.lower():
+        msg = ("`origin` is %s but the release goes to %s; the tag would be pushed "
+               "to the wrong repository. Point origin at %s (git remote set-url) "
+               "or pass --repo %s." % (origin, repo, repo, origin))
+        if dry:
+            print("⚠ " + msg)
+        else:
+            sys.exit("✗ " + msg)
 
 
 def run(cmd, dry, capture=False, check=True):
@@ -115,11 +203,12 @@ def _tag_exists(tag, dry):
     return bool(out.strip())
 
 
-def _release_exists(tag, dry):
+def _release_exists(tag, repo, dry):
     """True iff a GitHub Release already exists for this tag."""
     if dry:
         return False
-    out = run(["gh", "release", "view", tag], dry, capture=True, check=False)
+    out = run(["gh", "release", "view", tag, "--repo", repo], dry, capture=True,
+              check=False)
     # gh prints "release not found" to stderr (we don't capture stderr here),
     # so the empty stdout case = no release. Defensive against gh format
     # changes: also accept a "release tag" line if it appears.
@@ -147,7 +236,7 @@ def _bump_version(target_version, dry):
 
 # ── main flow ───────────────────────────────────────────────────────────────
 
-def main():
+def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("version", nargs="?", default=None,
                     help="vX.Y.Z. Omit to use the version in oreoOS/config.py.")
@@ -162,7 +251,10 @@ def main():
                     help="answer 'yes' to every prompt (auto-stage, etc.).")
     ap.add_argument("--dry-run", action="store_true",
                     help="print every step without executing.")
-    args = ap.parse_args()
+    ap.add_argument("--repo", metavar="OWNER/NAME",
+                    help="GitHub repository to publish to (default: OTA_REPO in "
+                         "oreoOS/ota.py, where badges look for updates)")
+    args = ap.parse_args(argv)
 
     # Default to whatever oreoOS/config.py:VERSION currently holds. This is
     # the zero-arg invocation: `python tools/release.py` ships exactly
@@ -179,21 +271,30 @@ def main():
 
     dry = args.dry_run
     tag = "%s/%s" % (args.channel, args.version)
+    repo, repo_source = resolve_repo(args.repo)
 
     print("──────────────────────────────────────────────")
     print("Releasing OreoOS %s on channel %s" % (args.version, args.channel))
+    print("Repo: %s (%s)" % (repo, repo_source))
     print("Tag: %s" % tag)
     print("Dry-run: %s" % ("yes" if dry else "no"))
     print("──────────────────────────────────────────────\n")
 
+    if args.repo:
+        ota = ota_repo(OTA.read_text())
+        if ota and ota.lower() != repo.lower():
+            print("⚠ badges built from this checkout update from %s (OTA_REPO in "
+                  "oreoOS/ota.py), not %s" % (ota, repo))
+
     # 1. Pre-flight.
     _check_tools(dry)
+    _check_origin(repo, dry)
 
     # Resume detection: if the tag is already on origin AND there's no
     # GitHub Release for it (i.e. a previous attempt died after the tag
     # push), we skip the git steps and jump straight to build + publish.
     tag_on_remote = _tag_exists(tag, dry)
-    release_live  = _release_exists(tag, dry)
+    release_live  = _release_exists(tag, repo, dry)
     # Three resume states the script knows how to handle:
     #   resume=False         clean run: full git → build → create
     #   resume="build"       tag pushed but no GitHub Release: git skipped,
@@ -227,7 +328,7 @@ def main():
 
     # 3. Build the release artefacts. asset_base_url points at the URL
     # gh will use once the upload step has finished.
-    asset_base = "https://github.com/elixpo/oreo/releases/download/%s/" % tag
+    asset_base = asset_base_url(repo, tag)
     run([
         sys.executable, "tools/build_release.py",
         "--version", args.version,
@@ -292,12 +393,14 @@ def main():
         # any partial uploads from before.
         run([
             "gh", "release", "upload", tag,
+            "--repo", repo,
             "--clobber",
             *upload_files,
         ], dry)
     else:
         run([
             "gh", "release", "create", tag,
+            "--repo", repo,
             "--title", title,
             "--notes", notes,
             *prerelease_flag,
@@ -305,7 +408,7 @@ def main():
             *upload_files,
         ], dry)
 
-    print("\n✓ release %s pushed and published." % tag)
+    print("\n✓ release %s pushed and published to %s." % (tag, repo))
     if not dry:
         print("  Badges on this channel will pick it up within 6 h of next")
         print("  background check (Settings → Check Update to force it now).")
