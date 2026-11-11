@@ -26,6 +26,11 @@ repainted. Selection moves repaint only the two rows involved.
 
 While either job runs the Store asks the launcher to keep its modules
 loaded (keep_loaded()), so a later visit re-attaches to the job.
+
+Install, update and uninstall run on the UI thread (one TLS session and
+the flash writes at a time) under an oreoOS.busy card: a spinner that
+keeps turning while the download blocks, the file being fetched, and a
+progress bar. An OS without oreoOS.busy gets the old in-page bar.
 """
 
 import gc
@@ -44,6 +49,18 @@ _icon_job = None
 
 LABEL = {store.INSTALL: "INSTALL", store.OPEN: "OPEN",
          store.UPDATE: "UPDATE"}
+
+
+def _busy(display, title, detail="", progress=None, delay_ms=0):
+    """Start an oreoOS.busy card, or None when this OS has none."""
+    if display is None:
+        return None
+    try:
+        from oreoOS import busy
+        return busy.start(title, detail, progress, display=display,
+                          delay_ms=delay_ms)
+    except Exception:
+        return None
 
 
 class App(oreoOS.App):
@@ -85,6 +102,7 @@ class App(oreoOS.App):
         self._job = None             # catalogue refresh in flight
         self._auto = False           # automatic refresh waiting on quiet
         self._want_install = False   # A on Install while an icon loads
+        self._card = None            # oreoOS.busy card during an install
         store.forget_installed()
         self._load_rows()
         self._want_refresh = store.needs_refresh()
@@ -521,7 +539,13 @@ class App(oreoOS.App):
         elif btn == api.BTN_A:
             self._view = "detail"
             if self._confirm_sel == 1:
-                ok, msg = store.uninstall(self._entry["id"])
+                b = _busy(self._os.display, "Removing " + self._entry["name"],
+                          "Deleting its files", delay_ms=150)
+                try:
+                    ok, msg = store.uninstall(self._entry["id"])
+                finally:
+                    if b is not None:
+                        b.stop(restore=False)   # a full paint follows
                 self._note = ("Uninstalled. Reinstall it from Discover."
                               if ok else "Uninstall failed: " + msg)
                 self._set_actions()
@@ -541,12 +565,19 @@ class App(oreoOS.App):
         self._busy = True
         self._note = ""
         self._prog_ms = 0
+        verb = "Updating" if store.is_installed(e["id"]) else "Installing"
+        self._card = _busy(self._os.display, "%s %s" % (verb, e["name"]),
+                           "Starting", 0.0)
         self._on_progress(0, store.total_size(e), "Starting")
         gc.collect()
         try:
             ok, msg = store.install(e["id"], self._on_progress)
         except Exception as ex:
             ok, msg = False, str(ex)
+        finally:
+            if self._card is not None:
+                self._card.stop(restore=False)  # a full paint follows
+                self._card = None
         self._busy = False
         self._sizes.clear()
         self._icons.pop(e["id"], None)
@@ -556,7 +587,12 @@ class App(oreoOS.App):
         self._paint = "full"
 
     def _on_progress(self, received, total, label):
-        """Repaint only the progress bar, at most every 120 ms."""
+        """Move the busy card's bar; without one, repaint only the
+        in-page progress bar, at most every 120 ms."""
+        card = getattr(self, "_card", None)
+        if card is not None:
+            card.progress(received / total if total else None, label)
+            return
         now = time.ticks_ms()
         if self._prog_ms and received < total and \
            time.ticks_diff(now, self._prog_ms) < 120:

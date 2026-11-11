@@ -96,7 +96,7 @@ How the code exchange works, and the protocol: [TRANSFER.md](TRANSFER.md).
 
 ## Your profile
 
-Badge, Identity, Commits, Weather and the clock read the owner's details
+Badge, Commits, Weather and the clock read the owner's details
 (GitHub user, name, timezone, weather location) from `/profile.json` on the
 badge. To set them without rebuilding OreoOS, write the file on the computer
 and copy it over:

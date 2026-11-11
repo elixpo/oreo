@@ -1,11 +1,16 @@
 """Transfer — receive photos, videos and documents from a computer over USB.
 
-Open the app, run `oreo transfer send <files>` on the computer and type
-the six-character code shown here. Files are checked (SHA-256 and their
-format header) before they appear in the Gallery or the Reader.
+Open the app, run `oreo send <files>` (the same as `oreo transfer send`)
+on the computer and type the six-character code shown here. Files are
+checked (SHA-256 and their format header) before they appear in the
+Gallery or the Reader.
 
 Screens follow the session in src/proto.py:
-  waiting    the code, big, and the command to run on the computer
+  waiting    the code, big, and the command to run on the computer. Once
+             a second the app asks oreoOS.usbhost whether a computer has
+             enumerated the badge's USB port: then it says "Computer
+             connected over USB" instead of "Waiting for a computer...",
+             and goes back to waiting when the cable is pulled
   hello      a computer connected and has not entered the code yet
   authed     ready; a progress bar while a file arrives; recent results
   locked     too many wrong codes: a countdown, then a new code
@@ -35,6 +40,9 @@ TOP = widgets.HEADER_H + 8
 READ_BUDGET_MS = 25              # serial reading per frame
 PROGRESS_MS = 250                # repaint cadence while a file arrives
 ANIM_MS = 400                    # "waiting..." dots
+USB_POLL_MS = 1000               # how often to ask whether a host is there
+UNPLUG_POLLS = 2                 # "no host" this many times ends a session
+SEND_CMD = "oreo send <files>"
 
 GREEN = api.rgb(61, 190, 120)
 
@@ -69,6 +77,13 @@ class App(oreoOS.App):
             from oreoOS.config import VERSION
         except Exception:
             VERSION = ""
+        self._usb = None             # oreoOS.usbhost.Probe, if this OS has it
+        self._usb_off = 0            # consecutive "no host" polls in a session
+        try:
+            from oreoOS import usbhost
+            self._usb = usbhost.Probe(USB_POLL_MS)
+        except Exception:
+            self._usb = None
         self._link = None
         try:
             self._link = UsbLink(proto.MAX_LINE)
@@ -123,10 +138,31 @@ class App(oreoOS.App):
             self._dirty = True
 
     # ── per frame ───────────────────────────────────────────────────────
+    def usb_host(self):
+        """True / False when the OS can tell whether a computer has
+        enumerated the USB port, None when it cannot."""
+        return self._usb.state if self._usb is not None else None
+
+    def _poll_usb(self, rx):
+        probe = self._usb
+        if probe is None:
+            return
+        state = probe.poll()
+        if probe.read:
+            self._usb_off = self._usb_off + 1 if state is False else 0
+        if self._usb_off >= UNPLUG_POLLS and rx.active():
+            # The cable was pulled mid-session: that computer cannot come
+            # back to it, so end it now instead of at the protocol's idle
+            # timeout. Two readings in a row, so one odd reading cannot
+            # cut a transfer short.
+            rx.end("unplugged")
+            self._dirty = True
+
     def update(self, dt):
         rx = self._rx
         if rx is None or self._link is None:
             return
+        self._poll_usb(rx)
         try:
             lines = self._link.read_lines(READ_BUDGET_MS)
         except Exception as e:
@@ -147,15 +183,17 @@ class App(oreoOS.App):
 
         now = time.ticks_ms()
         prog = rx.progress()
+        usb = self.usb_host()
         sig = (rx.state, rx.code, rx.host, rx.tries, len(rx.log),
                rx.log[-1] if rx.log else None, (rx.locked_ms() + 999) // 1000,
-               prog[0] if prog else None)
+               prog[0] if prog else None, usb)
         if sig != self._sig:
             self._sig = sig
             self._dirty = True
         elif prog and rx.changed and time.ticks_diff(now, self._next_paint) >= 0:
             self._dirty = True
-        elif rx.state in (proto.WAITING, proto.HELLO) and \
+        elif (rx.state == proto.HELLO or
+              (rx.state == proto.WAITING and usb is not True)) and \
                 time.ticks_diff(now, self._next_paint) >= 0:
             self._dirty = True       # animated dots
         if self._dirty:
@@ -200,11 +238,19 @@ class App(oreoOS.App):
     def _draw_waiting(self, d, rx):
         _center(d, "Code for your computer", TOP, theme.TEXT_DIM)
         self._draw_code(d, rx, TOP + 16)
-        _center(d, "Waiting for a computer" + self._dots(), TOP + 50, theme.GOLD)
         y = TOP + 72
-        d.text("On the computer, over USB:", PAD, y, theme.TEXT_DIM)
-        d.text("oreo transfer send <files>", PAD, y + 14, theme.TEAL)
-        d.text("then type the code above.", PAD, y + 28, theme.TEXT_DIM)
+        if self.usb_host():
+            msg = "Computer connected over USB"
+            x = (SW - len(msg) * 8 - 14) // 2
+            d.rect(x, TOP + 50, 8, 8, GREEN, fill=True)
+            d.text(msg, x + 14, TOP + 50, GREEN)
+            d.text("On the computer, run:", PAD, y, theme.TEXT_DIM)
+        else:
+            _center(d, "Waiting for a computer" + self._dots(), TOP + 50,
+                    theme.GOLD)
+            d.text("Plug in the USB cable, then run:", PAD, y, theme.TEXT_DIM)
+        d.text(SEND_CMD, PAD, y + 14, theme.TEAL)
+        d.text("and type the code above.", PAD, y + 28, theme.TEXT_DIM)
 
     def _draw_hello(self, d, rx):
         _center(d, "Connected: " + _clip(rx.host, 26), TOP, theme.TEXT_BRIGHT)

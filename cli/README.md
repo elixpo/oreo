@@ -6,7 +6,7 @@ OreoOS through MicroPython's raw REPL, using `mpremote`'s serial transport
 as a library (issue #117).
 
 ```sh
-oreo                       # find the badge, show its status, open the menu
+oreo                       # the full-screen Oreo view (oreo menu: the numbered menu)
 oreo info
 oreo wifi scan
 oreo wifi connect "Home Net"     # password asked without echo
@@ -43,7 +43,8 @@ build-provenance attestation (`gh attestation verify <file> -R elixpo/oreo`).
 From a checkout: `pipx install ./cli` (or `pip install -e cli/`).
 
 Dependencies: `rich`, `pyserial`, `mpremote` 1.28.x (matching the badge's
-MicroPython 1.28), `Pillow`. Videos also need `ffmpeg` on your PATH.
+MicroPython 1.28), `Pillow`, `textual` 8.x (the full-screen view). Videos
+also need `ffmpeg` on your PATH.
 
 Full guide (every command, Wi-Fi setup, troubleshooting):
 [docs/CLI.md](https://github.com/elixpo/oreo/blob/main/docs/CLI.md).
@@ -57,7 +58,8 @@ checks this.
 
 | Command | Does |
 |---|---|
-| `oreo` | Finds the badge and opens the interactive view (status, files, apps, Wi-Fi, media, shell) |
+| `oreo` (or `oreo ui`) | The full-screen Oreo view: status, files, apps, Wi-Fi, Transfer, profile, app install, updates and the shell, with progress and Esc to cancel; waits for a badge to be plugged in |
+| `oreo menu` | The numbered menu, for terminals the full-screen view cannot drive (`oreo` falls back to it; `OREO_UI=menu` always picks it) |
 | `oreo devs [--all]` | Lists badges by USB ID; never opens a port |
 | `oreo info` | OreoOS and firmware version, space by category, Wi-Fi, Bluetooth, battery |
 | `oreo shell` | MicroPython REPL; OreoOS restarts when you leave (Ctrl-] / Ctrl-X) |
@@ -90,7 +92,14 @@ unplugged), `5` OreoOS missing on the badge, `130` cancelled.
   the port.
 - **OreoOS keeps running.** A command stops OreoOS (Ctrl-C, raw REPL, soft
   reset), does its work, then soft-resets so `main.py` starts OreoOS again.
-  The interactive view keeps OreoOS paused until you quit.
+  The full-screen view and the menu keep OreoOS paused until you quit (q
+  or Ctrl-C), and restart it then, also after an error.
+- **The full-screen view never freezes.** Badge operations run in background
+  threads that share one lock, so only one command is ever on the serial
+  port; they call the same code as the commands, with dialogs for
+  questions (`oreo_cli/tui.py`, `oreo_cli/worker.py`).
+- **The badge's screen** shows the progress of long operations through
+  `oreoOS/hostui.py` when the OreoOS on it has that module.
 - **Wi-Fi passwords** are read with `getpass` (or `--password-stdin`), sent
   to the badge once and never printed, logged, returned or stored on the
   computer. `oreo wifi saved` only lists names.
@@ -119,6 +128,8 @@ The tests need no badge: `tests/fake.py` has a `FakeTransport` that runs
 the CLI's MicroPython snippets in CPython against a fake filesystem and
 fake OreoOS modules. Inside the OreoOS repository, `test_contract.py` also
 runs them against the real `oreoWare/wifi.py` and `oreoOS/storage.py`.
+`test_tui.py` drives the full-screen view headless with Textual's pilot
+against the same fake badge (skipped when Textual is not installed).
 
 The media converters in `oreo_cli/media.py` are copied from
 `tools/media_ingest.py` and `tools/encode_video_benchmark.py`; keep the

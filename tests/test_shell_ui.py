@@ -353,16 +353,16 @@ class NotifPanelTest(unittest.TestCase):
             p.tick(0.05)
         self.assertTrue(p.covers_screen())
 
-    def test_double_tap_opt_out(self):
+    def test_double_tap_always_opens(self):
         np = self.np
         class Captures:
             CAPTURES_C = True
-        class Busy:
+        class OldOptOut:                  # the removed opt-out is ignored
             CAPTURES_C = True
             C_DOUBLE_TAP = False
         self.assertFalse(np.hotkey_allowed(Captures()))
         self.assertTrue(np.double_tap_opens(Captures()))
-        self.assertFalse(np.double_tap_opens(Busy()))
+        self.assertTrue(np.double_tap_opens(OldOptOut()))
         self.assertGreater(np.DOUBLE_TAP_MS, 150)
 
     def test_hotkey_allowed(self):

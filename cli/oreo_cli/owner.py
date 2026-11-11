@@ -1,6 +1,6 @@
 """`oreo setup`: the badge owner's profile, written over USB.
 
-Badge, Identity, Commits, Weather and the clock read the owner's details
+Badge, Commits, Weather and the clock read the owner's details
 through oreoOS/profile.py, which takes the first non-empty value from
 /profile.json on the badge, then /secrets.py (written by tools/deploy.py),
 then the app's own default. This command edits /profile.json, so a badge

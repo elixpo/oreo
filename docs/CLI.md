@@ -35,6 +35,7 @@ Related guides:
   work.
 
 Contents: [Install](#install) · [First run](#first-run) ·
+[Interactive UI](#interactive-ui) ·
 [Commands](#commands) · [Sending files: `oreo transfer`](#oreo-transfer-send-files-to-the-transfer-app) ·
 [Wi-Fi setup](#wi-fi-setup) · [Updating OreoOS](#oreo-update-update-oreoos) ·
 [Exit status](#exit-status) · [Troubleshooting](#troubleshooting) ·
@@ -146,6 +147,7 @@ These are installed with the CLI:
 - `pyserial`
 - `mpremote` 1.28.x, which must match the badge's MicroPython 1.28
 - `Pillow`
+- `textual` 8.x, for the [full-screen view](#interactive-ui)
 
 Converting **videos** also needs [ffmpeg](https://ffmpeg.org/) on your PATH
 (for `oreo transfer send` and `oreo add`). Photos and documents do not.
@@ -184,12 +186,95 @@ The CLI stores nothing else on the computer.
 
    ```sh
    oreo devs        # is the badge there? (never opens the port)
-   oreo             # status, then an interactive menu
+   oreo             # the full-screen Oreo view
    ```
 
 3. If no badge is found, run `oreo doctor`.
 
-`oreo` with no command shows the badge's status and then a menu:
+## Interactive UI
+
+`oreo` with no command (or `oreo ui`) switches the terminal to a full-screen
+Oreo view that handles everything about the badge. It opens at once, waits
+for a badge to be plugged in if there is none, and asks which one to use if
+there are several. Leaving it puts your terminal back as it was.
+
+```
+ Oreo Badge OREO01 — OreoOS v2.0.0 · /dev/ttyACM0 · OreoOS paused
+╭──────────────────────╮╭────────────────────────────────────────────────────────╮
+│ 1  Status            ││ ╭─ Oreo Badge ─────────────────────────────────────╮   │
+│ 2  Files             ││ │    OreoOS  v2.0.0 (2026-11-07)                   │   │
+│ 3  Apps              ││ │  firmware  MicroPython 1.28.0                    │   │
+│ 4  Wi-Fi             ││ │      port  /dev/ttyACM0                          │   │
+│ 5  Transfer          ││ │     Wi-Fi  connected 192.168.1.42, 2 saved       │   │
+│ 6  Profile           ││ │   battery  87% (4.01 V)                          │   │
+│ 7  Install app       ││ ╰──────────────────────────────────────────────────╯   │
+│ 8  Update OreoOS     ││ storage  1.2 MiB used of 8.0 MiB, 6.8 MiB free         │
+│ ──────────────────── ││  Category    Size   Files                              │
+│ s  Shell (REPL)      ││  system   812.0 KiB    96   ...                        │
+│ q  Quit              ││                                                        │
+╰──────────────────────╯╰────────────────────────────────────────────────────────╯
+                         ⠹ copying to /documents: song.mp3  1.1 MiB / 3.0 MiB  ━━━━━━──── 37%  Esc cancel
+                        ╭────────────────────────────────────────────────────────╮
+                        │ ─ oreo · push ───────────────────────────────────────  │
+                        │ ✓ notes.md  1.2 KiB                                    │
+                        ╰────────────────────────────────────────────────────────╯
+ s Shell  r Refresh  esc Cancel  q Quit  d Download  u Upload here  x Delete
+```
+
+The header shows the badge, its port, the OreoOS version and whether OreoOS
+is paused. The sidebar lists the sections; the bottom bar shows what is
+running (with a progress bar and Esc to cancel), and the log under it keeps
+what each operation reported. The footer always shows the keys for the
+section you are in. The mouse works too, but every action has a key.
+
+| Key | Section or action |
+|---|---|
+| **1** | Status: versions, storage, Wi-Fi, battery (`oreo info`) |
+| **2** | Files: Enter opens a folder, Backspace goes up, **d** downloads, **u** uploads files or folders into the folder shown, **a** adds photos, videos or documents (`oreo add`), **x** deletes (asks first; OreoOS's own files are refused) |
+| **3** | Apps: installed apps and the App Store; **f** fetches the catalogue, **i** installs, **u** updates all, **x** removes |
+| **4** | Wi-Fi: saved networks; **n** scans, **c** connects (password asked without echo), **x** forgets |
+| **5** | Transfer: type the files, Enter; OreoOS restarts, open Transfer on the badge and type the code it shows (`oreo transfer send`) |
+| **6** | Profile: **e** edits it field by field, **l** loads the keys from an `.env`-style file (`oreo setup`) |
+| **7** | Install app: an app folder from this computer (`oreo app install`) |
+| **8** | Update OreoOS: **c** checks, **u** updates (`oreo update`) |
+| **s** | Shell: the badge's MicroPython REPL in this terminal; Ctrl-] or Ctrl-X comes back to the view |
+| **r** | Refresh the section shown |
+| **Esc** | Cancel the running operation (in a text field with nothing running: back to the sidebar) |
+| **q**, **Ctrl-C** | Quit; OreoOS starts again |
+
+How it behaves:
+
+- **It never freezes.** Every badge operation runs in the background, with a
+  spinner or a progress bar. There is only ever one command on the serial
+  port: something asked for while another operation runs waits its turn
+  (the bar shows "+1 waiting").
+- **Cancel** stops copies, downloads, App Store installs and Transfer between
+  two chunks, and a half-copied file is removed, as with Ctrl-C in the plain
+  commands. Scans and Wi-Fi joins are interrupted on the badge. Once an
+  OreoOS update starts it cannot be cancelled (quitting waits for it).
+- **Questions are dialogs.** Confirmations, the Transfer code and passwords
+  appear in a box; Esc cancels the operation that asked.
+- **OreoOS is paused while the view is open**, so the badge's screen shows
+  what the computer is doing during long operations (with an OreoOS that has
+  `oreoOS/hostui.py`). It restarts when you quit: with **q**, with Ctrl-C,
+  and if anything fails. `--reset hard|none` works as for the commands. The
+  Transfer section is the exception: the Transfer app runs inside OreoOS, so
+  it restarts OreoOS first, and the next section that needs the badge pauses
+  it again. A profile saved or an app installed takes effect when OreoOS
+  restarts, which happens when you quit.
+- **Unplugged?** The view goes back to waiting and picks the badge up again
+  when it returns.
+
+The view is built with [Textual](https://textual.textualize.io/), which is
+installed with the CLI. Where it cannot run, `oreo` falls back to the
+numbered menu below: when standard input or output is not a terminal, with
+`TERM=dumb`, or when Textual is missing. `oreo ui` says why instead of falling
+back. To always get the menu, run `oreo menu` or set `OREO_UI=menu`.
+
+### The numbered menu
+
+`oreo menu` (and `oreo` where the full-screen view cannot run) shows the
+badge's status and then a menu:
 
 | Key | Action |
 |---|---|
@@ -234,6 +319,14 @@ instead (see [`oreo transfer`](#oreo-transfer-send-files-to-the-transfer-app)).
   leaves the badge at the MicroPython prompt.
 - **Some commands do not stop OreoOS.** `oreo transfer` talks to the Transfer
   app while it runs, and `oreo logs` only listens.
+- **The badge's screen shows long operations.** While OreoOS is paused for
+  `push`, `pull`, `add`, `app install`, `apps install`/`update` and
+  `update`, the badge shows what is happening and how far it has got
+  (through `oreoOS/hostui.py`, in OreoOS versions that have it), and clears
+  the screen at the end. The updates ride along with the commands the CLI
+  sends anyway, so they cost no extra time; an OreoOS without it works as
+  before. (`oreo transfer` needs none: the Transfer app shows its own
+  progress.)
 - **Destructive actions ask first.** These are `rm -r`, `apps remove`, `app remove`,
   `transfer rm`, `update`, `update --clean` and `flash`. Without a terminal,
   the answer is "no" unless you pass `--yes`.
@@ -255,7 +348,8 @@ Put these before the command, for example `oreo --port /dev/ttyACM1 info`.
 
 | Command | What it does | Stops OreoOS? |
 |---|---|---|
-| [`oreo`](#first-run) | Status and the interactive menu | while the menu is open |
+| [`oreo`](#interactive-ui) / `oreo ui` | The full-screen Oreo view | while it is open |
+| [`oreo menu`](#the-numbered-menu) | The numbered menu, for simple terminals | while it is open |
 | [`oreo devs`](#oreo-devs-list-badges) | List badges | no (never opens a port) |
 | [`oreo info`](#oreo-info-status) | Versions, storage, Wi-Fi, battery | briefly |
 | [`oreo transfer`](#oreo-transfer-send-files-to-the-transfer-app) / `oreo send` | Send files to the Transfer app, using the code on the badge | **no** |
@@ -492,8 +586,8 @@ location from its network ([PROFILE.md](PROFILE.md#weathers-location)).
 - When several are given, later ones win: the file, then `--set`, then the
   named options such as `--name`.
 
-Writes `/profile.json` on the badge, which Badge, Identity, Commits, Weather
-and the clock read through `oreoOS/profile.py` (see [PROFILE.md](PROFILE.md)).
+Writes `/profile.json` on the badge, which Badge, Commits, Weather and the
+clock read through `oreoOS/profile.py` (see [PROFILE.md](PROFILE.md)).
 No checkout or `.env.local` is needed.
 
 - It first shows what the badge has now and where each value comes from
@@ -976,6 +1070,23 @@ the output when you report a problem.
 10. On Windows (PowerShell and Git Bash) and macOS: `oreo devs`, `oreo info`,
     `oreo push notes.txt :documents/`, `oreo transfer send photo.jpg`, and
     `oreo --port com5 info` / `oreo --port /dev/tty.usbmodem* info`.
+11. The full-screen view (`oreo`), on Linux, macOS and Windows Terminal:
+    - started with no badge: the waiting screen; plug it in and it opens;
+      with two badges, the chooser;
+    - every section loads; switching sections quickly never errors (one
+      command on the port at a time);
+    - Files: upload a 1 MiB file and press Esc half way (no `.part` left),
+      download a folder, delete a file;
+    - Wi-Fi scan and connect; App Store fetch and install; profile edit;
+      app install from a folder; Transfer with the code; update check;
+    - **s** opens the REPL and Ctrl-] comes back to the view;
+    - **q**, Ctrl-C, and pulling the cable: the terminal is restored, and
+      OreoOS starts again (or the view waits for the badge to come back).
+12. With an OreoOS that has `oreoOS/hostui.py`: the badge's screen shows the
+    progress of `oreo push`/`pull` of a large file, `oreo add`,
+    `oreo app install`, `oreo apps install` and `oreo update`, and is cleared
+    when each finishes; with an older OreoOS, the same commands work as
+    before.
 
 ## Releasing
 

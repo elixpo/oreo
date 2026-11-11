@@ -437,6 +437,25 @@ class FakeDisplay:
         self.texts.append(s)
 
 
+class FakeProbe:
+    """Stands in for oreoOS.usbhost.Probe. Reads the hardware on every
+    poll while reads_left is None; otherwise only reads_left more times."""
+
+    def __init__(self, state):
+        self.state = state
+        self.read = False
+        self.changed = False
+        self.reads_left = None
+
+    def poll(self):
+        self.read = self.reads_left is None or self.reads_left > 0
+        if self.reads_left:
+            self.reads_left -= 1
+        elif self.reads_left == 0:
+            self.read = False
+        return self.state
+
+
 class FakeOS:
     def __init__(self):
         self.display = FakeDisplay()
@@ -523,7 +542,8 @@ class AppTest(unittest.TestCase):
         self.assertEqual(self.stream.data, b"")          # stale input drained
         screen = self.frame()
         self.assertIn(self.app._rx.code, screen)
-        self.assertIn("oreo transfer send <files>", screen)
+        self.assertIn("oreo send <files>", screen)
+        self.assertIn("Waiting for a computer", screen)   # no usbhost here
         self.assertFalse(self.app.realtime_mode())
         self.say("hello", v=self.proto.VERSION, host="studio-mac")
         screen = self.frame()
@@ -562,6 +582,47 @@ class AppTest(unittest.TestCase):
         for _ in range(self.proto.MAX_TRIES):
             self.say("auth", code="ZZZZZZ")
         self.assertIn("TOO MANY WRONG CODES", self.frame())
+
+    def _probe(self, state):
+        probe = FakeProbe(state)
+        self.app._usb = probe
+        return probe
+
+    def test_usb_host_connected_screen(self):
+        probe = self._probe(True)
+        screen = self.frame()
+        self.assertIn("Computer connected over USB", screen)
+        self.assertNotIn("Waiting for a computer", screen)
+        self.assertIn("oreo send <files>", screen)
+        self.assertIn(self.app._rx.code, screen)         # still the code
+        probe.state = False                               # cable pulled
+        screen = self.frame()
+        self.assertIn("Waiting for a computer", screen)
+        self.assertNotIn("Computer connected over USB", screen)
+
+    def test_unplug_ends_a_session(self):
+        probe = self._probe(True)
+        self.say("hello", v=self.proto.VERSION, host="studio-mac")
+        self.frame()
+        self.assertTrue(self.app._rx.active())
+        probe.state = False
+        probe.reads_left = 1
+        self.frame()                                      # one reading: kept
+        self.assertTrue(self.app._rx.active())
+        self.frame()                                      # cached, no reading
+        self.assertTrue(self.app._rx.active())
+        probe.reads_left = 1
+        self.frame()                                      # second reading
+        self.assertFalse(self.app._rx.active())
+        self.assertIn("unplugged", self.app._rx.log[-1][1])
+        self.assertIn("Waiting for a computer", self.frame())
+
+    def test_unknown_usb_keeps_session(self):
+        self._probe(None)
+        self.say("hello", v=self.proto.VERSION)
+        for _ in range(5):
+            self.frame()
+        self.assertTrue(self.app._rx.active())
 
     def test_exit_ends_session(self):
         self.say("hello", v=self.proto.VERSION)

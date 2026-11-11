@@ -374,6 +374,19 @@ def push_targets(files, sources, dest, dest_stat):
     return [dest]
 
 
+def push_files(ui, b, files, targets, verify=True):
+    """Copy [(local Path, rel)] to the badge paths in `targets`, with a
+    progress bar here and on the badge's screen."""
+    with b.showing():
+        for i, ((local, rel), target) in enumerate(zip(files, targets)):
+            with local_file(local):
+                data = local.read_bytes()
+            detail = rel if len(files) == 1 else "%s (%d of %d)" % (rel, i + 1, len(files))
+            with ui.progress(esc(rel), total=len(data)) as update:
+                b.write_file(data, target, progress=update, verify=verify,
+                             check_space=False, screen=("Receiving files", detail))
+
+
 @command("push")
 def cmd_push(ctx):
     ui = ctx.ui
@@ -390,13 +403,22 @@ def cmd_push(ctx):
             raise OreoError("not enough space: %s to copy, %s free on the badge"
                             % (human(total), human(free)))
         ui.header("push", "%d file(s), %s -> %s" % (len(files), human(total), esc(norm(args.dest))))
-        for (local, rel), target in zip(files, targets):
-            with local_file(local):
-                data = local.read_bytes()
-            with ui.progress(esc(rel), total=len(data)) as update:
-                b.write_file(data, target, progress=update, verify=not args.no_verify,
-                             check_space=False)
+        push_files(ui, b, files, targets, verify=not args.no_verify)
         ui.ok("copied %d file(s) to %s" % (len(files), esc(norm(args.dest))))
+
+
+def pull_files(ui, b, jobs):
+    """Copy [(badge path, local Path)] to this computer, with a progress
+    bar here and on the badge's screen."""
+    with b.showing():
+        for i, (remote, target) in enumerate(jobs):
+            name = posixpath.basename(remote)
+            detail = name if len(jobs) == 1 else "%s (%d of %d)" % (name, i + 1, len(jobs))
+            with ui.progress(esc(name), total=None) as update:
+                data = b.read_file(remote, progress=update, screen=("Sending files", detail))
+            with local_file(target):
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(data)
 
 
 @command("pull")
@@ -422,12 +444,7 @@ def cmd_pull(ctx):
             target = local / posixpath.basename(src) if local.is_dir() else local
             jobs = [(src, target)]
         ui.header("pull", "%d file(s) from %s" % (len(jobs), esc(src)))
-        for remote, target in jobs:
-            with ui.progress(esc(posixpath.basename(remote)), total=None) as update:
-                data = b.read_file(remote, progress=update)
-            with local_file(target):
-                target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_bytes(data)
+        pull_files(ui, b, jobs)
         ui.ok("saved %d file(s) under %s" % (len(jobs), esc(local)))
 
 
@@ -441,7 +458,7 @@ SYSTEM_FILES = ("/secrets.py", "/wifi.json")
 
 # Built-in apps: must equal DEFAULT_APPS in oreoOS/store.py (a contract
 # test in cli/tests/test_contract.py checks this inside the repo).
-DEFAULT_APPS = ("about", "badge", "commits", "gallery", "gamepad", "identity", "reader",
+DEFAULT_APPS = ("about", "badge", "commits", "gallery", "gamepad", "reader",
                 "settings", "store", "storage", "transfer", "launcher", "updates", "wifi")
 
 
@@ -527,12 +544,14 @@ def prepare_media(ui, files, opts):
 def send_media(ui, b, prepared):
     free, _ = b.free()
     media.check_space(sum(len(x[2]) for x in prepared), free)
-    for kind, name, blob in prepared:
-        dest = posixpath.join(media.destination(kind), name)
-        with ui.progress(esc(name), total=len(blob)) as update:
-            b.write_file(blob, dest, progress=update, check_space=False)
-        app = "Gallery" if kind in ("image", "video") else "Reader"
-        ui.ok("%s is in the %s (%s)" % (esc(name), app, esc(dest)))
+    with b.showing():
+        for kind, name, blob in prepared:
+            dest = posixpath.join(media.destination(kind), name)
+            app = "Gallery" if kind in ("image", "video") else "Reader"
+            with ui.progress(esc(name), total=len(blob)) as update:
+                b.write_file(blob, dest, progress=update, check_space=False,
+                             screen=("Adding to the %s" % app, name))
+            ui.ok("%s is in the %s (%s)" % (esc(name), app, esc(dest)))
 
 
 @command("add")
@@ -613,14 +632,18 @@ def apps_action(ui, b, action, app=None):
             return 0
     ui.header("apps", "%s %s" % (action, ", ".join(targets)))
     failed = 0
-    for target in targets:
-        with ui.progress(esc(target), total=(cat.get(target) or {}).get("size") or None) as update:
-            ok, msg = b.app_install(target, progress=update)
-        if ok:
-            ui.ok("%s %s" % (esc(target), "installed" if action == "install" else "updated"))
-        else:
-            failed += 1
-            ui.error("%s: %s" % (esc(target), esc(msg)))
+    title = "Installing app" if action == "install" else "Updating apps"
+    with b.showing():
+        for target in targets:
+            name = (cat.get(target) or {}).get("name") or target
+            with ui.progress(esc(target),
+                             total=(cat.get(target) or {}).get("size") or None) as update:
+                ok, msg = b.app_install(target, progress=update, screen=(title, name))
+            if ok:
+                ui.ok("%s %s" % (esc(target), "installed" if action == "install" else "updated"))
+            else:
+                failed += 1
+                ui.error("%s: %s" % (esc(target), esc(msg)))
     return 1 if failed else 0
 
 

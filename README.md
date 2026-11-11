@@ -108,10 +108,10 @@ install on-device from the **App Store** tile.
 
 | | | | |
 |:-:|:-:|:-:|:-:|
-| <img src="assets/icons/raw/badge_icon.png" width="64"><br>**Badge** | <img src="assets/icons/raw/identity_icon.png" width="64"><br>**Identity** | <img src="assets/icons/raw/commits_icon.png" width="64"><br>**Commits** | <img src="assets/icons/raw/wallpaper_icon.png" width="64"><br>**Weather** |
-| <img src="assets/icons/raw/racer_icon.png" width="64"><br>**Racer** | <img src="assets/icons/raw/flappy_icon.png" width="64"><br>**Flappy** | <img src="assets/icons/raw/snake_icon.png" width="64"><br>**Snake** | <img src="assets/icons/raw/gamepad_icon.png" width="64"><br>**Gamepad** |
-| <img src="assets/icons/raw/gallery_icon.png" width="64"><br>**Gallery** | <img src="assets/icons/raw/IR_Quest_icon.png" width="64"><br>**IR Quest** | <img src="assets/icons/raw/reader_icon.png" width="64"><br>**Reader** | <img src="assets/icons/raw/storage_icon.png" width="64"><br>**Storage** |
-| <img src="assets/icons/raw/apps_icon.png" width="64"><br>**App Store** | <img src="assets/icons/raw/settings_icon.png" width="64"><br>**Settings** | <img src="assets/icons/raw/about_icon.png" width="64"><br>**About** | |
+| <img src="assets/icons/raw/badge_icon.png" width="64"><br>**Badge** | <img src="assets/icons/raw/commits_icon.png" width="64"><br>**Commits** | <img src="assets/icons/raw/wallpaper_icon.png" width="64"><br>**Weather** | <img src="assets/icons/raw/racer_icon.png" width="64"><br>**Racer** |
+| <img src="assets/icons/raw/flappy_icon.png" width="64"><br>**Flappy** | <img src="assets/icons/raw/snake_icon.png" width="64"><br>**Snake** | <img src="assets/icons/raw/gamepad_icon.png" width="64"><br>**Gamepad** | <img src="assets/icons/raw/gallery_icon.png" width="64"><br>**Gallery** |
+| <img src="assets/icons/raw/IR_Quest_icon.png" width="64"><br>**IR Quest** | <img src="assets/icons/raw/reader_icon.png" width="64"><br>**Reader** | <img src="assets/icons/raw/storage_icon.png" width="64"><br>**Storage** | <img src="assets/icons/raw/apps_icon.png" width="64"><br>**App Store** |
+| <img src="assets/icons/raw/settings_icon.png" width="64"><br>**Settings** | <img src="assets/icons/raw/about_icon.png" width="64"><br>**About** | | |
 
 </div>
 
@@ -119,7 +119,7 @@ Bluetooth and WiFi don't get their own drawer tiles — they live inside **Setti
 
 ### 📦 App Store — install, update and remove apps on-device
 
-The badge ships a small default set (About, Badge, Commits, Gallery, Gamepad, Identity, Reader, Settings, Storage, Transfer and the App Store, plus the system apps Apps, Updates and WiFi). Everything else lives under [`apps_market/`](apps_market/) and installs from the **App Store** tile: Racer, Flappy Oreo, Snake, Elixpo Pet, IR Quest, Bluetooth, Weather, Color, Gestures and the Diwali special, Patakha.
+The badge ships a small default set (About, Badge, Commits, Gallery, Gamepad, Reader, Settings, Storage, Transfer and the App Store, plus the system apps Apps, Updates and WiFi). Everything else lives under [`apps_market/`](apps_market/) and installs from the **App Store** tile: Racer, Flappy Oreo, Snake, Elixpo Pet, IR Quest, Bluetooth, Weather, Color, Gestures and the Diwali special, Patakha.
 
 - **Discover** (first page): a featured card plus every app with its icon, tagline, category, size and an **INSTALL / OPEN / UPDATE** button. **A** opens the app's page (author, version, size, description) where you install it, with a progress bar.
 - **Installed** (press **B**): every app on the badge. Built-in apps can only be opened; others can be updated or uninstalled behind a confirm dialog, and reinstalled from Discover any time.

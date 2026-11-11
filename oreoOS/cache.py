@@ -1,6 +1,6 @@
 """TTL-cached file storage for app data fetched over WiFi.
 
-Apps that hit the network (Badge, Commits, Weather, future Identity sync)
+Apps that hit the network (Badge, Commits, Weather)
 all do the same dance:
 
   1. on entry: show whatever's in the cache so the screen isn't blank

@@ -7,6 +7,7 @@ and commands run with no badge plugged in never touch the hardware.
 
 import argparse
 import contextlib
+import os
 import sys
 import time
 
@@ -14,7 +15,7 @@ from . import __version__, commands, discovery
 from . import transfer  # noqa: F401  registers `transfer` and `send`
 from . import devtools, owner  # noqa: F401  register `new`, `app` and `setup`
 from .badge import Badge
-from .errors import (EXIT_CANCELLED, EXIT_ERROR, EXIT_LINK, Cancelled, OreoError,
+from .errors import (EXIT_CANCELLED, EXIT_ERROR, EXIT_LINK, Cancelled, OreoError, UsageError,
                      is_serial_error, local_error_message)
 from .ui import UI, adapt_stdio, esc
 
@@ -126,7 +127,7 @@ HELP = {
     "setup": ("Set the owner profile: GitHub user, name, timezone, weather",
               "Shows what the badge has now, asks for each value (Enter keeps it,\n"
               "- removes it) and writes /profile.json on the badge, which Badge,\n"
-              "Identity, Commits, Weather and the clock read (docs/PROFILE.md).\n"
+              "Commits, Weather and the clock read (docs/PROFILE.md).\n"
               "No .env.local or checkout needed. Values given as options are saved\n"
               "without prompting. The OpenWeatherMap key is asked without echo and\n"
               "never shown; an empty value removes a key. OreoOS restarts after.\n\n"
@@ -159,8 +160,24 @@ HELP = {
             "  oreo app install ./my_game\n"
             "  oreo app list\n"
             "  oreo app remove my_game"),
+    "ui": ("The full-screen Oreo view (also: `oreo` alone)",
+           "Opens a full-screen app for the badge: status, files, apps, Wi-Fi,\n"
+           "Transfer, owner profile, app install, updates and the REPL shell,\n"
+           "with progress and Cancel (Esc) for long operations. OreoOS is paused\n"
+           "while it is open and restarts when you quit (q or Ctrl-C).\n"
+           "`oreo` alone opens it too, or the numbered menu when the terminal\n"
+           "cannot show it (set OREO_UI=menu to always get the menu).\n\n"
+           "  oreo ui\n  oreo ui --port /dev/ttyACM1"),
+    "menu": ("The numbered menu (the view for simple terminals)",
+             "The line-by-line menu `oreo` showed before the full-screen view:\n"
+             "status, files, apps, Wi-Fi, media, Transfer, profile, app install,\n"
+             "updates and the shell, one numbered choice at a time.\n\n"
+             "  oreo menu"),
     "help": ("Help for a command", "  oreo help wifi"),
 }
+
+# OREO_UI values that ask for the numbered menu instead of the full-screen view
+MENU_VALUES = ("menu", "plain", "0", "no", "off")
 
 
 class Formatter(argparse.RawDescriptionHelpFormatter):
@@ -179,7 +196,8 @@ def build_parser():
         prog="oreo", formatter_class=Formatter,
         description="oreo %s: control the Elixpo Oreo Badge over USB.\n\n"
                     "Run `oreo` with no command to find the badge and open the\n"
-                    "interactive view. Docs: %s" % (__version__, HOME),
+                    "full-screen view (`oreo menu`: the numbered menu). Docs: %s"
+                    % (__version__, HOME),
         epilog="`oreo help <command>` shows details and examples.\n"
                "Exit status: 0 ok, 1 error, 2 usage, 3 no badge (or several),\n"
                "4 badge unreachable or busy, 5 OreoOS missing, 130 cancelled.")
@@ -244,7 +262,7 @@ def build_parser():
     s.add_argument("--set", action="append", metavar="KEY=VALUE",
                    help="set one key by its .env name (repeatable; KEY= removes it)")
     s.add_argument("--github-user", metavar="LOGIN", help="GitHub user for Badge and Commits")
-    s.add_argument("--name", metavar="TEXT", help="name on the Identity card")
+    s.add_argument("--name", metavar="TEXT", help="name on the Badge card")
     s.add_argument("--designation", metavar="TEXT", help="title under the name")
     s.add_argument("--timezone", metavar="HOURS",
                    help="hours from UTC, -12 to +14: 5.5, -4, +05:30")
@@ -306,6 +324,8 @@ def build_parser():
     s.add_argument("--build", action="store_true", help="build the firmware first")
 
     _sub(subs, "doctor")
+    _sub(subs, "ui")
+    _sub(subs, "menu")
 
     s = _sub(subs, "help")
     s.add_argument("topic", nargs="?")
@@ -359,6 +379,59 @@ def finish_shielded(b, mode):
         b.finish(mode)
 
 
+def tui_problem(embedded=False, stdin=None, stdout=None, env=None, find_spec=None):
+    """Why the full-screen view cannot run here, or None when it can.
+
+    It needs a real terminal on both ends (not a pipe, not TERM=dumb) and
+    Textual installed. `embedded`: main() was given a UI (tests, or a
+    program embedding oreo), which the view would not draw into."""
+    import importlib.util
+    env = os.environ if env is None else env
+    stdin = sys.stdin if stdin is None else stdin
+    stdout = sys.stdout if stdout is None else stdout
+    find_spec = find_spec or importlib.util.find_spec
+    if embedded:
+        return "oreo is embedded with its own UI"
+    if env.get("OREO_UI", "").strip().lower() in MENU_VALUES:
+        return "OREO_UI=%s asks for the menu" % env.get("OREO_UI")
+    for stream in (stdin, stdout):
+        try:
+            tty = stream.isatty()
+        except Exception:
+            tty = False
+        if not tty:
+            return "standard input and output must be a terminal"
+    if env.get("TERM", "") == "dumb":
+        return "TERM=dumb: this terminal cannot draw it"
+    try:
+        if find_spec("textual") is None:
+            return "Textual is not installed"
+    except (ImportError, ValueError):
+        return "Textual is not installed"
+    return None
+
+
+def run_view(ctx, explicit, embedded):
+    """`oreo` alone and `oreo ui`: the full-screen view, or the numbered
+    menu where it cannot run (`oreo ui` says why instead)."""
+    problem = tui_problem(embedded)
+    if problem is None:
+        from . import tui
+        return tui.run(ctx)
+    if explicit:
+        if "Textual" in problem:
+            raise OreoError("the full-screen view needs Textual, which is not installed",
+                            hint="reinstall oreo-cli (it depends on textual), or pip install "
+                                 "'textual>=8.2,<9'; `oreo menu` works without it")
+        raise UsageError("`oreo ui` cannot run here: %s" % problem,
+                         hint="run it in a terminal window, or use `oreo menu`")
+    if "Textual" in problem:
+        ctx.ui.note("Textual is not installed, so this is the numbered menu "
+                    "(reinstall oreo-cli for the full-screen view)")
+    from .interactive import run as interactive
+    return interactive(ctx)
+
+
 def _transport_error(e):
     """mpremote's TransportError, without importing mpremote eagerly."""
     return type(e).__name__ == "TransportError"
@@ -366,6 +439,7 @@ def _transport_error(e):
 
 def main(argv=None, ui=None, comports=None, link_factory=None, runner=None,
          sleep=None, monotonic=None):
+    embedded = ui is not None
     if ui is None:
         adapt_stdio()   # a non-UTF-8 pipe (Windows) must not crash on the marks
     parser = build_parser()
@@ -388,9 +462,11 @@ def main(argv=None, ui=None, comports=None, link_factory=None, runner=None,
               sleep=sleep, monotonic=monotonic)
     handler = commands.HANDLERS.get(args.cmd or "")
     try:
-        if handler is None:
+        if handler is None and args.cmd == "menu":
             from .interactive import run as interactive
             return interactive(ctx) or 0
+        if handler is None:
+            return run_view(ctx, explicit=args.cmd == "ui", embedded=embedded) or 0
         return handler(ctx) or 0
     except Cancelled as e:
         ui.warn(e.message)

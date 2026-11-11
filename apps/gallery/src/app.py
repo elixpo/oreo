@@ -43,6 +43,7 @@ SH = api.SCREEN_H
 
 
 _GALLERY_DIR = "apps/gallery/assets/optimized"
+LOAD_CARD_DELAY_MS = 200         # photo decodes quicker than this show no card
 _BENCHMARK_FLAG = "/.rv565-benchmark"
 _BENCHMARK_WARMUP = 48
 _BENCHMARK_FRAMES = 720
@@ -642,7 +643,24 @@ class App(oreoOS.App):
     def _photo(self, idx):
         name = self._names[idx]
         if name not in self._cache:
-            self._cache[name] = _load_photo(name)
+            # Decoding a large .rz565 can take a few hundred ms inside
+            # draw(): a busy card appears if it takes longer than
+            # LOAD_CARD_DELAY_MS. Its animator writes to the panel only,
+            # so the half-drawn frame is untouched and this frame's
+            # present() replaces the card.
+            card = None
+            try:
+                from oreoOS import busy
+                card = busy.start("Opening photo", name,
+                                  display=getattr(self._os, "display", None),
+                                  delay_ms=LOAD_CARD_DELAY_MS)
+            except Exception:
+                card = None
+            try:
+                self._cache[name] = _load_photo(name)
+            finally:
+                if card is not None:
+                    card.stop(restore=False)
         return self._cache.get(name)
 
     def on_button_press(self, btn):

@@ -564,6 +564,20 @@ class App(oreoOS.App):
         except Exception:
             pass
 
+    def _card(self, title, detail):
+        """An oreoOS.busy card (spinner on its own thread) over the page
+        while a synchronous test runs, or None on an OS without it."""
+        try:
+            from oreoOS import busy
+            return busy.start(title, detail, display=self._os.display)
+        except Exception:
+            return None
+
+    @staticmethod
+    def _end_card(card):
+        if card is not None:
+            card.stop(restore=False)     # the page repaints next frame
+
     def _run_speed_test(self):
         if not self._wifi or not self._snap.get("connected"):
             self._speed_label = "no link"
@@ -583,10 +597,13 @@ class App(oreoOS.App):
                 pass
             return False
 
+        card = self._card("Testing speed", "Any button cancels")
         try:
             ok, kbps, ms = self._wifi.speed_test(pump_cb=_pump)
         except Exception:
             ok, kbps, ms = (False, 0, 0)
+        finally:
+            self._end_card(card)
         self._busy = ""
         if cancel[0]:
             self._speed_label = "cancelled"
@@ -604,10 +621,13 @@ class App(oreoOS.App):
             return
         self._ping_label = "pinging..."
         self._paint_busy("ping")
+        card = self._card("Pinging", "Waiting for a reply")
         try:
             ok, rtt = self._wifi.ping()
         except Exception:
             ok, rtt = (False, None)
+        finally:
+            self._end_card(card)
         self._busy = ""
         if not ok or rtt is None:
             self._ping_label = "timeout"

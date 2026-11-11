@@ -5,8 +5,9 @@ loop in launcher.py intercepts BTN_C globally, calls `toggle()`, and
 while `is_active()` is True routes all subsequent input through the
 panel rather than the running app. Apps that use C themselves set
 `CAPTURES_C = True` (see `hotkey_allowed`): a single C then goes to the
-app and a quick double-tap of C opens the panel, unless the app also sets
-`C_DOUBLE_TAP = False` (C is too busy there, e.g. Gamepad's button test).
+app and a quick double-tap of C opens the panel. That holds in every app
+that captures C, Gamepad's button test included; the old per-app opt-out
+(`C_DOUBLE_TAP = False`) is no longer honoured.
 
 Layout (slides down from the top, full screen):
 
@@ -105,11 +106,11 @@ DOUBLE_TAP_MS = 350
 
 def double_tap_opens(app):
     """True when a double-tap of C should open the panel over an app that
-    captures C. Apps opt out with `C_DOUBLE_TAP = False`."""
-    try:
-        return bool(getattr(app, "C_DOUBLE_TAP", True))
-    except Exception:
-        return True
+    captures C: always. The first C of the pair reaches the app; the
+    second opens the panel. An app used to be able to turn this off with
+    `C_DOUBLE_TAP = False`, which left no way to reach the panel there;
+    the attribute is now ignored (tests/test_c_key_rule.py rejects it)."""
+    return True
 
 
 def quick_nav(sel, btn):

@@ -107,11 +107,14 @@ class Client:
     """The computer's end of a Transfer session on an open serial port.
 
     `ser` needs write(), read(n) and in_waiting (pyserial, or the test
-    fake). `clock`/`sleep` are injectable so timeouts can be tested."""
+    fake). `clock`/`sleep` are injectable so timeouts can be tested.
+    `check`, when given, is called while waiting for the badge and may
+    raise (the full-screen UI's Cancel button raises Cancelled there)."""
 
     def __init__(self, ser, clock=time.monotonic, sleep=time.sleep, host=None,
-                 window=WINDOW):
+                 window=WINDOW, check=None):
         self.ser = ser
+        self.check = check
         self.clock = clock
         self.sleep = sleep
         self.host = host or _hostname()
@@ -182,6 +185,8 @@ class Client:
                 msg = queue.pop(0)
                 if ops is None or msg["op"] in ops or msg["op"] == "error":
                     return msg
+            if self.check is not None:
+                self.check()
             n = self._waiting()
             if n:
                 self._rx += self.ser.read(n)
@@ -280,7 +285,7 @@ class Client:
                 if progress is not None:
                     progress(int(msg.get("got", 0)))
             msg = self.recv(DONE_S, ops=("done",))
-        except KeyboardInterrupt:
+        except (KeyboardInterrupt, Cancelled):
             self.abort()
             raise
         if msg is None:
@@ -415,7 +420,7 @@ def _session(ctx, body):
     """Open the port, wait for the Transfer app, check the code, run body."""
     ui = ctx.ui
     port, link, ser = _open(ctx)
-    client = Client(ser)
+    client = Client(ser, check=getattr(ctx, "check_cancel", None))
     try:
         with ui.status("looking for the Transfer app on %s" % esc(port)):
             hello = client.connect(
@@ -431,7 +436,7 @@ def _session(ctx, body):
             return body(client, hello)
         finally:
             client.bye()
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, Cancelled):
         client.abort()
         client.bye()
         raise

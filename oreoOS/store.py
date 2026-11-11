@@ -60,7 +60,7 @@ T_API       = 8           # seconds, catalogue / icon requests
 # Keep in sync with the directories under apps/ (tests/test_store.py
 # checks it).
 DEFAULT_APPS = (
-    "about", "badge", "commits", "gallery", "gamepad", "identity", "reader",
+    "about", "badge", "commits", "gallery", "gamepad", "reader",
     "settings", "store", "storage", "transfer",
     # system apps the OS needs
     "launcher", "updates", "wifi",

@@ -112,10 +112,17 @@ def run_update(ctx, b, channel="stable", check_only=False):
     """The whole flow on an open session `b`. Returns an exit code.
 
     After a successful install the badge has been reset and `b` is closed;
-    the session's own restart then does nothing."""
-    ui = ctx.ui
+    the session's own restart then does nothing. The badge's screen shows
+    each step (oreoOS/hostui.py, when the OreoOS on it has it)."""
     if channel not in CHANNELS:
         raise OreoError("unknown channel %r" % channel, hint="use stable or beta")
+    with b.showing():
+        return _run_update(ctx, b, channel, check_only)
+
+
+def _run_update(ctx, b, channel, check_only):
+    ui = ctx.ui
+    title = "Checking for updates" if check_only else "Updating OreoOS"
     with ui.status("reading the badge"):
         st = _ota(b.ota_status)
     current = st.get("current") or "?"
@@ -128,11 +135,13 @@ def run_update(ctx, b, channel="stable", check_only=False):
             raise Cancelled("nothing changed; the badge installs it at its next restart")
         return _apply_and_reboot(ctx, b, target)
 
+    b.screen(title, "connecting to Wi-Fi")
     with ui.status("bringing up Wi-Fi on the badge"):
         r = b.wifi_online()
     if not r.get("online"):
         raise OreoError("the badge could not get online, so it cannot download the update",
                         hint="add a network: `oreo wifi scan`, then `oreo wifi connect <name>`")
+    b.screen(title, "asking GitHub for the newest %s release" % channel)
     with ui.status("asking GitHub for the newest %s release" % channel):
         rel = _ota(b.ota_check, channel)
     if rel.get("error"):
@@ -149,6 +158,7 @@ def run_update(ctx, b, channel="stable", check_only=False):
         channel, esc(latest), "  [warn](major version: apps or settings may change)[/]"
         if rel.get("major") else ""))
 
+    b.screen(title, "comparing files with %s" % latest)
     with ui.status("comparing the badge's files with the release"):
         pk = _ota(b.ota_peek)
     if pk.get("error"):
@@ -173,7 +183,8 @@ def run_update(ctx, b, channel="stable", check_only=False):
         raise Cancelled("nothing changed")
 
     with ui.progress("downloading %s" % esc(latest), total=pk["files"], unit="files") as update:
-        ok = b.ota_download(progress=lambda i, t, p: update(i, t or None))
+        ok = b.ota_download(progress=lambda i, t, p: update(i, t or None),
+                            screen="Downloading OreoOS %s" % latest)
     if not ok:
         raise OreoError("the download failed; nothing was changed on the badge",
                         hint="check the Wi-Fi signal and run `oreo update` again")
@@ -189,7 +200,7 @@ def _apply_and_reboot(ctx, b, target):
     with deferred_interrupt(ui):
         with ui.status("installing %s (do not unplug the badge)" % esc(target)):
             try:
-                applied = _ota(b.ota_apply)
+                applied = _ota(b.ota_apply, screen="Installing OreoOS %s" % target)
             except LinkError:
                 raise LinkError("the badge disconnected while installing",
                                 hint="plug it back in: OreoOS finishes the update when it "
