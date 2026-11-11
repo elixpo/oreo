@@ -366,3 +366,33 @@ class Display(api.Display):
         # present() assumes the full-screen window set at init; put it back
         # so the next full flush is not squeezed into this rectangle.
         p.set_window(0, 0, api.SCREEN_W - 1, api.SCREEN_H - 1)
+
+    def push_buffer(self, buf, x, y, w, h, src_x=0, src_y=0, src_w=None):
+        """Write a w x h block of an external RGB565 buffer straight to the
+        panel at (x, y), bypassing (and not touching) the framebuffer.
+
+        `buf` holds pixels the way the framebuffer does (colours passed
+        through _swap, i.e. big-endian on the wire), `src_w` pixels per
+        row (default w); the block starts at (src_x, src_y) in it.
+        oreoOS.busy's animator thread uses this so a loading spinner can
+        move while the UI thread is blocked, without sharing the
+        framebuffer. The caller keeps it from overlapping a present()."""
+        if src_w is None:
+            src_w = w
+        p = self._panel
+        p.set_window(x, y, x + w - 1, y + h - 1)
+        p.cs(0)
+        p.dc(0); p.spi.write(b'\x2C')
+        p.dc(1)
+        mv = memoryview(buf)
+        stride = src_w * 2
+        start = (src_y * src_w + src_x) * 2
+        if src_x == 0 and w == src_w:
+            p.spi.write(mv[start: start + h * stride])
+        else:
+            n = w * 2
+            for _ in range(h):
+                p.spi.write(mv[start: start + n])
+                start += stride
+        p.cs(1)
+        p.set_window(0, 0, api.SCREEN_W - 1, api.SCREEN_H - 1)

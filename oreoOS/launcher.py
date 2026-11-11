@@ -314,6 +314,27 @@ def _show_loading(os_obj, label, author=None):
     return False
 
 
+# The LOADING panel is static while on_enter() blocks the UI thread, so a
+# spinner turns on it meanwhile (oreoOS.busy's animator thread; it writes
+# only its own 24x24 box to the panel and stops before anything else
+# presents). Placed below the byline, above the hint.
+LOADING_SPIN_Y = 168
+LOADING_SPIN_DELAY_MS = 120      # quick on_enter()s show no spinner
+LOADING_SPIN_DIM = api.rgb(255, 170, 176)
+
+
+def _loading_spinner(os_obj):
+    """Start the LOADING panel's spinner; returns it, or None."""
+    try:
+        from oreoOS import busy, theme
+        return busy.spinner(os_obj.display, (api.SCREEN_W - busy.SPIN) // 2,
+                            LOADING_SPIN_Y, fg=api.WHITE, bg=theme.PRIMARY,
+                            dim=LOADING_SPIN_DIM,
+                            delay_ms=LOADING_SPIN_DELAY_MS)
+    except Exception:
+        return None
+
+
 # ── generic app run loop ──────────────────────────────────────────────────────
 
 def run_app(os_obj, app):
@@ -324,7 +345,8 @@ def run_app(os_obj, app):
     # while on_enter does its work; the very next frame fully overwrites it.
     # If the user mashes HOME during the slide, abort the launch entirely and
     # route them back to the apps drawer instead of waiting for on_enter.
-    if getattr(app, "SHOW_LOADING", False):
+    loading = bool(getattr(app, "SHOW_LOADING", False))
+    if loading:
         label  = getattr(app, "name",   app.__class__.__name__)
         author = getattr(app, "author", None)
         if _show_loading(os_obj, label, author):
@@ -393,7 +415,13 @@ def run_app(os_obj, app):
     # frame, so period + this frame's work bounds its delay.
     period_ms = 0
 
-    app.on_enter(os_obj)
+    spin = _loading_spinner(os_obj) if loading else None
+    try:
+        app.on_enter(os_obj)
+    finally:
+        if spin is not None:
+            # The app's first frame repaints the whole screen.
+            spin.stop(restore=False)
     last = time.ticks_ms()
     try:
         while not os_obj._quit_requested:
@@ -1002,6 +1030,11 @@ def boot():
     # machine.reset() after apply to guarantee the new drivers boot fresh.
     os_obj = OS()
     _bc("OS() constructed")
+    try:
+        from oreoOS import busy
+        busy.bind(os_obj.display)       # default display for busy.show()
+    except Exception:
+        pass
     # Safe mode: HOME held while booting skips Wi-Fi and Bluetooth
     # auto-start for this boot (the crash screen in entry.py points here).
     safe = _safe_boot_requested(os_obj.buttons)

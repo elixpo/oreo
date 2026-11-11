@@ -20,6 +20,12 @@ Layout per state (top to bottom):
 Modes (a sub-page system inside this app):
     "main"      version status + buttons
     "changelog" scrollable release notes for the discovered version
+
+The check and the download block the UI thread (one TLS session at a
+time), so both run under an oreoOS.busy card: its spinner keeps turning
+on a small animator thread, the detail line follows the network phase
+(_network_pulse) and the download shows a bar per file. An OS without
+oreoOS.busy falls back to repainting the page from the pulses.
 """
 
 import oreoOS
@@ -56,6 +62,27 @@ def wait_background(pulse=None, limit_ms=WAIT_BG_MS, net=None):
 
 SW = api.SCREEN_W
 SH = api.SCREEN_H
+
+PHASES = {
+    "dns":      "Finding GitHub",
+    "connect":  "Connecting",
+    "tls":      "Secure link",
+    "request":  "Requesting release",
+    "read":     "Reading update data",
+    "redirect": "Opening release",
+    "wait":     "Finishing check",
+}
+
+
+def _busy(display, title, detail="", progress=None):
+    """Start an oreoOS.busy card, or None when this OS has none."""
+    if display is None:
+        return None
+    try:
+        from oreoOS import busy
+        return busy.start(title, detail, progress, display=display)
+    except Exception:
+        return None
 
 S_IDLE        = "idle"
 S_CHECKING    = "checking"
@@ -98,6 +125,7 @@ class App(oreoOS.App):
         self._loader_paint_ms = 0
         self._error   = ""
         self._dirty   = True
+        self._card    = None           # oreoOS.busy card while blocked
         # Auto-run a check on entry so the page is meaningful without
         # a manual A press.
         self._run_check()
@@ -172,7 +200,21 @@ class App(oreoOS.App):
             self.draw(self._os.display); self._os.display.present()
         except Exception:
             pass
+        self._card = _busy(self._os.display, "Checking for updates",
+                           "Starting")
+        try:
+            self._check()
+        finally:
+            self._end_card()
 
+    def _end_card(self):
+        if self._card is not None:
+            self._card.stop(restore=False)   # the next frame repaints
+            self._card = None
+        self._dirty = True
+
+    def _check(self):
+        from oreoOS import ota
         wait_background(self._network_pulse)
 
         # Always fetch the latest tag — we need to compare against the
@@ -236,17 +278,15 @@ class App(oreoOS.App):
         self._dirty = True
 
     def _network_pulse(self, phase, received=0):
-        """Repaint the loader while a synchronous HTTPS request is active."""
-        labels = {
-            "dns":      "FINDING GITHUB",
-            "connect":  "CONNECTING",
-            "tls":      "SECURE LINK",
-            "request":  "REQUESTING RELEASE",
-            "read":     "READING UPDATE DATA",
-            "redirect": "OPENING RELEASE",
-            "wait":     "FINISHING CHECK",
-        }
-        self._loader_phase = labels.get(phase, "CHECKING")
+        """Show the network phase while a synchronous HTTPS request runs:
+        on the busy card, or (no card) by repainting the page loader."""
+        label = PHASES.get(phase, "Checking")
+        if self._card is not None:
+            if phase == "read" and received:
+                label = "%s, %d KB" % (label, received // 1024)
+            self._card.detail(label)
+            return
+        self._loader_phase = label.upper()
 
         # Full LCD presentation costs about 31 ms. Throttle body-read pulses
         # so animation does not become the dominant network workload.
@@ -276,12 +316,18 @@ class App(oreoOS.App):
             return
         if not ota.is_pending():
             if not self._peeked:
-                rel = self._safe(lambda: ota.check())
+                self._card = _busy(self._os.display, "Checking for updates",
+                                   "Starting")
+                try:
+                    rel = self._safe(lambda: ota.check())
+                    if rel:
+                        self._peeked = self._safe(lambda: ota.peek(rel))
+                finally:
+                    self._end_card()
                 if not rel:
                     self._state = S_UP_TO_DATE
                     self._dirty = True
                     return
-                self._peeked = self._safe(lambda: ota.peek(rel))
                 if not self._peeked:
                     self._state = S_FAILED
                     self._dirty = True
@@ -293,7 +339,15 @@ class App(oreoOS.App):
                 self.draw(self._os.display); self._os.display.present()
             except Exception:
                 pass
-            ok = self._safe(lambda: ota.download(self._peeked))
+            ver = (self._release or {}).get("version", "")
+            self._card = _busy(self._os.display,
+                               ("Downloading " + ver).strip(),
+                               "Starting", 0.0)
+            try:
+                ok = self._safe(lambda: ota.download(
+                    self._peeked, on_progress=self._file_progress))
+            finally:
+                self._end_card()
             if not ok:
                 self._state = S_FAILED
                 self._error = "download failed"
@@ -313,6 +367,11 @@ class App(oreoOS.App):
             machine.reset()
         except Exception:
             self._os.quit()
+
+    def _file_progress(self, index, total, path):
+        if self._card is not None:
+            self._card.progress(index / total if total else None,
+                                (path or "").split("/")[-1])
 
     def _open_changelog(self):
         self._mode   = "changelog"

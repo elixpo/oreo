@@ -130,7 +130,7 @@ frame. Rules that keep the badge responsive:
 | Attribute | Default | Meaning |
 |---|---|---|
 | `name` | `"unnamed"` | Shown in headers and crash screens. |
-| `SHOW_LOADING` | `False` | Show the loading slide while `on_enter` runs. Set it when `on_enter` takes more than about 200 ms. |
+| `SHOW_LOADING` | `False` | Show the loading slide while `on_enter` runs, with a spinner that keeps turning while `on_enter` blocks. Set it when `on_enter` takes more than about 200 ms. |
 | `CAPTURES_C` | `False` | Deliver C to the app instead of opening the notification panel. A double-tap of C still opens the panel. May be changed on the instance at runtime, for example only during play. See [The C key](#the-c-key). |
 | `BLOCK_IDLE` | `False` | Keep the badge from auto-sleeping while the app is open (video, a timer). |
 | `realtime_mode()` | `False` | Return True only while playing media or capturing; the OS then defers its housekeeping for lower latency. |
@@ -202,6 +202,68 @@ Sprites: put PNGs in `assets/raw/` and run
 `python tools/optimize_assets.py --app my_app` to make
 `assets/optimized/*.py` modules, then load them with
 `__import__("apps.my_app.assets.optimized.hero", None, None, ["DATA", "W", "H"])`.
+
+## Slow work: the loading animation
+
+Everything that makes the badge wait must show that it is working. Work
+that can run on a worker thread (network fetches) should: use
+`oreoOS.cache.Refresh` and draw a loading state from `update()`/`draw()`
+while it runs (Commits, Weather and the Store's catalogue do this). Work
+that has to block the UI thread (an install that holds the only TLS
+session, an OTA download, decoding a large photo inside `draw()`) goes
+under `oreoOS.busy`:
+
+```python
+from oreoOS import busy
+
+with busy.show("Installing Racer", "Starting", 0.0,
+               display=self.os.display) as b:
+    for i, path in enumerate(files):
+        fetch(path)
+        b.progress((i + 1) / len(files), path)   # bar and detail line
+self._dirty = True                                # repaint afterwards
+```
+
+`busy.start(title, detail, progress)` returns the same object without
+`with`; `progress(frac, detail=None)`, `detail(text)` and
+`stop(restore=True)` act on it (or, as module functions, on the one on
+screen). `progress=None` means "unknown length": spinner only.
+`delay_ms=200` shows nothing if the work ends sooner, so quick cases do
+not flash a card.
+
+How it animates while your code blocks: a small `_thread` task draws the
+card (spinner, title, detail, optional bar) into its own buffer and writes
+it straight to the panel with `Display.push_buffer()`; it never touches
+the framebuffer, so it cannot tear or leave pixels in your frame. While it
+runs, `display.present()` and `present_rect()` are wrapped: if your code
+presents, the animator is stopped first (stop waits on the lock it holds
+for each draw), so the two never write to the panel at once. `stop()`
+flushes the framebuffer once to put the screen back; pass
+`restore=False` when a full frame follows anyway (inside `draw()`, or
+before a reset). Network waits release the GIL, so the spinner keeps
+turning; a long C call that holds it (the TLS key exchange) can pause it
+for a moment. Without `_thread`, or on an OS whose display has no
+`push_buffer()`, the card is drawn by your thread instead and moves on
+`progress()`, `detail()` and `pump()` calls.
+
+Rules: do not draw or present from another thread while a card is up,
+and repaint your app after it (`self._dirty = True`). App Store apps
+should import `oreoOS.busy` inside `try: ... except ImportError:` (older
+OS versions do not have it).
+
+The OS uses it for App Store install, update and uninstall, the Updates
+check and download, Gallery photos that take long to decode, the Wi-Fi
+speed test and ping, and the spinner on the `SHOW_LOADING` slide.
+
+### The screen while a computer drives the badge
+
+While the `oreo` CLI works over the raw REPL (OreoOS is stopped), it can
+show progress with `oreoOS.hostui`: `hostui.show(title, detail="",
+progress=None)` draws a "Connected to computer" frame (title, detail, a
+bar for 0.0-1.0 or a static busy glyph for None) and `hostui.clear()`
+blanks it. It sets up the panel itself without a reset, sends only the
+parts that changed (cheap enough for every chunk), keeps one 12.8 KB strip
+buffer, and never raises. It is for the raw REPL only; apps use `busy`.
 
 ## Saving state
 

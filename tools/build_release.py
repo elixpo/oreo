@@ -76,6 +76,8 @@ SHIP_PATTERNS = [
     "oreoOS/profile.py",
     "oreoOS/crashlog.py",
     "oreoOS/geo.py",
+    "oreoOS/busy.py",
+    "oreoOS/hostui.py",
     "oreoOS/usbhost.py",
     "oreoOS/mascot.png",
     "oreoWare/__init__.py",
