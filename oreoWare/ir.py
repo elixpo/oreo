@@ -28,9 +28,15 @@ API:
     ir.stop_receive()
     ir.poll()    — call once per app frame; runs the decoder
     ir.rx_status() — {"backend": "rmt"|"irq"|None, "warning": str|None, ...}
+    ir.close()   — stop RX and release the TX channel (app exit)
+    ir.debug(True) — print RX/TX lifecycle transitions to the serial console
 
 TX pauses an active receiver and restarts it afterwards, so a caller can
-send without managing the RX lifecycle itself.
+send without managing the RX lifecycle itself. The RX and TX RMT channels
+never exist at the same time: RX is deleted before TX is created, and the
+TX channel is deleted (and GPIO 2 parked low) before RX is created again.
+start_receive() while listening and stop_receive() while stopped are
+no-ops, so tab switches never touch the hardware.
 
 on_packet(code_or_None, info_dict)
     code is the 32-bit NEC value, or None when a raw/unknown packet hit
@@ -81,6 +87,26 @@ _RMT_CLOCK_DIV = 80
 _rmt          = None
 _rmt_carrier  = 0
 _last_error   = None
+_debug        = False
+
+
+def debug(on=None):
+    """Get or set serial lifecycle logging (also in the native receiver)."""
+    global _debug
+    if on is not None:
+        _debug = bool(on)
+        if _native_rx is not None and hasattr(_native_rx, "debug"):
+            try:
+                _native_rx.debug(_debug)
+            except Exception:
+                pass
+    return _debug
+
+
+def _log(msg, always=False):
+    """Serial diagnostics. Only called on transitions, never per frame."""
+    if _debug or always:
+        print("[ir] " + msg)
 
 
 def _get_rmt(carrier_hz):
@@ -113,19 +139,29 @@ def _get_rmt(carrier_hz):
             _rmt = RMT(0, **kwargs)
         _rmt_carrier = carrier_hz
         _last_error = None
+        _log("TX channel up: gpio=%d carrier=%d" % (pins.IR_TX, carrier_hz))
     return _rmt
 
 
 def _release_rmt_tx():
-    """Release the idle TX channel before handing RMT back to RX."""
+    """Release the idle TX channel before handing RMT back to RX.
+
+    Deleting an RMT TX channel disables the pin's output driver, which would
+    leave the 2N2222 base floating; drive GPIO 2 low again instead."""
     global _rmt, _rmt_carrier
-    if _rmt is not None:
-        try:
-            _rmt.deinit()
-        except Exception:
-            pass
+    if _rmt is None:
+        return
+    try:
+        _rmt.deinit()
+    except Exception as exc:
+        _log("TX deinit: %s" % exc, always=True)
     _rmt = None
     _rmt_carrier = 0
+    try:
+        Pin(pins.IR_TX, Pin.OUT, value=0)
+    except Exception:
+        pass
+    _log("TX channel released, gpio=%d parked low" % pins.IR_TX)
 
 
 def nec_pulses(code32):
@@ -145,19 +181,26 @@ def _send(pulses, carrier_hz, timeout_ms):
     global _last_error
     resume = _rx_callback if _rx_backend else None
     resume_mode = _rx_mode
-    if resume:
-        stop_receive()
+    err = None
     try:
+        if resume:
+            # The RX channel is deleted before TX claims RMT; if that fails
+            # nothing is transmitted and the restart below reports it.
+            stop_receive()
         rmt = _get_rmt(carrier_hz)
         rmt.write_pulses(pulses, 1)
         if not rmt.wait_done(timeout=timeout_ms):
             raise RuntimeError("RMT transmit timeout")
     except Exception as exc:
-        _last_error = "TX: %s" % exc
-        raise
-    finally:
-        if resume:
-            start_receive(resume, mode=resume_mode)
+        err = exc
+    if resume:
+        # Releases the TX channel first, then brings RX back.
+        start_receive(resume, mode=resume_mode)
+    if err is not None:
+        # Set after the restart, which clears _last_error.
+        _last_error = "TX: %s" % err
+        _log(_last_error, always=True)
+        raise err
     _last_error = None
     return True
 
@@ -244,18 +287,21 @@ def start_receive(on_packet, mode="focus"):
             _native_rx.start(pins.IR_RX)
             _rx_backend = "rmt"
             _rx_warning = None
+            _log("RX listening: %s" % _native_summary())
             return
         except Exception as exc:
             # Keep the full text; the edge-IRQ path still receives NEC.
             _rx_warning = "RMT RX: %s" % exc
+            _log("%s; falling back to pin IRQ" % _rx_warning, always=True)
             try:
                 _native_rx.stop()
-            except Exception:
-                pass
+            except Exception as stop_exc:
+                _log("RMT RX cleanup: %s" % stop_exc, always=True)
     _rx_pin = Pin(pins.IR_RX, Pin.IN, Pin.PULL_UP)
     _rx_pin.irq(handler=_on_edge,
                 trigger=Pin.IRQ_FALLING | Pin.IRQ_RISING)
     _rx_backend = "irq"
+    _log("RX listening: pin IRQ on gpio=%d" % pins.IR_RX)
 
 
 def stop_receive():
@@ -263,11 +309,13 @@ def stop_receive():
     if the native module reports a cleanup error (which is re-raised)."""
     global _rx_pin, _rx_callback, _pulse_count, _pulse_overflow, _rx_backend
     err = None
+    was = _rx_backend
     if _rx_backend == "rmt":
         try:
             _native_rx.stop()
         except Exception as exc:
             err = exc
+            _log("RX stop: %s" % exc, always=True)
     if _rx_pin is not None:
         _rx_pin.irq(handler=None)
     _rx_pin = None
@@ -275,14 +323,31 @@ def stop_receive():
     _rx_backend = None
     _pulse_count = 0
     _pulse_overflow = False
+    if was is not None:
+        _log("RX stopped (%s)" % was)
     if err is not None:
         raise err
+
+
+def close():
+    """Stop RX and release the TX channel; call when the IR app exits."""
+    try:
+        stop_receive()
+    finally:
+        _release_rmt_tx()
+
+
+def _native_summary():
+    st = rx_status()
+    return "ch=%s dma=%s filter=%sns state=%s live=%s" % (
+        st.get("channel"), st.get("dma"), st.get("filter_ns"),
+        st.get("state"), st.get("live_channels"))
 
 
 def rx_status():
     """Receiver diagnostics for UIs and the serial console."""
     st = {"backend": _rx_backend, "warning": _rx_warning,
-          "native": _HAVE_NATIVE_RX}
+          "native": _HAVE_NATIVE_RX, "tx_open": _rmt is not None}
     if _HAVE_NATIVE_RX:
         try:
             info = _native_rx.info()
@@ -290,6 +355,13 @@ def rx_status():
             st["filter_ns"] = info[3]
             st["stage"] = info[4]
             st["esp_err"] = info[5]
+            if len(info) >= 13:
+                st["channel"] = info[6]
+                st["state"] = info[7]
+                st["frames"] = info[8]
+                if info[9]:
+                    st["dma_skipped"] = "%s: %s" % (info[9], info[10])
+                st["live_channels"] = info[11] - info[12]
         except Exception:
             pass          # firmware older than _oreo_ir.info()
     return st
@@ -310,7 +382,11 @@ def poll():
         except Exception as exc:
             # The native module already tore the channel down.
             _last_error = "RX: %s" % exc
-            stop_receive()
+            _log(_last_error, always=True)
+            try:
+                stop_receive()
+            except Exception:
+                pass      # keep the original error; stop already logged
             raise
         if pulses is not None:
             _deliver_frame(pulses)
