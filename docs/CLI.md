@@ -488,14 +488,16 @@ No checkout or `.env.local` is needed.
 - Values are checked before the badge is touched: the timezone is hours from
   UTC between -12 and +14 in quarter hours (`5.5`, `-4`, `+05:30`,
   `UTC+5:45`), latitude -90 to 90, longitude -180 to 180, GitHub user names
-  as GitHub allows them, and short names that fit the screen.
+  as GitHub allows them, and short plain-ASCII names that fit the screen
+  (the badge font has no other characters).
 - The OpenWeatherMap key is read without echo and never printed. The badge
   only reports whether one is set, so the key never comes back to the
   computer. `--owm-key KEY` works but warns that the key may land in your
   shell history; prefer the prompt or `--owm-key-stdin`.
-- The new file is merged on the badge, written to `/profile.json.part`, read
+- The new file is merged on the badge, written to `/profile.json.tmp`, read
   back and then renamed over `/profile.json`, so a cut-off save never leaves
-  a half-written profile.
+  a half-written profile. If the power goes between removing the old file
+  and the rename, OreoOS reads the `.tmp` copy, and the next save repairs it.
 - OreoOS restarts afterwards so the apps read the new profile (`--reset none`
   leaves it at the MicroPython prompt). A new timezone applies at the next
   time sync, which happens as OreoOS starts.

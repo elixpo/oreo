@@ -18,7 +18,8 @@ from its `## [<version>]` section below, so every release needs one.
   values and where they come from, prompts for each one (or takes them as
   options), checks the ranges before touching the badge, never echoes or
   prints the key (the badge only reports whether one is set), merges and
-  writes atomically through `/profile.json.part`, and restarts OreoOS.
+  writes atomically through `/profile.json.tmp` (the backup the badge falls
+  back to), and restarts OreoOS.
   `oreo setup --show` prints the profile with the key hidden;
   `--owm-key-stdin` reads the key from standard input.
 - `oreo new <name>`: a new app folder from the app template, which now ships

@@ -190,6 +190,11 @@ class NewTest(TmpDir):
             r = run_cli(["new", "x", "--dir", str(self.tmp / "out")])
         self.assertEqual(r.rc, 1)
         self.assertIn("template changed", r.out)
+        # no half-made folder left to block the next try
+        self.assertFalse((self.tmp / "out" / "x").exists())
+        r = run_cli(["new", "x", "--dir", str(self.tmp / "out")])
+        self.assertEqual(r.rc, 0, r.out)
+        self.assertTrue((self.tmp / "out" / "x" / "manifest.json").exists())
 
 
 class AppInstallTest(TmpDir):
@@ -290,9 +295,18 @@ class AppInstallTest(TmpDir):
             self.assertEqual(r.rc, 2, (argv, r.out))
             self.assertEqual(r.links, [])
 
+    @unittest.skipUnless((REPO / "oreoOS" / "store.py").exists(), "not in a checkout")
     def test_system_apps_cover_the_store_defaults(self):
-        for a in commands.DEFAULT_APPS:
-            self.assertIn(a, devtools.SYSTEM_APPS)
+        # against the badge's own list, not commands.DEFAULT_APPS (which
+        # SYSTEM_APPS is built from, so comparing those proves nothing)
+        found = None
+        for node in ast.parse((REPO / "oreoOS" / "store.py").read_text(encoding="utf-8")).body:
+            if isinstance(node, ast.Assign) and any(
+                    isinstance(t, ast.Name) and t.id == "DEFAULT_APPS" for t in node.targets):
+                found = ast.literal_eval(node.value)
+        self.assertIsNotNone(found, "DEFAULT_APPS not found in oreoOS/store.py")
+        self.assertLessEqual(set(found), set(devtools.SYSTEM_APPS))
+        self.assertIn("launcher", devtools.SYSTEM_APPS)
 
 
 class DevNotesTest(TmpDir):

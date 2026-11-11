@@ -60,6 +60,15 @@ class ValidateTest(unittest.TestCase):
     def test_empty_means_remove(self):
         self.assertEqual(owner.validate("DESIGNATION", "  "), "")
 
+    def test_text_fields_are_plain_ascii(self):
+        self.assertEqual(owner.validate("DISPLAY_NAME", "Mona O'Hara-Lisa"),
+                         "Mona O'Hara-Lisa")
+        for key, bad in (("DISPLAY_NAME", "Jos\u00e9"), ("DESIGNATION", "Lead \u2014 Firmware"),
+                         ("WEATHER_NAME", "M\u00fcnchen"), ("DISPLAY_NAME", "x\x7f")):
+            with self.assertRaises(UsageError, msg=(key, bad)) as cm:
+                owner.validate(key, bad)
+            self.assertIn("ASCII", cm.exception.message)
+
     def test_bad_key_is_never_quoted(self):
         with self.assertRaises(UsageError) as cm:
             owner.validate("OWM_API_KEY", "short-secret!")
@@ -104,11 +113,12 @@ class SetupCommandTest(unittest.TestCase):
         self.assertIn("OreoOS is restarting", r.out)
         self.assertIn("UTC+5:30", r.out)
         self.assertEqual(self.fake.restarts, ["soft"])
-        self.assertFalse(self.fake.exists("/profile.json.part"))
-        # written through a temp file and renamed, merged on the badge
-        write = [c for c in self.fake.sent if "'.part'" in c]
+        self.assertFalse(self.fake.exists("/profile.json.tmp"))
+        # staged as the .tmp that state.read_json falls back to, then renamed
+        write = [c for c in self.fake.sent if "os.rename(" in c]
         self.assertEqual(len(write), 1)
-        self.assertIn("os.rename(w,", write[0])
+        self.assertIn("w=%r+'.tmp'" % "/profile.json", write[0])
+        self.assertNotIn(".part", write[0])
 
     def test_merges_and_removes(self):
         self.fake.put("/profile.json", json.dumps(
@@ -128,7 +138,7 @@ class SetupCommandTest(unittest.TestCase):
         self.assertNotIn(KEY, r.out)
         for out in self.fake.outputs:
             self.assertNotIn(KEY.encode(), out)
-        self.assertFalse(any("'.part'" in c for c in self.fake.sent))   # --show writes nothing
+        self.assertFalse(any("os.rename(" in c for c in self.fake.sent))   # --show writes nothing
 
     def test_key_from_stdin_is_sent_once_and_not_printed(self):
         with mock.patch.object(sys, "stdin", io.StringIO(KEY + "\n")):
@@ -197,6 +207,30 @@ class SetupCommandTest(unittest.TestCase):
         self.assertIn("not set", secrets_asked[0])
         self.assertNotIn(KEY, r.out)
 
+    def test_interactive_bad_key_asks_again(self):
+        asked = []
+        typed = iter(["short-secret!", KEY])
+
+        def secret(prompt):
+            asked.append(prompt)
+            return next(typed)
+        answers = ["octocat", "Mona", "", "", "", "", "", "y"]
+        r = self.run_setup(interactive=True, inputs=answers, secret=secret)
+        self.assertEqual(r.rc, 0, r.out)
+        self.assertEqual(len(asked), 2)
+        self.assertIn("does not look like an OpenWeatherMap API key", r.out)
+        self.assertNotIn("short-secret", r.out)
+        self.assertNotIn(KEY, r.out)
+        # the answers typed before the bad key are kept
+        self.assertEqual(self.profile(), {"GITHUB_USER": "octocat", "DISPLAY_NAME": "Mona",
+                                          "OWM_API_KEY": KEY})
+
+    def test_bad_ascii_name_fails_before_the_badge(self):
+        r = run_cli(["setup", "--name", "Jos\u00e9"])
+        self.assertEqual(r.rc, 2, r.out)
+        self.assertIn("ASCII", r.out)
+        self.assertEqual(r.links, [])
+
     def test_interactive_nothing_changed(self):
         r = self.run_setup(interactive=True, inputs=[""] * 7, secret=lambda p: "")
         self.assertEqual(r.rc, 0, r.out)
@@ -229,11 +263,8 @@ class SetupCommandTest(unittest.TestCase):
         self.assertEqual(r.rc, 0, r.out)
         self.assertIn("--reset none", r.out)
 
-    @unittest.skipUnless(PROFILE.exists(), "not inside an OreoOS checkout")
-    def test_badge_profile_module_reads_what_was_written(self):
-        r = self.run_setup("--github-user", "octocat", "--timezone", "5.75", "--lat", "-33.9",
-                           "--lon", "151.2", "--owm-key", KEY)
-        self.assertEqual(r.rc, 0, r.out)
+    def badge_profile(self):
+        """The real oreoOS/profile.py, reading the fake badge's /profile.json."""
         state = load(STATE, "oreo_state_for_cli_test")
         pkg = types.ModuleType("oreoOS")
         pkg.state = state
@@ -249,6 +280,56 @@ class SetupCommandTest(unittest.TestCase):
                 else:
                     sys.modules[k] = v
         profile.PATH = self.fake.os._real("/profile.json")
+        return profile
+
+    def fat_rename(self, cut=False):
+        """FAT's rename: refuses an existing target. With cut=True the power
+        goes before the rename that follows the remove."""
+        real_rename = self.fake.os.rename
+
+        def rename(a, b):
+            if self.fake.exists(b):
+                raise OSError(17)
+            if cut:
+                raise RuntimeError("power cut")
+            return real_rename(a, b)
+        self.fake.os.rename = rename
+        return real_rename
+
+    def test_fat_rename_fallback(self):
+        self.fake.put("/profile.json", json.dumps({"GITHUB_USER": "old"}).encode())
+        self.fat_rename()
+        r = self.run_setup("--name", "Me")
+        self.assertEqual(r.rc, 0, r.out)
+        self.assertEqual(self.profile(), {"GITHUB_USER": "old", "DISPLAY_NAME": "Me"})
+        self.assertFalse(self.fake.exists("/profile.json.tmp"))
+
+    @unittest.skipUnless(PROFILE.exists(), "not inside an OreoOS checkout")
+    def test_power_cut_between_remove_and_rename_keeps_the_profile(self):
+        self.fake.put("/profile.json", json.dumps({"GITHUB_USER": "old"}).encode())
+        real_rename = self.fat_rename(cut=True)
+        r = self.run_setup("--github-user", "octocat", "--name", "Me")
+        self.assertNotEqual(r.rc, 0, r.out)
+        self.assertFalse(self.fake.exists("/profile.json"))
+        self.assertTrue(self.fake.exists("/profile.json.tmp"))
+        profile = self.badge_profile()
+        self.assertEqual(profile.get("GITHUB_USER"), "octocat")
+        self.assertEqual(profile.get("DISPLAY_NAME"), "Me")
+        # and the next `oreo setup` sees the backup and repairs it
+        self.fake.os.rename = real_rename
+        r = self.run_setup("--designation", "Firmware")
+        self.assertEqual(r.rc, 0, r.out)
+        self.assertIn("cut short", r.out)
+        self.assertEqual(self.profile(), {"GITHUB_USER": "octocat", "DISPLAY_NAME": "Me",
+                                          "DESIGNATION": "Firmware"})
+        self.assertFalse(self.fake.exists("/profile.json.tmp"))
+
+    @unittest.skipUnless(PROFILE.exists(), "not inside an OreoOS checkout")
+    def test_badge_profile_module_reads_what_was_written(self):
+        r = self.run_setup("--github-user", "octocat", "--timezone", "5.75", "--lat", "-33.9",
+                           "--lon", "151.2", "--owm-key", KEY)
+        self.assertEqual(r.rc, 0, r.out)
+        profile = self.badge_profile()
         self.assertTrue(profile.is_set_up())
         self.assertEqual(profile.get("GITHUB_USER"), "octocat")
         self.assertEqual(profile.get("TIMEZONE_OFFSET"), 5.75)

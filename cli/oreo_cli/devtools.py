@@ -141,7 +141,12 @@ def cmd_new(ctx):
     ui.header("new", "app %s (%s)" % (esc(display), aid))
     with local_file(dest):
         parent.mkdir(parents=True, exist_ok=True)
-        scaffold(dest, aid, display, author)
+        try:
+            scaffold(dest, aid, display, author)
+        except BaseException:
+            # do not leave a half-made folder that blocks the next try
+            shutil.rmtree(dest, ignore_errors=True)
+            raise
     errors, warnings = appcheck.validate(dest)
     if errors:   # the template itself is broken
         raise OreoError("the new app does not pass the checks: %s" % "; ".join(errors),

@@ -130,6 +130,10 @@ def validate(key, value):
                          % (LABELS[key], len(v), limit))
     if any(ord(c) < 32 for c in v):
         raise UsageError("%s has control characters" % LABELS[key])
+    if not all(32 <= ord(c) < 127 for c in v):
+        raise UsageError("%s must be plain ASCII letters, digits and punctuation "
+                         "(the badge font has no others)" % LABELS[key],
+                         hint="e.g. Jose for José")
     return v
 
 
@@ -180,9 +184,12 @@ def read(b):
 
 
 def _write_code(updates):
-    # Merge on the badge so an existing key never has to leave it. Written
-    # to /profile.json.part, read back and parsed, then renamed over
-    # /profile.json (with the remove-then-rename fallback that FAT needs).
+    # Merge on the badge so an existing key never has to leave it. Staged
+    # as /profile.json.tmp, read back and parsed, then renamed over
+    # /profile.json, with the remove-then-rename fallback FAT needs. The
+    # staging name is the one oreoOS/state.read_json falls back to, so a
+    # power cut between the remove and the rename still leaves a profile
+    # the badge reads (the same scheme as state.write_json).
     return (
         "import os\n"
         "U=%(u)s\n"
@@ -203,7 +210,7 @@ def _write_code(updates):
         "  d[k]=U[k]\n"
         "U=None\n"
         "t=_j.dumps(d)\n"
-        "w=%(p)s+'.part'\n"
+        "w=%(p)s+'.tmp'\n"
         "with open(w,'w') as h:\n"
         " h.write(t)\n"
         "with open(w) as h:\n"
@@ -219,10 +226,6 @@ def _write_code(updates):
         " except OSError:\n"
         "  pass\n"
         " os.rename(w,%(p)s)\n"
-        "try:\n"
-        " os.remove(%(p)s+'.tmp')\n"
-        "except OSError:\n"
-        " pass\n"
         "_e({'keys':sorted(k for k in d if d[k] not in (None,''))})\n"
         % {"u": lit(updates), "p": lit(PATH)})
 
@@ -326,15 +329,22 @@ def ask_updates(ui, data):
         if key == SECRET:
             prompt = "%s (%s; Enter keeps it, - removes it)" % (
                 label, "set" if value else "not set")
-            try:
-                raw = ui.secret(prompt)
-            except EOFError:
-                raw = ""
-            raw = (raw or "").strip()
-            if not raw:
-                continue
-            out[key] = "" if raw == "-" else validate(key, raw)
-            raw = None
+            while True:
+                try:
+                    raw = ui.secret(prompt)
+                except EOFError:
+                    raw = ""
+                raw = (raw or "").strip()
+                if not raw:
+                    break
+                try:
+                    out[key] = "" if raw == "-" else validate(key, raw)
+                except UsageError as e:
+                    ui.error(e.message, hint=e.hint)   # never quotes the key
+                    continue
+                finally:
+                    raw = None
+                break
             continue
         shown = "" if value is None else (_num(value) if key in NUMERIC else str(value))
         while True:
