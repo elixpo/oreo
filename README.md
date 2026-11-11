@@ -487,6 +487,8 @@ The Gallery's video playback grew into **RV565**, a standalone library and file 
 |---|---|
 | Arduino | Library Manager → **RV565**, or `arduino-cli lib install RV565` |
 | Python (desktop) | `pip install rv565` — [on PyPI](https://pypi.org/project/rv565/), with a Pillow plugin via `pip install "rv565[pillow]"` |
+| ESP-IDF | `idf.py add-dependency "elixpo/rv565"` — [ESP Component Registry](https://components.espressif.com/components/elixpo/rv565) |
+| CircuitPython | `circup install circuitpython_rv565` — [elixpo/CircuitPython_RV565](https://github.com/elixpo/CircuitPython_RV565), [docs](https://circuitpython-rv565.readthedocs.io) |
 | Browser | [oreo.elixpo.com/rv565/convert](https://oreo.elixpo.com/rv565/convert/) — convert a video with no install and no upload |
 
 ---
@@ -569,7 +571,21 @@ operating system based on MicroPython. Its video pipeline is described in the
 paper [RV565 (arXiv:2610.35935)](https://arxiv.org/abs/2610.35935), and the
 playback library is published separately as
 [RV565](https://github.com/elixpo/rv565) (Arduino Library Manager, ESP Component
-Registry, PyPI).
+Registry, PyPI, CircuitPython).
+
+**Written about**
+
+- Adafruit blog: [RV565: frame-independent RGB565 video for ESP32-S3 and RP2350 SPI displays](https://blog.adafruit.com/2026/11/10/rv565-frame-independent-rgb565-video-for-esp32-s3-and-rp2350-spi-displays/) (10 Nov 2026)
+- Elixpo blog: [From 0.5 FPS to native video: building OreoOS Gallery playback](https://blogs.elixpo.com/elixpohere/esp32s3-spiderman)
+- Elixpo blog: [The Screen Was Blank](https://blogs.elixpo.com/elixpohere/rv565-pico-2-tweak), porting RV565 to the Raspberry Pi Pico 2
+- Paper: [arXiv:2610.35935](https://arxiv.org/abs/2610.35935), archived on [Zenodo](https://doi.org/10.5281/zenodo.23543367)
+
+**Submitted, under review**
+
+- The board image for MicroPython's board list: [micropython-media #132](https://github.com/micropython/micropython-media/pull/132)
+- OreoOS in [awesome-esp #68](https://github.com/agucova/awesome-esp/pull/68)
+- RV565's own submissions (FFmpeg, file(1), PRONOM, Kaitai and others) are
+  listed in [its README](https://github.com/elixpo/rv565#where-rv565-is).
 
 ### Google Summer of Code 2027
 
@@ -579,16 +595,18 @@ accepted. Oreo hosts one proposed project idea:
 
 | Idea | Size | Difficulty | Mentors (primary / backup) |
 | --- | --- | --- | --- |
-| [Oreo badge desktop simulator](https://gsoc.elixpo.com/ideas/oreo-badge-simulator/) | 175 h | Intermediate | [Ayushman Bhattacharya](https://github.com/Circuit-Overtime) / [Vivek Yadav](https://github.com/ez-vivek) |
+| [Oreo badge simulator and CLI test bench](https://gsoc.elixpo.com/ideas/oreo-badge-simulator/) | 175 h | Intermediate | [Ayushman Bhattacharya](https://github.com/Circuit-Overtime) / [Vivek Yadav](https://github.com/ez-vivek) |
 
 **How to start** (no badge hardware needed)
 
 1. Read the idea page and the programme site at [gsoc.elixpo.com](https://gsoc.elixpo.com).
-2. Set up the Python environment from the "Get going" section above, and read
+2. Run the tests (`python3 -m unittest discover -s tests` and
+   `python3 tools/validate_app.py`, standard library only), install the CLI
+   from the checkout (`pip install -e cli/`) and try `oreo new my_app`. Read
    [LEARN.md](LEARN.md) for a guided tour of OreoOS.
-3. Read [`docs/README.md`](docs/README.md) and [`docs/HARDWARE.md`](docs/HARDWARE.md)
-   to see what the display and buttons do, since the simulator has to stand in
-   for them.
+3. Read [`docs/CLI.md`](docs/CLI.md), [`docs/README.md`](docs/README.md) and
+   [`docs/HARDWARE.md`](docs/HARDWARE.md): the simulator stands in for the
+   display and buttons, and answers the `oreo` CLI like a badge.
 4. Read [CONTRIBUTING.md](CONTRIBUTING.md), then pick a small issue from the
    [issue tracker](https://github.com/elixpo/oreo/issues).
 
