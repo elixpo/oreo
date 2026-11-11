@@ -137,6 +137,34 @@ def cmd_shell(ctx):
     ui.ok("left the shell; OreoOS is starting" if ctx.args.reset != "none" else "left the shell")
 
 
+def dev_notes(folder):
+    """What `oreo dev` can and cannot do, true to how OreoOS loads apps:
+    OreoOS does not run while the REPL is open, but started from the REPL
+    it loads any app found under /remote/apps/<id>/ from the mount instead
+    of /apps/<id>, and re-reads its files on every launch (apps are
+    unloaded when they exit). See docs/APPS.md, "Live editing"."""
+    notes = ["The REPL starts in /remote, so `import mymodule` loads your local copy. "
+             "A module is imported once: after an edit, "
+             "import sys; del sys.modules['mymodule'] and import it again.",
+             "Ctrl-D here soft-resets the badge, which starts OreoOS (main.py) and ends "
+             "live editing; leave with Ctrl-] or Ctrl-X instead.",
+             "OreoOS is stopped while you are here. To reach its modules: "
+             "import sys; sys.path.append('/')"]
+    root = Path(folder)
+    if (root / "apps").is_dir() and any((p / "manifest.json").is_file()
+                                         for p in (root / "apps").iterdir() if p.is_dir()):
+        notes.append("This folder has apps/<id>/: start OreoOS with "
+                     "import os; os.chdir('/'); exec(open('/main.py').read()) "
+                     "and those apps load from the computer (the console prints "
+                     "[dev] <id> from /remote/apps). Save, press HOME, reopen the app.")
+    elif (root / "manifest.json").is_file():
+        notes.append("This is an app folder. For live editing, mount its parent with the "
+                     "app under apps/%s/ and start OreoOS from the REPL "
+                     "(see docs/APPS.md, \"Live editing\"); or run `oreo app install %s` "
+                     "to copy it to the badge." % (esc(root.name), esc(folder)))
+    return notes
+
+
 @command("dev")
 def cmd_dev(ctx):
     ui = ctx.ui
@@ -150,6 +178,8 @@ def cmd_dev(ctx):
         b.connect()
         b.link.mount(str(folder))
         ui.header("dev", "%s is mounted at /remote. Ctrl-] or Ctrl-X to leave." % esc(folder))
+        for line in dev_notes(folder):
+            ui.note(line)
         b.link.friendly()
         if ctx.args.run:
             b.link.t.serial.write(("exec(open(%r).read())\r" % ctx.args.run).encode())
