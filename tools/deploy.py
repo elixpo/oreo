@@ -165,6 +165,12 @@ DEPLOY = [
     ("oreoOS/notif_panel.py",   "oreoOS/notif_panel.py"),
     ("oreoOS/pair_prompt.py",   "oreoOS/pair_prompt.py"),
     ("oreoOS/gestures.py",      "oreoOS/gestures.py"),
+    ("oreoOS/netsvc.py",        "oreoOS/netsvc.py"),    # background network (#121)
+    ("oreoOS/perf.py",          "oreoOS/perf.py"),      # boot timing (#121)
+    ("oreoOS/bonds.py",         "oreoOS/bonds.py"),     # BLE bond store (bt.py)
+    ("oreoOS/state.py",         "oreoOS/state.py"),     # /state app saves
+    ("oreoOS/profile.py",       "oreoOS/profile.py"),   # owner profile
+    ("oreoOS/crashlog.py",      "oreoOS/crashlog.py"),  # /crash.log
 
     # Hardware drivers
     ("oreoWare/__init__.py",    "oreoWare/__init__.py"),
@@ -477,6 +483,40 @@ def mpremote_batch(actions, label=""):
     return rc
 
 
+# Owner profile keys. Before the profile moved to .env.local these were
+# hardcoded in config.py, so an older .env.local may lack them; a deploy
+# then writes them blank and the badge loses its name, weather location
+# and timezone (the clock falls back to UTC) unless /profile.json on the
+# badge sets them.
+PROFILE_KEYS = ("GITHUB_USER", "DISPLAY_NAME", "DESIGNATION",
+                "TIMEZONE_OFFSET", "WEATHER_LAT", "WEATHER_LON")
+
+
+def blank_profile_keys(env):
+    """The PROFILE_KEYS with no value in the parsed .env/.env.local."""
+    return [k for k in PROFILE_KEYS if not str(env.get(k) or "").strip()]
+
+
+def profile_note(blank):
+    """One deploy note naming every blank profile key."""
+    effects = []
+    if "GITHUB_USER" in blank:
+        effects.append("Badge and Commits show a setup hint")
+    if "DISPLAY_NAME" in blank and "GITHUB_USER" in blank:
+        effects.append("Identity shows a placeholder")
+    if "WEATHER_LAT" in blank or "WEATHER_LON" in blank:
+        effects.append("Weather has no location")
+    if "TIMEZONE_OFFSET" in blank:
+        effects.append("the clock runs on UTC")
+    text = ("  note: no value in .env.local for %s; writing them blank."
+            % ", ".join(blank))
+    if effects:
+        text += " Unless /profile.json on the badge sets them, " + \
+            "; ".join(effects) + "."
+    return text + " Add them to .env.local (see .env.example) or " \
+        "/profile.json (docs/PROFILE.md)."
+
+
 def write_device_config():
     """Generate a local .cfg_snapshot.py by importing the project's config.py.
 
@@ -509,6 +549,9 @@ def write_device_config():
               "SOPS-encrypted); writing them blank, so WiFi and weather stay "
               "off until you set your own values in .env.local."
               % ", ".join(missing))
+    blank = blank_profile_keys(getattr(_cfg, "_env", {}))
+    if blank:
+        print(profile_note(blank))
 
     fields = (
         # name              python repr formatter
@@ -525,10 +568,10 @@ def write_device_config():
         ("DISPLAY_NAME",     "%r"),
         ("DESIGNATION",      "%r"),
         ("OWM_API_KEY",      "%r"),
-        ("WEATHER_LAT",      "%s"),
-        ("WEATHER_LON",      "%s"),
+        ("WEATHER_LAT",      "%r"),
+        ("WEATHER_LON",      "%r"),
         ("WEATHER_NAME",     "%r"),
-        ("TIMEZONE_OFFSET",  "%s"),
+        ("TIMEZONE_OFFSET",  "%r"),
         ("WIFI_TX_DBM",      "%s"),
         ("WIFI_POWERSAVE",   "%r"),
         ("BT_ADV_INTERVAL_MS","%s"),

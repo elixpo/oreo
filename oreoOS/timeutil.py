@@ -176,8 +176,8 @@ def _sync(timezone_offset_h):
 
         if timezone_offset_h is None:
             try:
-                from oreoOS.config import TIMEZONE_OFFSET as _TZ
-                timezone_offset_h = _TZ
+                from oreoOS import profile
+                timezone_offset_h = profile.get("TIMEZONE_OFFSET", 0)
             except Exception:
                 timezone_offset_h = 0
 

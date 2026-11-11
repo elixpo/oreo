@@ -176,6 +176,39 @@ def auto_fetch_ok(net=None):
     return _online()
 
 
+def _owner_location():
+    """(lat, lon, key) for the owner. With no location the key is "" and
+    the setup card explains what to set.
+
+    Reads /profile.json then secrets.py through oreoOS.profile. An OS
+    built before oreoOS.profile existed falls back to reading secrets.py
+    directly, so an App Store update never loses a location that worked.
+    """
+    try:
+        from oreoOS import profile
+    except ImportError:
+        profile = None
+    lat = lon = None
+    key = ""
+    try:
+        if profile is not None:
+            lat = profile.get("WEATHER_LAT")
+            lon = profile.get("WEATHER_LON")
+            key = profile.get("OWM_API_KEY", "") or ""
+        else:
+            import secrets
+            lat = getattr(secrets, "WEATHER_LAT", None)
+            lon = getattr(secrets, "WEATHER_LON", None)
+            key = getattr(secrets, "OWM_API_KEY", "") or ""
+            lat = None if lat is None else float(lat)
+            lon = None if lon is None else float(lon)
+    except Exception:
+        lat = lon = None
+    if lat is None or lon is None:
+        return None, None, ""
+    return lat, lon, key
+
+
 class App(oreoOS.App):
     name         = "Weather"
     SHOW_LOADING = True
@@ -183,13 +216,7 @@ class App(oreoOS.App):
     def on_enter(self, os):
         global _job, _cfg
         self._os = os
-        try:
-            from secrets import WEATHER_LAT, WEATHER_LON, OWM_API_KEY
-            self._lat = float(WEATHER_LAT)
-            self._lon = float(WEATHER_LON)
-            self._key = OWM_API_KEY
-        except Exception:
-            self._lat, self._lon, self._key = 12.97, 77.59, ""
+        self._lat, self._lon, self._key = _owner_location()
 
         play_h = SH - widgets.HEADER_H - widgets.HINT_H
 
@@ -356,13 +383,12 @@ class App(oreoOS.App):
         d.rect(cx, cy, cw, 2,  theme.PRIMARY, fill=True)
         d.text("setup needed", (SW - 12 * 16) // 2, cy + 14, theme.PRIMARY, scale=2)
         for i, ln in enumerate([
-                "Set on your laptop:",
+                "Set your location and key:",
                 "",
-                "  OWM_API_KEY=...",
-                "  WEATHER_LAT=...",
-                "  WEATHER_LON=...",
+                "  OWM_API_KEY",
+                "  WEATHER_LAT / WEATHER_LON",
                 "",
-                "edit .env then redeploy."]):
+                "in /profile.json or .env.local"]):
             d.text(ln, cx + 16, cy + 38 + i * 14, theme.TEXT_BRIGHT)
 
     def _draw_offline(self, d, busy=False):

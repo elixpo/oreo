@@ -230,24 +230,41 @@ def auto_fetch_ok(net=None):
         return True
 
 
+# Shown when no GITHUB_USER is set: the badge never borrows someone
+# else's profile.
+SETUP_LINES = (
+    "No GitHub user set yet.",
+    "",
+    "Set GITHUB_USER in .env.local",
+    "and redeploy, or put it in",
+    "/profile.json on the badge.",
+    "See docs/PROFILE.md.",
+)
+
+
 class App(oreoOS.App):
     name         = "Commits"
     SHOW_LOADING = False      # the cached graph is drawn immediately
 
     def on_enter(self, os):
         self._os = os
-        self._user = github.user("Circuit-Overtime")
+        # "" until the owner sets GITHUB_USER: then nothing is fetched and
+        # draw() shows how to set it (never a stranger's graph).
+        self._user = github.user("")
         self._levels = bytearray(SLOTS)
-        days, age = github.cached_graph(self._user)
+        if self._user:
+            days, age = github.cached_graph(self._user)
+        else:
+            days, age = None, None
         self._set_days(days)
         self._live = False
         self._note = None             # "NO WIFI" / "FAILED" pill text
-        self._job = cache.Refresh(self._fetch)
+        self._job = cache.Refresh(self._fetch) if self._user else None
         self._reset_progress()
         self._dirty = True
         # A stale cache is refreshed automatically, but not inside the
         # boot quiet window (update() starts it once that is over).
-        self._auto = github.stale(age, github.GRAPH_TTL_S)
+        self._auto = bool(self._user) and github.stale(age, github.GRAPH_TTL_S)
         if self._auto and auto_fetch_ok():
             self._refresh(quiet=True)
 
@@ -391,6 +408,14 @@ class App(oreoOS.App):
         d.rect(CARD_X + 2, CARD_Y + 2, CARD_W, CARD_H, theme.MUTED2, fill=True)
         d.rect(CARD_X,     CARD_Y,     CARD_W, CARD_H, theme.CARD,   fill=True)
         d.rect(CARD_X,     CARD_Y,     CARD_W, 3,      theme.PRIMARY, fill=True)
+
+        if not self._user:
+            y = USER_Y + 8
+            for i, line in enumerate(SETUP_LINES):
+                col = theme.PRIMARY if i == 0 else theme.TEXT_BRIGHT
+                d.text(line, (SW - len(line) * 8) // 2, y, col)
+                y += 14
+            return
 
         # Username (scale=2 pink) + gold underline.
         user_str = "@" + self._user[:17]

@@ -882,7 +882,8 @@ class CommitsAutoTest(unittest.TestCase):
         gh.fetches = 0
         gh.GRAPH_TTL_S = 3600
         gh.online = lambda: gh.up
-        gh.user = lambda name: name
+        # A configured owner: with no GITHUB_USER the app fetches nothing.
+        gh.user = lambda name: name or "octocat"
         gh.cached_graph = lambda user: ([], None)
         gh.stale = lambda age, ttl: True
         self.gate = threading.Event()
