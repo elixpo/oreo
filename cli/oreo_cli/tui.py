@@ -29,6 +29,7 @@ import threading
 from pathlib import Path
 
 from rich.markup import MarkupError
+from rich.style import Style
 from rich.text import Text
 from rich.theme import Theme
 from textual import on
@@ -47,6 +48,10 @@ from .ui import MARK_ERR, MARK_OK, STYLES, esc, human
 from .worker import BadgeSession, Job, RenderUI, Sink, SinkUI, explain
 
 SPINNER = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+
+# Shown under the menu: where the source and the docs live.
+REPO_URL = "https://github.com/elixpo/oreo"
+DOCS_URL = "https://oreo.elixpo.com/docs/cli/"
 
 SECTIONS = (
     ("status", "1", "Status"),
@@ -579,7 +584,7 @@ class TransferPane(Pane):
 
 class ProfilePane(Pane):
     BINDINGS = [Binding("e", "edit", "Edit"),
-                Binding("l", "from_file", "Load from file")]
+                Binding("f", "from_file", "Load from file")]
 
     def compose(self) -> ComposeResult:
         with VerticalScroll():
@@ -596,7 +601,7 @@ class ProfilePane(Pane):
     def show(self, data):
         rui = RenderUI()
         owner.show(rui, data, title="owner profile in %s" % owner.PATH)
-        rui.note("e edits it field by field (Enter keeps a value, - removes it); l loads "
+        rui.note("e edits it field by field (Enter keeps a value, - removes it); f loads "
                  "the profile keys from an .env-style file such as .env.local.")
         self.query_one("#profile-body", Static).update(rui.renderable())
 
@@ -731,8 +736,10 @@ class OreoApp(App, Sink):
     CSS = """
     Screen { background: $surface; }
     #body { height: 1fr; }
-    #nav { width: 24; border: round #7a5236; background: $surface; }
-    #nav:focus { border: round #c58b5b; }
+    #side { width: 28; border: round #7a5236; background: $surface; }
+    #side:focus-within { border: round #c58b5b; }
+    #nav { height: auto; border: none; background: $surface; }
+    #links { height: auto; padding: 0 1; color: $text-muted; border-top: solid #5a3d29; }
     #main { width: 1fr; }
     #panes { height: 1fr; border: round #7a5236; padding: 0 1; }
     #panes > Pane { height: 1fr; }
@@ -742,7 +749,16 @@ class OreoApp(App, Sink):
     #activity-text { width: 1fr; }
     #activity-bar { width: 50; }
     #activity-hint { width: auto; color: $text-muted; }
-    #log { height: 8; border: round #7a5236; padding: 0 1; }
+    /* Scrollbars in the view's colours (no black or blue blocks). */
+    * { scrollbar-background: $surface; scrollbar-background-hover: $surface;
+        scrollbar-background-active: $surface; scrollbar-color: #7a5236;
+        scrollbar-color-hover: #c58b5b; scrollbar-color-active: #c58b5b;
+        scrollbar-corner-color: $surface; }
+    /* Three lines by default; l (or an error) makes it about half the
+       height. Its scrollbar appears only when the lines overflow. */
+    #log { height: 5; border: round #7a5236; padding: 0 1; overflow-y: auto;
+           overflow-x: hidden; background: $surface; scrollbar-size-vertical: 1; }
+    #log.expanded { height: 50%; }
     Input { margin: 1 0 0 0; }
     Button { margin: 1 1 0 0; }
     #update-buttons, #ask-buttons { height: auto; }
@@ -760,6 +776,7 @@ class OreoApp(App, Sink):
         Binding("s", "shell", "Shell"),
         Binding("r", "reload", "Refresh"),
         Binding("escape", "cancel_job", "Cancel"),
+        Binding("l", "toggle_log", "Log"),
         Binding("q", "quit_app", "Quit"),
         Binding("ctrl+c", "quit_app", "Quit", show=False, priority=True),
         Binding("ctrl+q", "quit_app", "Quit", show=False, priority=True),
@@ -779,15 +796,18 @@ class OreoApp(App, Sink):
         self._waiting = None
         self._ui_thread = None
         self._bar_label = None
+        self._log_auto = False         # the log grew by itself for an error
 
     # ── layout ───────────────────────────────────────────────────────
     def compose(self) -> ComposeResult:
         yield Header()
         with Horizontal(id="body"):
-            yield OptionList(*[Option("%s  %s" % (key, label), id=sid)
-                               for sid, key, label in SECTIONS], None,
-                             Option("s  Shell (REPL)", id="shell"),
-                             Option("q  Quit", id="quit"), id="nav")
+            with Vertical(id="side"):
+                yield OptionList(*[Option("%s  %s" % (key, label), id=sid)
+                                   for sid, key, label in SECTIONS], None,
+                                 Option("s  Shell (REPL)", id="shell"),
+                                 Option("q  Quit", id="quit"), id="nav")
+                yield Static(links_text(), id="links")
             with Vertical(id="main"):
                 with ContentSwitcher(initial="status", id="panes"):
                     for sid, cls in PANES.items():
@@ -907,6 +927,8 @@ class OreoApp(App, Sink):
         if self.session.badge is None:
             self.notify("no badge connected yet", severity="warning")
             return None
+        if self._log_auto:             # back to compact on the next action
+            self._set_log(False)
         job = Job(title, cancellable=cancellable, interrupt=interrupt)
         self.jobs.append(job)
         self._activity()
@@ -947,6 +969,8 @@ class OreoApp(App, Sink):
         if level == "warn":
             self.log_line("[warn]![/] %s" % message)
             return
+        if not self.log_expanded:
+            self._set_log(True, auto=True)
         self.log_line("[err]%s %s[/]" % (MARK_ERR, message))
         if detail and getattr(self.ctx.args, "verbose", False):
             for line in str(detail).strip().splitlines()[-6:]:
@@ -1016,6 +1040,19 @@ class OreoApp(App, Sink):
     def log_line(self, renderable):
         self.query_one("#log", RichLog).write(_text(renderable))
 
+    @property
+    def log_expanded(self):
+        return self.query_one("#log", RichLog).has_class("expanded")
+
+    def _set_log(self, expanded, auto=False):
+        log = self.query_one("#log", RichLog)
+        log.set_class(expanded, "expanded")
+        self._log_auto = expanded and auto
+        log.scroll_end(animate=False)
+
+    def action_toggle_log(self):
+        self._set_log(not self.log_expanded)
+
     def _progress(self, label, done, total, unit):
         bar = self.query_one("#activity-bar", ProgressBar)
         if label is None:
@@ -1081,6 +1118,8 @@ class OreoApp(App, Sink):
         return self.query_one("#" + sid, Pane)
 
     def action_section(self, sid):
+        if self._log_auto:
+            self._set_log(False)
         self.query_one(ContentSwitcher).current = sid
         nav = self.query_one("#nav", OptionList)
         for i, (s, _, _) in enumerate(SECTIONS):
@@ -1163,6 +1202,18 @@ class OreoApp(App, Sink):
             self._header()
             self._activity()
         self.log_line("[dim]back from the shell[/dim]")
+
+
+def links_text():
+    """The source and docs links under the menu: terminal hyperlinks where
+    the terminal supports them (OSC 8), plain dim text elsewhere."""
+    text = Text()
+    for i, (label, url) in enumerate((("source", REPO_URL), ("docs", DOCS_URL))):
+        if i:
+            text.append("\n")
+        text.append(label + "\n", style="dim")
+        text.append(url.split("://", 1)[1].rstrip("/"), style=Style(dim=True, link=url))
+    return text
 
 
 def run_shell(b):

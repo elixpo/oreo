@@ -374,6 +374,73 @@ class TuiTest(unittest.IsolatedAsyncioTestCase):
             pane = app.query_one(tui.FilesPane)
             await self.until(pilot, lambda: not app.jobs and pane.entries)
 
+    async def test_errors_expand_the_log_until_the_next_action(self):
+        app = self.app()
+        async with app.run_test(size=self.SIZE) as pilot:
+            await self.connected(pilot)
+            self.assertFalse(app.log_expanded)
+            self.fake.fail_on = "os.ilistdir"
+            await pilot.press("2")
+            await self.until(pilot, lambda: not app.jobs and app.log_expanded)
+            self.fake.fail_on = None
+            await pilot.press("r")                  # the next action
+            self.assertFalse(app.log_expanded)
+            await self.until(pilot, lambda: not app.jobs)
+            self.assertFalse(app.log_expanded)
+
+    # ── layout ───────────────────────────────────────────────────────
+    async def test_log_is_three_lines_and_l_expands_it(self):
+        app = self.app()
+        async with app.run_test(size=self.SIZE) as pilot:
+            await self.connected(pilot)
+            log = app.query_one("#log", RichLog)
+            self.assertEqual(log.content_region.height, 3)
+            # one line in it: no scrollbar
+            self.assertFalse(log.show_vertical_scrollbar)
+            self.assertIn("pausing OreoOS", self.log_text(app))
+            self.assertIn("ready", str(app.query_one("#activity-text").content))
+            self.assertIn("l", app.active_bindings)              # shown in the footer
+            self.assertEqual(app.active_bindings["l"].binding.description, "Log")
+            await pilot.press("l")
+            await pilot.pause(0.05)
+            self.assertTrue(app.log_expanded)
+            main = app.query_one("#main").content_region.height
+            self.assertGreaterEqual(log.region.height, main // 2 - 1)
+            await pilot.press("l")
+            await pilot.pause(0.05)
+            self.assertFalse(app.log_expanded)
+            self.assertEqual(log.content_region.height, 3)
+            # an expanded log stays open on the next action when asked for
+            await pilot.press("l", "1")
+            await self.until(pilot, lambda: not app.jobs)
+            self.assertTrue(app.log_expanded)
+
+    async def test_log_scrollbar_only_when_it_overflows(self):
+        app = self.app()
+        async with app.run_test(size=self.SIZE) as pilot:
+            await self.connected(pilot)
+            log = app.query_one("#log", RichLog)
+            for i in range(10):
+                app.log_line("line %d" % i)
+            await pilot.pause(0.05)
+            self.assertTrue(log.show_vertical_scrollbar)
+
+    async def test_sidebar_links_to_the_source_and_the_docs(self):
+        app = self.app()
+        async with app.run_test(size=self.SIZE) as pilot:
+            await self.connected(pilot)
+            links = app.query_one("#links", Static)
+            text = plain(links.content)
+            self.assertIn("github.com/elixpo/oreo", text)
+            self.assertIn("oreo.elixpo.com/docs/cli", text)
+            urls = {span.style.link for span in tui.links_text().spans
+                    if getattr(span.style, "link", None)}
+            self.assertEqual(urls, {tui.REPO_URL, tui.DOCS_URL})
+            # under the menu, after Quit
+            nav = app.query_one("#nav")
+            self.assertGreaterEqual(links.region.y, nav.region.bottom)
+            self.assertEqual(nav.get_option_at_index(nav.option_count - 1).id, "quit")
+
     async def test_unplugged_badge_goes_back_to_waiting(self):
         ports = [badge_port()]
         app = self.app(ports=lambda: list(ports))

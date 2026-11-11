@@ -31,9 +31,14 @@ docs/CLI.md ("Testing on a badge").
   bar, one command on the serial port at a time; Esc cancels copies,
   downloads, installs and Transfer between two chunks (removing a half
   copy), and interrupts scans on the badge. It waits for a badge to be
-  plugged in and asks which one when there are several. OreoOS stays paused
-  while the view is open and restarts when it closes, also on Ctrl-C and on
-  errors. It reuses the commands' own code, so behaviour matches them.
+  plugged in and asks which one when there are several. The log under
+  the section is three lines; **l** makes it about half the height, and it
+  grows by itself when an operation fails, until the next action. Under the
+  menu are the links to the source (github.com/elixpo/oreo) and the docs
+  (oreo.elixpo.com/docs/cli), clickable in terminals that support links.
+  OreoOS stays paused while the view is open and restarts when it closes,
+  also on Ctrl-C and on errors. It reuses the commands' own code, so
+  behaviour matches them.
 - `oreo menu`: the numbered menu (the interactive view of 0.1.0). `oreo`
   falls back to it where the full-screen view cannot run (no terminal,
   `TERM=dumb`, Textual missing) or when `OREO_UI=menu` is set; `oreo ui`
