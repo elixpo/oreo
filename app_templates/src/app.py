@@ -10,7 +10,7 @@ oreoOS.state in /state/<app id>.json when the app closes.
 
 Keep this file focused on the lifecycle. As your app grows, split
 pure logic into src/<feature>.py and drawing into src/render.py —
-see apps/snake/ for the reference layout.
+see apps_market/snake/ for the reference layout.
 """
 
 import oreoOS

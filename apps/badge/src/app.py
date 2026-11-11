@@ -1,7 +1,8 @@
 """Badge — GitHub identity card.
 
-Reads GITHUB_USER from secrets.py and draws the profile cached on flash the
-moment the app opens, Wi-Fi or not. When the cache is older than
+Reads GITHUB_USER from the owner profile (oreoOS.profile: /profile.json,
+then secrets.py) and draws the profile cached on flash the moment the app
+opens, Wi-Fi or not. When the cache is older than
 oreoOS.github.PROFILE_TTL_S (or A is pressed) and Wi-Fi is up, a fresh copy
 is fetched in the background (oreoOS.cache.Refresh) while the cached card
 stays on screen and buttons keep working.
