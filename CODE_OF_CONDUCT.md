@@ -72,9 +72,20 @@ reported to the maintainers responsible for enforcement at:
 
 **hello@elixpo.com**
 
-All complaints will be reviewed and investigated promptly and fairly. All
-community leaders are obligated to respect the privacy and security of the
-reporter of any incident.
+For anything connected with Google Summer of Code (applicants, contributors
+and mentors), you can also write to **gsoc@elixpo.com**. If your report
+concerns one of the maintainers, write to Anwesha Chakraborty, Elixpo's
+programme coordinator, at **anwesha@elixpo.com**; the person concerned will
+not take part in handling it.
+
+We acknowledge every report within 3 working days. All complaints will be
+reviewed and investigated promptly and fairly. All community leaders are
+obligated to respect the privacy and security of the reporter of any
+incident, and nothing is shared beyond the people handling it without the
+reporter's consent.
+
+Google Summer of Code participants are also covered by the programme's own
+rules and may contact Google's programme administrators directly.
 
 ## Enforcement guidelines
 
