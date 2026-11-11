@@ -147,9 +147,9 @@
       "description": "Find other badges nearby over infrared and trade quest tokens with them.",
       "category": "Social",
       "author": "Circuit-Overtime",
-      "version": "0.1",
+      "version": "0.2",
       "icon": "IR_Quest_icon.png",
-      "size": 20060,
+      "size": 24689,
       "files": [
         ["__init__.py", 0],
         ["assets/__init__.py", 0],
@@ -157,7 +157,7 @@
         ["main.py", 241],
         ["manifest.json", 180],
         ["src/__init__.py", 0],
-        ["src/app.py", 18318],
+        ["src/app.py", 22947],
         ["src/text.py", 1321]
       ]
     },

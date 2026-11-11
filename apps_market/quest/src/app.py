@@ -12,13 +12,15 @@ Four tabs cycled with B:
           carrier. A fires.
 
   DIAG    receiver diagnostics in full: backend (native RMT or the pin-IRQ
-          fallback), DMA, glitch filter, driver stage and the complete
-          error text when something failed.
+          fallback), RMT channel, DMA, glitch filter, driver state and the
+          complete error text when something failed (UP/DOWN scroll it).
+          RIGHT toggles serial lifecycle logging (`oreo logs` shows it).
 
-RX lifecycle: the receiver starts once in on_enter and stops in on_exit.
-Tabs only change the mode hint, they never tear the channel down, and the
-driver pauses/resumes RX around each transmit by itself. If the receiver
-fails, the full error is shown wrapped (never truncated) and A retries.
+RX lifecycle: the receiver starts once in on_enter and stops in on_exit
+(which also releases the TX channel). Tabs only change the mode hint, they
+never tear the channel down, and the driver pauses/resumes RX around each
+transmit by itself. If the receiver fails, the full error is shown wrapped
+and scrollable (never truncated) and A retries.
 
 Hardware: TSOP38238 RX on GPIO 18, 2N2222/IR-LED TX on GPIO 2 via
 oreoWare.ir (RMT TX; native RMT RX with a Pin.irq fallback).
@@ -64,8 +66,10 @@ HINTS = (
     "B=tab  HOME=back",
     "B=tab  HOME=back",
     "A=fire  UP/DN=code  L/R=freq  B=tab",
-    "A=restart RX  B=tab",
+    "A=restart UP/DN=scroll R=log B=tab",
 )
+ERROR_HINT = "A=retry UP/DN=scroll B=tab"
+ERROR_LINES = (CH - 56) // LINE_H     # lines that fit in the error panel
 
 
 class App(oreoOS.App):
@@ -103,19 +107,32 @@ class App(oreoOS.App):
         self._history       = []         # (kind, code) tuples
         self._ago_s         = -1
 
-        # Errors are kept as full strings; the panel wraps them.
+        # Errors are kept as full strings; the panel wraps them and UP/DOWN
+        # scroll whatever does not fit, so nothing is ever cut off.
         self._error       = None
         self._error_lines = None
+        self._scroll      = 0
         self._status      = {}
         self._rx_desc     = ""
         self._rx_warn     = False
 
         self._send_flash_ms = 0
         self._dirty = True
+        if self._ir is not None and os.settings_get("ir_debug", False):
+            self._set_debug(True)
         self._start_rx()
 
     def on_exit(self):
-        self._stop_rx()
+        if self._ir is not None:
+            try:
+                # Stops RX and releases the TX channel as well.
+                close = getattr(self._ir, "close", None)
+                if close is not None:
+                    close()
+                else:
+                    self._ir.stop_receive()
+            except Exception as exc:
+                print("[quest] IR close: %s" % exc)
         try:
             self._os.settings_set("ir_code_idx", self._send_sel)
             self._os.settings_set("ir_freq_idx", self._send_freq)
@@ -127,9 +144,53 @@ class App(oreoOS.App):
         return "beacon" if self._tab == TAB_BEACON else "focus"
 
     def _set_error(self, msg):
+        if msg and msg != self._error:
+            # Rare event, never per frame: keep the full text on serial too.
+            print("[quest] IR error: %s" % msg)
         self._error = msg
-        self._error_lines = wrap(msg, TEXT_COLS, 11) if msg else None
+        self._error_lines = wrap(msg, TEXT_COLS) if msg else None
+        self._scroll = 0
         self._dirty = True
+
+    def _set_debug(self, on):
+        fn = getattr(self._ir, "debug", None)
+        if fn is None:
+            return False
+        try:
+            return fn(on)
+        except Exception:
+            return False
+
+    def _debug_on(self):
+        fn = getattr(self._ir, "debug", None) if self._ir is not None else None
+        try:
+            return bool(fn()) if fn is not None else False
+        except Exception:
+            return False
+
+    def _diag_text(self):
+        """Everything DIAG explains below the table, as one string."""
+        st = self._status
+        parts = []
+        if st.get("warning"):
+            parts.append(st["warning"])
+        if self._ir is not None:
+            try:
+                err = self._ir.last_error()
+            except Exception:
+                err = None
+            if err and err not in parts:
+                parts.append(err)
+        if st.get("dma_skipped") and st.get("backend") == "rmt":
+            parts.append("DMA skipped: %s" % st["dma_skipped"])
+        return "\n".join(parts)
+
+    def _scroll_by(self, step, total, visible):
+        top = max(0, total - visible)
+        new = min(top, max(0, self._scroll + step))
+        if new != self._scroll:
+            self._scroll = new
+            self._dirty = True
 
     def _refresh_status(self):
         """Snapshot driver diagnostics (called on events, not per frame)."""
@@ -148,7 +209,11 @@ class App(oreoOS.App):
                 ("  filter %dns" % fns) if fns else "")
             self._rx_warn = False
         elif backend == "irq":
-            self._rx_desc = "pin-IRQ fallback, see DIAG"
+            reason = st.get("esp_err") if st.get("warning") else None
+            if reason and reason != "ESP_OK":
+                self._rx_desc = "IRQ RX: %s" % reason
+            else:
+                self._rx_desc = "pin-IRQ fallback, see DIAG"
             self._rx_warn = bool(st.get("warning"))
         else:
             self._rx_desc = "receiver stopped"
@@ -196,23 +261,45 @@ class App(oreoOS.App):
     def on_button_press(self, btn):
         if btn == api.BTN_B:
             self._tab = (self._tab + 1) % N_TABS
+            self._scroll = 0
             if self._error:
                 # Leaving an error: clear it and bring RX back up fresh.
                 self._set_error(None)
                 self._restart_rx()
             else:
                 self._start_rx()        # mode swap only; channel stays up
+            if self._tab == TAB_DIAG:
+                self._refresh_status()
             self._dirty = True
             return
         if self._error:
             if btn == api.BTN_A:
                 self._set_error(None)
                 self._restart_rx()
+            elif btn in (api.BTN_UP, api.BTN_DOWN):
+                self._scroll_by(-1 if btn == api.BTN_UP else 1,
+                                len(self._error_lines or ()), ERROR_LINES)
             return
         if self._tab == TAB_SEND:
             self._on_send_button(btn)
-        elif self._tab == TAB_DIAG and btn == api.BTN_A:
+        elif self._tab == TAB_DIAG:
+            self._on_diag_button(btn)
+
+    def _on_diag_button(self, btn):
+        if btn == api.BTN_A:
             self._restart_rx()
+        elif btn in (api.BTN_UP, api.BTN_DOWN):
+            lines = wrap(self._diag_text(), TEXT_COLS)
+            self._scroll_by(-1 if btn == api.BTN_UP else 1,
+                            len(lines), self._diag_lines())
+        elif btn == api.BTN_RIGHT:
+            on = not self._debug_on()
+            self._set_debug(on)
+            try:
+                self._os.settings_set("ir_debug", on)
+            except Exception:
+                pass
+            self._dirty = True
 
     def _on_send_button(self, btn):
         if btn == api.BTN_UP:
@@ -282,7 +369,7 @@ class App(oreoOS.App):
 
         d.clear(theme.BG)
         self._draw_header(d)
-        hint = "A=retry  B=next tab" if self._error else HINTS[self._tab]
+        hint = ERROR_HINT if self._error else HINTS[self._tab]
         widgets.draw_hint(d, hint)
 
         if self._ir is None:
@@ -349,10 +436,16 @@ class App(oreoOS.App):
     def _draw_error(self, d):
         d.rect(CX, CY, CW, 3, theme.ORANGE, fill=True)
         d.text("IR error", CX + 12, CY + 12, theme.PRIMARY, scale=2)
+        lines = self._error_lines or ()
         y = CY + 38
-        for line in self._error_lines or ():
+        for line in lines[self._scroll:self._scroll + ERROR_LINES]:
             d.text(line, CX + 12, y, theme.TEXT_BRIGHT)
             y += LINE_H
+        if len(lines) > ERROR_LINES:
+            more = "%d-%d/%d" % (self._scroll + 1,
+                                 min(len(lines), self._scroll + ERROR_LINES),
+                                 len(lines))
+            d.text(more, CX + CW - len(more) * 8 - 12, CY + 16, theme.MUTED)
         d.text("A retries, B moves on", CX + 12, CY + CH - 18, theme.MUTED)
 
     def _draw_focus(self, d):
@@ -446,35 +539,58 @@ class App(oreoOS.App):
             d.rect(tx - 10, ty - 4, mw + 20, 22, theme.GREEN, fill=True)
             d.text(msg, tx, ty, api.WHITE, scale=2)
 
-    def _draw_diag(self, d):
+    def _diag_rows(self):
         st = self._status
         backend = st.get("backend")
-        rows = (
+        if not st.get("native"):
+            rmt = "module missing"
+        else:
+            ch = st.get("channel")
+            rmt = "%s%s %s" % (
+                ("ch%d " % ch) if isinstance(ch, int) and ch >= 0 else "",
+                "DMA" if st.get("dma") else "no DMA",
+                ("%dns" % st["filter_ns"]) if st.get("filter_ns") else "nofilt")
+            if st.get("live_channels") is not None:
+                rmt += " L%d" % st["live_channels"]
+        state = st.get("state") or "-"
+        stage = st.get("stage")
+        if stage and stage != state:
+            state = "%s/%s" % (state, stage)
+        return (
             ("Backend", {"rmt": "native RMT",
                          "irq": "pin IRQ (fallback)"}.get(backend, "stopped")),
-            ("Native",  "built in" if st.get("native") else "missing"),
-            ("DMA",     "yes" if st.get("dma") else "no"),
-            ("Filter",  ("%d ns" % st["filter_ns"]) if st.get("filter_ns")
-                        else "off"),
-            ("Stage",   st.get("stage") or "-"),
+            ("RMT",     rmt),
+            ("State",   state),
             ("ESP err", st.get("esp_err") or "-"),
             ("Frames",  "%d" % self._total_frames),
+            ("Log",     "serial on" if self._debug_on() else "off (R)"),
         )
+
+    def _diag_lines(self):
+        """Text lines that fit under the DIAG table."""
+        top = CY + 10 + len(self._diag_rows()) * (LINE_H + 1) + 9
+        return (CY + CH - 6 - top) // LINE_H
+
+    def _draw_diag(self, d):
+        rows = self._diag_rows()
         y = CY + 10
         for label, value in rows:
             d.text(label, CX + 12, y, theme.MUTED)
             d.text(str(value)[:TEXT_COLS - 10], CX + 92, y, theme.TEXT_BRIGHT)
             y += LINE_H + 1
-        warn = st.get("warning")
-        if not warn and self._ir is not None:
-            try:
-                warn = self._ir.last_error()
-            except Exception:
-                warn = None
-        if warn:
-            y += 4
-            d.rect(CX + 12, y, CW - 24, 1, theme.ORANGE, fill=True)
-            y += 5
-            for line in wrap(warn, TEXT_COLS, (CY + CH - 6 - y) // LINE_H):
-                d.text(line, CX + 12, y, theme.TEXT_BRIGHT)
-                y += LINE_H
+        text = self._diag_text()
+        if not text:
+            return
+        y += 4
+        d.rect(CX + 12, y, CW - 24, 1, theme.ORANGE, fill=True)
+        y += 5
+        lines = wrap(text, TEXT_COLS)
+        visible = self._diag_lines()
+        if self._scroll > max(0, len(lines) - visible):
+            self._scroll = max(0, len(lines) - visible)
+        for line in lines[self._scroll:self._scroll + visible]:
+            d.text(line, CX + 12, y, theme.TEXT_BRIGHT)
+            y += LINE_H
+        if len(lines) > visible:
+            more = "%d/%d" % (self._scroll + visible, len(lines))
+            d.text(more, CX + CW - len(more) * 8 - 12, CY + 10, theme.MUTED)
