@@ -518,6 +518,17 @@ We love new contributors. The bar is low; the welcome is warm.
 
 ---
 
+## The Oreo family
+
+One project in three repositories, grouped under the
+[`oreo-badge`](https://github.com/orgs/elixpo/repositories?q=topic%3Aoreo-badge) topic:
+
+- [elixpo/oreo](https://github.com/elixpo/oreo): the Oreo Badge hardware, OreoOS and the `oreo` CLI
+- [elixpo/rv565](https://github.com/elixpo/rv565): RV565, the badge's video format (C library, encoder, Arduino, ESP-IDF and Pico SDK)
+- [elixpo/CircuitPython_RV565](https://github.com/elixpo/CircuitPython_RV565): RV565 playback for CircuitPython
+
+---
+
 ## The ecosystem
 
 Oreo Badge is part of **Elixpo** - an open, ethical, and accessible ecosystem
