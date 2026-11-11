@@ -9,7 +9,7 @@ const STEPS = [
   { n: "01", t: "Flash MicroPython",      b: "Download the ESP32-S3 build, hold the BOOT button, flash via esptool. Two-minute job." },
   { n: "02", t: "Clone the OS",            b: "`git clone https://github.com/elixpo/oreo` and copy `.env.example` → `.env` with your WiFi credentials." },
   { n: "03", t: "Deploy",                  b: "`python tools/deploy.py` — pushes everything over USB, skips unchanged files, bumps the version." },
-  { n: "04", t: "Open the badge",          b: "Drawer → Settings → WiFi → Send files. Cloudflare-served `/upload` works from any phone on the same WiFi." },
+  { n: "04", t: "Open the badge",          b: "Install the CLI (`pipx install oreo-cli`, see docs/CLI.md), open the Transfer app on the badge and run `oreo send <files>`; type the code the badge shows." },
 ];
 
 export default function GetStartedPage() {

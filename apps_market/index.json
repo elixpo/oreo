@@ -169,15 +169,15 @@
       "description": "Pair with other badges over Bluetooth and send files between them.",
       "category": "Social",
       "author": "Circuit-Overtime",
-      "version": "0.1",
+      "version": "0.2",
       "icon": "bluetooth_icon.png",
-      "size": 7564,
+      "size": 7593,
       "files": [
         ["__init__.py", 0],
         ["main.py", 238],
         ["manifest.json", 181],
         ["src/__init__.py", 0],
-        ["src/app.py", 7145]
+        ["src/app.py", 7174]
       ]
     },
     {

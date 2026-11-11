@@ -127,8 +127,8 @@ export const ALL_APPS: AppEntry[] = [
     details: "Scans nearby networks live with signal bars and lock icons, shows " +
              "connect progress with a clear reason when it fails, and lists saved " +
              "networks to join or forget. The badge connects in the background at " +
-             "boot. A paired phone or laptop can send it a new network's password " +
-             "from the Send Files page." }),
+             "boot. Networks can also be added from a computer with `oreo wifi " +
+             "connect`. Files no longer travel over Wi-Fi: use the Transfer app." }),
   app("updates",  { name: "Updates",   category: "core", tint: "gold",    icon: "RefreshCw",
     pngIcon: "/icons/settings_icon.png",
     blurb:   "Check for and install new OreoOS releases over Wi-Fi.",

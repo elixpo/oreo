@@ -7,8 +7,8 @@ What this page shows (all live, polled at 4 Hz, repainted only on change):
   Paired     bonded devices in /bonds.json
   Receive    idle, or a progress bar while a BLE transfer is arriving
 
-Phones send files over WiFi (Settings -> WiFi -> Send files), which is
-much faster. Over BLE the badge accepts .txt / .md (and raw image bytes)
+Computers send files over USB with the Transfer app and `oreo send`
+(docs/TRANSFER.md), which is much faster. Over BLE the badge accepts .txt / .md (and raw image bytes)
 from tools/bt_send.py on a laptop; see docs/BLUETOOTH.md for what works,
 the limits, and the plan.
 """
@@ -178,8 +178,8 @@ class App(oreoOS.App):
 
         d.rect(PAD_X, y + 26, SW - 2 * PAD_X, 1, theme.MUTED2, fill=True)
         lines = (
-            ("Phones: send files over WiFi", theme.TEXT_BRIGHT),
-            ("(Settings > WiFi > Send files).", theme.TEXT_DIM),
+            ("Computers: Transfer app over USB", theme.TEXT_BRIGHT),
+            ("(`oreo send` on the computer).", theme.TEXT_DIM),
             ("BLE receive: .txt / .md from a", theme.TEXT_DIM),
             ("laptop with tools/bt_send.py.", theme.TEXT_DIM),
             ("Pair requests pop up on screen.", theme.TEXT_DIM),
