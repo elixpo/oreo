@@ -170,6 +170,12 @@ DEPLOY = [
     # flash, so the local upload page renders a broken-image icon.
     ("oreoOS/mascot.png",       "oreoOS/mascot.png"),
     ("oreoOS/gestures.py",      "oreoOS/gestures.py"),
+    ("oreoOS/netsvc.py",        "oreoOS/netsvc.py"),    # background network (#121)
+    ("oreoOS/perf.py",          "oreoOS/perf.py"),      # boot timing (#121)
+    ("oreoOS/bonds.py",         "oreoOS/bonds.py"),     # BLE bond store (bt.py)
+    ("oreoOS/state.py",         "oreoOS/state.py"),     # /state app saves
+    ("oreoOS/profile.py",       "oreoOS/profile.py"),   # owner profile
+    ("oreoOS/crashlog.py",      "oreoOS/crashlog.py"),  # /crash.log
 
     # Hardware drivers
     ("oreoWare/__init__.py",    "oreoWare/__init__.py"),
@@ -514,6 +520,10 @@ def write_device_config():
               "SOPS-encrypted); writing them blank, so WiFi and weather stay "
               "off until you set your own values in .env.local."
               % ", ".join(missing))
+    if not getattr(_cfg, "GITHUB_USER", ""):
+        print("  note: no GITHUB_USER in .env.local; Badge, Identity and "
+              "Commits show a setup hint until you set one there or in "
+              "/profile.json on the badge (docs/PROFILE.md).")
 
     fields = (
         # name              python repr formatter
@@ -530,10 +540,10 @@ def write_device_config():
         ("DISPLAY_NAME",     "%r"),
         ("DESIGNATION",      "%r"),
         ("OWM_API_KEY",      "%r"),
-        ("WEATHER_LAT",      "%s"),
-        ("WEATHER_LON",      "%s"),
+        ("WEATHER_LAT",      "%r"),
+        ("WEATHER_LON",      "%r"),
         ("WEATHER_NAME",     "%r"),
-        ("TIMEZONE_OFFSET",  "%s"),
+        ("TIMEZONE_OFFSET",  "%r"),
         ("WIFI_TX_DBM",      "%s"),
         ("WIFI_POWERSAVE",   "%r"),
         ("BT_ADV_INTERVAL_MS","%s"),

@@ -119,13 +119,17 @@ class App(oreoOS.App):
 
     def on_enter(self, os):
         self._os = os
+        # Owner's location and key from /profile.json or secrets.py. With
+        # no location there is nothing to fetch: the setup card explains.
         try:
-            from secrets import WEATHER_LAT, WEATHER_LON, OWM_API_KEY
-            self._lat = float(WEATHER_LAT)
-            self._lon = float(WEATHER_LON)
-            self._key = OWM_API_KEY
+            from oreoOS import profile
+            self._lat = profile.get("WEATHER_LAT")
+            self._lon = profile.get("WEATHER_LON")
+            self._key = profile.get("OWM_API_KEY", "")
         except Exception:
-            self._lat, self._lon, self._key = 12.97, 77.59, ""
+            self._lat, self._lon, self._key = None, None, ""
+        if self._lat is None or self._lon is None:
+            self._key = ""
 
         play_h = SH - widgets.HEADER_H - widgets.HINT_H
 
@@ -251,13 +255,12 @@ class App(oreoOS.App):
         d.rect(cx, cy, cw, 2,  theme.PRIMARY, fill=True)
         d.text("setup needed", (SW - 12 * 16) // 2, cy + 14, theme.PRIMARY, scale=2)
         for i, ln in enumerate([
-                "Set on your laptop:",
+                "Set your location and key:",
                 "",
-                "  OWM_API_KEY=...",
-                "  WEATHER_LAT=...",
-                "  WEATHER_LON=...",
+                "  OWM_API_KEY",
+                "  WEATHER_LAT / WEATHER_LON",
                 "",
-                "edit .env then redeploy."]):
+                "in /profile.json or .env.local"]):
             d.text(ln, cx + 16, cy + 38 + i * 14, theme.TEXT_BRIGHT)
 
     def _draw_offline(self, d):

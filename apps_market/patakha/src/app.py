@@ -13,20 +13,20 @@ Controls:
 
 Code layout: game.py is the pure integer simulation (host tested),
 render.py draws, this file owns lifecycle, input and the fixed timestep.
-High score persists in apps/patakha/hi.txt.
+High score persists in /state/patakha.json (oreoOS.state).
 """
 
 import time
 
 import oreoOS
-from oreoOS import api, theme
+from oreoOS import api, state, theme
 
 from . import game as g
 from . import render as r
 
 TITLE, PLAY, PAUSE, OVER = 1, 2, 3, 4
 
-HI_PATH = "apps/patakha/hi.txt"
+LEGACY_HI_PATH = "apps/patakha/hi.txt"   # pre-/state save, migrated once
 MAX_TICKS_PER_FRAME = 5        # after a stall, catch up at most 100 ms
 OVER_LOCK_TICKS = 40           # ignore A for 0.8 s so held fire can't skip it
 
@@ -35,19 +35,12 @@ TILT_FULL_DEG = 15.0
 
 
 def _load_hi():
-    try:
-        with open(HI_PATH) as f:
-            return int(f.read().strip() or "0")
-    except Exception:
-        return 0
+    return int(state.load_migrating("patakha", {"hi": 0},
+                                    LEGACY_HI_PATH, ("hi",))["hi"])
 
 
 def _save_hi(v):
-    try:
-        with open(HI_PATH, "w") as f:
-            f.write(str(int(v)))
-    except Exception:
-        pass
+    state.save("patakha", {"hi": int(v)})
 
 
 class App(oreoOS.App):

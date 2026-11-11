@@ -1,28 +1,23 @@
 """Persistent hi-score storage for Snake.
 
 Lives in its own module so the app code never deals with file paths
-directly — useful as a teaching example of how to keep I/O isolated
-from game logic.
+directly: a teaching example of keeping I/O out of game logic. The
+score is kept by oreoOS.state in /state/snake.json, outside the app
+folder, so it survives an uninstall and reinstall.
 """
 
-HISCORE_PATH = "apps/snake/hiscore.txt"
+from oreoOS import state
+
+LEGACY_PATH = "apps/snake/hiscore.txt"   # pre-/state save, migrated once
 
 
 def load():
-    """Read the current hi-score off flash. Returns 0 on first run or
-    if the file is missing/corrupt — never raises."""
-    try:
-        with open(HISCORE_PATH) as f:
-            return int(f.read().strip() or "0")
-    except Exception:
-        return 0
+    """The current hi-score. 0 on first run; never raises."""
+    return int(state.load_migrating("snake", {"hi": 0},
+                                    LEGACY_PATH, ("hi",))["hi"])
 
 
 def save(value):
-    """Persist a new hi-score. Silently ignores write failures (full
-    flash, read-only mount) so the game keeps running."""
-    try:
-        with open(HISCORE_PATH, "w") as f:
-            f.write(str(value))
-    except Exception:
-        pass
+    """Persist a new hi-score. A failed write (full flash) is ignored so
+    the game keeps running."""
+    state.save("snake", {"hi": int(value)})

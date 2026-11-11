@@ -28,13 +28,13 @@ Assets used (drop into apps/racer/assets/raw/, run:
 If a sprite is missing, the game falls back to coloured rectangles so the
 mechanics are playable even before the asset pipeline has run.
 
-Hi-score persists in apps/racer/hi.txt.
+Hi-score persists in /state/racer.json (oreoOS.state).
 """
 
 import time
 
 import oreoOS
-from oreoOS import api
+from oreoOS import api, state
 
 from .spawn import Rng, choose_x
 
@@ -98,23 +98,16 @@ C_TEXT       = api.WHITE
 C_DIM        = api.rgb(200, 180, 160)
 C_SHADOW     = api.rgb( 20,  30,  45)
 
-HI_PATH = "apps/racer/hi.txt"
+LEGACY_HI_PATH = "apps/racer/hi.txt"   # pre-/state save, migrated once
 
 
 def _load_hi():
-    try:
-        with open(HI_PATH) as f:
-            return int(f.read().strip() or "0")
-    except Exception:
-        return 0
+    return int(state.load_migrating("racer", {"hi": 0},
+                                    LEGACY_HI_PATH, ("hi",))["hi"])
 
 
 def _save_hi(v):
-    try:
-        with open(HI_PATH, "w") as f:
-            f.write(str(int(v)))
-    except Exception:
-        pass
+    state.save("racer", {"hi": int(v)})
 
 
 def _try_sprite(name):

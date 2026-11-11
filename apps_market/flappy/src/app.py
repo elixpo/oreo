@@ -16,7 +16,7 @@ Controls: A or UP = flap.
 """
 
 import oreoOS
-from oreoOS import api, font
+from oreoOS import api, font, state
 
 SW = api.SCREEN_W   # 320
 SH = api.SCREEN_H   # 240
@@ -56,21 +56,15 @@ C_HI       = api.rgb(255, 230,  80)
 
 # ── persistent high score ────────────────────────────────────────────────────
 
-HISCORE_PATH = "apps/flappy/hiscore.txt"
+# Lives in /state/flappy.json (oreoOS.state), so it survives an uninstall.
+LEGACY_HISCORE_PATH = "apps/flappy/hiscore.txt"   # pre-/state save
 
 def _load_hiscore():
-    try:
-        with open(HISCORE_PATH, "r") as f:
-            return int(f.read().strip() or "0")
-    except Exception:
-        return 0
+    return int(state.load_migrating("flappy", {"hi": 0},
+                                    LEGACY_HISCORE_PATH, ("hi",))["hi"])
 
 def _save_hiscore(v):
-    try:
-        with open(HISCORE_PATH, "w") as f:
-            f.write(str(int(v)))
-    except Exception:
-        pass
+    state.save("flappy", {"hi": int(v)})
 
 # ── asset loaders ────────────────────────────────────────────────────────────
 

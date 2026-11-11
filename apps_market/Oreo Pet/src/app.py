@@ -16,13 +16,13 @@ Controls:
 
 import time
 import oreoOS
-from oreoOS import api
+from oreoOS import api, state
 from oreoOS import theme, widgets
 
 SW = api.SCREEN_W
 SH = api.SCREEN_H
 
-STATE_PATH = "apps/pet/state.txt"
+LEGACY_STATE_PATH = "apps/pet/state.txt"   # pre-/state save, migrated once
 
 # Per-second decay — slowed ~3× from the previous tune so the pet survives
 # a normal multi-day on-off cadence without auto-starving. At 0.00045 pt/s
@@ -38,30 +38,22 @@ EAT_FACE_MS  = 1200      # show 'eat' expression for this long after feeding
 # ─── helpers ─────────────────────────────────────────────────────────────────
 
 def _load_state():
-    """Read persisted (hunger, happy, health) from disk.
+    """Read persisted (hunger, happy, health) from /state/pet.json.
 
-    First-launch / post-flash behaviour: state.txt does not exist yet (a
-    deploy --clean wipes it; a fresh badge has never written it), so we
-    return (100, 100, 100). The pet starts maxed-out and only decays
-    while the user is actually looking at the app.
-
-    Persisted state is preserved across power-cycles and reboots because
-    state.txt sits on the regular filesystem partition — it survives
-    until the user re-flashes with --clean.
+    First launch: nothing saved yet, so the pet starts at (100, 100, 100)
+    and only decays while the user is looking at the app. The state lives
+    outside apps/pet/, so it survives reboots, App Store updates and an
+    uninstall/reinstall.
     """
+    s = state.load_migrating("pet", {"hunger": 100, "happy": 100, "health": 100},
+                             LEGACY_STATE_PATH, ("hunger", "happy", "health"))
     try:
-        with open(STATE_PATH) as f:
-            a, b, c = f.read().strip().split(",")
-            return (int(a), int(b), int(c))
+        return (int(s["hunger"]), int(s["happy"]), int(s["health"]))
     except Exception:
         return (100, 100, 100)
 
 def _save_state(h, hp, hl):
-    try:
-        with open(STATE_PATH, "w") as f:
-            f.write("%d,%d,%d" % (h, hp, hl))
-    except Exception:
-        pass
+    state.save("pet", {"hunger": int(h), "happy": int(hp), "health": int(hl)})
 
 def _clamp(v):
     return max(0, min(100, int(v)))

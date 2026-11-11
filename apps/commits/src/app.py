@@ -212,7 +212,7 @@ class App(oreoOS.App):
 
     def on_enter(self, os):
         self._os = os
-        self._user = github.user("Circuit-Overtime")
+        self._user = github.user("octocat")
         self._levels = bytearray(SLOTS)
         days, age = github.cached_graph(self._user)
         self._set_days(days)
