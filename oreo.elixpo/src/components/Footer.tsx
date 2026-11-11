@@ -12,6 +12,7 @@ const COLUMNS: FooterColumn[] = [
       { label: "Badge",       href: "/badge/" },
       { label: "Apps",        href: "/apps/" },
       { label: "Docs",        href: "/docs/" },
+      { label: "oreo CLI",    href: "/docs/cli/" },
       { label: "Hacks",       href: "/hacks/" },
       { label: "Contribute",  href: "/contribute/" },
       { label: "Upload",      href: "/upload/" },

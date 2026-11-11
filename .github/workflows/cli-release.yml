@@ -307,7 +307,7 @@ jobs:
             echo "Or download the wheel, check it against \`SHA256SUMS\`, and run \`pipx install oreo_cli-$VERSION-py3-none-any.whl\`."
             echo "Provenance: \`gh attestation verify oreo_cli-$VERSION-py3-none-any.whl -R ${GITHUB_REPOSITORY}\`."
             echo
-            echo "Docs: https://github.com/${GITHUB_REPOSITORY}/blob/main/docs/CLI.md"
+            echo "Docs: https://oreo.elixpo.com/docs/cli/"
           } >> "$RUNNER_TEMP/notes.md"
           cat "$RUNNER_TEMP/notes.md"
       - name: Create the release

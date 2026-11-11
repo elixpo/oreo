@@ -200,31 +200,36 @@ there are several. Leaving it puts your terminal back as it was.
 
 ```
  Oreo Badge OREO01 — OreoOS v2.0.0 · /dev/ttyACM0 · OreoOS paused
-╭──────────────────────╮╭────────────────────────────────────────────────────────╮
-│ 1  Status            ││ ╭─ Oreo Badge ─────────────────────────────────────╮   │
-│ 2  Files             ││ │    OreoOS  v2.0.0 (2026-11-07)                   │   │
-│ 3  Apps              ││ │  firmware  MicroPython 1.28.0                    │   │
-│ 4  Wi-Fi             ││ │      port  /dev/ttyACM0                          │   │
-│ 5  Transfer          ││ │     Wi-Fi  connected 192.168.1.42, 2 saved       │   │
-│ 6  Profile           ││ │   battery  87% (4.01 V)                          │   │
-│ 7  Install app       ││ ╰──────────────────────────────────────────────────╯   │
-│ 8  Update OreoOS     ││ storage  1.2 MiB used of 8.0 MiB, 6.8 MiB free         │
-│ ──────────────────── ││  Category    Size   Files                              │
-│ s  Shell (REPL)      ││  system   812.0 KiB    96   ...                        │
-│ q  Quit              ││                                                        │
-╰──────────────────────╯╰────────────────────────────────────────────────────────╯
-                         ⠹ copying to /documents: song.mp3  1.1 MiB / 3.0 MiB  ━━━━━━──── 37%  Esc cancel
-                        ╭────────────────────────────────────────────────────────╮
-                        │ ─ oreo · push ───────────────────────────────────────  │
-                        │ ✓ notes.md  1.2 KiB                                    │
-                        ╰────────────────────────────────────────────────────────╯
- s Shell  r Refresh  esc Cancel  q Quit  d Download  u Upload here  x Delete
+╭──────────────────────────╮╭────────────────────────────────────────────────────────╮
+│ 1  Status                ││ ╭─ Oreo Badge ─────────────────────────────────────╮   │
+│ 2  Files                 ││ │    OreoOS  v2.0.0 (2026-11-07)                   │   │
+│ 3  Apps                  ││ │  firmware  MicroPython 1.28.0                    │   │
+│ 4  Wi-Fi                 ││ │      port  /dev/ttyACM0                          │   │
+│ 5  Transfer              ││ │     Wi-Fi  connected 192.168.1.42, 2 saved       │   │
+│ 6  Profile               ││ │   battery  87% (4.01 V)                          │   │
+│ 7  Install app           ││ ╰──────────────────────────────────────────────────╯   │
+│ 8  Update OreoOS         ││ storage  1.2 MiB used of 8.0 MiB, 6.8 MiB free         │
+│ ──────────────────────── ││  Category    Size   Files                              │
+│ s  Shell (REPL)          ││  system   812.0 KiB    96   ...                        │
+│ q  Quit                  ││                                                        │
+│ ──────────────────────── │╰────────────────────────────────────────────────────────╯
+│ source                   │ ⠹ copying to /documents: song.mp3  1.1 MiB / 3.0 MiB ━━━━── 37%  Esc cancel
+│ github.com/elixpo/oreo   │╭────────────────────────────────────────────────────────╮
+│ docs                     ││ badge on /dev/ttyACM0; pausing OreoOS while this view  │
+│ oreo.elixpo.com/docs/cli ││ ✓ notes.md  1.2 KiB                                    │
+│                          ││                                                        │
+╰──────────────────────────╯╰────────────────────────────────────────────────────────╯
+ s Shell  r Refresh  esc Cancel  l Log  q Quit  d Download  u Upload here  x Delete
 ```
 
 The header shows the badge, its port, the OreoOS version and whether OreoOS
-is paused. The sidebar lists the sections; the bottom bar shows what is
-running (with a progress bar and Esc to cancel), and the log under it keeps
-what each operation reported. The footer always shows the keys for the
+is paused. The sidebar lists the sections, and under them the links to the
+source code and to this guide (clickable in terminals that support links).
+The bar under the section shows what is running (with a progress bar and
+Esc to cancel), or "ready" when nothing is. The log under it keeps what
+each operation reported: three lines, which **l** makes about half the
+height and back. When an operation fails the log grows by itself, and
+shrinks again at the next action. The footer always shows the keys for the
 section you are in. The mouse works too, but every action has a key.
 
 | Key | Section or action |
@@ -234,11 +239,12 @@ section you are in. The mouse works too, but every action has a key.
 | **3** | Apps: installed apps and the App Store; **f** fetches the catalogue, **i** installs, **u** updates all, **x** removes |
 | **4** | Wi-Fi: saved networks; **n** scans, **c** connects (password asked without echo), **x** forgets |
 | **5** | Transfer: type the files, Enter; OreoOS restarts, open Transfer on the badge and type the code it shows (`oreo transfer send`) |
-| **6** | Profile: **e** edits it field by field, **l** loads the keys from an `.env`-style file (`oreo setup`) |
+| **6** | Profile: **e** edits it field by field, **f** loads the keys from an `.env`-style file (`oreo setup`) |
 | **7** | Install app: an app folder from this computer (`oreo app install`) |
 | **8** | Update OreoOS: **c** checks, **u** updates (`oreo update`) |
 | **s** | Shell: the badge's MicroPython REPL in this terminal; Ctrl-] or Ctrl-X comes back to the view |
 | **r** | Refresh the section shown |
+| **l** | A bigger log, or back to three lines |
 | **Esc** | Cancel the running operation (in a text field with nothing running: back to the sidebar) |
 | **q**, **Ctrl-C** | Quit; OreoOS starts again |
 

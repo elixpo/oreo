@@ -3,13 +3,13 @@
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Reveal, fadeUp, staggerContainer } from "@/components/MotionWrap";
-import { Download, Terminal, Usb, Github } from "lucide-react";
+import { Terminal, Usb, Github } from "lucide-react";
 
 const STEPS = [
   { n: "01", t: "Flash MicroPython",      b: "Download the ESP32-S3 build, hold the BOOT button, flash via esptool. Two-minute job." },
   { n: "02", t: "Clone the OS",            b: "`git clone https://github.com/elixpo/oreo` and copy `.env.example` → `.env` with your WiFi credentials." },
   { n: "03", t: "Deploy",                  b: "`python tools/deploy.py` — pushes everything over USB, skips unchanged files, bumps the version." },
-  { n: "04", t: "Open the badge",          b: "Install the CLI (`pipx install oreo-cli`, see docs/CLI.md), open the Transfer app on the badge and run `oreo send <files>`; type the code the badge shows." },
+  { n: "04", t: "Install the oreo CLI",     b: "Run the installer from the oreo CLI docs (it checks the release's SHA-256 and installs with pipx or uv), then `oreo` opens the full-screen view. To send photos and documents, open Tools > Transfer on the badge, run `oreo send <files>` and type the code the badge shows." },
 ];
 
 export default function GetStartedPage() {
@@ -64,12 +64,12 @@ export default function GetStartedPage() {
 
       <Reveal>
         <div className="mt-16 grid gap-4 sm:grid-cols-3">
-          <CTA icon={<Download className="h-4 w-4" />} title="MicroPython firmware"
-               body="ESP32-S3 build matching your flash size."
-               href="https://micropython.org/download/ESP32_GENERIC_S3/" />
-          <CTA icon={<Terminal className="h-4 w-4" />} title="mpremote"
-               body="Talks to the badge over USB serial."
-               href="https://docs.micropython.org/en/latest/reference/mpremote.html" />
+          <CTA icon={<Terminal className="h-4 w-4" />} title="oreo CLI"
+               body="Install it, then every command: Transfer, Wi-Fi, apps, updates."
+               href="/docs/cli/" internal />
+          <CTA icon={<Usb className="h-4 w-4" />} title="Connecting over USB"
+               body="Which port, permissions, and raw mpremote."
+               href="/docs/usb/" internal />
           <CTA icon={<Github className="h-4 w-4" />} title="Repo"
                body="Source, schematics, CHANGELOG."
                href="https://github.com/elixpo/oreo" />
@@ -80,10 +80,13 @@ export default function GetStartedPage() {
         <div className="mt-16 rounded-md border border-border bg-bg-raised/40 p-6 text-sm text-text-dim">
           <p className="text-text">Need help?</p>
           <p className="mt-2">
-            Open an issue with your serial-console log
-            (<code className="text-text-dim">mpremote connect /dev/ttyACM0 repl</code>) —
-            the project's print breadcrumbs make most boot failures
-            diagnosable in one round trip.
+            Run <code className="text-text-dim">oreo doctor</code> first: it
+            checks the cable, port, permissions and firmware and ends with
+            next steps (see{" "}
+            <Link href="/docs/cli/#troubleshooting" className="text-primary underline decoration-primary/40 underline-offset-2">
+              troubleshooting
+            </Link>). Still stuck? Open an issue with its output and the
+            console log from <code className="text-text-dim">oreo logs --restart</code>.
           </p>
         </div>
       </Reveal>
@@ -92,11 +95,12 @@ export default function GetStartedPage() {
   );
 }
 
-function CTA({ icon, title, body, href }: { icon: React.ReactNode; title: string; body: string; href: string }) {
+function CTA({ icon, title, body, href, internal = false }:
+  { icon: React.ReactNode; title: string; body: string; href: string; internal?: boolean }) {
   return (
     <Link
       href={href}
-      target="_blank"
+      target={internal ? undefined : "_blank"}
       className="card-surface group flex items-start gap-3 p-5
                  hover:border-primary/40"
     >

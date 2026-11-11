@@ -159,18 +159,19 @@ port name.
 # Linux, macOS (Windows: irm https://raw.githubusercontent.com/elixpo/oreo/main/cli/install.ps1 | iex)
 curl --proto '=https' --tlsv1.2 -LsSf https://raw.githubusercontent.com/elixpo/oreo/main/cli/install.sh | sh
 
-oreo                                   # status and an interactive menu
+oreo                                   # the full-screen Oreo view
 oreo transfer send photo.jpg notes.md  # with Tools > Transfer open on the badge; type the code it shows
 oreo wifi connect "Home Net"           # Wi-Fi is for the internet: App Store, updates, GitHub, weather, time
 oreo update                            # newest OreoOS, downloaded by the badge
 ```
 
 - [`docs/CLI.md`](docs/CLI.md): the oreo-cli manual (every command, exit
-  codes, troubleshooting, FAQ).
+  codes, troubleshooting, FAQ); on the website at
+  [oreo.elixpo.com/docs/cli](https://oreo.elixpo.com/docs/cli/).
 - [`docs/USB.md`](docs/USB.md): ports, drivers, permissions, and raw
-  `mpremote`.
+  `mpremote` ([/docs/usb](https://oreo.elixpo.com/docs/usb/)).
 - [`docs/TRANSFER.md`](docs/TRANSFER.md): how the Transfer app and its code
-  exchange work.
+  exchange work ([/docs/transfer](https://oreo.elixpo.com/docs/transfer/)).
 
 ## 🚀 Get going
 

@@ -19,7 +19,7 @@ from .errors import (EXIT_CANCELLED, EXIT_ERROR, EXIT_LINK, Cancelled, OreoError
                      is_serial_error, local_error_message)
 from .ui import UI, adapt_stdio, esc
 
-HOME = "https://oreo.elixpo.com/docs"
+HOME = "https://oreo.elixpo.com/docs/cli/"
 
 # name -> (one-line summary, long description with examples)
 HELP = {

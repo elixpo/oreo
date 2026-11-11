@@ -147,7 +147,7 @@ try {
     Write-Host ""
     Write-Host "  Plug in the badge and run:  oreo" -ForegroundColor Cyan
     Write-Host "  Check the setup:            oreo doctor"
-    Write-Host "  Docs: https://github.com/$Repository/blob/main/docs/CLI.md"
+    Write-Host "  Docs: https://oreo.elixpo.com/docs/cli/"
 } finally {
     Remove-Item -Recurse -Force $Temporary -ErrorAction SilentlyContinue
 }
