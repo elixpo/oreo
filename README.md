@@ -182,6 +182,8 @@ pip install -r oreoOS/requirements.txt
 python tools/deploy.py /dev/ttyACM0      # flash to a connected board
 ```
 
+Connecting over USB (which port, the oreo CLI, the Transfer app, flashing) is covered in [`docs/USB.md`](docs/USB.md).
+
 To set your GitHub user, name, timezone and weather location, see
 [`docs/PROFILE.md`](docs/PROFILE.md). For writing apps, see
 [`docs/APPS.md`](docs/APPS.md); for OS internals, [`CONTRIBUTING.md`](CONTRIBUTING.md).
@@ -493,6 +495,7 @@ The Gallery's video playback grew into **RV565**, a standalone library and file 
 | | |
 |---|---|
 | 👋 **Just want to use it?** | this README + [`docs/HARDWARE.md`](docs/HARDWARE.md) |
+| 🔌 **Connecting it to a computer?** | [`docs/USB.md`](docs/USB.md) + [`docs/CLI.md`](docs/CLI.md): the oreo CLI, Transfer, flashing |
 | 🧑‍💻 **Want to write an app?** | [`docs/APPS.md`](docs/APPS.md) + [`app_templates/`](app_templates/) |
 | 🔌 **Building your own PCB?** | [`docs/DATASHEET.md`](docs/DATASHEET.md) + [`oreoWare/pins.py`](oreoWare/pins.py) |
 | 🤝 **Joining the community?** | [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) + [`SUPPORT.md`](SUPPORT.md) |

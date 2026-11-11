@@ -653,6 +653,10 @@ def deploy_website():
 # ── main ──────────────────────────────────────────────────────────────────────
 
 def main():
+    if "-h" in sys.argv[1:] or "--help" in sys.argv[1:]:
+        print(__doc__.strip())
+        return
+
     # Website-only path — short-circuits everything ESP-related so the
     # user can ship the site without a badge attached.
     if "--website" in sys.argv:
@@ -661,6 +665,15 @@ def main():
 
     import time as _t
     t0 = _t.time()
+    print("Deploying Oreo Badge OS → %s\n" % PORT)
+
+    # Verify the device is reachable before changing anything locally, so a
+    # missing or busy badge never leaves a version bump behind.
+    r = mpremote("fs", "ls", ":")
+    if r.returncode != 0:
+        print("Cannot reach device on %s. Check USB cable and port." % PORT)
+        sys.exit(1)
+
     if "--no-bump" not in sys.argv:
         old, new = bump_patch_version()
         if new:
@@ -668,13 +681,6 @@ def main():
         else:
             print("Version: could not locate VERSION line in %s — skipping bump"
                   % CONFIG_PATH)
-    print("Deploying Oreo Badge OS → %s\n" % PORT)
-
-    # Verify device reachable
-    r = mpremote("fs", "ls", ":")
-    if r.returncode != 0:
-        print("Cannot reach device on %s. Check USB cable and port." % PORT)
-        sys.exit(1)
 
     if OVERRIDE_DIRS:
         # Wipe the specified app trees on device. We do this BEFORE the
