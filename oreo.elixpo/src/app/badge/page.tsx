@@ -59,15 +59,23 @@ export default function BadgePage() {
             <motion.p variants={fadeUp} className="mt-5 max-w-2xl text-text-dim">
               Tufty-classic portrait layout. Eight buttons, IR for line-of-sight
               quests, an MPU6050 for shake and tilt, four LEDs around the frame.
-              Schematics and BOM live on the repo — fork them and roll your own.
+              The build guide, BOM and KiCad schematics live in the repo — fork
+              them and roll your own.
             </motion.p>
             <motion.div variants={fadeUp} className="mt-8 flex flex-wrap gap-3">
               <a
-                href="https://github.com/elixpo/oreo/tree/main/docs/hardware"
+                href="https://github.com/elixpo/oreo/blob/main/docs/HARDWARE.md"
                 target="_blank" rel="noreferrer"
                 className="btn-primary"
               >
-                <Github className="h-4 w-4" /> Schematics + BOM
+                <Github className="h-4 w-4" /> Build guide + BOM
+              </a>
+              <a
+                href="https://github.com/elixpo/oreo/tree/main/circuit/elixpo"
+                target="_blank" rel="noreferrer"
+                className="btn-ghost"
+              >
+                KiCad schematics
               </a>
               <a
                 href="https://github.com/elixpo/oreo"

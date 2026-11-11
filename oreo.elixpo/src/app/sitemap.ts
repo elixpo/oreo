@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { ALL_CATALOG } from "@/data/apps";
+import { HACK_GUIDES } from "@/data/hacks";
 import { SITE_URL } from "@/lib/seo";
 
 export const dynamic = "force-static";
@@ -35,5 +36,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.6,
   }));
 
-  return [...pages, ...appPages];
+  const hackPages: MetadataRoute.Sitemap = HACK_GUIDES.map((hack) => ({
+    url: `${SITE_URL}/hacks/${hack.slug}/`,
+    changeFrequency: "monthly",
+    priority: 0.6,
+  }));
+
+  return [...pages, ...appPages, ...hackPages];
 }

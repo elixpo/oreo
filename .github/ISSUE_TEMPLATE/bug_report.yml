@@ -1,43 +1,63 @@
-name: 🐛 Bug report
-description: Something on the badge isn't behaving the way you'd expect.
-title: "[bug] "
-labels: ["bug", "needs-triage"]
+name: Bug report
+description: Something on the badge, in an app or in the oreo CLI does not work as it should.
+title: "bug: "
+labels: ["bug"]
 body:
   - type: markdown
     attributes:
       value: |
-        Thanks for taking the time to file this. The more specific you can
-        be, the faster we can help. Screenshots / phone photos of the
-        badge welcome.
+        Thanks for reporting this. The commands below run on the computer the
+        badge is plugged into ([oreo-cli](https://oreo.elixpo.com/docs/cli/)).
+        A photo of the screen helps. Security problems go to a
+        [private advisory](https://github.com/elixpo/oreo/security/advisories/new), not here.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where is the bug?
+      options:
+        - An app on the badge
+        - OreoOS (home screen, drawer, notifications, updates, Wi-Fi)
+        - The oreo CLI
+        - Transfer (oreo transfer / the Transfer app)
+        - Firmware or hardware drivers
+        - Not sure
+    validations:
+      required: true
 
   - type: input
     id: version
     attributes:
-      label: OS version
-      description: Settings → Version (or About → Version).
-      placeholder: "e.g. v1.2.55"
+      label: OreoOS version
+      description: The first lines of `oreo info` (or the About app on the badge).
+      placeholder: "e.g. OreoOS v2.0.0 (2026-11-01), MicroPython 1.28.0"
     validations:
       required: true
+
+  - type: input
+    id: cli_version
+    attributes:
+      label: oreo-cli version and computer
+      description: "`oreo --version`, and your OS (Linux, macOS, Windows/WSL). Skip if the CLI is not involved."
+      placeholder: "e.g. oreo-cli 1.0.0 on Ubuntu 24.04"
 
   - type: dropdown
     id: hardware
     attributes:
       label: Hardware
       options:
-        - ESP32-S3-DevKitC-1-N16R8 (reference)
-        - Custom PCB
-        - Breadboard prototype
-        - Other / unsure
+        - ESP32-S3-DevKitC-1 N16R8 on a breadboard (reference build)
+        - Oreo PCB
+        - Other or not sure
     validations:
       required: true
 
   - type: textarea
     id: what_happened
     attributes:
-      label: What happened?
-      description: What did you see, and what did you expect to see?
+      label: What happened, and what did you expect?
       placeholder: |
-        Opened the Racer app, tilted right, the car drove left instead.
+        Opened Racer, tilted right, the car drove left.
     validations:
       required: true
 
@@ -45,15 +65,27 @@ body:
     id: steps
     attributes:
       label: Steps to reproduce
-      description: Numbered steps if you can. "Boot → Apps → Racer → press A → tilt right" is perfect.
+      description: Numbered steps from a freshly started badge.
+      placeholder: |
+        1. Open the apps drawer, then Racer
+        2. Press A to start
+        3. Tilt the badge right
+    validations:
+      required: true
+
+  - type: textarea
+    id: doctor
+    attributes:
+      label: "`oreo doctor` output"
+      description: Checks the cable, port, permissions and firmware. Paste it as is.
+      render: shell
 
   - type: textarea
     id: logs
     attributes:
-      label: Logs / serial output (optional)
+      label: Console output (optional)
+      description: "`oreo logs --restart`, then reproduce the bug. For a crash, also `oreo pull /crash.log` and paste the end of it."
       render: shell
-      placeholder: |
-        # paste anything from mpremote / serial monitor here
 
   - type: checkboxes
     id: terms

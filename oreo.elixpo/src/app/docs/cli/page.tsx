@@ -15,7 +15,7 @@ export const metadata = pageMetadata({
 export default function CliDocsPage() {
   return (
     <RepoDoc
-      file="CLI.md"
+      file="docs/CLI.md"
       chip="docs · oreo CLI"
       icon={Terminal}
       title="The oreo command-line tool."

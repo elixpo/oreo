@@ -15,7 +15,7 @@ export const metadata = pageMetadata({
 export default function UsbDocsPage() {
   return (
     <RepoDoc
-      file="USB.md"
+      file="docs/USB.md"
       chip="docs · USB"
       icon={Usb}
       title="Using the badge from a computer."
