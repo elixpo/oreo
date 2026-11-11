@@ -156,6 +156,7 @@ export default function PaperPage() {
             <div><dt className="text-xs text-muted">Artifact</dt><dd><a href={`https://doi.org/${ZENODO_DOI}`} target="_blank" rel="noreferrer" className="font-semibold underline decoration-border underline-offset-4 hover:decoration-text">doi:{ZENODO_DOI}</a></dd></div>
             <div><dt className="text-xs text-muted">Workload</dt><dd className="font-semibold">Big Buck Bunny (CC BY 3.0), Blender Foundation</dd></div>
             <div><dt className="text-xs text-muted">Licence</dt><dd className="font-semibold">CC BY 4.0</dd></div>
+            <div><dt className="text-xs text-muted">Format</dt><dd className="font-semibold">Measured with RV565 format version 6. Version 7 (RV565 2.0) adds more pixel formats and delta frames; version 6 files remain valid.</dd></div>
           </dl>
         </aside>
       </section>

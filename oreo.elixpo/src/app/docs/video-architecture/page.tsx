@@ -162,6 +162,7 @@ compressed_size[1]  +  zlib frame 1
 compressed_size[n]  +  zlib frame n`}</pre>
             </div>
             <p>Independent frames avoid a predictive reference chain. Seeking is direct, corruption remains local to one frame, and the decoder never needs to reconstruct earlier pictures before showing the requested one.</p>
+            <p>RV565 format version 7, from the RV565 2.0 library, generalises this container: nine pixel formats from RGB565 to 1-bit monochrome, stored or zlib frames, and optional XOR-delta and repeat frames with a keyframe at least every K frames. Version 6 is its RGB565, zlib, every-frame-a-keyframe case. The badge&apos;s Gallery still writes and plays version 6 until its firmware module moves to the 2.0 library; the <Link href="/rv565/convert/" className="underline decoration-border underline-offset-4 hover:decoration-text">browser converter</Link> writes either.</p>
 
             <SectionTitle id="encoding" icon={Workflow}>Do expensive visual work on the host</SectionTitle>
             <p>The ingestion tool decodes and resizes source media before it reaches constrained storage. It converts frames directly to RGB565, compresses them independently, validates the result, and checks whether the encoded asset fits the target storage budget.</p>
