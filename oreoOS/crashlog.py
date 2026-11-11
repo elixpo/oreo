@@ -11,6 +11,11 @@ record() prints the traceback over USB serial (what `oreo logs` and
 `mpremote repl` show), appends it to /crash.log with the context string,
 and returns a short summary for drawing. /crash.log is capped at
 MAX_BYTES; older entries are dropped from the front. Never raises.
+
+The launcher calls it for every app that crashes (the crash screen) and,
+with save=False, for the first frame error of a run of them (console
+only, so a flaky frame does not write flash every time). Read the log
+from a computer with `oreo pull /crash.log`.
 """
 
 import sys
@@ -107,18 +112,39 @@ def _trim(path, max_bytes):
         pass
 
 
-def record(err, context="", path=None, echo=True):
-    """Log `err` and return {'message', 'where', 'traceback'}."""
+def summary(err):
+    """'TypeError: message', or just the type name when there is none."""
+    try:
+        text = str(err)
+    except Exception:
+        text = ""
+    name = type(err).__name__
+    return "%s: %s" % (name, text) if text else name
+
+
+def record(err, context="", path=None, echo=True, save=True):
+    """Log `err` and return {'message', 'where', 'traceback'}.
+
+    echo prints the traceback on the USB console; save appends it to the
+    log file. Neither can raise out of here."""
     path = path or PATH
-    tb = format_exception(err)
-    msg = "%s: %s" % (type(err).__name__, err) if str(err) else type(err).__name__
-    where = last_frame(tb)
+    try:
+        tb = format_exception(err)
+    except Exception:               # MemoryError building the buffer
+        tb = ""
+    msg = summary(err)
+    try:
+        where = last_frame(tb)
+    except Exception:
+        where = ""
     if echo:
         try:
             print("=== crash%s ===" % (" in " + context if context else ""))
             print(tb, end="" if tb.endswith("\n") else "\n")
         except Exception:
             pass
+    if not save:
+        return {"message": msg, "where": where, "traceback": tb}
     try:
         with open(path, "a") as f:
             f.write("--- t=%d %s\n" % (_ticks(), context))

@@ -17,9 +17,15 @@ update() when it lands; the automatic one waits for netsvc's boot quiet
 window and for any other background network thread
 (netsvc.fetch_busy(), via store.refresh_due()). The job is kept at module
 level, so leaving and re-opening the Store while it runs re-attaches to
-it instead of starting a second fetch. Missing icons are fetched afterwards from update(), one request
-per frame, while the cached list is already on screen. Selection moves
-repaint only the two rows involved.
+it instead of starting a second fetch. Missing icons are downloaded
+afterwards on the same kind of worker (store.fetch_icon_body() in a
+Refresh job), one at a time, never alongside the catalogue refresh, an
+install or another background network thread (store.icon_fetch_ok());
+each row shows a letter tile until its icon lands, then only that row is
+repainted. Selection moves repaint only the two rows involved.
+
+While either job runs the Store asks the launcher to keep its modules
+loaded (keep_loaded()), so a later visit re-attaches to the job.
 """
 
 import gc
@@ -33,6 +39,8 @@ INSTALLED = 1
 
 # The catalogue refresh in flight, kept across Store visits (see above).
 _inflight = None
+# The icon download in flight: (Refresh job, app id), or None.
+_icon_job = None
 
 LABEL = {store.INSTALL: "INSTALL", store.OPEN: "OPEN",
          store.UPDATE: "UPDATE"}
@@ -41,6 +49,12 @@ LABEL = {store.INSTALL: "INSTALL", store.OPEN: "OPEN",
 class App(oreoOS.App):
     name = "App Store"
     author = "Circuit-Overtime"
+
+    def keep_loaded(self):
+        """Stay imported after exit while a worker runs (the launcher
+        unloads apps otherwise), so the next visit collects its result
+        instead of starting a second TLS session."""
+        return _inflight is not None or _icon_job is not None
 
     def on_enter(self, os_):
         super().on_enter(os_)
@@ -70,6 +84,7 @@ class App(oreoOS.App):
         self._dirty = False          # set by the OS after an overlay closes
         self._job = None             # catalogue refresh in flight
         self._auto = False           # automatic refresh waiting on quiet
+        self._want_install = False   # A on Install while an icon loads
         store.forget_installed()
         self._load_rows()
         self._want_refresh = store.needs_refresh()
@@ -198,20 +213,73 @@ class App(oreoOS.App):
                     _inflight = None
                 self._refresh_done(job.result)
             return                   # no icon fetches during a refresh
+        if self._poll_icon():
+            return                   # one network job at a time
         if self._auto and store.refresh_due():
             self._auto = False
             self._want_refresh = True
+        if self._want_install:
+            self._want_install = False
+            if self._view == "detail" and self._entry is not None:
+                self._install()
+            return
         if self._busy or self._view == "confirm":
             return
         if self._want_refresh:
             self._want_refresh = False
             self._refresh()
-        elif self._queue:
-            e = self._queue.pop(0)
-            if store.fetch_icon(e):
-                self._icons.pop(e["id"], None)
-                self._big.pop(e["id"], None)
-                self._paint = "full"
+        elif self._queue and store.icon_fetch_ok():
+            self._start_icon(self._queue.pop(0))
+
+    # ── icon downloads ─────────────────────────────────────────────────
+
+    def _start_icon(self, e):
+        """Download e's icon on a worker; the row keeps its letter tile
+        until _poll_icon() sees the result."""
+        global _icon_job
+        try:
+            from oreoOS import cache
+            from oreoOS import _http    # noqa: F401  import on the UI thread
+            job = cache.Refresh(lambda: store.fetch_icon_body(e))
+        except Exception:
+            if store.fetch_icon(e):     # no worker support: old path
+                self._icon_arrived(e["id"])
+            return
+        job.start()
+        _icon_job = (job, e["id"])
+
+    def _poll_icon(self):
+        """Collect a finished icon download. True while one still runs."""
+        global _icon_job
+        if _icon_job is None:
+            return False
+        job, app_id = _icon_job
+        if not job.poll():
+            return job.busy()
+        _icon_job = None
+        body = job.result
+        job.result = None
+        if body and store.save_icon(app_id, body):
+            self._icon_arrived(app_id)
+        del body
+        return False
+
+    def _row_id(self, i):
+        if self._page == DISCOVER:
+            return self._discover_entry(i)[1]["id"]
+        return self._installed[i]["dir"]
+
+    def _icon_arrived(self, app_id):
+        """Forget the placeholder and repaint where the icon shows."""
+        self._icons.pop(app_id, None)
+        self._big.pop(app_id, None)
+        if self._view == "list":
+            rows = [i for i, _y, _h in self._layout()
+                    if self._row_id(i) == app_id]
+            if rows:
+                self._mark_rows(*rows)
+        elif self._entry is not None and self._entry["id"] == app_id:
+            self._paint = "full"
 
     def _refresh(self):
         """Start the catalogue fetch on a worker; returns at once."""
@@ -407,6 +475,7 @@ class App(oreoOS.App):
             self._note = "Built-in app: it can't be uninstalled."
 
     def _back(self):
+        self._want_install = False
         self._view = "list"
         self._entry = None
         self._big.clear()
@@ -433,6 +502,11 @@ class App(oreoOS.App):
             elif self._job is not None:
                 # One TLS session at a time: wait for the refresh.
                 self._note = "Refreshing the list, try again in a moment."
+                self._paint = "full"
+            elif _icon_job is not None:
+                # An icon is downloading: install as soon as it lands.
+                self._want_install = True
+                self._note = "Starting..."
                 self._paint = "full"
             else:
                 self._install()

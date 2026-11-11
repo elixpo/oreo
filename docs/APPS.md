@@ -248,12 +248,74 @@ app never connects or scans by itself.
 
 ## When it crashes
 
-An exception in your app shows the crash screen and returns to the
-drawer. During boot, the full traceback goes to the USB serial console
-and to `/crash.log` on the badge, and the crash screen shows the
-innermost `file:line`. Read the log with `mpremote cat /crash.log`.
-`oreoOS.crashlog.record(err, "context")` does the same from your own
-`except` blocks.
+An exception from your app (in `on_enter`, a frame, or an import)
+shows the crash screen with the error and the innermost `file:line`,
+then returns to the drawer. Before that, the launcher records the full
+traceback with `oreoOS.crashlog`:
+
+- it prints on the USB console (`oreo logs` shows it), and
+- it is appended to `/crash.log` on the badge, capped at 8 KB (the
+  oldest entries go first). Copy it to the computer with
+  `oreo pull /crash.log`.
+
+A single bad frame does not crash the app: the OS prints that frame's
+traceback on the console only (no flash write) and carries on, and shows
+the crash screen after 8 bad frames in a row. An error in `on_exit` is
+logged too, without hiding the crash that led to it. Crashes during boot
+go to the same log. `oreoOS.crashlog.record(err, "context")` does the
+same from your own `except` blocks.
+
+## Reloading and the dev loop
+
+When an app exits, the launcher removes `apps.<name>` and its submodules
+from `sys.modules` and runs `gc.collect()`. The next launch imports the
+files again, so code sent with `oreo push -r myapp /apps/myapp` (or
+installed from the Store) runs the next time you open the app, without a
+reboot. OS modules (`oreoOS`, `oreoWare`) and other apps are never
+unloaded; the drawer (`apps/launcher`) stays loaded because it opens on
+every HOME press. A copy of `oreoOS/` itself still needs a reboot.
+
+If your app leaves something running after `on_exit` (a thread, a
+`machine.Timer` or pin IRQ callback, a module-level job that the next
+visit picks up), stop it in `on_exit`, or keep the app loaded:
+
+```python
+class App(oreoOS.App):
+    KEEP_LOADED = True            # never unload this app
+
+    def keep_loaded(self):        # or decide at exit (the App Store does
+        return _job is not None   # this while a download runs)
+```
+
+Unloading an app with a live thread does not crash anything (the thread
+keeps its module alive), but the next launch would get a second copy
+with its own globals.
+
+### Live editing with `oreo dev`
+
+`oreo dev <folder>` mounts a folder from the computer at `/remote` and
+opens the REPL; OreoOS is not running then. If the folder contains
+`apps/<name>/` with `manifest.json` and `main.py`, start OreoOS from the
+REPL and that app loads from the computer instead of `/apps/<name>`:
+
+```bash
+mkdir -p ~/work/apps && cp -r apps_market/my_app ~/work/apps/my_app
+oreo dev ~/work
+```
+
+```python
+>>> import os; os.chdir("/"); exec(open("/main.py").read())
+```
+
+`os.chdir("/")` matters: the mount makes `/remote` the current folder,
+and MicroPython looks for modules there first, so without it `oreoOS`
+is not found. Mounted apps appear in the drawer (one that is also
+installed is replaced by the mounted copy), the console prints
+`[dev] my_app from /remote/apps`, and each launch reads the files again,
+so save on the computer, press HOME, and open the app. Loading over USB
+is slower than from flash. Leaving `oreo dev` resets the badge, and the
+installed apps are used again. Without a mount, the launcher's only cost
+is one failed `stat` per listing and per launch.
 
 ## Check it
 

@@ -24,12 +24,29 @@ HINT_H   = 16
 # Forest-green header for the home screen (matches the bg image's tones).
 HEADER_HOME_BG = api.rgb(46, 102,  74)
 
-# Cached link state for the header WiFi pip. The actual `wifi.rssi()`
-# call is cheap (~1 ms) but we still amortise it to keep header draws
+# Cached link state for the header WiFi pip. netsvc.status() is cheap
+# (a few driver calls) but we still amortise it to keep header draws
 # free of network-module syscalls on tight game loops.
 _WIFI_POLL_MS    = 2000
 _wifi_cache      = {"connected": False, "rssi": None, "metered": False,
-                    "last_ms":   None}
+                    "state": "offline", "last_ms": None}
+
+# How the pip draws each netsvc.status() state.
+CONNECTING_STEP_MS = 400         # one more bar every step while joining
+
+
+def _link_state(w):
+    """netsvc's state ("connected", "connecting", "retrying", "off",
+    "offline"), or one read from the driver when netsvc is missing."""
+    try:
+        from oreoOS import netsvc
+        return netsvc.status()[0]
+    except Exception:
+        pass
+    try:
+        return "connected" if w.is_connected() else "offline"
+    except Exception:
+        return "offline"
 
 
 def _poll_wifi():
@@ -43,14 +60,16 @@ def _poll_wifi():
         return _wifi_cache
     try:
         from oreoWare import wifi as _w
-        _wifi_cache["connected"] = bool(_w.is_connected())
+        state = _link_state(_w)
+        conn = state == "connected"
+        _wifi_cache["state"] = state
+        _wifi_cache["connected"] = conn
         try:
-            _wifi_cache["rssi"] = _w.rssi() if _wifi_cache["connected"] else None
+            _wifi_cache["rssi"] = _w.rssi() if conn else None
         except Exception:
             _wifi_cache["rssi"] = None
         try:
-            _wifi_cache["metered"] = bool(_w.is_metered()) \
-                                     if _wifi_cache["connected"] else False
+            _wifi_cache["metered"] = bool(_w.is_metered()) if conn else False
         except Exception:
             _wifi_cache["metered"] = False
     except Exception:
@@ -60,44 +79,61 @@ def _poll_wifi():
     return _wifi_cache
 
 
+def _rssi_bars(rssi):
+    if rssi is None:
+        return 2
+    if rssi >= -55:
+        return 4
+    if rssi >= -65:
+        return 3
+    if rssi >= -75:
+        return 2
+    return 1
+
+
+def wifi_bars(state, now_ms=0):
+    """(filled bars 0-4, style) for a _wifi_cache snapshot. style is
+    "on" (white: connected), "dim" (muted fill: joining, or waiting to
+    retry) or "off" (outlines only). While connecting the fill climbs one
+    bar per CONNECTING_STEP_MS each time the header is drawn; retrying
+    shows one dim bar."""
+    link = state.get("state")
+    if link is None:                 # old-style snapshot
+        link = "connected" if state.get("connected") else "offline"
+    if link == "connected":
+        return _rssi_bars(state.get("rssi")), "on"
+    if link == "connecting":
+        return 1 + (now_ms // CONNECTING_STEP_MS) % 4, "dim"
+    if link == "retrying":
+        return 1, "dim"
+    return 0, "off"
+
+
 def _draw_wifi_pip(d, x, y, w, h, state):
-    """4-bar WiFi indicator. Hollow bars when disconnected, full bars
-    by RSSI when associated, with a tiny "$" tucked next to a metered
-    link so the user knows OTA + store won't auto-fetch on it."""
+    """4-bar WiFi indicator: white bars by RSSI when associated, dim bars
+    while joining or waiting to retry, outlines when off or offline, and
+    a tiny "$" next to a metered link so the user knows OTA + store won't
+    auto-fetch on it."""
     bars     = 4
     bar_w    = 2
     gap      = 1
     block_w  = bars * bar_w + (bars - 1) * gap
     bx       = x + (w - block_w) // 2
     by_base  = y + h - 1
-    rssi     = state.get("rssi")
-    connected = state.get("connected")
-    # Pick a fill count by RSSI thresholds; disconnected → 0.
-    if not connected:
-        fill = 0
-    elif rssi is None:
-        fill = 2
-    elif rssi >= -55:
-        fill = 4
-    elif rssi >= -65:
-        fill = 3
-    elif rssi >= -75:
-        fill = 2
-    elif rssi >= -85:
-        fill = 1
-    else:
-        fill = 1
+    now = _time.ticks_ms() if _time else 0
+    fill, style = wifi_bars(state, now)
+    color = api.WHITE if style == "on" else theme.MUTED
     for i in range(bars):
         bh = 2 + i * 2     # ascending 2,4,6,8 px
         bx_i = bx + i * (bar_w + gap)
         if i < fill:
-            d.rect(bx_i, by_base - bh, bar_w, bh, api.WHITE, fill=True)
+            d.rect(bx_i, by_base - bh, bar_w, bh, color, fill=True)
         else:
             # Hollow outline for the empty cells so the gauge stays
             # readable even at full bars.
             d.rect(bx_i, by_base - bh, bar_w, 1, theme.MUTED, fill=True)
     # Metered marker: a tiny "$" 8 px to the left of the pip cluster.
-    if connected and state.get("metered"):
+    if style == "on" and state.get("metered"):
         d.text("$", bx - 10, y + (h - 8) // 2, theme.GOLD, scale=1)
 
 # Lazy-loaded title font (Pixelify Sans 16 — fits the 28-px header bar nicely).
@@ -135,8 +171,8 @@ def draw_header(d, title, color=None, accent=None):
         d.text(title, tx, (HEADER_H - 16) // 2, api.WHITE, scale=2)
 
     # Top-right WiFi pip. Polled on a 2 s cadence so this paint stays
-    # cheap. Renders nothing on top of the header bg when WiFi is
-    # off — the empty space reads as "no link" without an extra glyph.
+    # cheap. Outlines only when Wi-Fi is off or offline; dim bars while
+    # netsvc is joining (climbing on each redraw) or waiting to retry.
     pip_w = 16
     pip_h = HEADER_H - 4
     pip_x = SW - pip_w - 6

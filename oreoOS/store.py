@@ -571,24 +571,62 @@ def local_icon(entry_id, icon):
     return None
 
 
-def fetch_icon(entry):
-    """Download an app's optimized icon module into the icon cache.
-    Returns True when a usable icon is now cached."""
+def icon_fetch_ok(net=None):
+    """True when the Store may start an icon download now: past netsvc's
+    boot quiet window and with no other background network thread
+    (netsvc.fetch_busy(): the clock sync or the OTA probe), the same gate
+    as the automatic catalogue refresh, so two TLS sessions never share
+    the heap. Not netsvc.background_ok(): that is a 15-minute grace for
+    work nobody asked for (the OTA probe); the user opened the Store."""
+    if net is None:
+        try:
+            from oreoOS import netsvc as net
+        except Exception:
+            return True
+    try:
+        if net.in_quiet():
+            return False
+    except Exception:
+        pass
+    try:
+        return not net.fetch_busy()
+    except Exception:
+        return True
+
+
+def fetch_icon_body(entry):
+    """Network half of fetch_icon(): the icon module's bytes, or None.
+    Touches no files and no module state, so it can run on a worker
+    thread (the Store runs it in an oreoOS.cache.Refresh job)."""
     icon = entry.get("icon")
     if not icon or not wifi_up():
-        return False
+        return None
     url = raw_url("%s/assets/optimized/%s.py" % (entry["path"],
                                                  _icon_stem(icon)))
     body = _http_get(url)
     if not body or not _valid_icon_module(body):
+        return None
+    return body
+
+
+def save_icon(entry_id, body):
+    """UI-thread half: write a fetch_icon_body() result into the icon
+    cache. Returns True when a usable icon is now cached."""
+    if not body or not valid_id(entry_id) or not _valid_icon_module(body):
         return False
     _ensure_dir(ICONS_DIR)
     try:
-        with open(ICONS_DIR + "/" + entry["id"] + ".py", "wb") as f:
+        with open(ICONS_DIR + "/" + entry_id + ".py", "wb") as f:
             f.write(body)
         return True
     except Exception:
         return False
+
+
+def fetch_icon(entry):
+    """Download an app's optimized icon module into the icon cache,
+    blocking. Returns True when a usable icon is now cached."""
+    return save_icon(entry["id"], fetch_icon_body(entry))
 
 
 def _prune_icons():
