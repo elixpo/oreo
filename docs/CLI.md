@@ -492,8 +492,8 @@ location from its network ([PROFILE.md](PROFILE.md#weathers-location)).
 - When several are given, later ones win: the file, then `--set`, then the
   named options such as `--name`.
 
-Writes `/profile.json` on the badge, which Badge, Identity, Commits, Weather
-and the clock read through `oreoOS/profile.py` (see [PROFILE.md](PROFILE.md)).
+Writes `/profile.json` on the badge, which Badge, Commits, Weather and the
+clock read through `oreoOS/profile.py` (see [PROFILE.md](PROFILE.md)).
 No checkout or `.env.local` is needed.
 
 - It first shows what the badge has now and where each value comes from

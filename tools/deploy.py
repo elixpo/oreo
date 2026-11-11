@@ -509,9 +509,11 @@ def profile_note(blank):
     """One deploy note naming every blank profile key."""
     effects = []
     if "GITHUB_USER" in blank:
-        effects.append("Badge and Commits show a setup hint")
-    if "DISPLAY_NAME" in blank and "GITHUB_USER" in blank:
-        effects.append("Identity shows a placeholder")
+        if "DISPLAY_NAME" in blank:
+            effects.append("Badge shows its setup card")
+        else:
+            effects.append("Badge has no GitHub card")
+        effects.append("Commits shows a setup hint")
     if "TIMEZONE_OFFSET" in blank:
         effects.append("the clock runs on UTC")
     text = ("  note: no value in .env.local for %s; writing them blank."
@@ -521,6 +523,53 @@ def profile_note(blank):
             "; ".join(effects) + "."
     return text + " Add them to .env.local (see .env.example) or " \
         "/profile.json (docs/PROFILE.md)."
+
+
+# Built-in apps that have left apps/ (merged into another app or dropped).
+# A badge deployed before still has their folder, which the drawer would
+# keep showing as a tile, so every deploy deletes these folders, plus any
+# OS files that only they used. Nothing else under /apps is touched: App
+# Store installs and apps the owner put there with `oreo push` stay.
+# A name that is back in apps/ or in the App Store is never removed.
+RETIRED_APPS = (
+    "identity",          # merged into Badge (name, title and GitHub card)
+)
+RETIRED_FILES = (
+    "assets/icons/optimized/identity_icon.py",
+)
+
+
+def retired_paths(repo_apps, store_apps):
+    """Device paths a deploy removes: apps/<name> for each RETIRED_APPS
+    entry that is neither a repo app nor an App Store app, and the
+    RETIRED_FILES."""
+    keep = set(repo_apps) | set(store_apps)
+    return (["apps/" + a for a in RETIRED_APPS if a not in keep]
+            + list(RETIRED_FILES))
+
+
+def retired_script(paths):
+    """Device-side script deleting `paths` (folders recursively); missing
+    paths are skipped silently, removed ones are printed."""
+    return (
+        "import os\n"
+        "def _rm(p):\n"
+        "    try:\n"
+        "        for f in os.listdir(p): _rm(p + '/' + f)\n"
+        "        os.rmdir(p)\n"
+        "    except OSError:\n"
+        "        os.remove(p)\n"
+        "for p in %r:\n"
+        "    try:\n"
+        "        os.stat(p)\n"
+        "    except OSError:\n"
+        "        continue\n"
+        "    try:\n"
+        "        _rm(p)\n"
+        "        print('  removed retired ' + p)\n"
+        "    except OSError:\n"
+        "        print('  could not remove ' + p)\n"
+    ) % list(paths)
 
 
 def write_device_config():
@@ -821,16 +870,15 @@ def main():
         ) % keep
         print("  pruning stale gallery photos on device (keep=%d)" % len(keep))
         mpremote("exec", cleanup)
-    repo_apps = sorted({
+    repo_apps = {
         p.name for p in Path("apps").iterdir()
         if p.is_dir() and (p / "main.py").exists()
             and (p / "manifest.json").exists()
             and not p.name.startswith("_")
-    })
+    }
     # Apps the App Store installs (apps_market/index.json) live under apps/
-    # too but are not in the repo's apps/: never prune them. Their market
-    # folder names stay as well, so the Store can migrate an older install
-    # saved under that name (e.g. "Oreo Pet") to its id.
+    # too; with their market folder names (an older Store saved e.g.
+    # "Oreo Pet") they are never removed.
     store_apps = set()
     try:
         for e in json.loads(Path("apps_market/index.json").read_text())["apps"]:
@@ -838,31 +886,16 @@ def main():
             store_apps.add(e["path"].split("/", 1)[1])
     except (OSError, ValueError, KeyError, IndexError):
         pass
-    repo_apps = sorted(set(repo_apps) | store_apps)
-    apps_prune = (
-        "import os\n"
-        "keep = set(%r)\n"
-        "def _rm(p):\n"
-        "    try:\n"
-        "        for f in os.listdir(p): _rm(p + '/' + f)\n"
-        "        os.rmdir(p)\n"
-        "    except OSError:\n"
-        "        try: os.remove(p)\n"
-        "        except: pass\n"
-        "try:\n"
-        "    for d in os.listdir('apps'):\n"
-        "        if d in keep or d.startswith('_') or d == '__init__.py':\n"
-        "            continue\n"
-        "        try:\n"
-        "            os.stat('apps/' + d + '/manifest.json')\n"
-        "        except OSError:\n"
-        "            continue\n"
-        "        print('  prune apps/' + d)\n"
-        "        _rm('apps/' + d)\n"
-        "except OSError: pass\n"
-    ) % repo_apps
-    print("  pruning stale apps on device (keep=%d)" % len(repo_apps))
-    mpremote("exec", apps_prune)
+    retired = retired_paths(repo_apps, store_apps)
+    if retired:
+        print("  removing retired built-ins on device (%s)"
+              % ", ".join(retired))
+        mpremote("exec", retired_script(retired))
+        # Forget their hashes too, so a file that comes back later is
+        # pushed again instead of being skipped as "already there".
+        for k in list(new_cache):
+            if any(k == r or k.startswith(r + "/") for r in retired):
+                del new_cache[k]
 
     cache_state = "miss" if not cache else "hit (%d entries)" % len(cache)
     print("  hash cache: %s   |   to push: %d   skipped: %d"

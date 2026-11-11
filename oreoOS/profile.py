@@ -1,6 +1,6 @@
 """The badge owner's profile: who they are and where they are.
 
-Badge, Identity, Commits, Weather and the clock read the owner's details
+Badge, Commits, Weather and the clock read the owner's details
 through this module instead of importing secrets.py directly, so a badge
 can be set up without a repo checkout.
 
@@ -14,8 +14,8 @@ Lookup order for every key, first non-empty value wins:
 Keys use the secrets.py names so both sources line up:
 
   GITHUB_USER       GitHub login for Badge and Commits
-  DISPLAY_NAME      name on the Identity card
-  DISPLAY_DESIGNATION  one-line title under the name (DESIGNATION is
+  DISPLAY_NAME      name on the Badge
+  DISPLAY_DESIGNATION  title under the name on the Badge (DESIGNATION is
                     accepted as the older name)
   TIMEZONE_OFFSET   hours from UTC, e.g. 5.5 or -4
   WEATHER_LAT       latitude for Weather (float); optional: without it

@@ -230,7 +230,6 @@ ACTIVE = {
     # "bluetooth_icon": None,
     # "wifi_icon": None,
     # "about_icon": None,
-    # "identity_icon": None,
     # "elixpo_pet_icon": None,
     # "elixpo_sketch_icon": None,
     # "IR_Quest_icon": None,
