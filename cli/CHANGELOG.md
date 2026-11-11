@@ -10,6 +10,37 @@ from its `## [<version>]` section below, so every release needs one.
 
 ## [Unreleased]
 
+### Added
+
+- `oreo setup`: the owner profile (GitHub user, name, title, timezone,
+  weather place and OpenWeatherMap key) in `/profile.json` on the badge, the
+  file `oreoOS/profile.py` reads (docs/PROFILE.md). It shows the current
+  values and where they come from, prompts for each one (or takes them as
+  options), checks the ranges before touching the badge, never echoes or
+  prints the key (the badge only reports whether one is set), merges and
+  writes atomically through `/profile.json.part`, and restarts OreoOS.
+  `oreo setup --show` prints the profile with the key hidden;
+  `--owm-key-stdin` reads the key from standard input.
+- `oreo new <name>`: a new app folder from the app template, which now ships
+  inside oreo-cli, with the id, display name, author and icon module filled
+  in.
+- `oreo app install <folder>`: checks an app folder with the same rules as
+  `tools/validate_app.py` (vendored; a test keeps them identical), refuses
+  built-in apps without `--force`, copies only the files that belong on the
+  badge to `/apps/<id>/` with the verified push, removes files left from an
+  earlier install and restarts OreoOS. `oreo app list` and
+  `oreo app remove <id>` too.
+- Interactive view: **t** sends files to the Transfer app (the
+  `oreo transfer send` flow), **p** edits the owner profile, **i** installs
+  an app from a folder.
+
+### Changed
+
+- `oreo dev` explains how live editing relates to OreoOS: the REPL imports
+  from `/remote`, modules are imported once, OreoOS does not run meanwhile,
+  and its drawer lists apps from `/apps`, so apps are tried with
+  `oreo app install`.
+
 ## [1.0.0] - 2026-11-11
 
 First stable release. Commands, options, output and exit codes are now
