@@ -11,10 +11,12 @@ A on a row opens the app's detail page (icon, name, author, version,
 size, description and the actions). B or HOME goes back.
 
 Speed: the catalogue cached on flash is drawn on the first frame; the
-refresh from GitHub (one small JSON file) and any missing icons are
-fetched afterwards from update(), one request per frame, while the
-cached list is already on screen. Selection moves repaint only the two
-rows involved.
+refresh from GitHub (one small JSON file) runs on a worker thread
+(store.fetch_index() in an oreoOS.cache.Refresh job) and is applied by
+update() when it lands; the automatic one waits for netsvc's boot quiet
+window. Missing icons are fetched afterwards from update(), one request
+per frame, while the cached list is already on screen. Selection moves
+repaint only the two rows involved.
 """
 
 import gc
@@ -60,12 +62,19 @@ class App(oreoOS.App):
         self._prog_ms = 0
         self._installed = []
         self._dirty = False          # set by the OS after an overlay closes
+        self._job = None             # catalogue refresh in flight
+        self._auto = False           # automatic refresh waiting on quiet
         store.forget_installed()
         self._load_rows()
         self._want_refresh = store.needs_refresh()
+        if self._want_refresh and not store.refresh_due():
+            # Boot quiet window: refresh when it ends (update()).
+            self._want_refresh = False
+            self._auto = True
         if not store.wifi_up():
             self._status = "OFFLINE" if self._apps else ""
             self._want_refresh = False
+            self._auto = False
         # Settings may ask for an app's page (store.open_app). Without a
         # cached catalogue it is opened once the refresh has loaded one.
         self._pending = store.take_pending()
@@ -78,7 +87,7 @@ class App(oreoOS.App):
         if e is not None:
             self._pending = None
             self._open_detail(e)
-        elif not self._want_refresh:
+        elif not self._want_refresh and not self._auto and not self._job:
             self._pending = None
 
     # ── data ───────────────────────────────────────────────────────────
@@ -167,6 +176,15 @@ class App(oreoOS.App):
         if self._frames < 2:
             self._frames += 1        # let the cached list reach the screen
             return
+        job = self._job
+        if job is not None:
+            if job.poll():
+                self._job = None
+                self._refresh_done(job.result)
+            return                   # no icon fetches during a refresh
+        if self._auto and store.refresh_due():
+            self._auto = False
+            self._want_refresh = True
         if self._busy or self._view == "confirm":
             return
         if self._want_refresh:
@@ -180,10 +198,25 @@ class App(oreoOS.App):
                 self._paint = "full"
 
     def _refresh(self):
+        """Start the catalogue fetch on a worker; returns at once."""
+        if self._job is not None:
+            return
         self._status = "UPDATING"
         self._paint_now_header()
+        try:
+            from oreoOS import cache
+            from oreoOS import _http    # noqa: F401  import on the UI thread
+            job = cache.Refresh(store.fetch_index)
+        except Exception:
+            self._refresh_done(store.fetch_index())
+            return
+        job.start()
+        self._job = job
+
+    def _refresh_done(self, result):
+        """UI thread: apply a fetch_index() result."""
         keep = self._current_id()
-        ok = store.refresh()
+        ok = store.apply_index(result)
         self._status = "" if ok else (
             "OFFLINE" if store.last_error() == "offline" else "ERROR")
         self._load_rows()
@@ -379,6 +412,10 @@ class App(oreoOS.App):
             elif label == "Uninstall":
                 self._view = "confirm"
                 self._confirm_sel = 0        # Cancel is the default
+                self._paint = "full"
+            elif self._job is not None:
+                # One TLS session at a time: wait for the refresh.
+                self._note = "Refreshing the list, try again in a moment."
                 self._paint = "full"
             else:
                 self._install()

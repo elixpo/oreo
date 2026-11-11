@@ -23,6 +23,12 @@ the same visual hierarchy cheaply.
 Controls:
   A      force refresh
   HOME   apps drawer
+
+Network: the fetch runs off the UI loop (oreoOS.cache.Refresh on a
+thread) through oreoOS._http, whose socket timeouts are honoured. The
+last reading is drawn at once on re-entry; the first automatic fetch
+waits for netsvc's boot quiet window and for Wi-Fi, and never runs
+inline on a build without threads (A still fetches there).
 """
 
 import time
@@ -35,6 +41,11 @@ SH = api.SCREEN_H
 
 REFRESH_SEC = 600
 DIM_FACTOR  = 0.22
+T_FETCH     = 8             # seconds, DNS + TLS + GET
+
+# Last reading, kept across app entries so re-opening draws it at once.
+_last_data  = None
+_last_ms    = None
 
 
 def _bucket(code):
@@ -91,16 +102,9 @@ def _upscale_dim_bg(data, w, h, sw, sh, factor):
     return out
 
 
-def _fetch_owm(lat, lon, api_key):
+def parse_owm(j):
+    """OpenWeatherMap /weather JSON (dict) -> the fields drawn."""
     try:
-        import urequests
-        url = ("https://api.openweathermap.org/data/2.5/weather"
-               "?lat=%.3f&lon=%.3f&units=metric&appid=%s" % (lat, lon, api_key))
-        r = urequests.get(url, headers={"User-Agent": "OreoBadge"})
-        if r.status_code != 200:
-            r.close()
-            return None
-        j = r.json(); r.close()
         return {
             "temp":  round(float(j.get("main", {}).get("temp", 0))),
             "feels": round(float(j.get("main", {}).get("feels_like", 0))),
@@ -111,6 +115,47 @@ def _fetch_owm(lat, lon, api_key):
         }
     except Exception:
         return None
+
+
+def _fetch_owm(lat, lon, api_key):
+    # Runs on the Refresh worker thread: network and parsing only.
+    try:
+        import json
+        from oreoOS import _http
+        url = ("https://api.openweathermap.org/data/2.5/weather"
+               "?lat=%.3f&lon=%.3f&units=metric&appid=%s" % (lat, lon, api_key))
+        body = _http.get_url(url, accept="application/json",
+                             timeout_s=T_FETCH)
+        if not body:
+            return None
+        return parse_owm(json.loads(body.decode("utf-8")))
+    except Exception:
+        return None
+
+
+def _online():
+    try:
+        from oreoWare import wifi
+        return bool(wifi.is_connected())
+    except Exception:
+        return False
+
+
+def auto_fetch_ok(net=None):
+    """True when an automatic fetch may start: past netsvc's boot quiet
+    window, on a build with threads, with Wi-Fi up."""
+    if net is None:
+        try:
+            from oreoOS import netsvc as net
+        except Exception:
+            net = None
+    if net is not None:
+        try:
+            if net.in_quiet() or not net.has_threads():
+                return False
+        except Exception:
+            pass
+    return _online()
 
 
 class App(oreoOS.App):
@@ -140,14 +185,41 @@ class App(oreoOS.App):
         self._pandas = {k: _try_sprite("panda_" + k)
                         for k in ("sun", "cloud", "rain", "snow", "storm")}
 
-        self._data  = None
-        self._last  = 0
-        self._refresh()
+        self._data  = _last_data
+        self._last  = _last_ms
+        self._job   = None
+        try:
+            from oreoOS import cache
+            self._job = cache.Refresh(self._fetch)
+        except Exception:
+            self._job = None
         self._dirty = True
 
+    def on_exit(self):
+        # A running fetch finishes on its own; its result is dropped.
+        self._job = None
+
+    def _fetch(self):
+        return _fetch_owm(self._lat, self._lon, self._key)
+
+    def _due(self):
+        return (self._last is None or
+                time.ticks_diff(time.ticks_ms(), self._last)
+                > REFRESH_SEC * 1000)
+
     def _refresh(self):
-        self._data = _fetch_owm(self._lat, self._lon, self._key) if self._key else None
+        """Start a fetch; returns at once. update() picks the result up."""
+        job = self._job
+        if not self._key or job is None or job.busy():
+            return
+        try:
+            # Import on the UI thread, not on the worker.
+            import json                 # noqa: F401
+            from oreoOS import _http    # noqa: F401
+        except Exception:
+            pass
         self._last = time.ticks_ms()
+        job.start()
         self._dirty = True
 
     def on_button_press(self, btn):
@@ -155,7 +227,16 @@ class App(oreoOS.App):
             self._refresh()
 
     def update(self, dt):
-        if time.ticks_diff(time.ticks_ms(), self._last) > REFRESH_SEC * 1000:
+        global _last_data, _last_ms
+        job = self._job
+        if job is None:
+            return
+        if job.poll():
+            if job.result is not None:
+                self._data = job.result
+                _last_data, _last_ms = self._data, self._last
+            self._dirty = True
+        elif not job.busy() and self._key and self._due() and auto_fetch_ok():
             self._refresh()
 
     # ── render ─────────────────────────────────────────────────────────
@@ -181,7 +262,8 @@ class App(oreoOS.App):
             self._dirty = False
             return
         if self._data is None:
-            self._draw_offline(d)
+            busy = self._job is not None and self._job.busy()
+            self._draw_offline(d, busy)
             self._dirty = False
             return
 
@@ -260,9 +342,10 @@ class App(oreoOS.App):
                 "edit .env then redeploy."]):
             d.text(ln, cx + 16, cy + 38 + i * 14, theme.TEXT_BRIGHT)
 
-    def _draw_offline(self, d):
-        msg = "offline — press A to retry"
+    def _draw_offline(self, d, busy=False):
+        title = "loading" if busy else "offline"
+        msg = "fetching weather..." if busy else "offline — press A to retry"
         d.rect(20, 110, SW - 40, 36, theme.CARD, fill=True)
         d.rect(20, 110, SW - 40,  2, theme.PRIMARY, fill=True)
-        d.text("offline", (SW - 7 * 16) // 2, 118, theme.PRIMARY, scale=2)
+        d.text(title, (SW - len(title) * 16) // 2, 118, theme.PRIMARY, scale=2)
         d.text(msg, (SW - len(msg) * 8) // 2, 138, theme.TEXT_BRIGHT)

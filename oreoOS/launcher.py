@@ -507,17 +507,18 @@ def run_app(os_obj, app):
                 except Exception:
                     pass
                 # Background OTA probe: rate-limited inside ota to one
-                # check every 6 h, only with Wi-Fi up. check() is still a
-                # blocking GitHub GET (up to T_GH_API plus DNS), so it is
-                # gated on a ticks-based grace after Home here: ota's own
-                # grace compares time.time() against a stamp taken before
-                # the clock sync, and the first sync after a cold boot
-                # jumps the clock by years and defeats it. Timed with the
-                # network tail so perf reports it.
+                # check every 6 h, only with Wi-Fi up. The GitHub GET runs
+                # on its own thread; this call only starts it and, on a
+                # later frame, writes the result to settings (UI thread).
+                # Still gated on a ticks-based grace after Home here: ota's
+                # own grace compares time.time() against a stamp taken
+                # before the clock sync, and the first sync after a cold
+                # boot jumps the clock by years and defeats it. Timed with
+                # the network tail so perf reports it.
                 if _net is None or _net.background_ok():
                     try:
                         from oreoOS import ota as _ota
-                        _ota.background_check(os_obj)
+                        _ota.background_check(os_obj, foreground=app_name)
                     except Exception:
                         pass
                 net_ms = time.ticks_diff(time.ticks_ms(), net_t0)

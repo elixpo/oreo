@@ -579,39 +579,28 @@ def discard_pending():
     _rm_tree(STAGE_DIR)
 
 
-def background_check(os_obj, min_interval_s=6 * 3600):
-    """Cheap periodic version probe — runs in the OS run-loop tail.
+# The background probe's network part runs on its own thread (a
+# cache.Refresh job): check() is a DNS lookup, a TLS handshake and a
+# GitHub GET, up to T_GH_API plus DNS. The run loop only starts the job
+# and, on a later frame, applies the result. Settings and notifications
+# are written on the UI thread only, in _bg_apply().
+_bg_job = None
+# Foreground apps that already use the network (or the radio) heavily:
+# the probe waits until they are closed so two TLS sessions never share
+# the heap.
+BG_SKIP_APPS = ("Updates", "App Store", "Commits", "Weather", "WiFi")
 
-    Behaviour:
-      * Disabled by default (see DISABLE flag below). The MicroPython
-        urequests build on this firmware does NOT honour `timeout=` for
-        the response body read — only the connect. When GitHub's edge
-        keeps the socket open but never returns data, r.json() hangs
-        FOREVER, freezing the OS run loop. Until we replace urequests
-        with a raw-socket implementation that wraps settimeout() around
-        every recv(), background probing is opt-in only via the
-        `ota_bg_check` setting.
-      * The manual "Check Update" row in Settings calls check() directly
-        and remains available regardless of this flag.
-      * Skips if WiFi isn't up.
-      * Skips inside the boot grace window (_OTA_BOOT_GRACE_S).
-      * Skips if a check ran in the last `min_interval_s` (6 h default).
-      * On result, stashes flags on the OS settings dict.
 
-    Returns True iff a new release was discovered this call.
-    """
-    # _http is the raw-socket helper at module scope; nothing to gate
-    # on here since it lazy-imports inside check()/peek()/download().
-
-    # Opt-out gate. Default ON because the boot-grace + 4 s API timeout
-    # + 6 h rate-limit cap the worst-case freeze at 4 s once every 6 h,
-    # which is tolerable. Users on a flaky GitHub edge can flip this off
-    # via Settings if the cap turns out to leak through.
+def _bg_gate(os_obj, min_interval_s):
+    """Cheap UI-thread checks. Returns the wall-clock now (int) when a
+    probe may start, else None."""
+    # Opt-out gate. Default ON; users on a flaky GitHub edge can turn it
+    # off from Settings.
     try:
         if not os_obj.settings_get("ota_bg_check", True):
-            return False
+            return None
     except Exception:
-        return False
+        return None
     last = 0
     try:
         last = int(os_obj.settings_get("ota_last_check_s", 0) or 0)
@@ -620,58 +609,47 @@ def background_check(os_obj, min_interval_s=6 * 3600):
     try:
         now = int(time.time())
     except Exception:
-        return False
+        return None
 
-    # Boot-grace: never probe in the first _OTA_BOOT_GRACE_S of uptime,
-    # even if the persisted timestamp is missing or zero. Without this,
-    # the very first frame after boot fires a synchronous HTTP GET and
-    # the user sees "press A, stuck for 4 s" because the exiting frame
-    # has to finish background_check before the next app loads.
+    # Boot-grace: never probe in the first _OTA_BOOT_GRACE_S of uptime.
+    # Wall-clock, so the launcher also gates on netsvc.background_ok()
+    # (ticks), which a first clock sync cannot cut short.
     try:
         boot_ts = getattr(os_obj, "_boot_ts_s", None)
         if boot_ts is not None and (now - boot_ts) < _OTA_BOOT_GRACE_S:
-            return False
+            return None
     except Exception:
         pass
 
     if now - last < min_interval_s:
-        return False
+        return None
 
-    # Only probe when there's a working network connection — silently
-    # skips when offline so the boot is never gated on DNS. Also skip
-    # entirely when the current SSID is flagged metered in /wifi.json,
-    # so a phone hotspot or tethered connection isn't billed for
-    # background traffic.
+    # Only probe on a working link, and never on a metered one (a phone
+    # hotspot isn't billed for background traffic).
     try:
         from oreoWare import wifi
         if not wifi.is_connected():
-            return False
+            return None
         try:
             if wifi.is_metered():
-                return False
+                return None
         except Exception:
             pass
     except Exception:
-        return False
+        return None
+    return now
 
-    try:
-        os_obj.settings_set("ota_last_check_s", now)
-    except Exception:
-        pass
 
-    try:
-        rel = check()
-    except Exception:
-        rel = None
+def _bg_apply(os_obj, rel):
+    """UI thread: record a finished probe. True iff it found a release."""
     if not rel:
         try:
             os_obj.settings_set("ota_status", "up-to-date")
         except Exception:
             pass
         return False
-
-    # New release found — surface it. The home-screen + launcher tile dot
-    # render off these flags; the warn popup fires once per `version`.
+    # New release found: the home-screen and launcher tile dot render off
+    # these flags; the warn popup fires once per `version`.
     try:
         os_obj.settings_set("ota_status",            "needs-confirm")
         os_obj.settings_set("ota_pending_version",   rel.get("version", ""))
@@ -685,6 +663,81 @@ def background_check(os_obj, min_interval_s=6 * 3600):
         pass
     push_update_notification(rel.get("version", ""))
     return True
+
+
+def background_busy():
+    """True while a background probe's GET is in flight."""
+    return _bg_job is not None and _bg_job.busy()
+
+
+def background_check(os_obj, min_interval_s=6 * 3600, foreground=None):
+    """Periodic version probe, called from the OS run-loop tail every
+    frame. Never blocks on the network (#118 follow-up):
+
+      * a finished probe is collected and applied first (UI thread);
+      * otherwise the cheap gates run: the `ota_bg_check` setting, the
+        boot grace, the 6 h rate limit, Wi-Fi up and not metered, no
+        network-heavy app in the foreground, the clock-sync worker idle;
+      * then check() starts on its own thread and this returns at once.
+
+    The manual "Check Update" flow in the Updates app calls check()
+    directly and is unaffected.
+
+    Returns True on the frame that applies a probe which found a new
+    release.
+    """
+    global _bg_job
+    job = _bg_job
+    if job is not None:
+        if job.busy():
+            return False
+        if job.poll():
+            _bg_job = None
+            return _bg_apply(os_obj, job.result)
+        _bg_job = None
+
+    if foreground in BG_SKIP_APPS:
+        return False
+    now = _bg_gate(os_obj, min_interval_s)
+    if now is None:
+        return False
+    try:
+        from oreoOS import netsvc
+        if netsvc.worker_busy():
+            return False            # one network thread at a time
+        if not netsvc.has_threads():
+            # The job would run inline and freeze a frame for the GET:
+            # leave the probe to the Updates app's manual check.
+            return False
+    except Exception:
+        pass
+    try:
+        from oreoOS import cache
+        from oreoOS import _http    # noqa: F401  import here, not on the thread
+    except Exception:
+        return False
+
+    # Stamp before the GET so a probe that fails is not retried every
+    # frame; a failure waits for the next interval like a success.
+    try:
+        os_obj.settings_set("ota_last_check_s", now)
+    except Exception:
+        pass
+    job = cache.Refresh(_bg_fetch)
+    if not job.start() or not job.threaded:
+        # No thread could be created: the job would run inside poll() on
+        # the UI thread. Drop it; the next interval tries again.
+        return False
+    _bg_job = job
+    return False
+
+
+def _bg_fetch():
+    # Worker thread: network only, no settings, no drawing.
+    try:
+        return check()
+    except Exception:
+        return None
 
 
 def push_update_notification(version):

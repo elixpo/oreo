@@ -442,7 +442,7 @@ class NetsvcBackgroundOkTest(unittest.TestCase):
 
     def test_launcher_gates_ota_probe(self):
         src = (ROOT / "oreoOS/launcher.py").read_text()
-        i = src.index("_ota.background_check(os_obj)")
+        i = src.index("_ota.background_check(os_obj, foreground=app_name)")
         head = src[:i]
         self.assertIn("_net.background_ok()", head[-600:])
         # Inside the timed network tail, so perf's net_ms covers it.

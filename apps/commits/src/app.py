@@ -206,6 +206,21 @@ def _fmt_count(n):
     return str(n)
 
 
+def auto_fetch_ok(net=None):
+    """True when an automatic (not user-asked) fetch may start: past
+    netsvc's boot quiet window, and on a build with threads, where the
+    fetch runs off the UI loop. Without netsvc, always True."""
+    if net is None:
+        try:
+            from oreoOS import netsvc as net
+        except Exception:
+            return True
+    try:
+        return net.has_threads() and not net.in_quiet()
+    except Exception:
+        return True
+
+
 class App(oreoOS.App):
     name         = "Commits"
     SHOW_LOADING = False      # the cached graph is drawn immediately
@@ -221,7 +236,11 @@ class App(oreoOS.App):
         self._job = cache.Refresh(self._fetch)
         self._reset_progress()
         self._dirty = True
-        if github.stale(age, github.GRAPH_TTL_S):
+        # A stale cache is refreshed automatically, but not inside the
+        # boot quiet window (update() starts it once that is over).
+        self._auto = github.stale(age, github.GRAPH_TTL_S)
+        if self._auto and auto_fetch_ok():
+            self._auto = False
             self._refresh(quiet=True)
 
     def on_exit(self):
@@ -330,6 +349,9 @@ class App(oreoOS.App):
         job = self._job
         if job is None:
             return
+        if self._auto and auto_fetch_ok():
+            self._auto = False
+            self._refresh(quiet=True)
         if job.poll():
             if job.result:
                 self._set_days(job.result)

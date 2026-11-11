@@ -27,7 +27,9 @@ blocking lwIP calls, so the UI keeps running. The wifi state machine
 (auto_begin/auto_tick) and the HTTP listener stay on the UI thread: they
 are non-blocking already and are not written to be thread-safe.
 
-Status for the status bar and the C panel: status() / status_text().
+Status for the status bar and the C panel: status() / status_text() /
+short_text(). The manual "Sync time" rows call request_sync() and watch
+sync_result() for the outcome (#118 follow-up).
 """
 
 import time
@@ -69,6 +71,9 @@ _ntp_ok_ms  = None
 _ntp_last   = ""                # last result message
 _busy       = False             # worker thread running
 _result     = None              # (ok, msg) handed back by the worker
+_link_seen  = None              # wifi.link_seq() at the last link-up
+_sync_seq   = 0                 # bumps on every finished sync attempt
+_sync_ok    = False             # outcome of that attempt
 
 
 def _wifi():
@@ -209,8 +214,15 @@ def tick(foreground=None, now=None):
             conn = bool(wifi.is_connected())
         except Exception:
             conn = False
+        seq = _seq(wifi)
         if conn and not _link:
-            _link_up(now)
+            _link_up(now, seq)
+        elif conn and seq is not None and seq != _link_seen:
+            # Dropped and re-joined between two polls: is_connected() was
+            # never seen False, but the join counter moved. Treat it as a
+            # new link so the link-up jobs run again.
+            _log("re-joined between polls")
+            _link_up(now, seq)
         elif not conn and _link:
             _link_down(now)
         if not conn:
@@ -222,9 +234,19 @@ def tick(foreground=None, now=None):
             _start_ntp(now)
 
 
-def _link_up(now):
+def _seq(wifi):
+    """wifi.link_seq(), or None on a driver without it."""
+    try:
+        return wifi.link_seq()
+    except Exception:
+        return None
+
+
+def _link_up(now, seq=None):
     global _link, _hold, _rejoin_at, _rejoin_n, _jobs_due, _ntp_at, _ntp_n
+    global _link_seen
     _link = True
+    _link_seen = seq
     _hold = False           # connected, so the radio is evidently wanted
     _rejoin_at = None
     _rejoin_n = 0
@@ -385,8 +407,11 @@ def _collect(now):
 
 
 def _ntp_finished(now, ok, msg):
-    global _ntp_at, _ntp_n, _ntp_ok_ms, _ntp_last
+    global _ntp_at, _ntp_n, _ntp_ok_ms, _ntp_last, _sync_seq, _sync_ok
     _ntp_last = msg
+    if msg != "busy":
+        _sync_seq += 1
+        _sync_ok = bool(ok)
     if ok:
         _ntp_n = 0
         _ntp_ok_ms = now
@@ -404,13 +429,37 @@ def _ntp_finished(now, ok, msg):
 
 def request_sync(now=None):
     """Ask for a clock sync on the worker instead of on the UI thread
-    (for the panel's and Settings' "Sync" rows). False when offline."""
+    (for the panel's and Settings' "Sync" rows). False when offline.
+    A sync already running counts as the requested one. Watch
+    sync_result() for the outcome: its sequence number moves when the
+    attempt finishes."""
     global _ntp_at, _ntp_n
     if not _link:
         return False
-    _ntp_at = time.ticks_ms() if now is None else now
-    _ntp_n = 0
+    if not _busy:
+        _ntp_at = time.ticks_ms() if now is None else now
+        _ntp_n = 0
     return True
+
+
+def sync_result():
+    """(seq, ok, msg) of the last finished sync attempt. seq is 0 before
+    the first one and bumps on every attempt, so a caller can take seq
+    when it asks and wait for it to change."""
+    return (_sync_seq, _sync_ok, _ntp_last)
+
+
+def worker_busy():
+    """True while the clock-sync worker thread runs. Other one-shot
+    network threads (the OTA probe) wait for it, so two TLS/DNS jobs
+    never share the heap."""
+    return _busy
+
+
+def has_threads():
+    """False on a build without _thread: background fetches would run
+    inline, so automatic ones should wait for a user action instead."""
+    return _thread is not None
 
 
 # ── status ──────────────────────────────────────────────────────────────
@@ -446,6 +495,21 @@ def status_text(now=None):
     if state == "off":
         return "Wi-Fi off"
     return state
+
+
+def short_text(state, secs):
+    """At most 10 characters for a status(): fits the C panel's WiFi tile
+    and the gap in Home's status bar. "" when connected (the SSID or the
+    icon says it)."""
+    if state == "connected":
+        return ""
+    if state == "retrying":
+        return "retry %ds" % secs
+    if state == "connecting":
+        return "joining"
+    if state == "off":
+        return "off"
+    return "no link"
 
 
 def time_status():

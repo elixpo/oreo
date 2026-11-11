@@ -34,8 +34,12 @@ HOME (or C) restores the previous brightness and returns to the app.
 Quick settings are wired directly into oreoWare modules — `bt.set_active`,
 `wifi.connect_from_config`/`wifi.disconnect`, `display.set_brightness`.
 The Settings and Update tiles close the panel and launch their app. The
-panel never blocks for I/O except the WiFi association wait, which can
-be cancelled with any key.
+panel never blocks for I/O except the WiFi association wait on an old
+wifi.py without auto_begin(), which can be cancelled with any key. The
+manual time sync runs on netsvc's worker (netsvc.request_sync()); the
+row shows "syncing…" until netsvc.sync_result() reports the outcome. The
+WiFi tile's sub-label comes from netsvc.status() (joining, retry N s,
+off, no link) or the SSID when connected.
 
 Rendering: while sliding, the panel paints every frame. Once fully open
 it covers the whole screen, the run loop stops painting the app under
@@ -52,6 +56,7 @@ SH = api.SCREEN_H
 
 _ANIM_DUR = 0.18      # slide-in duration (seconds)
 _REFRESH_MS = 500     # live status (clock, BT pulse) repaint cadence
+SYNC_WAIT_MS = 15000  # give up on a manual sync that never reports back
 
 # Quick tiles: three on the first row, two wider ones on the second.
 _PILL_PAD = 12
@@ -123,6 +128,44 @@ def quick_nav(sel, btn):
             return Q_WIFI if sel == Q_UPDATE else Q_TORCH
         return sel
     return sel
+
+
+def wifi_tile_state(net=None, wifi=None):
+    """(on, sub-label) for the WiFi tile. The tile tracks the radio; the
+    sub-label is the SSID when connected, else netsvc's state ("joining",
+    "retry 12s", "no link"). Cheap: radio-state queries only, no scan."""
+    if wifi is None:
+        from oreoWare import wifi
+    try:
+        connected = bool(wifi.is_connected())
+    except Exception:
+        connected = False
+    try:
+        radio_on = bool(wifi.is_radio_on())
+    except Exception:
+        radio_on = connected
+    if connected:
+        cur = ""
+        try:
+            cur = wifi.ssid() or ""
+        except Exception:
+            pass
+        return (radio_on, cur[:10] if cur else "on")
+    if not radio_on:
+        return (False, "off")
+    if net is None:
+        try:
+            from oreoOS import netsvc as net
+        except Exception:
+            net = None
+    sub = "no link"
+    if net is not None:
+        try:
+            state, secs = net.status()
+            sub = net.short_text(state, secs) or "on"
+        except Exception:
+            pass
+    return (True, sub)
 
 
 def _outline(d, x, y, w, h, color):
@@ -271,6 +314,9 @@ class NotifPanel:
         # the live clock instead. (start_ms, text, color_key)
         self._time_toast = None
         self._toast_ms   = 1500
+        # netsvc.sync_result()[0] when the manual sync was asked for;
+        # None when no manual sync is outstanding.
+        self._sync_wait  = None
 
     # ── visibility ──────────────────────────────────────────────────────
     def is_active(self):
@@ -349,6 +395,8 @@ class NotifPanel:
     # ── per-frame ───────────────────────────────────────────────────────
     def tick(self, dt):
         if self._scroll.step(dt):
+            self._dirty = True
+        if self._poll_sync():
             self._dirty = True
         if self._dir == 0:
             if self.open and self._torch_prev is None:
@@ -591,17 +639,48 @@ class NotifPanel:
         self._close_now()
 
     def _sync_time(self):
-        # ~2 s blocking call. We post a "syncing…" toast first so the
-        # next frame can paint it before we vanish into the network
-        # round-trip; the result toast appears on the frame after.
-        self._time_toast = (time.ticks_ms(), "syncing…", "muted")
+        # Non-blocking: the sync runs on netsvc's worker thread. The row
+        # shows "syncing…" until _poll_sync() sees the result.
+        now = time.ticks_ms()
+        if self._sync_wait is not None:
+            return                      # one is already outstanding
         try:
-            from oreoOS import timeutil
-            ok, msg = timeutil.sync_from_ntp()
+            from oreoOS import netsvc
+            seq = netsvc.sync_result()[0]
+            queued = netsvc.request_sync()
         except Exception:
-            ok, msg = False, "failed"
-        key = "ok" if ok else "err"
-        self._time_toast = (time.ticks_ms(), msg, key)
+            queued, seq = False, None
+        if not queued:
+            self._time_toast = (now, "no wifi", "err")
+            return
+        self._sync_wait = seq
+        self._time_toast = (now, "syncing…", "muted")
+
+    def _poll_sync(self):
+        """Pick up the outcome of a manual sync. Cheap: a tuple read on
+        netsvc. True when the row changed."""
+        if self._sync_wait is None:
+            return False
+        now = time.ticks_ms()
+        try:
+            from oreoOS import netsvc
+            seq, ok, msg = netsvc.sync_result()
+        except Exception:
+            seq, ok, msg = None, False, "failed"
+        if seq == self._sync_wait:
+            toast = self._time_toast
+            if (toast is None or
+                    time.ticks_diff(now, toast[0]) > SYNC_WAIT_MS):
+                # The worker never reported back (the link dropped before
+                # it started): stop waiting.
+                self._sync_wait = None
+                self._time_toast = (now, "try again", "err")
+                return True
+            return False
+        self._sync_wait = None
+        self._time_toast = (now, (msg or ("synced" if ok else "failed"))[:20],
+                            "ok" if ok else "err")
+        return True
 
     def _open_app(self, name):
         # Close the panel synchronously and hand control to the app —
@@ -717,24 +796,7 @@ class NotifPanel:
         wifi_s = (False, "off")
         bt_s   = (False, "off")
         try:
-            from oreoWare import wifi
-            connected = False
-            radio_on = False
-            try:
-                connected = bool(wifi.is_connected())
-            except Exception:
-                pass
-            try:
-                radio_on = bool(wifi.is_radio_on())
-            except Exception:
-                radio_on = connected
-            if connected:
-                cur = ""
-                try: cur = wifi.ssid() or ""
-                except Exception: pass
-                wifi_s = (radio_on, cur[:10] if cur else "on")
-            elif radio_on:
-                wifi_s = (True, "no link")
+            wifi_s = wifi_tile_state()
         except Exception:
             pass
         try:

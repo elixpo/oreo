@@ -428,19 +428,47 @@ def needs_refresh(max_age_ms=15 * 60 * 1000):
         return True
 
 
-def refresh():
-    """Fetch the catalogue. Returns True on success; on failure the cached
-    catalogue stays and last_error() says why."""
-    global _apps, _featured, _refreshed_ms, _last_error
-    catalogue()
-    if not wifi_up():
-        _last_error = "offline"
+def refresh_due(max_age_ms=15 * 60 * 1000, net=None):
+    """needs_refresh(), and also past netsvc's boot quiet window: the
+    automatic refresh on opening the Store waits for it (a user's A
+    press does not)."""
+    if not needs_refresh(max_age_ms):
         return False
+    if net is None:
+        try:
+            from oreoOS import netsvc as net
+        except Exception:
+            return True
+    try:
+        return not net.in_quiet()
+    except Exception:
+        return True
+
+
+def fetch_index():
+    """Network half of refresh(): GET and parse the catalogue. Touches no
+    module state and no files, so it can run on a worker thread (the
+    Store app runs it in an oreoOS.cache.Refresh job). Returns
+    (body, parsed) or (None, error)."""
+    if not wifi_up():
+        return None, "offline"
     _bc("refresh " + STORE_REF)
     body = _http_get(raw_url(INDEX_PATH))
     parsed = parse_index(body) if body else None
     if not parsed:
-        _last_error = "catalogue unavailable"
+        return None, "catalogue unavailable"
+    return body, parsed
+
+
+def apply_index(result):
+    """UI-thread half of refresh(): adopt a fetch_index() result, write
+    the flash cache and prune. Returns True on success; on failure the
+    cached catalogue stays and last_error() says why."""
+    global _apps, _featured, _refreshed_ms, _last_error
+    catalogue()
+    body, parsed = result if result else (None, "catalogue unavailable")
+    if body is None:
+        _last_error = parsed or "catalogue unavailable"
         return False
     _apps, _featured = parsed
     _last_error = ""
@@ -462,6 +490,14 @@ def refresh():
             _rm_tree(old)
     gc.collect()
     return True
+
+
+def refresh():
+    """Fetch the catalogue, blocking. Returns True on success; on failure
+    the cached catalogue stays and last_error() says why. The Store app
+    runs fetch_index() on a thread and apply_index() itself instead."""
+    catalogue()
+    return apply_index(fetch_index())
 
 
 def last_error():

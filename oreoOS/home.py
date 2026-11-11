@@ -14,6 +14,11 @@ Layout:
   └────────────────────────────────────────────────────────────┘
 
 Nav: LEFT/RIGHT wrap, A to open.
+
+Wi-Fi state: next to the clock the status bar names what netsvc is doing
+when the link is not up ("joining", "retry 12s", "off", "no link"), read
+once a second from netsvc.status() (radio-state queries only). Home never
+fetches anything itself, so it has nothing to defer for the quiet window.
 """
 
 import time
@@ -52,6 +57,25 @@ _HOME_STATUS_BG = api.rgb(46, 102,  74)
 # to False and we'd see a brief disconnected-icon flicker until the next poll.
 _NET_INTERVAL_MS = 5000          # 5 s — cron-style refresh while ANY screen is open
 _net_cache = {"wifi": False, "bt": False, "checked_ms": None, "ever_checked": False}
+
+_LINK_MS    = 1000                 # Wi-Fi state label refresh cadence
+_LINK_X     = 54                   # label starts after "HH:MM"
+_LINK_CHARS = 10
+
+
+def link_label(net=None):
+    """(text, state) for the status-bar Wi-Fi label; text is "" when
+    connected. Cheap: netsvc.status() only queries radio state."""
+    if net is None:
+        try:
+            from oreoOS import netsvc as net
+        except Exception:
+            return ("", "")
+    try:
+        state, secs = net.status()
+        return (net.short_text(state, secs)[:_LINK_CHARS], state)
+    except Exception:
+        return ("", "")
 
 
 def _poll_network():
@@ -288,6 +312,8 @@ class Home(oreoOS.App):
         except Exception:
             self._battery_pct = 85
         self._last_batt_ms = None
+        self._link_ms      = None
+        self._link         = ("", "")
 
     def on_enter(self, os):
         super().on_enter(os)
@@ -313,6 +339,22 @@ class Home(oreoOS.App):
                 self._wifi_ok      = _net_cache["wifi"]
                 self._bt_on        = _net_cache["bt"]
                 self._status_dirty = True
+
+        # Wi-Fi state label: once a second, repaint the bar on change
+        # (a retry countdown ticks once a second, so does the bar then).
+        import time as _t
+        now = _t.ticks_ms()
+        if self._link_ms is None or _t.ticks_diff(now, self._link_ms) >= _LINK_MS:
+            self._link_ms = now
+            link = link_label()
+            if link != self._link:
+                self._link = link
+                self._status_dirty = True
+                if link[1]:
+                    up = link[1] == "connected"
+                    if up != self._wifi_ok:
+                        self._wifi_ok = up
+                        _net_cache["wifi"] = up
 
         # Battery: re-sample every ~30 s. ADC reads are ~1 ms, but the
         # percentage changes slowly enough that anything more frequent is
@@ -415,7 +457,13 @@ class Home(oreoOS.App):
         _icon_bt     (d, bt_x,   icon_y, active=self._bt_on)
         d.text(pct_str, pct_x, text_y, api.WHITE)
         _icon_battery(d, bat_x, (_STATUS_H - 10) // 2, pct=self._battery_pct)
-        _icon_wifi (d, pct_x - 32, 5, connected=self._wifi_ok)
+
+        text, state = self._link
+        if text:
+            color = (theme.GOLD if state == "retrying"
+                     else api.WHITE if state == "connecting"
+                     else api.rgb(200, 170, 170))
+            d.text(text, _LINK_X, text_y, color)
 
     def _draw_clock_area(self, d, h, m, wd, day, mon, yr):
         # Repaint just the clock band over the (cached) background.
