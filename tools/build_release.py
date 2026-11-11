@@ -42,6 +42,7 @@ SHIP_PATTERNS = [
     # OS + drivers
     "oreoOS/__init__.py",
     "oreoOS/_http.py",
+    "oreoOS/tls_roots.py",
     "oreoOS/config.py",
     "oreoOS/api.py",
     "oreoOS/app.py",
