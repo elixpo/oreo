@@ -51,6 +51,9 @@ def rv565(frames=2, w=8, h=6):
     return out
 
 
+STDIN_RING = 259                 # usable bytes in MicroPython's stdin ring
+
+
 class Clock:
     def __init__(self):
         self.t = 100.0
@@ -78,7 +81,13 @@ class FakeSerial:
         self.inbox = bytearray()
         self.written = bytearray()
         self.lines_in = 0
-        self.unread = 0              # bytes written while nothing reads
+        # While the app is closed nothing reads stdin: bytes go into
+        # MicroPython's stdin ring (ports/esp32/mphalport.c, 260 bytes, 259
+        # usable). tud_cdc_rx_cb spots Ctrl-C only as a byte enters the ring;
+        # once it is full later bytes wait in TinyUSB and Ctrl-C is never seen.
+        self.ring = bytearray()
+        self.blocked = 0             # bytes that found the ring full
+        self.interrupted = False     # a Ctrl-C reached MicroPython
         self.timeout = 0.05
         self.on_line = None          # hook(line) after each badge-side line
         ms = (lambda: int(clock.t * 1000)) if clock else None
@@ -95,6 +104,8 @@ class FakeSerial:
     def open_app(self):
         self.app_open = True
         self.inbox = bytearray()     # the app drains what queued up
+        self.ring = bytearray()
+        self.blocked = 0
         self.rx.announce()
 
     # pyserial surface
@@ -103,7 +114,14 @@ class FakeSerial:
         if self.echo:
             self.to_host += data
         if not self.app_open:
-            self.unread += len(data)
+            for b in data:
+                if self.blocked or len(self.ring) >= STDIN_RING:
+                    self.blocked += 1
+                    continue
+                if b == 0x03:
+                    self.interrupted = True
+                else:
+                    self.ring.append(b)
             return len(data)
         self.inbox += data
         while b"\n" in self.inbox:
@@ -325,9 +343,61 @@ class ClientProtocolTest(TransferTestBase):
         self.assertEqual(cm.exception.badge_code, "no_answer")
         self.assertIn("Transfer", cm.exception.hint)
         self.assertEqual(len(waited), 1)
-        # Never more unread bytes than the badge's USB buffers hold.
-        self.assertLessEqual(ser.written.count(b"@OTH "), transfer.HELLO_SENDS)
-        self.assertLess(ser.unread, 512)
+        # Nothing is written while the app is closed: nobody would read it.
+        self.assertEqual(bytes(ser.written), b"")
+
+    def test_app_not_open_leaves_ctrl_c_working(self):
+        # Failed runs with the longest host name the CLI sends, then what
+        # `oreo add` / mpremote do next: Ctrl-C must still reach MicroPython.
+        clock = Clock()
+        ser = FakeSerial(self.proto, self.root, app_open=False, clock=clock)
+        for _ in range(5):
+            c = Client(ser, clock=clock, sleep=clock.sleep, host="h" * 24)
+            with self.assertRaises(TransferError):
+                c.connect(wait=20)
+        self.assertEqual(len(ser.ring), 0)
+        ser.write(b"\r\x03\x03")
+        self.assertTrue(ser.interrupted)
+        self.assertEqual(ser.blocked, 0)
+
+    def test_ring_model_blocks_ctrl_c_when_full(self):
+        # The model itself: three of the old unprompted hellos (102 bytes
+        # each with a 24-character host) fill the ring and Ctrl-C is lost.
+        ser = FakeSerial(self.proto, self.root, app_open=False)
+        hello = (b'@OTH {"v":1,"host":"' + b"h" * 24 + b'","client":"oreo-cli 0.1.0",'
+                 b'"id":"01234567","op":"hello"}\n')
+        self.assertEqual(len(hello), 102)
+        for _ in range(3):
+            ser.write(hello)
+        ser.write(b"\x03")
+        self.assertFalse(ser.interrupted)
+
+    def test_stale_announce_sends_one_short_hello(self):
+        # An announce left in the computer's buffer from an app that has
+        # since closed: one hello goes out, well inside the ring.
+        clock = Clock()
+        ser = FakeSerial(self.proto, self.root, app_open=False, clock=clock)
+        ser.to_host += b'@OTB {"op": "announce", "v": 1, "app": "transfer"}\r\n'
+        c = Client(ser, clock=clock, sleep=clock.sleep, host="h" * 24)
+        with self.assertRaises(TransferError):
+            c.connect(wait=20)
+        self.assertEqual(ser.written.count(b"@OTH "), 1)
+        self.assertLess(len(ser.ring), 110)
+        ser.write(b"\x03")
+        self.assertTrue(ser.interrupted)
+
+    def test_stale_session_is_taken_over(self):
+        # A CLI was killed after hello: the badge stays in that session but
+        # keeps announcing while idle, so the next run gets in.
+        clock = Clock()
+        ser = FakeSerial(self.proto, self.root, clock=clock)
+        self.client(ser, clock).connect(wait=5)
+        self.assertEqual(ser.rx.state, "hello")
+        clock.t += 30
+        c2 = Client(ser, clock=clock, sleep=clock.sleep, host="desk")
+        hello = c2.connect(wait=10)
+        self.assertEqual(hello["op"], "hello")
+        self.assertEqual(ser.rx.host, "desk")
 
     def test_app_opened_while_waiting(self):
         clock = Clock()

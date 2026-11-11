@@ -159,6 +159,34 @@ class ReceiverTest(unittest.TestCase):
         self.w.rx.tick()
         self.assertEqual(len(self.w.out), n + 1)
 
+    def test_announces_while_a_session_is_idle_but_not_mid_file(self):
+        # The CLI says hello only after an announce, so a session left by a
+        # killed CLI must keep announcing or nobody could take it over.
+        w = self.w
+        w.cmd("hello", v=proto.VERSION, host="old", id="1")
+        n = len(w.out)
+        w.clock.ms += proto.ANNOUNCE_MS - 1
+        w.rx.tick()
+        self.assertEqual(len(w.out), n)                    # still fresh
+        w.clock.ms += 1
+        w.rx.tick()
+        self.assertEqual(w.last()["op"], "announce")
+        n = len(w.out)
+        w.clock.ms += 100
+        w.rx.tick()
+        self.assertEqual(len(w.out), n)                    # rate-limited
+        r = w.cmd("hello", v=proto.VERSION, host="new", id="2")
+        self.assertEqual((r["op"], w.rx.host), ("hello", "new"))
+        # No announces while a file is on its way.
+        w.cmd("auth", code=w.rx.code)
+        blob = rz565()
+        self.assertEqual(w.cmd("put", name="a.rz565", size=len(blob),
+                               sha256=hashlib.sha256(blob).hexdigest())["op"], "ready")
+        n = len(w.out)
+        w.clock.ms += proto.ANNOUNCE_MS * 3
+        w.rx.tick()
+        self.assertEqual(len(w.out), n)
+
     def test_hello_reports_limits_and_version_mismatch(self):
         r = self.w.cmd("hello", v=proto.VERSION, host="lap/top", id="42")
         self.assertEqual((r["op"], r["id"], r["chunk"]), ("hello", "42", proto.CHUNK))

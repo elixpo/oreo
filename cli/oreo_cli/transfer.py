@@ -18,6 +18,13 @@ and only then renamed into place.
 If the Transfer app is not open the command waits for it (the app
 announces itself when it opens) and otherwise explains; it never falls
 back to the raw REPL.
+
+Nothing is written to the badge until the app has announced itself.
+While the app is closed nothing in OreoOS reads the USB serial stream,
+and MicroPython keeps unread bytes in a 260-byte ring buffer (259 usable)
+that it checks for Ctrl-C only as each byte enters it. A few unanswered
+hellos would fill it, and then the Ctrl-C that `oreo add`, `oreo shell`
+and mpremote send would never arrive until the badge was reset.
 """
 
 import base64
@@ -46,9 +53,8 @@ WINDOW = 4                   # chunks in flight before waiting for an ack
 READY_EXTS = {".rz565": "image", ".r565": "image", ".rv565": "video",
               ".mdz": "document", ".txtz": "document"}
 
-HELLO_REPLY_S = 1.5          # answer expected this fast when the app is open
-HELLO_RESEND_S = 3.0
-HELLO_SENDS = 3              # unanswered hellos, so the badge's USB buffer never fills
+ANNOUNCE_WAIT_S = 2.5        # the open app announces every 2 s while it waits
+HELLO_RESEND_S = 1.0         # least time between two hellos, each sent only on an announce
 READY_S = 10.0
 ACK_S = 15.0
 DONE_S = 30.0
@@ -192,25 +198,28 @@ class Client:
 
     # ── session ─────────────────────────────────────────────────────
     def connect(self, wait=60.0, on_wait=None):
-        """Say hello and wait for the Transfer app. Returns its hello reply."""
+        """Wait for the Transfer app to announce itself, then say hello.
+        Returns its hello reply.
+
+        A hello is sent only in answer to an announce, which proves the app
+        is reading the port; while the app is closed nothing is written, so
+        the badge's stdin buffer never fills and a later Ctrl-C (`oreo add`,
+        `oreo shell`, mpremote) still gets through."""
         hello_id = os.urandom(4).hex()
         start = self.clock()
-        deadline = start + max(wait, HELLO_REPLY_S)
-        sends = 0
+        deadline = start + max(wait, ANNOUNCE_WAIT_S)
         last = None
         told = False
 
         def hello():
-            nonlocal sends, last
+            nonlocal last
             try:
                 self.send("hello", v=PROTOCOL, host=self.host,
                           client="oreo-cli " + __version__, id=hello_id)
-            except TransferError:       # write timeout: nothing reads the port yet
+            except TransferError:       # write timeout: the app stopped reading
                 pass
-            sends += 1
             last = self.clock()
 
-        hello()
         while self.clock() < deadline:
             msg = self.recv(0.25, ops=("hello", "announce"))
             now = self.clock()
@@ -224,15 +233,13 @@ class Client:
                         "the badge speaks Transfer protocol v%s, this oreo-cli v%d"
                         % (msg.get("v"), PROTOCOL), code="version",
                         hint="update oreo-cli and OreoOS to matching versions")
-                if op == "announce" and now - last >= 0.5:
-                    hello()          # the app just opened (or is idle): it reads now
+                if op == "announce" and (last is None or now - last >= HELLO_RESEND_S):
+                    hello()          # the app is open and reading now
                 continue
-            if not told and now - start >= HELLO_REPLY_S:
+            if not told and last is None and now - start >= ANNOUNCE_WAIT_S:
                 told = True
                 if on_wait is not None:
                     on_wait()
-            if sends < HELLO_SENDS and now - last >= HELLO_RESEND_S:
-                hello()
         raise TransferError("the Transfer app is not open on the badge",
                             code="no_answer", hint=OPEN_HINT)
 

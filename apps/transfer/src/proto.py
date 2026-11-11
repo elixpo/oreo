@@ -17,8 +17,9 @@ Lines without one of these prefixes are ignored (OreoOS log lines go to
 the same stream, and a REPL would echo the computer's own lines back).
 
 Session:
-  badge   announce        (when the app opens, and every few seconds
-                           while it waits; the computer may say hello first)
+  badge   announce        (when the app opens, every few seconds while it
+                           waits, and while a session is idle with no file
+                           on its way; the CLI says hello only after one)
   hello   {v, host, client, id}    -> hello {v, chunk, max, free, ...}
   auth    {code}                   -> ok | error auth (tries left) | locked
   put     {name, size, sha256}     -> ready, then per chunk: ack {seq, got},
@@ -416,6 +417,14 @@ class Receiver:
                  IDLE_AUTHED_MS if self.state == AUTHED else IDLE_HELLO_MS)
         if idle >= limit:
             self.end("timed out", ("timeout", "nothing heard from the computer"))
+            return
+        # A computer that went quiet (the CLI was killed) holds the session
+        # until it times out. The CLI says hello only after an announce, so
+        # keep announcing while the session is idle and no file is on its
+        # way: a new `oreo transfer` can then take over.
+        if self.state != RECEIVING and idle >= ANNOUNCE_MS:
+            if self._announce_at is None or _diff(now, self._announce_at) >= ANNOUNCE_MS:
+                self.announce(now)
 
     # ── input ───────────────────────────────────────────────────────────
     def feed(self, line, now=None):
