@@ -273,7 +273,7 @@ from `sys.modules` and runs `gc.collect()`. The next launch imports the
 files again, so an app installed or updated from the App Store while
 OreoOS runs, or a file you edit under a running `oreo dev` mount, runs the
 next time you open the app, without a reboot. (`oreo push` and
-`oreo apps install` already restart OreoOS when they finish, so their files
+`oreo app install` already restart OreoOS when they finish, so their files
 are loaded fresh either way.) OS modules (`oreoOS`, `oreoWare`) and other apps are never
 unloaded; the drawer (`apps/launcher`) stays loaded because it opens on
 every HOME press. A copy of `oreoOS/` itself still needs a reboot.

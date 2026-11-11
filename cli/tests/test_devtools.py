@@ -320,16 +320,20 @@ class DevNotesTest(TmpDir):
         self.assertNotIn("oreo app install", plain)
 
     @unittest.skipUnless((REPO / "oreoOS" / "launcher.py").exists(), "not in a checkout")
-    def test_launcher_still_prefers_apps_over_remote(self):
-        # dev_notes() says OreoOS lists apps from /apps and ignores /remote/apps
-        # while /apps exists. If the launcher changes that, update the notes.
-        tree = ast.parse((REPO / "oreoOS" / "launcher.py").read_text(encoding="utf-8"))
-        found = None
-        for node in tree.body:
-            if isinstance(node, ast.Assign) and getattr(node.targets[0], "id", "") == \
-                    "_APPS_CANDIDATES":
-                found = ast.literal_eval(node.value)
-        self.assertEqual(found[0], "/apps")
+    def test_launcher_loads_remote_apps(self):
+        # dev_notes() says OreoOS started from the REPL loads apps from
+        # /remote/apps. If the launcher drops that, update the notes.
+        src = (REPO / "oreoOS" / "launcher.py").read_text(encoding="utf-8")
+        self.assertIn('REMOTE_APPS = "/remote/apps"', src)
+        self.assertIn("def unload_app(", src)
+
+    def test_dev_notes_for_a_mount_with_apps(self):
+        d = Path(self.tmp) / "work" / "apps" / "my_app"
+        d.mkdir(parents=True)
+        (d / "manifest.json").write_text("{}")
+        text = " ".join(commands.dev_notes(Path(self.tmp) / "work"))
+        self.assertIn("exec(open('/main.py').read())", text)
+        self.assertIn("/remote/apps", text)
 
 
 class HelpAndDocsTest(unittest.TestCase):

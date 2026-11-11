@@ -650,10 +650,24 @@ need no copying. MicroPython imports a module once: after an edit, run
 `import sys; del sys.modules['mymodule']` and import it again. To reach
 OreoOS's own modules, `import sys; sys.path.append('/')`.
 
-OreoOS does not run while you are in the REPL, and its Apps drawer lists apps
-from `/apps` (it only falls back to `/remote/apps` on a badge with no `/apps`
-folder), so an app in the mounted folder does not show up in the drawer. To
-try an app in OreoOS, use [`oreo app install`](#oreo-app-install-an-app-from-a-folder).
+OreoOS does not run while you are in the REPL. To edit an app live, mount a
+folder that contains `apps/<id>/` and start OreoOS from the REPL:
+
+```sh
+oreo dev ~/work                    # ~/work/apps/my_app/{manifest.json,main.py,...}
+```
+
+```python
+>>> import os; os.chdir("/"); exec(open("/main.py").read())
+```
+
+Apps under `/remote/apps` load from the computer instead of `/apps` (the
+console prints `[dev] my_app from /remote/apps`), and OreoOS re-reads an
+app's files every time it opens, so save on the computer, press HOME and
+reopen the app. Leaving `oreo dev` resets the badge and the installed apps
+are used again. To copy an app onto the badge instead, use
+[`oreo app install`](#oreo-app-install-an-app-from-a-folder). Details:
+[docs/APPS.md](APPS.md#live-editing-with-oreo-dev).
 
 Leave with Ctrl-] or Ctrl-X. Ctrl-D soft-resets the badge, which starts
 OreoOS and ends live editing.
