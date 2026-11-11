@@ -135,7 +135,13 @@ HELP = {
               "  oreo setup --github-user octocat --name \"Mona Lisa\" --timezone 5.5\n"
               "  oreo setup --lat 12.97 --lon 77.59 --weather-name Bengaluru\n"
               "  oreo setup --owm-key-stdin < owm-key.txt\n"
-              "  oreo setup --designation \"\"     remove the title"),
+              "  oreo setup --designation \"\"     remove the title\n"
+              "  oreo setup --from-file .env.local   the profile keys from your .env.local\n"
+              "  oreo setup --set DISPLAY_NAME=\"Mona Lisa\" --set TIMEZONE_OFFSET=5.5\n"
+              "\n"
+              "Keys: GITHUB_USER, DISPLAY_NAME, DISPLAY_DESIGNATION, TIMEZONE_OFFSET,\n"
+              "OWM_API_KEY, and optionally WEATHER_LAT, WEATHER_LON, WEATHER_NAME.\n"
+              "Without WEATHER_LAT/LON, Weather finds the badge's location itself."),
     "new": ("Make a new app folder from the app template",
             "Copies the OreoOS app template (a counter: A adds, B subtracts) into\n"
             "./<id>, with your app's name, id, author and icon module filled in.\n"
@@ -232,6 +238,11 @@ def build_parser():
 
     s = _sub(subs, "setup")
     s.add_argument("--show", action="store_true", help="only print the profile (key hidden)")
+    s.add_argument("--from-file", metavar="FILE",
+                   help="take the profile keys from an .env-style file, e.g. .env.local "
+                        "(other keys in it are left alone)")
+    s.add_argument("--set", action="append", metavar="KEY=VALUE",
+                   help="set one key by its .env name (repeatable; KEY= removes it)")
     s.add_argument("--github-user", metavar="LOGIN", help="GitHub user for Badge and Commits")
     s.add_argument("--name", metavar="TEXT", help="name on the Identity card")
     s.add_argument("--designation", metavar="TEXT", help="title under the name")

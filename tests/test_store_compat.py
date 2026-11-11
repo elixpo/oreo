@@ -180,7 +180,9 @@ class OldOsFallbackTest(_OldOsCase):
         try:
             self.assertEqual(m._owner_location(), (22.57, 88.36, "k"))
             fake.WEATHER_LAT = None
-            self.assertEqual(m._owner_location(), (None, None, ""))
+            # No pinned place: lat/lon stay None (the fetch locates the
+            # badge), and the key is kept.
+            self.assertEqual(m._owner_location(), (None, None, "k"))
         finally:
             if saved is None:
                 sys.modules.pop("secrets", None)
@@ -304,14 +306,20 @@ class DeployProfileNoteTest(unittest.TestCase):
     def test_lists_every_blank_key(self):
         env = {"GITHUB_USER": "me", "DISPLAY_NAME": " ", "WEATHER_LAT": "1"}
         blank = self.deploy.blank_profile_keys(env)
-        self.assertEqual(blank, ["DISPLAY_NAME", "DESIGNATION",
-                                 "TIMEZONE_OFFSET", "WEATHER_LON"])
+        # Weather's location is optional now (the badge finds its own).
+        self.assertEqual(blank, ["DISPLAY_NAME", "DISPLAY_DESIGNATION",
+                                 "TIMEZONE_OFFSET"])
         note = self.deploy.profile_note(blank)
         for k in blank:
             self.assertIn(k, note)
         self.assertIn("UTC", note)
-        self.assertIn("Weather", note)
+        self.assertNotIn("Weather has no location", note)
         self.assertIn("/profile.json", note)
+
+    def test_older_designation_name_counts(self):
+        env = {"GITHUB_USER": "me", "DISPLAY_NAME": "Me", "DESIGNATION": "OSS",
+               "TIMEZONE_OFFSET": "5.5"}
+        self.assertEqual(self.deploy.blank_profile_keys(env), [])
 
     def test_nothing_blank(self):
         env = {k: "1" for k in self.deploy.PROFILE_KEYS}

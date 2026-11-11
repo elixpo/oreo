@@ -43,7 +43,8 @@ def _float_or_none(s):
 # wins over these (oreoOS/profile.py; docs/PROFILE.md).
 GITHUB_USER       = _env.get("GITHUB_USER", "")
 DISPLAY_NAME      = _env.get("DISPLAY_NAME", "")
-DESIGNATION       = _env.get("DESIGNATION", "")
+# .env.local names it DISPLAY_DESIGNATION; DESIGNATION is the older name.
+DESIGNATION       = _env.get("DISPLAY_DESIGNATION") or _env.get("DESIGNATION", "")
 WEATHER_LAT       = _float_or_none(_env.get("WEATHER_LAT"))
 WEATHER_LON       = _float_or_none(_env.get("WEATHER_LON"))
 WEATHER_NAME      = _env.get("WEATHER_NAME", "")

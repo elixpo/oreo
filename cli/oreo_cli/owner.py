@@ -18,6 +18,7 @@ once and redacted from any error text.
 
 import math
 import re
+from pathlib import Path
 import sys
 
 from .badge import lit
@@ -29,16 +30,18 @@ PATH = "/profile.json"
 
 # Same keys, in the same order, as KEYS in oreoOS/profile.py (a contract
 # test checks this inside an OreoOS checkout).
-KEYS = ("GITHUB_USER", "DISPLAY_NAME", "DESIGNATION", "TIMEZONE_OFFSET",
+KEYS = ("GITHUB_USER", "DISPLAY_NAME", "DISPLAY_DESIGNATION", "TIMEZONE_OFFSET",
         "WEATHER_LAT", "WEATHER_LON", "WEATHER_NAME", "OWM_API_KEY")
 NUMERIC = ("TIMEZONE_OFFSET", "WEATHER_LAT", "WEATHER_LON")
 SECRET = "OWM_API_KEY"
+# Older names still accepted on input (files, --set) and read from the badge.
+ALIASES = {"DESIGNATION": "DISPLAY_DESIGNATION"}
 
 # key -> (option, label shown in prompts and tables)
 FIELDS = (
     ("GITHUB_USER", "github_user", "GitHub user"),
     ("DISPLAY_NAME", "name", "Name"),
-    ("DESIGNATION", "designation", "Title"),
+    ("DISPLAY_DESIGNATION", "designation", "Title"),
     ("TIMEZONE_OFFSET", "timezone", "Timezone (hours from UTC)"),
     ("WEATHER_LAT", "lat", "Weather latitude"),
     ("WEATHER_LON", "lon", "Weather longitude"),
@@ -49,7 +52,7 @@ LABELS = {k: label for k, _, label in FIELDS}
 
 _GITHUB_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}$")
 _OFFSET_RE = re.compile(r"^(?:UTC|GMT)?\s*([+-]?)(\d{1,2})(?::(\d{2}))?$", re.I)
-_TEXT_MAX = {"DISPLAY_NAME": 32, "DESIGNATION": 40, "WEATHER_NAME": 32}
+_TEXT_MAX = {"DISPLAY_NAME": 32, "DISPLAY_DESIGNATION": 40, "WEATHER_NAME": 32}
 
 
 def _number(text, what):
@@ -174,7 +177,7 @@ def _read_code():
         "except Exception:\n"
         " pass\n"
         "_e({'file':f,'state':st,'secrets':s})\n"
-        % {"k": lit(list(KEYS)), "s": lit(SECRET), "p": lit(PATH)})
+        % {"k": lit(list(KEYS) + list(ALIASES)), "s": lit(SECRET), "p": lit(PATH)})
 
 
 def read(b):
@@ -230,6 +233,16 @@ def _write_code(updates):
         % {"u": lit(updates), "p": lit(PATH)})
 
 
+def _with_aliases_cleared(updates):
+    """Saving a key under its current name removes the older name from
+    /profile.json, so a stale DESIGNATION can't shadow DISPLAY_DESIGNATION."""
+    out = dict(updates)
+    for alias, new in ALIASES.items():
+        if new in out:
+            out[alias] = ""
+    return out
+
+
 def write(b, updates):
     """Merge `updates` into /profile.json on the badge. Returns the keys
     now set in the file."""
@@ -238,7 +251,8 @@ def write(b, updates):
             raise UsageError("unknown profile key: %s" % k)
     secret = updates.get(SECRET)
     try:
-        r = b.result(_write_code(updates), secrets=(secret,) if secret else ())
+        r = b.result(_write_code(_with_aliases_cleared(updates)),
+                     secrets=(secret,) if secret else ())
     except BadgeError as e:
         raise OreoError("could not write %s on the badge: %s" % (PATH, e.message),
                         hint="check free space with `oreo info`, then try again")
@@ -275,13 +289,12 @@ def resolved(data):
     f = data.get("file") or {}
     s = data.get("secrets") or {}
     out = {}
+    old = dict((new, alias) for alias, new in ALIASES.items())
     for k in KEYS:
-        if k in f:
-            out[k] = (f[k], "profile.json")
-        elif k in s:
-            out[k] = (s[k], "secrets.py")
-        else:
-            out[k] = (None, "")
+        names = (k, old[k]) if k in old else (k,)
+        hit = next(((f[n], "profile.json") for n in names if n in f), None) or \
+            next(((s[n], "secrets.py") for n in names if n in s), None)
+        out[k] = hit or (None, "")
     return out
 
 
@@ -304,8 +317,13 @@ def show(ui, data, title="profile"):
 # ── the flow ─────────────────────────────────────────────────────────
 
 def updates_from_args(args):
-    """{key: validated value} from the command-line flags ("" removes)."""
+    """{key: validated value} from --from-file, then --set, then the named
+    flags (later ones win; "" removes a key)."""
     out = {}
+    if getattr(args, "from_file", None):
+        got, _ = updates_from_file(args.from_file)
+        out.update(got)
+    out.update(updates_from_set(getattr(args, "set", None)))
     for key, opt, _ in FIELDS:
         raw = getattr(args, opt, None)
         if raw is not None:
@@ -315,6 +333,71 @@ def updates_from_args(args):
         if not line:
             raise UsageError("no key on standard input")
         out[SECRET] = validate(SECRET, line)
+    return out
+
+
+def canonical_key(name):
+    """A profile key from a file or --set, by the names in .env.example /
+    .env.local (older names accepted). None for anything else."""
+    k = str(name).strip().upper()
+    k = ALIASES.get(k, k)
+    return k if k in KEYS else None
+
+
+def parse_env_text(text):
+    """KEY=VALUE pairs from .env-style text: comments, blank lines and an
+    `export ` prefix are skipped, matching quotes are removed."""
+    pairs = []
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        if line.startswith("export "):
+            line = line[7:].lstrip()
+        k, v = line.split("=", 1)
+        k, v = k.strip(), v.strip()
+        if len(v) >= 2 and v[0] == v[-1] and v[0] in "'\"":
+            v = v[1:-1]
+        elif " #" in v:
+            v = v.split(" #", 1)[0].rstrip()
+        pairs.append((k, v))
+    return pairs
+
+
+def updates_from_file(path):
+    """(updates, ignored_names) from an .env-style file. Only profile keys
+    are taken; everything else (Wi-Fi password, tokens) is left alone and
+    only its name is reported. Empty values are skipped, not removed."""
+    try:
+        text = Path(path).expanduser().read_text(encoding="utf-8")
+    except OSError as e:
+        raise UsageError("cannot read %s: %s" % (path, e.strerror or e))
+    out, ignored = {}, []
+    for name, value in parse_env_text(text):
+        k = canonical_key(name)
+        if k is None:
+            ignored.append(name)
+            continue
+        if value == "":
+            continue
+        out[k] = validate(k, value)
+    return out, ignored
+
+
+def updates_from_set(items):
+    """{key: value} from repeated --set KEY=VALUE ("KEY=" removes it)."""
+    out = {}
+    for item in items or ():
+        if "=" not in item:
+            raise UsageError("--set needs KEY=VALUE, not %r" % item,
+                             hint="e.g. --set DISPLAY_NAME=\"Mona Lisa\"; keys are listed "
+                                  "in `oreo help setup`")
+        name, value = item.split("=", 1)
+        k = canonical_key(name)
+        if k is None:
+            raise UsageError("%s is not a profile key" % name.strip(),
+                             hint="profile keys: " + ", ".join(KEYS))
+        out[k] = validate(k, value)
     return out
 
 
@@ -404,9 +487,11 @@ def setup(ui, b, updates=None, show_only=False):
     saved = read(b)
     show(ui, saved, title="saved")
     now = dict((k, v) for k, (v, _) in resolved(saved).items())
-    if now.get("WEATHER_LAT") is None or now.get("WEATHER_LON") is None \
-            or not now.get(SECRET):
-        ui.note("Weather needs a latitude, a longitude and an OpenWeatherMap key.")
+    if not now.get(SECRET):
+        ui.note("Weather needs an OpenWeatherMap key (OWM_API_KEY).")
+    if now.get("WEATHER_LAT") is None or now.get("WEATHER_LON") is None:
+        ui.note("No weather location pinned: Weather finds the badge's location "
+                "from its network (set WEATHER_LAT and WEATHER_LON to pin one).")
     return True
 
 
@@ -427,7 +512,13 @@ def cmd_setup(ctx):
     ui = ctx.ui
     args = ctx.args
     updates = updates_from_args(args)          # bad values fail before the badge is touched
-    if args.show and updates:
+    if getattr(args, "from_file", None):
+        got, ignored = updates_from_file(args.from_file)
+        ui.note("from %s: %s" % (esc(args.from_file),
+                                 ", ".join(sorted(got)) or "no profile values"))
+        if ignored:
+            ui.note("left alone (not profile keys): %s" % ", ".join(sorted(set(ignored))))
+    if args.show and (updates or getattr(args, "from_file", None) or getattr(args, "set", None)):
         raise UsageError("--show only prints the profile; leave out the other options")
     if args.owm_key is not None and args.owm_key.strip():
         ui.warn("a key given as --owm-key can end up in your shell history; "

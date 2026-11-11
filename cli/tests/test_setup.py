@@ -58,12 +58,12 @@ class ValidateTest(unittest.TestCase):
                 owner.validate("GITHUB_USER", bad)
 
     def test_empty_means_remove(self):
-        self.assertEqual(owner.validate("DESIGNATION", "  "), "")
+        self.assertEqual(owner.validate("DISPLAY_DESIGNATION", "  "), "")
 
     def test_text_fields_are_plain_ascii(self):
         self.assertEqual(owner.validate("DISPLAY_NAME", "Mona O'Hara-Lisa"),
                          "Mona O'Hara-Lisa")
-        for key, bad in (("DISPLAY_NAME", "Jos\u00e9"), ("DESIGNATION", "Lead \u2014 Firmware"),
+        for key, bad in (("DISPLAY_NAME", "Jos\u00e9"), ("DISPLAY_DESIGNATION", "Lead \u2014 Firmware"),
                          ("WEATHER_NAME", "M\u00fcnchen"), ("DISPLAY_NAME", "x\x7f")):
             with self.assertRaises(UsageError, msg=(key, bad)) as cm:
                 owner.validate(key, bad)
@@ -122,7 +122,7 @@ class SetupCommandTest(unittest.TestCase):
 
     def test_merges_and_removes(self):
         self.fake.put("/profile.json", json.dumps(
-            {"GITHUB_USER": "old", "DESIGNATION": "Intern", "OWM_API_KEY": KEY,
+            {"GITHUB_USER": "old", "DISPLAY_DESIGNATION": "Intern", "OWM_API_KEY": KEY,
              "EXTRA": "kept"}).encode())
         r = self.run_setup("--github-user", "new", "--designation", "")
         self.assertEqual(r.rc, 0, r.out)
@@ -188,7 +188,7 @@ class SetupCommandTest(unittest.TestCase):
 
     def test_interactive_prompts(self):
         self.fake.put("/profile.json", json.dumps(
-            {"GITHUB_USER": "octocat", "DESIGNATION": "Intern"}).encode())
+            {"GITHUB_USER": "octocat", "DISPLAY_DESIGNATION": "Intern"}).encode())
         secrets_asked = []
 
         def secret(prompt):
@@ -321,7 +321,7 @@ class SetupCommandTest(unittest.TestCase):
         self.assertEqual(r.rc, 0, r.out)
         self.assertIn("cut short", r.out)
         self.assertEqual(self.profile(), {"GITHUB_USER": "octocat", "DISPLAY_NAME": "Me",
-                                          "DESIGNATION": "Firmware"})
+                                          "DISPLAY_DESIGNATION": "Firmware"})
         self.assertFalse(self.fake.exists("/profile.json.tmp"))
 
     @unittest.skipUnless(PROFILE.exists(), "not inside an OreoOS checkout")
@@ -336,9 +336,75 @@ class SetupCommandTest(unittest.TestCase):
         self.assertEqual(profile.get("WEATHER_LAT"), -33.9)
         self.assertEqual(profile.get("OWM_API_KEY"), KEY)
         # and the badge's own save() accepts the file and merges into it
-        profile.save({"DESIGNATION": "Firmware"})
-        self.assertEqual(self.profile()["DESIGNATION"], "Firmware")
+        profile.save({"DISPLAY_DESIGNATION": "Firmware"})
+        self.assertEqual(self.profile()["DISPLAY_DESIGNATION"], "Firmware")
 
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FromFileAndSetTest(unittest.TestCase):
+    """--from-file (.env-style, e.g. .env.local) and --set KEY=VALUE."""
+
+    ENV = (
+        "# my .env.local\n"
+        "POLLINATIONS_KEY=pk_should_never_be_read_or_shown\n"
+        "WIFI_SSID=Home\n"
+        "WIFI_PASSWORD=hunter2hunter2\n"
+        "GH_TOKEN=ghp_tokentokentokentokentokentokentoken\n"
+        "export DISPLAY_NAME=\"Ayushman B\"\n"
+        "DISPLAY_DESIGNATION='OSS Maintainer'\n"
+        "TIMEZONE_OFFSET=5.5  # IST\n"
+        "OWM_API_KEY=" + KEY + "\n"
+        "WEATHER_LAT=\n"
+    )
+
+    def setUp(self):
+        self.fake = FakeTransport()
+        self.addCleanup(self.fake.cleanup)
+        import tempfile
+        d = tempfile.mkdtemp()
+        self.path = Path(d) / ".env.local"
+        self.path.write_text(self.ENV)
+
+    def profile(self):
+        return json.loads(self.fake.get("/profile.json"))
+
+    def test_file_takes_only_profile_keys_and_shows_no_values(self):
+        r = run_cli(["setup", "--from-file", str(self.path)], fake=self.fake)
+        self.assertEqual(r.rc, 0, r.out)
+        self.assertEqual(self.profile(), {
+            "DISPLAY_NAME": "Ayushman B", "DISPLAY_DESIGNATION": "OSS Maintainer",
+            "TIMEZONE_OFFSET": 5.5, "OWM_API_KEY": KEY})
+        for secret in ("pk_should_never", "hunter2", "ghp_token", KEY):
+            self.assertNotIn(secret, r.out)
+            self.assertFalse(any(secret in c for c in self.fake.sent if secret != KEY),
+                             secret)
+        self.assertIn("left alone (not profile keys)", r.out)
+        self.assertIn("WIFI_PASSWORD", r.out)       # named, never valued
+        self.assertIn("finds the badge's location", r.out)
+
+    def test_older_designation_name_in_a_file(self):
+        self.path.write_text("DESIGNATION=Old name\n")
+        got, ignored = owner.updates_from_file(self.path)
+        self.assertEqual(got, {"DISPLAY_DESIGNATION": "Old name"})
+        self.assertEqual(ignored, [])
+
+    def test_set_one_by_one_and_precedence(self):
+        r = run_cli(["setup", "--from-file", str(self.path),
+                     "--set", "display_name=From Set", "--set", "GITHUB_USER=octocat",
+                     "--name", "From Flag"], fake=self.fake)
+        self.assertEqual(r.rc, 0, r.out)
+        p = self.profile()
+        self.assertEqual(p["DISPLAY_NAME"], "From Flag")   # file < --set < flags
+        self.assertEqual(p["GITHUB_USER"], "octocat")
+
+    def test_set_removes_and_rejects(self):
+        self.fake.put("/profile.json", json.dumps({"WEATHER_NAME": "X"}).encode())
+        r = run_cli(["setup", "--set", "WEATHER_NAME="], fake=self.fake)
+        self.assertEqual(r.rc, 0, r.out)
+        self.assertNotIn("WEATHER_NAME", self.profile())
+        for bad in ("WIFI_PASSWORD=x", "nonsense", "TIMEZONE_OFFSET=99"):
+            r = run_cli(["setup", "--set", bad])    # no fake: must fail before the badge
+            self.assertEqual(r.rc, 2, (bad, r.out))

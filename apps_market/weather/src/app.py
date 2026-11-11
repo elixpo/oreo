@@ -142,9 +142,31 @@ def _fetch_owm(lat, lon, api_key):
         return None
 
 
+def _auto_location():
+    """(lat, lon) of the badge from oreoOS.geo, or None. Network I/O: runs
+    on the Refresh worker thread. An OS without oreoOS.geo has no automatic
+    location; the setup card then asks for WEATHER_LAT / WEATHER_LON."""
+    try:
+        from oreoOS import geo
+    except ImportError:
+        return None
+    try:
+        got = geo.lookup()
+    except Exception:
+        return None
+    if not got:
+        return None
+    return got["lat"], got["lon"]
+
+
 def _fetch_cfg():
     # Runs on the Refresh worker thread.
     lat, lon, key = _cfg
+    if lat is None or lon is None:
+        found = _auto_location()
+        if found is None:
+            return None
+        lat, lon = found
     return _fetch_owm(lat, lon, key)
 
 
@@ -179,8 +201,9 @@ def auto_fetch_ok(net=None):
 
 
 def _owner_location():
-    """(lat, lon, key) for the owner. With no location the key is "" and
-    the setup card explains what to set.
+    """(lat, lon, key) for the owner. lat/lon are None when no place is
+    pinned; the fetch then uses the badge's own location (oreoOS.geo). With
+    no key the setup card explains what to set.
 
     Reads /profile.json then secrets.py through oreoOS.profile. An OS
     built before oreoOS.profile existed falls back to reading secrets.py
@@ -207,7 +230,8 @@ def _owner_location():
     except Exception:
         lat = lon = None
     if lat is None or lon is None:
-        return None, None, ""
+        # No pinned place: the fetch finds the badge's own location.
+        return None, None, key
     return lat, lon, key
 
 
@@ -385,17 +409,20 @@ class App(oreoOS.App):
         d.rect(cx, cy, cw, 2,  theme.PRIMARY, fill=True)
         d.text("setup needed", (SW - 12 * 16) // 2, cy + 14, theme.PRIMARY, scale=2)
         for i, ln in enumerate([
-                "Set your location and key:",
-                "",
+                "Set your OpenWeatherMap key",
                 "  OWM_API_KEY",
-                "  WEATHER_LAT / WEATHER_LON",
+                "with oreo setup or .env.local.",
                 "",
-                "in /profile.json or .env.local"]):
+                "Location: found from the",
+                "badge's network, or pin it",
+                "with WEATHER_LAT / WEATHER_LON."]):
             d.text(ln, cx + 16, cy + 38 + i * 14, theme.TEXT_BRIGHT)
 
     def _draw_offline(self, d, busy=False):
         title = "loading" if busy else "offline"
         msg = "fetching weather..." if busy else "offline — press A to retry"
+        if busy and (self._lat is None or self._lon is None):
+            msg = "finding your location..."
         d.rect(20, 110, SW - 40, 36, theme.CARD, fill=True)
         d.rect(20, 110, SW - 40,  2, theme.PRIMARY, fill=True)
         d.text(title, (SW - len(title) * 16) // 2, 118, theme.PRIMARY, scale=2)

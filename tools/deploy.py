@@ -171,6 +171,7 @@ DEPLOY = [
     ("oreoOS/state.py",         "oreoOS/state.py"),     # /state app saves
     ("oreoOS/profile.py",       "oreoOS/profile.py"),   # owner profile
     ("oreoOS/crashlog.py",      "oreoOS/crashlog.py"),  # /crash.log
+    ("oreoOS/geo.py",           "oreoOS/geo.py"),       # Weather's auto location
 
     # Hardware drivers
     ("oreoWare/__init__.py",    "oreoWare/__init__.py"),
@@ -488,13 +489,20 @@ def mpremote_batch(actions, label=""):
 # then writes them blank and the badge loses its name, weather location
 # and timezone (the clock falls back to UTC) unless /profile.json on the
 # badge sets them.
-PROFILE_KEYS = ("GITHUB_USER", "DISPLAY_NAME", "DESIGNATION",
-                "TIMEZONE_OFFSET", "WEATHER_LAT", "WEATHER_LON")
+# WEATHER_LAT / WEATHER_LON are optional: without them Weather uses the
+# badge's own location (oreoOS.geo). DISPLAY_DESIGNATION may also be given
+# under its older name DESIGNATION.
+PROFILE_KEYS = ("GITHUB_USER", "DISPLAY_NAME", "DISPLAY_DESIGNATION",
+                "TIMEZONE_OFFSET")
+_PROFILE_ALIASES = {"DISPLAY_DESIGNATION": "DESIGNATION"}
 
 
 def blank_profile_keys(env):
     """The PROFILE_KEYS with no value in the parsed .env/.env.local."""
-    return [k for k in PROFILE_KEYS if not str(env.get(k) or "").strip()]
+    def has(k):
+        return bool(str(env.get(k) or "").strip())
+    return [k for k in PROFILE_KEYS
+            if not has(k) and not has(_PROFILE_ALIASES.get(k, ""))]
 
 
 def profile_note(blank):
@@ -504,8 +512,6 @@ def profile_note(blank):
         effects.append("Badge and Commits show a setup hint")
     if "DISPLAY_NAME" in blank and "GITHUB_USER" in blank:
         effects.append("Identity shows a placeholder")
-    if "WEATHER_LAT" in blank or "WEATHER_LON" in blank:
-        effects.append("Weather has no location")
     if "TIMEZONE_OFFSET" in blank:
         effects.append("the clock runs on UTC")
     text = ("  note: no value in .env.local for %s; writing them blank."

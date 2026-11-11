@@ -474,7 +474,23 @@ oreo setup --github-user octocat --name "Mona Lisa" --timezone 5.5
 oreo setup --lat 12.97 --lon 77.59 --weather-name Bengaluru
 oreo setup --owm-key-stdin < owm-key.txt       # the OpenWeatherMap key, kept out of history
 oreo setup --designation ""                    # remove a value
+oreo setup --from-file .env.local              # the profile keys from an .env-style file
+oreo setup --set DISPLAY_NAME="Mona Lisa" --set TIMEZONE_OFFSET=5.5   # one key at a time
 ```
+
+Keys use the `.env.local` names: `GITHUB_USER`, `DISPLAY_NAME`,
+`DISPLAY_DESIGNATION` (or the older `DESIGNATION`), `TIMEZONE_OFFSET`,
+`OWM_API_KEY`, and optionally `WEATHER_LAT`, `WEATHER_LON`, `WEATHER_NAME`.
+Without a pinned latitude and longitude, Weather finds the badge's own
+location from its network ([PROFILE.md](PROFILE.md#weathers-location)).
+
+- `--from-file FILE` reads an `.env`-style file (comments, `export` and
+  quotes are fine). It takes only the profile keys, skips empty ones, and
+  leaves everything else in the file alone: it prints which keys it took
+  and the names of the others, never a value.
+- `--set KEY=VALUE` sets one key (repeatable); `KEY=` removes it.
+- When several are given, later ones win: the file, then `--set`, then the
+  named options such as `--name`.
 
 Writes `/profile.json` on the badge, which Badge, Identity, Commits, Weather
 and the clock read through `oreoOS/profile.py` (see [PROFILE.md](PROFILE.md)).

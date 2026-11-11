@@ -410,7 +410,7 @@ class ConfigDefaultsTest(unittest.TestCase):
 
     def test_env_example_lists_the_profile_keys(self):
         text = (ROOT / ".env.example").read_text()
-        for k in ("GITHUB_USER", "DISPLAY_NAME", "DESIGNATION",
+        for k in ("GITHUB_USER", "DISPLAY_NAME", "DISPLAY_DESIGNATION",
                   "TIMEZONE_OFFSET", "WEATHER_LAT", "WEATHER_LON",
                   "OWM_API_KEY", "WIFI_SSID", "WIFI_PASSWORD"):
             self.assertIn("\n%s=\n" % k, text)
