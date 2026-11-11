@@ -12,6 +12,31 @@ from its `## [<version>]` section below, so every release needs one.
 
 ### Added
 
+- A full-screen view: `oreo` with no command (and the new `oreo ui`)
+  switches the terminal to an Oreo app on the alternate screen, built with
+  Textual. A header shows the badge, port, OreoOS version and whether
+  OreoOS is paused; a sidebar has Status, Files (browse, upload, download,
+  add media, delete), Apps (App Store fetch, install, update, remove),
+  Wi-Fi (scan, connect, forget), Transfer (with the code the badge shows),
+  Profile (`oreo setup`, also from an `.env`-style file), Install app (from
+  a folder) and Update OreoOS, and **s** opens the REPL and comes back.
+  Every badge operation runs in the background with a spinner or progress
+  bar, one command on the serial port at a time; Esc cancels copies,
+  downloads, installs and Transfer between two chunks (removing a half
+  copy), and interrupts scans on the badge. It waits for a badge to be
+  plugged in and asks which one when there are several. OreoOS stays paused
+  while the view is open and restarts when it closes, also on Ctrl-C and on
+  errors. It reuses the commands' own code, so behaviour matches them.
+- `oreo menu`: the numbered menu. `oreo` falls back to it where the
+  full-screen view cannot run (no terminal, `TERM=dumb`, Textual missing)
+  or when `OREO_UI=menu` is set; `oreo ui` explains instead.
+- The badge's screen shows long operations: `push`, `pull`, `add`,
+  `app install`, `apps install`/`update` and `update` (and the same in the
+  view) call `oreoOS/hostui.py` (`show(title, detail, progress)`, `clear()`)
+  on OreoOS versions that have it. The calls ride along with execs the CLI
+  sends anyway, so a push costs no extra round trips; an OreoOS without it,
+  or a failure inside it, changes nothing.
+- Dependency: `textual >= 8.2, < 9` (imported only when the view opens).
 - `oreo setup --from-file FILE` takes the profile keys from an `.env`-style
   file such as `.env.local` (other keys are left alone and only named), and
   `--set KEY=VALUE` sets one key at a time by its `.env` name.

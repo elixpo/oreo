@@ -175,14 +175,34 @@ def transfer_view(ctx, b):
                  default="").strip()
     if not raw:
         return
+    files = split_files(raw)
+    restarted = []
+    try:
+        send_to_transfer(ctx, b, files, on_restart=lambda: restarted.append(1))
+    finally:
+        if restarted:
+            ui.note("OreoOS keeps running; the next menu entry that needs the badge "
+                    "pauses it again")
+
+
+def split_files(raw):
+    """File names typed on one line; quotes group names with spaces."""
     try:
         # Windows paths keep their backslashes; quotes still group names with spaces
-        files = [f.strip("'\"") for f in shlex.split(raw, posix=os.name != "nt")]
+        return [f.strip("'\"") for f in shlex.split(raw, posix=os.name != "nt")]
     except ValueError as e:
         raise OreoError("could not read the file list: %s" % e,
                         hint="put names with spaces in quotes")
+
+
+def send_to_transfer(ctx, b, files, code=None, on_restart=None):
+    """Convert `files`, restart OreoOS so the Transfer app can run, then
+    send them with the code the badge shows (asked through ctx.ui unless
+    given). Used by the menu and the full-screen UI. OreoOS keeps
+    running afterwards; the next raw-REPL command pauses it again."""
+    ui = ctx.ui
     args = argparse.Namespace(**vars(ctx.args))
-    args.action, args.files, args.code, args.wait = "send", files, None, 60.0
+    args.action, args.files, args.code, args.wait = "send", files, code, 60.0
     args.kind, args.seconds, args.photo_max = None, 10.0, 240
     tctx = copy.copy(ctx)
     tctx.args = args
@@ -190,12 +210,11 @@ def transfer_view(ctx, b):
     prepared = transfer.prepare(ui, files, args)   # before OreoOS is restarted
     from .main import finish_shielded          # main imports this module lazily
     finish_shielded(b, "soft")                 # Transfer runs inside OreoOS
+    if on_restart is not None:
+        on_restart()
     ui.note("OreoOS is starting; open Transfer on the badge (apps drawer -> Tools -> "
             "Transfer) and type the code it shows")
-    try:
-        transfer._session(tctx, lambda c, h: transfer.send_files(tctx, c, h, prepared))
-    finally:
-        ui.note("OreoOS keeps running; the next menu entry that needs the badge pauses it again")
+    return transfer._session(tctx, lambda c, h: transfer.send_files(tctx, c, h, prepared))
 
 
 def setup_view(ui, b):

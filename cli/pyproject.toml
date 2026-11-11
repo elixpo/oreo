@@ -41,6 +41,11 @@ dependencies = [
     # transport must match the badge's MicroPython 1.28 firmware.
     "mpremote >= 1.28.0, < 1.29",
     "Pillow >= 10.0",
+    # The full-screen view (`oreo`, `oreo ui`). Pinned to one major
+    # version: Textual changes its API between majors. 8.x supports
+    # Python 3.9+. Imported only when the view opens, so other commands
+    # start as fast as before; `oreo menu` works without it.
+    "textual >= 8.2, < 9",
 ]
 
 [project.scripts]
