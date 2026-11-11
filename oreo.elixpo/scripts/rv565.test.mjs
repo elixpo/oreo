@@ -16,16 +16,16 @@ import { join } from "node:path";
 import test from "node:test";
 
 import {
-  CODECS, PIXEL_FORMATS, Rv565Encoder, Rv565Error, checkSchedule, convertPixels, decodeFrame,
-  encodeClip, frameSize, frameTypeCounts, parseContainer, rgb565beToRgba, rgbaToRgb565be,
-  testPatternFrame, toCArray, toRgba, verify,
+  CODECS, PIXEL_FORMATS, Rv565Encoder, Rv565Error, changedLines, checkSchedule, convertPixels,
+  decodeFrame, encodeClip, frameLines, frameSize, frameTypeCounts, linesSentFraction, parseContainer,
+  rgb565beToRgba, rgbaToRgb565be, testPatternFrame, toCArray, toRgba, verify,
 } from "../src/lib/rv565.ts";
 
 const FIXTURES = new URL("./fixtures/rv565-v7/", import.meta.url);
 const manifest = JSON.parse(readFileSync(new URL("manifest.json", FIXTURES), "utf8"));
 const load = (file) => new Uint8Array(readFileSync(new URL(file, FIXTURES)));
 const sha = (data) => createHash("sha256").update(data).digest("hex");
-const TYPES = ["key", "delta", "repeat"];
+const TYPES = ["key", "delta", "repeat", "partial"];
 
 /** tools/make_conformance.py rgb_frames(): a gradient with a moving square;
  * frame 5 repeats frame 4. */
@@ -54,10 +54,16 @@ const rgbToRgba = (rgb) => {
   return out;
 };
 
-test("manifest covers every pixel format, both codecs, deltas, repeats and version 6", () => {
+test("manifest covers every pixel format, both codecs, deltas, partial deltas, repeats and version 6", () => {
   const valid = manifest.valid;
   assert.deepEqual(new Set(valid.map((v) => v.pixel_format)), new Set(PIXEL_FORMATS));
   assert.deepEqual(new Set(valid.map((v) => v.codec)), new Set(CODECS));
+  for (const fmt of PIXEL_FORMATS) {
+    for (const codec of CODECS) {
+      assert.ok(valid.some((v) => v.pixel_format === fmt && v.codec === codec && v.frame_types.includes("partial")), `${fmt} ${codec} partial`);
+    }
+  }
+  assert.ok(manifest.invalid.filter((v) => v.file.includes("partial")).length >= 7);
   assert.ok(valid.some((v) => v.version === 6));
   assert.ok(valid.some((v) => v.codec === "stored" && v.frame_types.includes("delta")));
   assert.ok(valid.some((v) => v.frame_types.includes("repeat")));
@@ -72,6 +78,7 @@ for (const v of manifest.valid) {
       [v.version, v.width, v.height, v.fps, v.frames, v.pixel_format, v.codec, v.keyframe_interval, v.frame_bytes],
     );
     assert.deepEqual(clip.index.map((r) => TYPES[r.type]), v.frame_types);
+    assert.deepEqual(v.frame_types.map((_, i) => changedLines(clip, i)), v.changed_lines);
     for (let i = 0; i < v.frames; i++) assert.equal(sha(await decodeFrame(clip, i)), v.frame_sha256[i], `frame ${i} in order`);
     // Random access: a fresh clip, frames in reverse, each a seek from a keyframe.
     const seek = parseContainer(load(v.file));
@@ -125,20 +132,97 @@ test("encoder chooses frames like the reference and round-trips every format and
     const frames = rgb.map((f) => convertPixels(f, W, H, pixelFormat, 3));
     for (const codec of CODECS) {
       for (const keyframeInterval of [1, 3, 4, 255]) {
-        const clip = parseContainer(await encodeClip(W, H, fps, frames, { pixelFormat, codec, keyframeInterval }));
-        assert.equal(clip.header.version, 7);
-        clip.index.forEach((r, i) => {
-          if (i % keyframeInterval === 0) assert.equal(TYPES[r.type], "key", `${pixelFormat} ${codec} K${keyframeInterval} frame ${i}`);
-          else if (i === 5) assert.equal(TYPES[r.type], "repeat", "frame 5 repeats frame 4");
-          else if (codec === "stored") assert.equal(TYPES[r.type], "key", "a stored delta is never smaller");
-        });
-        if (codec === "zlib" && keyframeInterval === 255) {
-          assert.ok(frameTypeCounts(clip).delta > 0, `${pixelFormat}: small motion makes deltas`);
+        for (const bandLines of [0, 1, 4, 8]) {
+          const what = `${pixelFormat} ${codec} K${keyframeInterval} B${bandLines}`;
+          const clip = parseContainer(await encodeClip(W, H, fps, frames, { pixelFormat, codec, keyframeInterval, bandLines }));
+          assert.equal(clip.header.version, 7);
+          clip.index.forEach((r, i) => {
+            const type = TYPES[r.type];
+            if (i % keyframeInterval === 0) assert.equal(type, "key", `${what} frame ${i}`);
+            else if (i === 5) assert.equal(type, "repeat", `${what}: frame 5 repeats frame 4`);
+            else if (codec === "stored") assert.notEqual(type, "delta", `${what}: a stored delta is never smaller`);
+            if (!bandLines) assert.notEqual(type, "partial", `${what}: band height 0 disables partials`);
+            if (type === "partial") assert.equal(r.partial.band, bandLines);
+          });
+          if (bandLines && keyframeInterval === 255) {
+            // The moving square leaves bands untouched (mono_vpage has 2 pages,
+            // so only band height 1 can skip one).
+            if (pixelFormat !== "mono_vpage" || bandLines === 1) {
+              assert.ok(frameTypeCounts(clip).partial > 0, `${what}: unchanged bands make partial deltas`);
+              assert.ok(linesSentFraction(clip) < 1, `${what}: fewer lines sent`);
+            }
+          }
+          if (codec === "zlib" && keyframeInterval === 255 && !bandLines) {
+            assert.ok(frameTypeCounts(clip).delta > 0, `${what}: small motion makes deltas`);
+          }
+          for (let i = 0; i < frames.length; i++) assert.deepEqual(await decodeFrame(clip, i), frames[i], `${what} frame ${i}`);
         }
-        for (let i = 0; i < frames.length; i++) assert.deepEqual(await decodeFrame(clip, i), frames[i]);
       }
     }
   }
+});
+
+test("partial deltas carry exactly the changed bands", async () => {
+  const W = 10, H = 20;
+  const a = new Uint8Array(2 * W * H).fill(0x11);
+  const b = a.slice();
+  b[2 * W * 9] ^= 0xff;            // row 9: band 1 with 8-line bands
+  b[2 * W * 19 + 3] ^= 0x01;       // row 19: band 2, the short last band
+  const clip = parseContainer(await encodeClip(W, H, 10, [a, b], { keyframeInterval: 2, codec: "stored" }));
+  assert.equal(TYPES[clip.index[1].type], "partial");
+  assert.deepEqual(clip.index[1].partial.changed, [1, 2]);
+  assert.deepEqual(changedLines(clip, 1), [[8, 12]]);
+  assert.deepEqual(changedLines(clip, 0), [[0, 20]]);
+  assert.deepEqual(await decodeFrame(clip, 1), b);
+  assert.deepEqual(frameLines("mono_vpage", 128, 64), [8, 128]);
+  assert.deepEqual(frameLines("rgb444", 21, 13), [13, 32]);
+});
+
+/** Deterministic noise frames: a base image, then per-frame small jitter
+ * (|d| <= jitter) on every channel plus a few large changes. */
+function noisyRgb(W, H, count, jitter, seed = 12345) {
+  const rand = () => (seed = (seed * 1103515245 + 12345) >>> 0) >>> 24;
+  const base = Uint8Array.from({ length: 3 * W * H }, rand);
+  return Array.from({ length: count }, (_, f) => {
+    const frame = base.map((v) => Math.max(0, Math.min(255, v + (f ? (rand() % (2 * jitter + 1)) - jitter : 0))));
+    for (let k = 0; k < 3 * f; k++) frame[rand() % frame.length] = rand();
+    return frame;
+  });
+}
+
+test("tolerance bounds the error per channel and turns small changes into repeats", async () => {
+  const W = 19, H = 11;
+  const rgb = noisyRgb(W, H, 8, 6);
+  for (const pixelFormat of PIXEL_FORMATS) {
+    const frames = rgb.map((f) => convertPixels(f, W, H, pixelFormat, 3));
+    for (const tolerance of [0, 3, 20, 255]) {
+      for (const codec of CODECS) {
+        const clip = parseContainer(await encodeClip(W, H, 24, frames, { pixelFormat, codec, keyframeInterval: 4, tolerance }));
+        for (let i = 0; i < frames.length; i++) {
+          const got = toRgba(await decodeFrame(clip, i), W, H, pixelFormat);
+          const want = toRgba(frames[i], W, H, pixelFormat);
+          let worst = 0;
+          for (let k = 0; k < got.length; k++) worst = Math.max(worst, Math.abs(got[k] - want[k]));
+          assert.ok(worst <= tolerance, `${pixelFormat} ${codec} T${tolerance} frame ${i}: error ${worst}`);
+        }
+        if (tolerance === 255) {
+          // Everything is within 255: every frame after the first shows frame 0.
+          const counts = frameTypeCounts(clip);
+          assert.equal(counts.repeat, frames.length - 1 - Math.floor((frames.length - 1) / 4), `${pixelFormat} ${codec}`);
+        }
+      }
+    }
+  }
+  // Only jitter, no large changes: a tolerance at least the jitter gives repeats.
+  const still = noisyRgb(W, H, 6, 2).map((f) => convertPixels(f, W, H, "rgb888", 3));
+  const jittered = parseContainer(await encodeClip(W, H, 24, [still[0], ...still.slice(1).map((f) => {
+    const out = still[0].slice();
+    for (let k = 0; k < out.length; k++) out[k] = Math.max(0, Math.min(255, still[0][k] + ((f[k] + k) % 5) - 2));
+    return out;
+  })], { pixelFormat: "rgb888", keyframeInterval: 255, tolerance: 2 }));
+  assert.equal(frameTypeCounts(jittered).repeat, 5);
+  assert.throws(() => new Rv565Encoder(4, 4, 24, { tolerance: 256 }), Rv565Error);
+  assert.throws(() => new Rv565Encoder(4, 4, 24, { bandLines: 256 }), Rv565Error);
 });
 
 test("writes version 6 for older players, and only what version 6 allows", async () => {
@@ -171,7 +255,7 @@ test("v6 reference vector decodes to the test pattern", async () => {
 /* Cross-check with the reference Python package. */
 
 const PY_CHECK = String.raw`
-import json, sys
+import io, json, sys
 src = sys.argv[1]
 if src:
     sys.path.insert(0, src)
@@ -180,70 +264,99 @@ assert rv565.VERSION == 7, "rv565 %s reads only version 6" % rv565.__version__
 d = sys.argv[2]
 cases = json.load(open(d + "/cases.json"))
 for c in cases:
-    clip = rv565.open(d + "/" + c["file"])
+    data = open(d + "/" + c["file"], "rb").read()
+    clip = rv565.open(data)
     h = clip.header
-    assert (h.version, h.width, h.height, h.fps, h.pixel_format, h.codec, h.keyframe_interval) == (
+    w, ht, fmt, t = h.width, h.height, h.pixel_format, c["tolerance"]
+    assert (h.version, w, ht, h.fps, fmt, h.codec, h.keyframe_interval) == (
         c["version"], c["width"], c["height"], c["fps"], c["pixel_format"], c["codec"], c["keyframe_interval"]), c["file"]
     assert [clip.frame_type(i) for i in range(len(clip))] == c["types"], c["file"]
+    assert [[list(r) for r in clip.changed_lines(i)] for i in range(len(clip))] == c["changed_lines"], c["file"]
     rgb = open(d + "/" + c["rgb"], "rb").read()
+    js_frames = open(d + "/" + c["frames"], "rb").read()
     preview = open(d + "/" + c["preview"], "rb").read()
-    n = 3 * h.width * h.height
+    n, size = 3 * w * ht, h.frame_bytes
     clip.verify()
+    sources = []
     for i in range(len(clip)):
-        src_rgb = rgb[i * n:(i + 1) * n]
+        source = rv565.convert(rgb[i * n:(i + 1) * n], w, ht, fmt)
+        sources.append(source)
         frame = clip.frame(i)
-        assert frame == rv565.convert(src_rgb, h.width, h.height, h.pixel_format), (c["file"], i)
-        assert rv565.to_rgb888(frame, h.width, h.height, h.pixel_format) == preview[i * n:(i + 1) * n], (c["file"], i)
+        assert frame == js_frames[i * size:(i + 1) * size], (c["file"], i, "decoded frame differs")
+        if t == 0:
+            assert frame == source, (c["file"], i)
+        else:
+            a, b = rv565.to_rgb888(frame, w, ht, fmt), rv565.to_rgb888(source, w, ht, fmt)
+            assert max(abs(x - y) for x, y in zip(a, b)) <= t, (c["file"], i, "tolerance exceeded")
+        assert rv565.to_rgb888(frame, w, ht, fmt) == preview[i * n:(i + 1) * n], (c["file"], i)
+    if h.codec == "stored":
+        # Stored output does not depend on a zlib build: the reference encoder
+        # must write the very same bytes, frame choices included.
+        buf = io.BytesIO()
+        rv565.write(buf, w, ht, h.fps, sources, pixel_format=fmt, codec="stored",
+                    keyframe_interval=h.keyframe_interval, version=h.version,
+                    band_lines=c["band_lines"], tolerance=t)
+        assert buf.getvalue() == data, (c["file"], "differs from the reference encoder")
 print(len(cases))
 `;
 
 function findPython() {
   const src = process.env.RV565_PYTHON_SRC ?? "";
-  const probe = spawnSync("python3", ["-I", "-c", "import sys\nif sys.argv[1]: sys.path.insert(0, sys.argv[1])\nimport rv565\nassert rv565.VERSION == 7", src]);
+  const probe = spawnSync("python3", ["-I", "-c", "import sys\nif sys.argv[1]: sys.path.insert(0, sys.argv[1])\nimport rv565\nassert rv565.VERSION == 7\nassert rv565.PARTIAL == 3", src]);
   return probe.status === 0 ? src : null;
 }
 
 const pySrc = findPython();
 
 test("files written here decode identically with the reference Python package",
-  { skip: pySrc === null && "reference rv565 >= 2.0 not found (set RV565_PYTHON_SRC)" }, async () => {
+  { skip: pySrc === null && "reference rv565 with partial deltas not found (set RV565_PYTHON_SRC)" }, async () => {
     const dir = mkdtempSync(join(tmpdir(), "rv565-js-"));
     try {
-      // Odd sizes pad rows and pages; random noise exercises every value.
-      let seed = 12345;
-      const rand = () => (seed = (seed * 1103515245 + 12345) >>> 0) >>> 24;
-      const W = 19, H = 11;
-      const base = Uint8Array.from({ length: 3 * W * H }, rand);
-      const rgb = Array.from({ length: 8 }, (_, f) => {
-        if (f === 3) return null; // repeat of frame 2
-        const frame = base.slice();
-        for (let k = 0; k < 20 * f; k++) frame[rand() % frame.length] = rand();
-        return frame;
-      });
+      // Odd sizes pad rows and pages; noise exercises every value; frame 3
+      // repeats frame 2.
+      const W = 19, H = 21;
+      const rgb = noisyRgb(W, H, 9, 3);
       rgb[3] = rgb[2];
+      // A still region: rows 8 and up keep frame 1's pixels from frame 2 on,
+      // so partial deltas skip bands.
+      for (let f = 2; f < rgb.length; f++) rgb[f].set(rgb[1].subarray(3 * W * 8), 3 * W * 8);
       const cases = [];
-      const writeCase = async (name, pixelFormat, codec, keyframeInterval, version = 7) => {
+      const writeCase = async (name, opts) => {
+        const { pixelFormat, codec, keyframeInterval, bandLines = 8, tolerance = 0, version = 7 } = opts;
         const frames = rgb.map((f) => convertPixels(f, W, H, pixelFormat, 3));
-        const data = await encodeClip(W, H, 30, frames, { pixelFormat, codec, keyframeInterval, version });
+        const data = await encodeClip(W, H, 30, frames, { pixelFormat, codec, keyframeInterval, bandLines, tolerance, version });
         const clip = parseContainer(data);
-        const preview = [];
+        const decoded = [], preview = [];
         for (let i = 0; i < frames.length; i++) {
-          const rgba = toRgba(await decodeFrame(clip, i), W, H, pixelFormat);
+          const frame = await decodeFrame(clip, i);
+          decoded.push(frame);
+          const rgba = toRgba(frame, W, H, pixelFormat);
           preview.push(Uint8Array.from({ length: 3 * W * H }, (_, j) => rgba[4 * Math.floor(j / 3) + (j % 3)]));
         }
         writeFileSync(join(dir, `${name}.rv565`), data);
+        writeFileSync(join(dir, `${name}.frames`), Buffer.concat(decoded));
         writeFileSync(join(dir, `${name}.preview`), Buffer.concat(preview));
         cases.push({
-          file: `${name}.rv565`, rgb: "source.rgb", preview: `${name}.preview`, version, width: W, height: H, fps: 30,
-          pixel_format: pixelFormat, codec, keyframe_interval: keyframeInterval,
+          file: `${name}.rv565`, rgb: "source.rgb", frames: `${name}.frames`, preview: `${name}.preview`, version,
+          width: W, height: H, fps: 30, pixel_format: pixelFormat, codec, keyframe_interval: keyframeInterval,
+          band_lines: bandLines, tolerance,
           types: clip.index.map((r) => TYPES[r.type]),
+          changed_lines: clip.index.map((_, i) => changedLines(clip, i)),
         });
+        return clip;
       };
       writeFileSync(join(dir, "source.rgb"), Buffer.concat(rgb));
+      let partials = 0;
       for (const fmt of PIXEL_FORMATS) {
-        for (const codec of CODECS) await writeCase(`${fmt}_${codec}`, fmt, codec, 4);
+        for (const codec of CODECS) {
+          for (const [bandLines, tolerance] of [[8, 0], [3, 0], [0, 0], [8, 6], [1, 40]]) {
+            const clip = await writeCase(`${fmt}_${codec}_b${bandLines}_t${tolerance}`, { pixelFormat: fmt, codec, keyframeInterval: 4, bandLines, tolerance });
+            partials += frameTypeCounts(clip).partial;
+          }
+        }
       }
-      await writeCase("rgb565be_v6", "rgb565be", "zlib", 1, 6);
+      assert.ok(partials > 0, "the cross-check exercises partial deltas");
+      await writeCase("rgb565be_v6", { pixelFormat: "rgb565be", codec: "zlib", keyframeInterval: 1, version: 6 });
       writeFileSync(join(dir, "cases.json"), JSON.stringify(cases));
       const run = spawnSync("python3", ["-I", "-c", PY_CHECK, pySrc, dir], { encoding: "utf8" });
       assert.equal(run.status, 0, run.stderr);

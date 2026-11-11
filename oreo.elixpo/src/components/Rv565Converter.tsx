@@ -5,7 +5,8 @@ import {
   AlertTriangle, Download, FileCode, Film, Loader2, Pause, Play, ShieldCheck, Upload, X,
 } from "lucide-react";
 import {
-  RV565_MAX_FPS, RV565_MAX_FPS_V6, Rv565Encoder, checkSchedule, convertPixels, decodeFrame, frameTypeCounts,
+  RV565_BAND_LINES, RV565_MAX_FPS, RV565_MAX_FPS_V6, Rv565Encoder, checkSchedule, convertPixels, decodeFrame,
+  frameTypeCounts, linesSentFraction,
   parseContainer, toCArray, toRgba, verify, type Codec, type PixelFormat, type Rv565Clip, type ScheduleReport,
 } from "@/lib/rv565";
 
@@ -48,12 +49,14 @@ type Fit = "fill" | "fit";
 type KeyMode = "second" | "every" | "custom";
 type Result = {
   clip: Rv565Clip; container: Uint8Array; report: ScheduleReport; serial: ScheduleReport; name: string;
-  counts: { key: number; delta: number; repeat: number }; opened: boolean;
+  counts: { key: number; delta: number; repeat: number; partial: number }; opened: boolean;
+  /** Share of all frame lines sent to the display (repeats and unchanged bands are skipped). */
+  linesSent: number;
 };
 
 function makeResult(clip: Rv565Clip, name: string, opened: boolean): Result {
   return {
-    clip, container: clip.data, name, opened, counts: frameTypeCounts(clip),
+    clip, container: clip.data, name, opened, counts: frameTypeCounts(clip), linesSent: linesSentFraction(clip),
     report: checkSchedule(clip, true), serial: checkSchedule(clip, false),
   };
 }
@@ -95,6 +98,8 @@ export default function Rv565Converter() {
   const [codec, setCodec] = useState<Codec>("zlib");
   const [keyMode, setKeyMode] = useState<KeyMode>("second");
   const [keyCustom, setKeyCustom] = useState(24);
+  const [bandLines, setBandLines] = useState(RV565_BAND_LINES);
+  const [tolerance, setTolerance] = useState(0);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -166,6 +171,7 @@ export default function Rv565Converter() {
 
       const encoder = new Rv565Encoder(size.w, size.h, fps, {
         version: v6 ? 6 : 7, pixelFormat: v6 ? "rgb565be" : pixelFormat, codec: v6 ? "zlib" : codec, keyframeInterval,
+        bandLines: v6 ? 0 : bandLines, tolerance,
       });
       for (let i = 0; i < frameCount; i++) {
         if (cancelRef.current) throw new Error("Cancelled.");
@@ -192,7 +198,7 @@ export default function Rv565Converter() {
     } finally {
       setBusy(false);
     }
-  }, [videoUrl, file, size, fit, fps, start, frameCount, v6, pixelFormat, codec, keyframeInterval]);
+  }, [videoUrl, file, size, fit, fps, start, frameCount, v6, pixelFormat, codec, keyframeInterval, bandLines, tolerance]);
 
   // Preview: decode each frame on the fly, as the microcontroller does, then
   // show it as RGB (grayscale and monochrome formats as white on black).
@@ -302,11 +308,38 @@ export default function Rv565Converter() {
             )}
           </label>
           <p className="text-xs leading-relaxed text-muted sm:col-span-2">
-            Between keyframes, a frame identical to the one before is stored as a repeat, and any other as an XOR delta
-            only when that is smaller than a keyframe, so a frame never costs more than a keyframe would. A keyframe
-            every second keeps seeking to at most one second of frames. Stored files use repeats but no deltas, since a
-            stored delta is never smaller.
+            Between keyframes, a frame identical to the one before is stored as a repeat. Any other frame is stored as
+            whichever is smallest of a keyframe, an XOR delta and a partial delta, which carries only the bands of rows
+            that changed. The partial delta wins even when it is slightly larger, because the board then sends only those
+            bands to the display. A keyframe every second keeps seeking to at most one second of frames.
           </p>
+          <label className="block text-sm sm:col-span-2">
+            <span className="eyebrow">Tolerance</span>
+            <span className="mt-2 flex items-center gap-3">
+              <input type="range" min={0} max={64} value={tolerance} onChange={(e) => setTolerance(+e.target.value)}
+                     aria-label="Tolerance, per colour channel out of 255" className="w-full accent-[#142018]" />
+              <span className="w-20 text-right font-mono">{tolerance ? `±${tolerance}` : "exact"}</span>
+            </span>
+            <span className="mt-2 block text-xs leading-snug text-muted">
+              0 keeps every frame exact. A higher value lets a pixel keep its colour from the previous frame when the new
+              colour is within that many steps (out of 255) on every channel, so noise and slow fades stop counting as
+              changes: files get smaller and more frames become repeats or small partial updates. No pixel is ever further
+              than this from the converted video.
+            </span>
+          </label>
+          <details className="text-sm sm:col-span-2">
+            <summary className="eyebrow cursor-pointer">Advanced</summary>
+            <label className="mt-3 block">
+              <span className="eyebrow">Partial-delta band height (rows)</span>
+              <input type="number" min={0} max={255} value={v6 ? 0 : bandLines} disabled={v6} aria-label="Band height in rows"
+                     onChange={(e) => setBandLines(Math.min(255, Math.max(0, Math.round(+e.target.value) || 0)))}
+                     className="mt-2 w-full rounded-pill border border-border bg-bg px-4 py-2" />
+              <span className="mt-2 block text-xs leading-snug text-muted">
+                Partial deltas mark changes in bands of this many rows (pages of 8 rows for SSD1306-style monochrome). Smaller
+                bands send less to the display but add a few bytes of mask. Default {RV565_BAND_LINES}; 0 turns partial deltas off.
+              </span>
+            </label>
+          </details>
           <label className="flex items-start gap-3 text-sm sm:col-span-2">
             <input type="checkbox" checked={v6} className="mt-1 accent-[#142018]"
                    onChange={(e) => { setV6(e.target.checked); if (e.target.checked) setFps((f) => Math.min(f, RV565_MAX_FPS_V6)); }} />
@@ -406,7 +439,8 @@ export default function Rv565Converter() {
             </div>
             <p className="mt-2 font-mono text-xs text-muted">
               RV565 v{result.clip.header.version} · {result.clip.header.pixelFormat} · {result.clip.header.codec}
-              {" "}· keyframe every {result.clip.header.keyframeInterval} · {result.counts.key} key, {result.counts.delta} delta, {result.counts.repeat} repeat
+              {" "}· keyframe every {result.clip.header.keyframeInterval} · {result.counts.key} key, {result.counts.delta} delta, {result.counts.partial} partial, {result.counts.repeat} repeat
+              {" "}· {(result.linesSent * 100).toFixed(1)}% of lines sent to the display
               {result.opened ? " · every frame verified" : ""}
             </p>
             {result.clip.header.version === 7 && (
@@ -443,7 +477,7 @@ export default function Rv565Converter() {
                   </li>
                   <li className="text-xs text-muted">
                     From the paper&apos;s decode-cost model, on a 320×240 panel at 40 MHz SPI.
-                    {result.counts.delta ? " Deltas add one XOR pass per frame, which the model does not include." : ""}
+                    {result.counts.delta || result.counts.partial ? " Deltas and partial deltas add an XOR pass, which the model does not include; partial deltas also send less than a full frame, which it does not credit." : ""}
                   </li>
                 </ul>
               ) : (

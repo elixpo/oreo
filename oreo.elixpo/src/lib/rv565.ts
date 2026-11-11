@@ -7,9 +7,13 @@
  *   header   "RV5", version, u16 width, u16 height, u8 fps, u8 flags,
  *            u16 frame count; version 7 adds u8 header size (16), u8 pixel
  *            format, u8 codec, u8 keyframe interval K
- *   records  u32 length, u8 frame type (key / XOR delta / repeat), body;
- *            version 6 records have no type byte and are all zlib keyframes
- *            of big-endian RGB565
+ *   records  u32 length, u8 frame type (key / XOR delta / repeat / partial
+ *            delta), body; version 6 records have no type byte and are all
+ *            zlib keyframes of big-endian RGB565
+ *
+ * A partial delta carries only the bands of lines that changed (u8 band
+ * height, a band mask, then the XOR of those bands), so a player decodes and
+ * sends only those bands to the display.
  *
  * Colour conversion follows the reference rules exactly, so a frame
  * converted here is byte-identical to `rv565.convert` in Python; the
@@ -39,9 +43,11 @@ export type PixelFormat = (typeof PIXEL_FORMATS)[number];
 export const CODECS = ["stored", "zlib"] as const;
 export type Codec = (typeof CODECS)[number];
 
-export const KEYFRAME = 0, DELTA = 1, REPEAT = 2;
-export type FrameType = typeof KEYFRAME | typeof DELTA | typeof REPEAT;
-export const FRAME_TYPE_NAMES = ["key", "delta", "repeat"] as const;
+export const KEYFRAME = 0, DELTA = 1, REPEAT = 2, PARTIAL = 3;
+export type FrameType = typeof KEYFRAME | typeof DELTA | typeof REPEAT | typeof PARTIAL;
+export const FRAME_TYPE_NAMES = ["key", "delta", "repeat", "partial"] as const;
+/** Default band height, in lines, of the reference encoder's partial deltas. */
+export const RV565_BAND_LINES = 8;
 
 export type Rv565Header = {
   version: number;
@@ -58,7 +64,11 @@ export type Rv565Header = {
   frameBytes: number;
 };
 
-export type Rv565Record = { type: FrameType; offset: number; length: number };
+/** A parsed partial delta body: band height, changed bands, where the
+ * codec-encoded data starts in the body and how long it decodes to. */
+export type PartialLayout = { band: number; changed: number[]; start: number; size: number };
+
+export type Rv565Record = { type: FrameType; offset: number; length: number; partial?: PartialLayout };
 
 export type Rv565Clip = {
   header: Rv565Header;
@@ -89,6 +99,31 @@ export function rowBytes(format: PixelFormat, width: number): number {
 /** Decoded size in bytes of one frame. */
 export function frameSize(format: PixelFormat, width: number, height: number): number {
   return format === "mono_vpage" ? width * ((height + 7) >> 3) : rowBytes(format, width) * height;
+}
+
+/** [P, R]: a frame is P lines of R bytes (pixel rows, or pages of 8 rows for
+ * mono_vpage). Partial deltas divide the frame into bands of lines. */
+export function frameLines(format: PixelFormat, width: number, height: number): [number, number] {
+  return format === "mono_vpage" ? [(height + 7) >> 3, width] : [height, rowBytes(format, width)];
+}
+
+/** Parse the header part of a partial delta body (docs/FORMAT.md, Partial delta). */
+export function partialLayout(body: Uint8Array, lines: number, lineBytes: number): PartialLayout {
+  if (body.length < 1 || body[0] === 0) throw new Rv565Error("partial delta with band height 0");
+  const band = body[0];
+  const count = Math.ceil(lines / band);
+  const maskLen = (count + 7) >> 3;
+  if (body.length < 1 + maskLen) throw new Rv565Error("partial delta too short for its band mask");
+  const changed: number[] = [];
+  let size = 0;
+  for (let b = 0; b < 8 * maskLen; b++) {
+    if (!((body[1 + (b >> 3)] >> (b & 7)) & 1)) continue;
+    if (b >= count) throw new Rv565Error("partial delta sets a band past the frame");
+    changed.push(b);
+    size += (Math.min(lines, (b + 1) * band) - b * band) * lineBytes;
+  }
+  if (!changed.length) throw new Rv565Error("partial delta with no changed band");
+  return { band, changed, start: 1 + maskLen, size };
 }
 
 const luma = (r: number, g: number, b: number) => Math.floor((299 * r + 587 * g + 114 * b + 500) / 1000);
@@ -273,13 +308,22 @@ export type EncodeOptions = {
   codec?: Codec;
   /** A keyframe at least every K frames (1-255). */
   keyframeInterval?: number;
+  /** Band height in lines for partial deltas (1-255, default 8); 0 turns them off. */
+  bandLines?: number;
+  /** 0-255, default 0 (lossless): keep a pixel of the previous decoded frame
+   * wherever every channel of the new one, in 8 bits, is within this. */
+  tolerance?: number;
 };
 
 /** Writes a clip one frame at a time, holding only the previous frame and the
- * encoded records. Frame choice is the reference encoder's: frames at
- * multiples of K are keyframes; any other frame is a repeat when it equals
- * the previous one, else the smaller of a delta and a keyframe (a stored delta
- * is never smaller, so stored clips use only keyframes and repeats). */
+ * encoded records. Frame choice is the reference encoder's
+ * (rv565.encode_frames): frames at multiples of K are keyframes; any other
+ * frame is a repeat when it equals the previous one, else the smallest of a
+ * keyframe, a delta (zlib only: a stored delta is never smaller) and a partial
+ * delta, except that the partial delta wins whenever it is at most 2% (and at
+ * least 16 bytes) larger, since it saves the display transfer of every
+ * unchanged band. With a tolerance, each frame first keeps the previous
+ * decoded pixel wherever the new one is within the tolerance. */
 export class Rv565Encoder {
   readonly width: number;
   readonly height: number;
@@ -288,6 +332,8 @@ export class Rv565Encoder {
   readonly pixelFormat: PixelFormat;
   readonly codec: Codec;
   readonly keyframeInterval: number;
+  readonly bandLines: number;
+  readonly tolerance: number;
   readonly frameBytes: number;
   private prev: Uint8Array | null = null;
   private records: Array<{ type: FrameType; body: Uint8Array }> = [];
@@ -300,6 +346,8 @@ export class Rv565Encoder {
     this.pixelFormat = options.pixelFormat ?? "rgb565be";
     this.codec = options.codec ?? "zlib";
     this.keyframeInterval = options.keyframeInterval ?? 1;
+    this.bandLines = options.bandLines ?? RV565_BAND_LINES;
+    this.tolerance = options.tolerance ?? 0;
     if (!(Number.isInteger(width) && width > 0 && width <= 0xffff && Number.isInteger(height) && height > 0 && height <= 0xffff)) {
       throw new Rv565Error(`size ${width}x${height} out of range`);
     }
@@ -307,6 +355,8 @@ export class Rv565Encoder {
     if (!CODECS.includes(this.codec)) throw new Rv565Error(`unknown codec ${this.codec}`);
     const k = this.keyframeInterval;
     if (!(Number.isInteger(k) && k >= 1 && k <= RV565_MAX_KEYFRAME_INTERVAL)) throw new Rv565Error("keyframe interval must be 1-255");
+    if (!(Number.isInteger(this.bandLines) && this.bandLines >= 0 && this.bandLines <= 255)) throw new Rv565Error("band height must be 0-255");
+    if (!(Number.isInteger(this.tolerance) && this.tolerance >= 0 && this.tolerance <= 255)) throw new Rv565Error("tolerance must be 0-255");
     if (this.version === RV565_VERSION_6) {
       if (this.pixelFormat !== "rgb565be" || this.codec !== "zlib" || k !== 1) {
         throw new Rv565Error("version 6 supports only rgb565be, zlib, keyframe interval 1");
@@ -326,24 +376,77 @@ export class Rv565Encoder {
     return this.codec === "stored" ? data.slice() : zlibCompress(data);
   }
 
+  /** Keep each pixel of prev where every channel of frame, in 8 bits, is
+   * within the tolerance of it; the result is what the decoder will show. */
+  private applyTolerance(frame: Uint8Array, prev: Uint8Array): Uint8Array {
+    const { width: w, height: h, pixelFormat: fmt, tolerance: t } = this;
+    const mixed = toRgba(frame, w, h, fmt);
+    const old = toRgba(prev, w, h, fmt);
+    for (let o = 0; o < mixed.length; o += 4) {
+      if (Math.abs(mixed[o] - old[o]) <= t && Math.abs(mixed[o + 1] - old[o + 1]) <= t && Math.abs(mixed[o + 2] - old[o + 2]) <= t) {
+        mixed[o] = old[o]; mixed[o + 1] = old[o + 1]; mixed[o + 2] = old[o + 2];
+      }
+    }
+    return convertPixels(mixed, w, h, fmt, 4);
+  }
+
+  /** Body of a partial delta, or null when no band changed. */
+  private async partialBody(frame: Uint8Array, prev: Uint8Array): Promise<Uint8Array | null> {
+    const band = this.bandLines;
+    const [lines, lineBytes] = frameLines(this.pixelFormat, this.width, this.height);
+    const count = Math.ceil(lines / band);
+    const mask = new Uint8Array((count + 7) >> 3);
+    const parts: Uint8Array[] = [];
+    for (let b = 0; b < count; b++) {
+      const lo = b * band * lineBytes, hi = Math.min(lines, (b + 1) * band) * lineBytes;
+      const a = frame.subarray(lo, hi), p = prev.subarray(lo, hi);
+      if (!equal(a, p)) {
+        mask[b >> 3] |= 1 << (b & 7);
+        parts.push(xor(a, p));
+      }
+    }
+    if (!parts.length) return null;
+    const joined = new Uint8Array(parts.reduce((n, x) => n + x.length, 0));
+    parts.reduce((at, x) => (joined.set(x, at), at + x.length), 0);
+    const data = await this.encode(joined);
+    const out = new Uint8Array(1 + mask.length + data.length);
+    out[0] = band;
+    out.set(mask, 1);
+    out.set(data, 1 + mask.length);
+    return out;
+  }
+
   /** Add one frame, already in the clip's pixel format; returns its type. */
-  async add(frame: Uint8Array): Promise<FrameType> {
+  async add(source: Uint8Array): Promise<FrameType> {
     const i = this.records.length;
     if (i >= RV565_MAX_FRAMES) throw new Rv565Error(`more than ${RV565_MAX_FRAMES} frames`);
-    if (frame.length !== this.frameBytes) throw new Rv565Error(`frame ${i} has ${frame.length} bytes, expected ${this.frameBytes}`);
+    if (source.length !== this.frameBytes) throw new Rv565Error(`frame ${i} has ${source.length} bytes, expected ${this.frameBytes}`);
     const prev = this.prev;
+    const frame = this.tolerance && prev ? this.applyTolerance(source, prev) : source;
     let record: { type: FrameType; body: Uint8Array };
     if (i % this.keyframeInterval === 0 || !prev) {
       record = { type: KEYFRAME, body: await this.encode(frame) };
     } else if (equal(frame, prev)) {
       record = { type: REPEAT, body: new Uint8Array(0) };
     } else {
-      const key = await this.encode(frame);
-      const delta = this.codec === "stored" ? key : await this.encode(xor(frame, prev));
-      record = delta.length < key.length ? { type: DELTA, body: delta } : { type: KEYFRAME, body: key };
+      const options: Array<{ type: FrameType; body: Uint8Array }> = [{ type: KEYFRAME, body: await this.encode(frame) }];
+      if (this.codec !== "stored") options.push({ type: DELTA, body: await this.encode(xor(frame, prev)) });
+      const partialBody = this.bandLines ? await this.partialBody(frame, prev) : null;
+      if (partialBody) options.push({ type: PARTIAL, body: partialBody });
+      // The smallest body, a delta winning ties (as min() over (length,
+      // type != delta) in the reference); then the partial delta if it is
+      // within 2% (at least 16 bytes) of that.
+      let best = options[0];
+      for (const o of options.slice(1)) {
+        if (o.body.length < best.body.length || (o.body.length === best.body.length && o.type === DELTA && best.type !== DELTA)) best = o;
+      }
+      if (partialBody && partialBody.length <= best.body.length + Math.max(16, Math.floor(best.body.length / 50))) {
+        best = { type: PARTIAL, body: partialBody };
+      }
+      record = best;
     }
     this.records.push(record);
-    this.prev = frame.slice();
+    this.prev = frame === source ? source.slice() : frame;
     return record.type;
   }
 
@@ -439,13 +542,22 @@ export function parseContainer(data: Uint8Array): Rv565Clip {
       index.push({ type: KEYFRAME, offset, length });
     } else {
       const type = data[offset];
-      if (type > REPEAT) throw new Rv565Error(`unsupported frame type ${type} at frame ${i}`);
+      if (type > PARTIAL) throw new Rv565Error(`unsupported frame type ${type} at frame ${i}`);
       if (i % header.keyframeInterval === 0 && type !== KEYFRAME) throw new Rv565Error(`frame ${i} must be a keyframe`);
       if (type === REPEAT && length !== 1) throw new Rv565Error(`repeat frame ${i} has a body`);
-      if (type !== REPEAT && header.codec === "stored" && length - 1 !== header.frameBytes) {
+      if ((type === KEYFRAME || type === DELTA) && header.codec === "stored" && length - 1 !== header.frameBytes) {
         throw new Rv565Error(`stored frame ${i} has ${length - 1} bytes, expected ${header.frameBytes}`);
       }
-      index.push({ type: type as FrameType, offset: offset + 1, length: length - 1 });
+      const record: Rv565Record = { type: type as FrameType, offset: offset + 1, length: length - 1 };
+      if (type === PARTIAL) {
+        const [lines, lineBytes] = frameLines(header.pixelFormat, header.width, header.height);
+        const layout = partialLayout(data.subarray(offset + 1, offset + length), lines, lineBytes);
+        if (header.codec === "stored" && length - 1 - layout.start !== layout.size) {
+          throw new Rv565Error(`stored partial frame ${i} has ${length - 1 - layout.start} bytes, expected ${layout.size}`);
+        }
+        record.partial = layout;
+      }
+      index.push(record);
     }
     offset += length;
   }
@@ -457,6 +569,51 @@ async function body(clip: Rv565Clip, i: number): Promise<Uint8Array> {
   const { offset, length } = clip.index[i];
   const raw = clip.data.subarray(offset, offset + length);
   return clip.header.codec === "stored" ? raw.slice() : inflateExact(raw, clip.header.frameBytes, i);
+}
+
+/** prev with the changed bands of partial delta i XORed in. */
+async function applyPartial(clip: Rv565Clip, i: number, prev: Uint8Array): Promise<Uint8Array> {
+  const { offset, length, partial } = clip.index[i];
+  const { band, changed, start, size } = partial!;
+  const raw = clip.data.subarray(offset + start, offset + length);
+  const data = clip.header.codec === "stored" ? raw : await inflateExact(raw, size, i);
+  const [lines, lineBytes] = frameLines(clip.header.pixelFormat, clip.header.width, clip.header.height);
+  const out = prev.slice();
+  let pos = 0;
+  for (const b of changed) {
+    const lo = b * band * lineBytes, hi = Math.min(lines, (b + 1) * band) * lineBytes;
+    for (let k = lo; k < hi; k++) out[k] ^= data[pos++];
+  }
+  return out;
+}
+
+/** Line ranges [first, count] that frame i changes, so a player knows what to
+ * send to the display: everything for a keyframe or delta, nothing for a
+ * repeat, the changed bands (merged into runs) for a partial delta. Lines are
+ * pixel rows, or pages of 8 rows for mono_vpage. */
+export function changedLines(clip: Rv565Clip, i: number): Array<[number, number]> {
+  const { pixelFormat, width, height } = clip.header;
+  const lines = frameLines(pixelFormat, width, height)[0];
+  const { type, partial } = clip.index[i];
+  if (type === REPEAT) return [];
+  if (type !== PARTIAL) return [[0, lines]];
+  const runs: Array<[number, number]> = [];
+  for (const b of partial!.changed) {
+    const first = b * partial!.band, end = Math.min(lines, (b + 1) * partial!.band);
+    const last = runs[runs.length - 1];
+    if (last && last[0] + last[1] === first) last[1] = end - last[0];
+    else runs.push([first, end - first]);
+  }
+  return runs;
+}
+
+/** Share of all frame lines that the clip sends to the display (0-1). */
+export function linesSentFraction(clip: Rv565Clip): number {
+  const { pixelFormat, width, height, frames } = clip.header;
+  const lines = frameLines(pixelFormat, width, height)[0];
+  let sent = 0;
+  for (let i = 0; i < frames; i++) for (const [, n] of changedLines(clip, i)) sent += n;
+  return sent / (lines * frames);
 }
 
 /** Frame i in the clip's pixel format (header.frameBytes bytes). Decoding in
@@ -478,6 +635,7 @@ export async function decodeFrame(clip: Rv565Clip, i: number): Promise<Uint8Arra
     const type = clip.index[j].type;
     if (type === KEYFRAME) frame = await body(clip, j);
     else if (type === DELTA) frame = xor(frame, await body(clip, j));
+    else if (type === PARTIAL) frame = await applyPartial(clip, j, frame);
   }
   clip.last = { i, frame };
   return frame;
@@ -491,7 +649,7 @@ export async function verify(clip: Rv565Clip): Promise<number> {
 }
 
 export function frameTypeCounts(clip: Rv565Clip) {
-  const counts = { key: 0, delta: 0, repeat: 0 };
+  const counts = { key: 0, delta: 0, repeat: 0, partial: 0 };
   for (const { type } of clip.index) counts[FRAME_TYPE_NAMES[type]]++;
   return counts;
 }
