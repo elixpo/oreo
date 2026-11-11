@@ -21,6 +21,9 @@ points at a short-lived release-assets.githubusercontent.com URL.
 
 Returns the response body as bytes on HTTP 200, or None on any unsupported
 status / timeout / DNS failure / SSL error. Caller logs / surfaces.
+
+Every connection verifies the server's certificate (tls_wrap, #110). When
+a request fails because of it, tls_error_since(tls_mark()) says why.
 """
 
 import time
@@ -36,18 +39,203 @@ except ImportError:
 USER_AGENT = "OreoBadge"
 
 
+# ═════════════════════════════════════════════════════════════════════════
+# TLS with certificate verification (#110)
+# ═════════════════════════════════════════════════════════════════════════
+#
+# Every HTTPS connection verifies the server's chain against the roots in
+# oreoOS/tls_roots.py (imported on the first TLS connection, not at boot)
+# and the server's name (mbedTLS checks it against server_hostname, which
+# also sets SNI). A failure raises TLSError and is never retried without
+# verification. Docs: docs/TLS.md.
+
+# A clock earlier than this is "not set" (the RTC starts at 2000-01-01).
+# mbedTLS compares certificate dates with the RTC, so TLS waits for, or
+# runs, an NTP sync first.
+MIN_CLOCK_YEAR = 2026
+CLOCK_WAIT_MS = 6000        # wait for a sync already running (netsvc)
+CLOCK_RETRY_MS = 30000      # own NTP attempts at most this often
+
+# Debug escape hatch, OFF by default: set it from the REPL
+# (`import oreoOS._http as h; h.INSECURE_DEBUG = True`) to skip certificate
+# checks until the next reset. It is never saved and every connection
+# prints a warning while it is on.
+INSECURE_DEBUG = False
+
+# Short, user-facing reasons (they fit the Updates screen's 34 columns
+# with the "TLS: " prefix).
+CLOCK    = "clock not set"
+DATE     = "certificate date invalid"
+UNTRUSTED = "untrusted certificate"
+NAME     = "certificate name mismatch"
+BUNDLE   = "CA bundle failed to load"
+REJECTED = "certificate rejected"
+
+
+class TLSError(OSError):
+    """A TLS connection refused for security reasons: the certificate
+    did not verify, or the clock is not set so it could not be checked.
+    `reason` is one of the short strings above; `host` the server."""
+
+    def __init__(self, reason, host="", detail=""):
+        # super(), not OSError.__init__: MicroPython's native exception
+        # types have no __init__ attribute.
+        super().__init__("TLS: " + reason)
+        self.reason = reason
+        self.host = host
+        self.detail = detail
+
+
+# Last TLS failure, for screens that only see "the request failed". A
+# caller takes tls_mark() before its requests and asks
+# tls_error_since(mark) after a failure: a sequence number rather than a
+# clear-then-read flag, so background threads cannot wipe another
+# caller's error.
+_tls_seq = 0
+_tls_reason = ""
+_tls_host = ""
+_ntp_try_ms = None
+_roots = None
+
+
+def tls_mark():
+    return _tls_seq
+
+
+def tls_error_since(mark):
+    """'TLS: <reason>' if a TLS connection failed after tls_mark()
+    returned `mark`, else None."""
+    if _tls_seq != mark and _tls_reason:
+        return "TLS: " + _tls_reason
+    return None
+
+
+def last_tls_error():
+    """(seq, reason, host) of the most recent TLS failure (seq 0: none)."""
+    return _tls_seq, _tls_reason, _tls_host
+
+
+def _fail(reason, host, detail=""):
+    global _tls_seq, _tls_reason, _tls_host
+    _tls_seq += 1
+    _tls_reason = reason
+    _tls_host = host
+    _bc("TLS refused %s: %s %s" % (host, reason, detail))
+    return TLSError(reason, host, detail)
+
+
+def _ticks():
+    try:
+        return time.ticks_ms()
+    except AttributeError:          # CPython (host tests)
+        return int(time.monotonic() * 1000)
+
+
+def _ticks_diff(a, b):
+    try:
+        return time.ticks_diff(a, b)
+    except AttributeError:
+        return a - b
+
+
+def _sleep_ms(ms):
+    try:
+        time.sleep_ms(ms)
+    except AttributeError:
+        time.sleep(ms / 1000)
+
+
+def clock_ok():
+    """True when the RTC holds a plausible date (after MIN_CLOCK_YEAR)."""
+    try:
+        return time.localtime()[0] >= MIN_CLOCK_YEAR
+    except Exception:
+        return False
+
+
+def ensure_clock():
+    """Make sure the clock is set before a certificate is checked.
+
+    Already set: returns at once. A sync in progress (netsvc's worker on
+    link-up): waits up to CLOCK_WAIT_MS for it. Otherwise runs one NTP
+    sync itself (bounded: DNS plus a 2.5 s UDP timeout), at most once per
+    CLOCK_RETRY_MS so a network without NTP does not slow every request.
+    Callers run on a worker or under a busy card, like the request itself.
+    Returns True when the clock is set.
+    """
+    global _ntp_try_ms
+    if clock_ok():
+        return True
+    try:
+        from oreoOS import timeutil
+    except Exception:
+        return False
+    start = _ticks()
+    while timeutil.sync_busy():
+        if _ticks_diff(_ticks(), start) >= CLOCK_WAIT_MS:
+            break
+        _sleep_ms(100)
+    if clock_ok():
+        return True
+    now = _ticks()
+    if _ntp_try_ms is not None and _ticks_diff(now, _ntp_try_ms) < CLOCK_RETRY_MS:
+        return False
+    _ntp_try_ms = now
+    _bc("clock not set: NTP sync before TLS")
+    try:
+        timeutil.sync_from_ntp()
+    except Exception:
+        pass
+    return clock_ok()
+
+
+def _load_roots():
+    """The DER roots, imported on the first TLS connection and kept."""
+    global _roots
+    if _roots is None:
+        from oreoOS import tls_roots
+        _roots = tls_roots.ROOTS
+    return _roots
+
+
+def _classify(text):
+    """Map an mbedTLS / OpenSSL verification message to a short reason."""
+    t = text.lower()
+    if "expired" in t or "future" in t or "not yet valid" in t:
+        return DATE
+    if "common name" in t or "hostname" in t or "match" in t:
+        return NAME
+    if ("trusted" in t or "unknown ca" in t or "issuer" in t
+            or "self signed" in t or "self-signed" in t
+            or "not correctly signed" in t or "local issuer" in t):
+        return UNTRUSTED
+    return REJECTED
+
+
+def _is_verify_failure(e):
+    """True for a certificate rejection, as opposed to a network error.
+
+    MicroPython raises ValueError with mbedtls_x509_crt_verify_info()'s
+    text, or OSError(-0x2700, "X509 - Certificate verification failed")
+    when that text is unavailable. CPython raises
+    ssl.SSLCertVerificationError, a ValueError subclass."""
+    if isinstance(e, ValueError):
+        return True
+    text = str(e)
+    return ("X509" in text or "-9984" in text or "verif" in text.lower()
+            or "certificate" in text.lower())
+
+
 def tls_wrap(raw, host):
-    """Wrap a connected socket in TLS 1.2+ as a client, with SNI.
+    """Wrap a connected socket in TLS 1.2+ as a client, with SNI, and
+    verify the server's certificate chain and name.
 
     One place for every HTTPS connection on the badge (OTA, App Store,
-    GitHub data, the WiFi speed test). The protocol is explicit
-    (PROTOCOL_TLS_CLIENT) rather than the deprecated wrap_socket() default.
-
-    Certificates are not verified yet: the badge carries no CA bundle, and
-    verification also needs a correct clock before the first request. This
-    matches the previous wrap_socket() behaviour (CERT_NONE); verifying
-    GitHub's chain is tracked separately. A fresh context per connection
-    keeps concurrent fetches (background refresh threads) independent.
+    GitHub data, geo, weather, the WiFi speed test). Raises TLSError when
+    the clock is not set or the certificate is rejected; there is no
+    fallback to an unverified connection (see INSECURE_DEBUG). Network
+    errors pass through unchanged. A fresh context per connection keeps
+    concurrent fetches (background refresh threads) independent.
     """
     ctx = _ssl.SSLContext(_ssl.PROTOCOL_TLS_CLIENT)
     # TLS 1.2 is the floor. MicroPython's mbedTLS 3.x has no TLS 1.0/1.1 at
@@ -57,8 +245,39 @@ def tls_wrap(raw, host):
         ctx.minimum_version = _ssl.TLSVersion.TLSv1_2
     except Exception:
         pass
-    ctx.verify_mode = _ssl.CERT_NONE
-    return ctx.wrap_socket(raw, server_hostname=host)
+    if INSECURE_DEBUG:
+        _bc("WARNING: certificate verification OFF (INSECURE_DEBUG) " + host)
+        ctx.verify_mode = _ssl.CERT_NONE
+        try:
+            ctx.check_hostname = False      # CPython only
+        except Exception:
+            pass
+        return ctx.wrap_socket(raw, server_hostname=host)
+
+    if not ensure_clock():
+        raise _fail(CLOCK, host)
+    try:
+        # MicroPython's mbedTLS parses one DER certificate per call (it
+        # rejects trailing bytes), and each call adds to the trust list.
+        for der in _load_roots():
+            ctx.load_verify_locations(cadata=der)
+    except Exception as e:
+        raise _fail(BUNDLE, host, str(e))
+    ctx.verify_mode = _ssl.CERT_REQUIRED
+    try:
+        ctx.check_hostname = True           # CPython; mbedTLS always checks
+    except Exception:
+        pass
+    try:
+        # server_hostname is SNI and, with CERT_REQUIRED, the name mbedTLS
+        # matches against the certificate's SAN/CN.
+        return ctx.wrap_socket(raw, server_hostname=host)
+    except Exception as e:
+        if _is_verify_failure(e):
+            raise _fail(_classify(str(e)), host, str(e))
+        raise
+
+
 MAX_REDIRECTS = 3
 # The largest current OTA asset is ~490 KiB. Keep a hard ceiling so a bad or
 # hostile endpoint cannot consume the whole heap, while leaving useful room

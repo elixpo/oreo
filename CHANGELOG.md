@@ -16,6 +16,11 @@ Format for a new entry (add to the top, push, CI does the rest):
 
 ---
 
+## Unreleased
+
+- **Verified HTTPS** (#110): every TLS connection (OTA, App Store, GitHub data, location, weather, speed test) now checks the server's certificate chain, host name and dates against 10 bundled root CAs (`oreoOS/tls_roots.py`, loaded on the first secure request). The clock is synced over NTP first; a connection whose certificate or clock can't be checked is refused, never retried unverified. Updates, App Store, Commits and Weather show the reason (`TLS: untrusted certificate`, `TLS: clock not set`, ...). Docs: docs/TLS.md; badge check: `oreo run tools/tls_probe.py`.
+- **Tooling**: `tools/gen_ca_bundle.py` regenerates the root bundle and `--check-hosts` verifies every host against it.
+
 ## v2.0.0 — 2026-11-07
 
 Diwali release: the App Store, a smoother shell, Wi-Fi handoff and Patakha.

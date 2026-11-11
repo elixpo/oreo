@@ -51,6 +51,12 @@ LABEL = {store.INSTALL: "INSTALL", store.OPEN: "OPEN",
          store.UPDATE: "UPDATE"}
 
 
+def _is_tls(msg):
+    """True for a store error that is a refused certificate (or the clock
+    it needs): oreoOS._http's 'TLS: <reason>' messages."""
+    return bool(msg) and str(msg).startswith("TLS:")
+
+
 def _busy(display, title, detail="", progress=None, delay_ms=0):
     """Start an oreoOS.busy card, or None when this OS has none."""
     if display is None:
@@ -320,8 +326,10 @@ class App(oreoOS.App):
         """UI thread: apply a fetch_index() result."""
         keep = self._current_id()
         ok = store.apply_index(result)
+        err = store.last_error()
         self._status = "" if ok else (
-            "OFFLINE" if store.last_error() == "offline" else "ERROR")
+            "OFFLINE" if err == "offline" else
+            "TLS ERROR" if _is_tls(err) else "ERROR")
         self._load_rows()
         self._icons.clear()
         self._big.clear()
@@ -676,7 +684,15 @@ class App(oreoOS.App):
     def _draw_list(self, d):
         if not self._rows():
             if self._page == DISCOVER:
-                if store.wifi_up():
+                err = store.last_error()
+                if (store.wifi_up() and self._job is None
+                        and _is_tls(err)):
+                    # The certificate check failed: say so, never retry
+                    # without it.
+                    lines = ("Secure connection failed",
+                             err[5:] if len(err) > 5 else err,
+                             "A = try again")
+                elif store.wifi_up():
                     lines = ("Loading the catalogue...",
                              "A = try again")
                 else:

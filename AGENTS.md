@@ -47,7 +47,7 @@ library and file format (github.com/elixpo/rv565).
 | `tools/` | Host scripts: deploy, release, asset conversion, `validate_app.py`, `app_icon.py`, `build_store_index.py`. |
 | `tests/` | Hardware-free OS and app tests (standard library only). |
 | `firmware/` | The MicroPython firmware build for the `OREO_BADGE` board. |
-| `docs/` | [APPS](docs/APPS.md), [CLI](docs/CLI.md), [USB](docs/USB.md), [TRANSFER](docs/TRANSFER.md), [PROFILE](docs/PROFILE.md), [HARDWARE](docs/HARDWARE.md). |
+| `docs/` | [APPS](docs/APPS.md), [CLI](docs/CLI.md), [USB](docs/USB.md), [TRANSFER](docs/TRANSFER.md), [PROFILE](docs/PROFILE.md), [HARDWARE](docs/HARDWARE.md), [TLS](docs/TLS.md). |
 | `oreo.elixpo/` | The website (static Next.js on Cloudflare Pages), including the CLI docs pages. |
 
 ## Contracts between the OS and the CLI

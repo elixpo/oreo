@@ -170,6 +170,27 @@ def _fetch_cfg():
     return _fetch_owm(lat, lon, key)
 
 
+def _tls_mark():
+    """A mark for _tls_failed(); None on an OS without verified TLS."""
+    try:
+        from oreoOS import _http
+        return _http.tls_mark()
+    except Exception:
+        return None
+
+
+def _tls_failed(mark):
+    """True when a certificate check (or the clock it needs) failed since
+    `mark` (OreoOS with verified TLS, #110)."""
+    if mark is None:
+        return False
+    try:
+        from oreoOS import _http
+        return bool(_http.tls_error_since(mark))
+    except Exception:
+        return False
+
+
 def _online():
     try:
         from oreoWare import wifi
@@ -294,6 +315,8 @@ class App(oreoOS.App):
             pass
         global _try_ms
         self._last = _try_ms = time.ticks_ms()
+        self._tls_mark = _tls_mark()
+        self._tls = False
         job.start()
         self._dirty = True
 
@@ -311,6 +334,8 @@ class App(oreoOS.App):
                 self._data = job.result
                 _last_data, _last_ms = self._data, _try_ms
                 self._last = _try_ms
+            else:
+                self._tls = _tls_failed(getattr(self, "_tls_mark", None))
             self._dirty = True
         elif not job.busy() and self._key and self._due() and auto_fetch_ok():
             self._refresh()
@@ -421,6 +446,9 @@ class App(oreoOS.App):
     def _draw_offline(self, d, busy=False):
         title = "loading" if busy else "offline"
         msg = "fetching weather..." if busy else "offline — press A to retry"
+        if not busy and getattr(self, "_tls", False):
+            title = "not secure"
+            msg = "certificate check failed, A=retry"
         if busy and (self._lat is None or self._lon is None):
             msg = "finding your location..."
         d.rect(20, 110, SW - 40, 36, theme.CARD, fill=True)

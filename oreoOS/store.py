@@ -87,6 +87,30 @@ def _http_get(url, timeout_s=T_API, accept="*/*"):
         return None
 
 
+def _tls_mark():
+    try:
+        from oreoOS import _http
+        return _http.tls_mark()
+    except Exception:
+        return None
+
+
+def _tls_error(mark, fallback):
+    """'TLS: <reason>' when a certificate check failed since `mark` (the
+    App Store shows it instead of a generic error), else `fallback`."""
+    if mark is None:
+        return fallback
+    try:
+        from oreoOS import _http
+        return _http.tls_error_since(mark) or fallback
+    except Exception:
+        return fallback
+
+
+def is_tls_error(msg):
+    return bool(msg) and msg.startswith("TLS:")
+
+
 def _q(path):
     """URL-quote the one character our repo paths use (space)."""
     return path.replace(" ", "%20")
@@ -459,10 +483,11 @@ def fetch_index():
     if not wifi_up():
         return None, "offline"
     _bc("refresh " + STORE_REF)
+    mark = _tls_mark()
     body = _http_get(raw_url(INDEX_PATH))
     parsed = parse_index(body) if body else None
     if not parsed:
-        return None, "catalogue unavailable"
+        return None, _tls_error(mark, "catalogue unavailable")
     return body, parsed
 
 
@@ -716,9 +741,10 @@ def install(app_id, progress_cb=None):
         return False, "built-in app"
     if not wifi_up():
         return False, "no WiFi"
+    mark = _tls_mark()
     files = entry["files"] or _fallback_files(entry)
     if not files:
-        return False, "no file list"
+        return False, _tls_error(mark, "no file list")
     names = [f[0] for f in files]
     if "main.py" not in names or "manifest.json" not in names:
         return False, "incomplete app"
@@ -746,7 +772,7 @@ def install(app_id, progress_cb=None):
         if not store_io.download_file(url, dst, size if entry["files"] else -1,
                                       _fp, buf):
             _rm_tree(stage)
-            return False, "download failed"
+            return False, _tls_error(mark, "download failed")
         done += size
         _report(progress_cb, done, total, "Downloading")
     m = _read_json(stage + "/manifest.json")
