@@ -4,8 +4,9 @@ Badge, Identity, Commits, Weather and the clock show the owner's details:
 GitHub user, name, title, timezone and weather location. Nothing is set
 by default. Until you set `GITHUB_USER`, Badge, Commits and Identity show
 a setup hint instead of someone else's profile, and nothing is fetched.
-Weather shows its setup card until it has a location and a key, and the
-clock runs on UTC until `TIMEZONE_OFFSET` is set.
+Weather shows its setup card until it has an OpenWeatherMap key; its
+location comes from the badge itself (below) unless you pin one. The clock
+runs on UTC until `TIMEZONE_OFFSET` is set.
 
 ## Upgrading from stable/v2.0.5 or older
 
@@ -14,9 +15,9 @@ and timezone (`+5.5`) hardcoded in `oreoOS/config.py`. They now come
 only from `.env.local` or `/profile.json`. If your `.env.local` does not
 set them, the next deploy writes them blank: Identity loses your name,
 Weather loses its location and the clock drops to UTC. Before you
-deploy, add `GITHUB_USER`, `DISPLAY_NAME`, `DESIGNATION`,
-`TIMEZONE_OFFSET`, `WEATHER_LAT` and `WEATHER_LON` to `.env.local`, or
-put them in `/profile.json` on the badge. `tools/deploy.py` prints one
+deploy, add `GITHUB_USER`, `DISPLAY_NAME`, `DISPLAY_DESIGNATION` and
+`TIMEZONE_OFFSET` (and `OWM_API_KEY` for Weather) to `.env.local`, or put
+them on the badge with `oreo setup`. `tools/deploy.py` prints one
 note listing every key that is still blank.
 
 ## The keys
@@ -25,11 +26,23 @@ note listing every key that is still blank.
 |---|---|---|
 | `GITHUB_USER` | Badge, Commits, Identity | `octocat` |
 | `DISPLAY_NAME` | Identity | `Mona Lisa` |
-| `DESIGNATION` | Identity (line under the name) | `Firmware @ Example` |
+| `DISPLAY_DESIGNATION` | Identity (line under the name); `DESIGNATION` is accepted as the older name | `Firmware @ Example` |
 | `TIMEZONE_OFFSET` | the clock, after each time sync | `5.5`, `-4` |
-| `WEATHER_LAT`, `WEATHER_LON` | Weather | `12.97`, `77.59` |
+| `WEATHER_LAT`, `WEATHER_LON` | Weather, **optional**: pins a place; without them the badge finds its own location | `12.97`, `77.59` |
 | `WEATHER_NAME` | Weather (optional label) | `Bengaluru` |
 | `OWM_API_KEY` | Weather ([OpenWeatherMap](https://openweathermap.org/api) key) | |
+
+## Weather's location
+
+With no `WEATHER_LAT` / `WEATHER_LON`, Weather asks where the badge is from
+its internet connection: `oreoOS/geo.py` sends one HTTPS request to a
+keyless geolocation service (ipwho.is, then ipapi.co) from Weather's
+background fetch, and gets a latitude, a longitude and a town. It is
+city-level, from the network's public address: no GPS, nothing else is
+sent. The answer is remembered in `/state/geo.json`, so Weather still has
+a place when the services are unreachable, and it is looked up again once
+per boot (so a badge that travels follows you). Set `WEATHER_LAT` and
+`WEATHER_LON` to pin a place instead; they always win.
 
 ## Where the badge looks
 
@@ -42,6 +55,21 @@ note listing every key that is still blank.
 3. The app's own fallback (for example `octocat`).
 
 ### Set it over USB
+
+With the `oreo` CLI ([CLI.md](CLI.md#oreo-setup-owner-profile)), using the
+same key names as `.env.local`:
+
+```bash
+oreo setup                                   # asks for each value
+oreo setup --from-file .env.local            # the profile keys from your file
+oreo setup --set DISPLAY_NAME="Mona Lisa" --set TIMEZONE_OFFSET=5.5
+```
+
+`--from-file` takes only the keys above and leaves everything else in the
+file (Wi-Fi password, tokens) alone; it names what it took and what it
+skipped, never their values.
+
+Or by hand:
 
 Write the file on your computer and copy it to the badge:
 

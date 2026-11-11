@@ -15,10 +15,11 @@ Keys use the secrets.py names so both sources line up:
 
   GITHUB_USER       GitHub login for Badge and Commits
   DISPLAY_NAME      name on the Identity card
-  DESIGNATION       one-line title under the name
+  DISPLAY_DESIGNATION  one-line title under the name (DESIGNATION is
+                    accepted as the older name)
   TIMEZONE_OFFSET   hours from UTC, e.g. 5.5 or -4
-  WEATHER_LAT       latitude for Weather (float)
-  WEATHER_LON       longitude for Weather (float)
+  WEATHER_LAT       latitude for Weather (float); optional: without it
+  WEATHER_LON       Weather uses the badge's own location (oreoOS.geo)
   WEATHER_NAME      optional place name shown by Weather
   OWM_API_KEY       OpenWeatherMap API key
 
@@ -31,9 +32,13 @@ from oreoOS import state as _state
 
 PATH = "/profile.json"
 
-KEYS = ("GITHUB_USER", "DISPLAY_NAME", "DESIGNATION", "TIMEZONE_OFFSET",
+KEYS = ("GITHUB_USER", "DISPLAY_NAME", "DISPLAY_DESIGNATION", "TIMEZONE_OFFSET",
         "WEATHER_LAT", "WEATHER_LON", "WEATHER_NAME", "OWM_API_KEY")
 _NUMERIC = ("TIMEZONE_OFFSET", "WEATHER_LAT", "WEATHER_LON")
+# The same value under its current and older name: .env.local and the CLI
+# use DISPLAY_DESIGNATION, older secrets.py files and apps say DESIGNATION.
+ALIASES = {"DESIGNATION": "DISPLAY_DESIGNATION",
+           "DISPLAY_DESIGNATION": "DESIGNATION"}
 
 _cache = None
 
@@ -64,10 +69,19 @@ def _empty(v):
 
 
 def get(key, default=None):
-    """The owner's value for `key`, or `default` when nobody set it."""
-    v = _read().get(key)
+    """The owner's value for `key`, or `default` when nobody set it.
+    /profile.json wins over secrets.py, under either name of an aliased key."""
+    names = (key, ALIASES[key]) if key in ALIASES else (key,)
+    v = None
+    for n in names:
+        v = _read().get(n)
+        if not _empty(v):
+            break
     if _empty(v):
-        v = _from_secrets(key)
+        for n in names:
+            v = _from_secrets(n)
+            if not _empty(v):
+                break
     if _empty(v):
         return default
     if key in _NUMERIC:
@@ -97,6 +111,13 @@ def save(updates):
     """
     data = dict(_read())
     for k, v in updates.items():
+        if k not in KEYS and ALIASES.get(k) in KEYS:
+            data.pop(k, None)          # store under the current name only
+            k = ALIASES[k]
+        elif k in KEYS and k in ALIASES.values():
+            for old, new in ALIASES.items():
+                if new == k and old not in KEYS:
+                    data.pop(old, None)
         if k not in KEYS:
             raise ValueError("unknown profile key: %s" % k)
         if _empty(v):

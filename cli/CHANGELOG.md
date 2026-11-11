@@ -12,6 +12,11 @@ from its `## [<version>]` section below, so every release needs one.
 
 ### Added
 
+- `oreo setup --from-file FILE` takes the profile keys from an `.env`-style
+  file such as `.env.local` (other keys are left alone and only named), and
+  `--set KEY=VALUE` sets one key at a time by its `.env` name.
+- The title is `DISPLAY_DESIGNATION`, as in `.env.local`; `DESIGNATION` is
+  still accepted.
 - `oreo setup`: the owner profile (GitHub user, name, title, timezone,
   weather place and OpenWeatherMap key) in `/profile.json` on the badge, the
   file `oreoOS/profile.py` reads (docs/PROFILE.md). It shows the current
