@@ -172,6 +172,7 @@ DEPLOY = [
     ("oreoOS/profile.py",       "oreoOS/profile.py"),   # owner profile
     ("oreoOS/crashlog.py",      "oreoOS/crashlog.py"),  # /crash.log
     ("oreoOS/geo.py",           "oreoOS/geo.py"),       # Weather's auto location
+    ("oreoOS/usbhost.py",       "oreoOS/usbhost.py"),   # is a computer on USB?
 
     # Hardware drivers
     ("oreoWare/__init__.py",    "oreoWare/__init__.py"),

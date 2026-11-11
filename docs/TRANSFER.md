@@ -24,11 +24,13 @@ updates, GitHub data, weather, time). Bluetooth sharing is planned last
 1. Plug the badge into the computer with a data cable. On the breadboard
    build, use the port labelled **USB** (see [USB.md](USB.md)).
 2. On the badge, open the apps drawer, then **Tools > Transfer**. The screen
-   shows a code such as `K7M2QX` and *Waiting for a computer...*.
+   shows a code such as `K7M2QX`. Once the computer has recognised the
+   badge on the cable it says *Computer connected over USB* (otherwise
+   *Waiting for a computer...*).
 3. On the computer ([install oreo-cli](CLI.md#install) first):
 
    ```sh
-   oreo transfer send holiday.jpg clip.mp4 talk-notes.md
+   oreo send holiday.jpg clip.mp4 talk-notes.md     # the same as: oreo transfer send ...
    ```
 
 4. The badge changes to *Connected: \<your computer's name\>*, and the
@@ -55,11 +57,16 @@ Every option, and what is converted to what, is in
 
 | Screen | What it means |
 |---|---|
-| Code, *Waiting for a computer...* | Ready. Run `oreo transfer` on the computer |
+| Code, *Waiting for a computer...* | Ready, but no computer is on the USB port yet (or this OreoOS cannot tell). Plug the cable into a computer |
+| Code, green dot, *Computer connected over USB* | A computer has recognised the badge. Run `oreo send <files>` on it |
 | *Connected: \<name\>*, *Type this code on the computer* | A computer is there and has not typed the code yet. After a wrong code it shows how many tries are left |
 | Green dot, *Ready. Send files from the computer.* | Code accepted |
 | *Receiving \<file\>*, progress bar | A file is arriving |
 | *TOO MANY WRONG CODES*, countdown | Locked after 5 wrong codes; a new code appears after 60 s |
+
+If the cable is pulled during a session, the badge ends it within about
+two seconds (*computer unplugged* in the list), shows a new code and waits
+again.
 
 | Button | Effect |
 |---|---|
@@ -106,6 +113,7 @@ cannot pause OreoOS. Leave Transfer (**HOME**) before running `oreo info`,
 | Piece | File |
 |---|---|
 | The app (screens, buttons) | [`apps/transfer/src/app.py`](../apps/transfer/src/app.py) |
+| Is a computer on the USB port? | [`oreoOS/usbhost.py`](../oreoOS/usbhost.py) |
 | Reading the USB console without blocking | [`apps/transfer/src/link.py`](../apps/transfer/src/link.py) |
 | The protocol, badge side; no screen or hardware access | [`apps/transfer/src/proto.py`](../apps/transfer/src/proto.py) |
 | The protocol, computer side, and `oreo transfer` | [`cli/oreo_cli/transfer.py`](../cli/oreo_cli/transfer.py) |
@@ -118,6 +126,55 @@ Transfer works the other way round: OreoOS keeps running, and the app reads
 runs.) Each side marks its own lines with a prefix and ignores every other
 line, so log output, a REPL echo or a stray byte cannot be mistaken for
 protocol data.
+
+### Detecting the computer on USB
+
+`oreoOS/usbhost.py` answers "is a computer on the USB port?" and the app
+asks it once a second (`usbhost.Probe`).
+
+MicroPython 1.28's ESP32-S3 port gives Python no way to ask: TinyUSB's
+`tud_mounted()`, `tud_ready()` and `tud_cdc_connected()` (DTR) are used
+only inside the C console code (`shared/tinyusb/mp_usbd_cdc.c`);
+`machine.USBDevice` exists on this port but only offers `config()`,
+`active()`, `submit_xfer()`, `stall()` and `remote_wakeup()`, none of which
+report the host, and reconfiguring it would drop the console; and
+`sys.stdout` writes and `select.poll()` behave the same with or without a
+host (without one, TinyUSB just overwrites its buffer).
+
+So `usbhost` reads the USB controller's own registers with
+`machine.mem32`. The ESP32-S3's USB OTG controller (a Synopsys DWC2 core,
+ESP-IDF's `USB_DWC` at `0x60080000`) has:
+
+| Register | Bits | Meaning |
+|---|---|---|
+| DCFG `0x60080800` | DEVADDR, 4..10 | The address the host gave the badge while enumerating it. Cleared on every bus reset |
+| DSTS `0x60080808` | SUSPSTS, 0 | The bus has been idle for 3 ms (suspended) |
+| DSTS `0x60080808` | SOFFN, 8..21 | Number of the last start-of-frame packet; a host sends one every 1 ms |
+
+A computer is connected when the address is set, the bus is not suspended,
+and the frame number moves within 2 ms. That matches TinyUSB's "mounted"
+(enumerated and configured). Reading these registers has no side effects;
+a check costs two or three reads and at most 2 ms.
+
+Limits:
+
+- It cannot tell whether a program on the computer has the port open
+  (DTR), only that the computer enumerated the badge. The screen therefore
+  says what to run rather than "the CLI is connected"; that is still shown
+  after `hello` (*Connected: \<name\>*).
+- A computer that sleeps, or that suspends the USB port to save power,
+  reads as unplugged until it wakes. A session in progress keeps the port
+  awake.
+- A charger or a charge-only cable reads as unplugged.
+- The badge has no VBUS sense pin; unplugging shows up as the bus going
+  idle, which the controller flags within 3 ms.
+- Only on an ESP32-S3 with the TinyUSB console (the Oreo Badge firmware,
+  ESP32_GENERIC_S3). Elsewhere `connected()` returns None, and Transfer
+  shows *Waiting for a computer...* as before.
+
+A firmware module exposing `tud_mounted()` and `tud_cdc_connected()`
+would add DTR, but it is not needed for this screen and is not part of the
+firmware.
 
 ### The protocol
 
@@ -292,6 +349,7 @@ These run without a badge:
 
 ```sh
 python3 -m unittest tests.test_transfer_proto                       # the badge side on its own
+python3 -m unittest discover -s tests -p 'test_busy_hostui_usb.py'  # usbhost against fake registers
 python3 -m unittest discover -s cli/tests -p 'test_transfer.py'      # the real CLI client against the real proto.py
 ```
 
