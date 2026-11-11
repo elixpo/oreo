@@ -201,6 +201,12 @@ export default function UploadPage() {
             the badge. Enter the 6-character code shown there to start a
             gated, same-network transfer. Files never leave your LAN.
           </p>
+          <p className="mt-3 max-w-xl text-text-dim">
+            <span className="text-text">OreoOS 2.1 and later</span> no longer receive files over
+            Wi-Fi: open the <span className="text-text">Transfer</span> app on the badge and
+            run <code>oreo send &lt;files&gt;</code> from a computer over USB. This page stays
+            for badges on older OreoOS.
+          </p>
         </div>
       </Reveal>
 

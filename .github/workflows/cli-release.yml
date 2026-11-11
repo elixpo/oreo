@@ -4,7 +4,7 @@
 #   - it runs only for `cli-v*` tags, and for pull requests that change cli/
 #     (tests and a build, never a release). release.yml runs on pushes to
 #     main that change oreoOS/** or oreoWare/**; a tag push never matches it.
-#   - CLI tags (`cli-v0.1.0`) never match the badge's OTA tag prefixes
+#   - CLI tags (`cli-v1.0.0`) never match the badge's OTA tag prefixes
 #     (`stable/`, `beta/`; oreoOS/ota.py filters /tags by prefix), and the
 #     CLI release is created with `--latest=false`, so the repository's
 #     "Latest" release stays the newest OreoOS release.
@@ -155,6 +155,9 @@ jobs:
           grep -qx "oreo-cli $VERSION" "$RUNNER_TEMP/version.txt"
           "$OREO" --help > /dev/null
           "$OREO" help wifi > /dev/null
+          "$OREO" help update > /dev/null
+          # The same command under the package name.
+          "$RUNNER_TEMP/oreo-venv/bin/oreo-cli" --version | grep -qx "oreo-cli $VERSION"
           # No badge on the runner: `oreo devs` lists nothing and exits 3.
           rc=0; "$OREO" --no-color devs || rc=$?
           [ "$rc" -eq 3 ] || { echo "::error::oreo devs exited $rc, expected 3"; exit 1; }
@@ -223,6 +226,8 @@ jobs:
           $oreo = "$env:RUNNER_TEMP\oreo-venv\Scripts\oreo.exe"
           $v = (& $oreo --version | Out-String).Trim()
           if ($v -ne "oreo-cli $env:VERSION") { throw "unexpected version: $v" }
+          $alias = (& "$env:RUNNER_TEMP\oreo-venv\Scripts\oreo-cli.exe" --version | Out-String).Trim()
+          if ($alias -ne "oreo-cli $env:VERSION") { throw "unexpected oreo-cli version: $alias" }
           & $oreo --help | Out-Null
           if ($LASTEXITCODE -ne 0) { throw "oreo --help failed" }
           & $oreo --no-color devs

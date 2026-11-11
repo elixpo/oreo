@@ -23,7 +23,14 @@ it on flash and installs each app's files from the paths listed there.
 
 The icon is looked up in the OS image first (`assets/icons/optimized/`),
 then downloaded from `apps_market/<folder>/assets/optimized/<icon>.py`,
-so an app with a new icon must ship its optimized icon module there.
+so an app with a new icon must ship its optimized icon module there:
+`python3 tools/app_icon.py apps_market/<folder>` makes it from an
+`icon.png` in the folder.
+
+Check the app with `python3 tools/validate_app.py apps_market/<folder>`
+(CI runs it on every app). Saves belong in `/state` through
+`oreoOS.state`, which the Store leaves alone on uninstall, so a
+reinstalled game keeps its high score. See [`docs/APPS.md`](../docs/APPS.md).
 
 An entry may be listed before its folder exists (Patakha while it is
 being built); the badge then finds its files through the GitHub API at

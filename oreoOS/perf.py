@@ -17,7 +17,7 @@ What it keeps:
     reading frame's own work.
   * the longest frame and the number of frames over SLOW_MS in the first
     WINDOW_MS after Home appeared
-  * the longest time the network tail of a frame (netsvc + http_server
+  * the longest time the network tail of a frame (netsvc
     tick + the OTA background probe) took since boot, and how many times it went over SLOW_MS.
 """
 

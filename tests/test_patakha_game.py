@@ -8,6 +8,7 @@ display to catch crashes in the draw path without a badge.
 import importlib
 import importlib.util
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -253,7 +254,13 @@ class AppSmokeTest(unittest.TestCase):
         api = importlib.import_module("oreoOS.api")
         clock = _FakeTime()
         mod.time = clock
-        mod.HI_PATH = "/nonexistent-dir/patakha-hi.txt"
+        # Keep the high score out of the real filesystem.
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        saved_dir = mod.state.STATE_DIR
+        mod.state.STATE_DIR = tmp.name + "/state"
+        self.addCleanup(setattr, mod.state, "STATE_DIR", saved_dir)
+        mod.LEGACY_HI_PATH = tmp.name + "/hi.txt"
         os_ = _FakeOS()
         app = mod.App()
         app.on_enter(os_)

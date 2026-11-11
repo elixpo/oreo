@@ -44,6 +44,71 @@ class _Row:
         self.off_label = off_label
 
 
+# How often update() re-reads the live row values (Wi-Fi state, sync
+# result) and repaints when one changed.
+LIVE_MS = 500
+
+
+def sync_summary(net, wifi=None):
+    """Value column of the "Sync Time" row, from netsvc.time_status().
+    Never touches the network."""
+    try:
+        state, _detail = net.time_status()
+    except Exception:
+        return ""
+    if state == "syncing":
+        return "syncing..."
+    if state == "pending":
+        return "queued"
+    if state == "synced":
+        # time_status() says the clock was synced at some point; the
+        # row reports the latest attempt (a manual sync can fail later).
+        try:
+            seq, ok, _msg = net.sync_result()
+            if seq and not ok:
+                return "failed"
+        except Exception:
+            pass
+        return "synced"
+    if state == "failed":
+        return "failed"
+    try:
+        if wifi is not None and not wifi.is_connected():
+            return "no wifi"
+    except Exception:
+        pass
+    return "tap A"
+
+
+def wifi_summary(wifi, net=None):
+    """Value column of the "WiFi" row: the SSID when connected, else
+    netsvc's state ("joining", "retry 12s", "off", "no link")."""
+    if not wifi:
+        return "—"
+    try:
+        if wifi.is_connected():
+            return wifi.ssid() or wifi.ip() or "on"
+    except Exception:
+        return "—"
+    if net is not None:
+        try:
+            state, secs = net.status()
+            return net.short_text(state, secs) or "on"
+        except Exception:
+            pass
+    try:
+        if wifi.connect_target():
+            return "joining"
+    except Exception:
+        pass
+    try:
+        if wifi.is_radio_on():
+            return "on"
+    except Exception:
+        pass
+    return "off"
+
+
 class App(oreoOS.App):
     name         = "Settings"
     author       = "Circuit-Overtime"
@@ -64,6 +129,14 @@ class App(oreoOS.App):
         except Exception:
             self._wifi = None
             self._bt   = None
+        try:
+            from oreoOS import netsvc as _n
+            self._net = _n
+        except Exception:
+            self._net = None
+        self._live_ms   = 0
+        self._live_vals = None
+        self._sync_note = ""          # "no wifi" after a refused request
 
         # Same value the notification panel's slider uses (100% after boot).
         self._brightness = getattr(os, "_last_brightness", 100)
@@ -238,10 +311,10 @@ class App(oreoOS.App):
             pass
 
     # ── time sync ───────────────────────────────────────────────────────
-    # Manual NTP re-sync. The boot path runs this once when WiFi comes up;
-    # this row lets the user kick it again after they fix a bad clock or
-    # land in a new timezone without rebooting. Result is mirrored to the
-    # notif panel via timeutil's module-level last_sync_status.
+    # Manual NTP re-sync. netsvc syncs on every link-up and every 6 h;
+    # this row asks it for one now (after fixing a bad clock or landing in
+    # a new timezone). The sync runs on netsvc's worker thread, never in
+    # this app's frame; update() repaints the row when the result lands.
     # ── gestures (sub-page) ─────────────────────────────────────────────
     # Settings just launches the dedicated apps/gestures/ app, same as
     # WiFi / Bluetooth. The summary string gives a glanceable status.
@@ -268,24 +341,21 @@ class App(oreoOS.App):
         return "%d on" % n if n else "Idle"
 
     def _sync_time(self):
-        try:
-            from oreoOS import timeutil
-            timeutil.sync_from_ntp()
-        except Exception:
-            pass
+        queued = False
+        if self._net is not None:
+            try:
+                queued = bool(self._net.request_sync())
+            except Exception:
+                queued = False
+        self._sync_note = "" if queued else "no wifi"
+        self._dirty = True
 
     def _sync_time_summary(self):
-        try:
-            from oreoOS import timeutil
-            status = timeutil.last_sync_status()
-        except Exception:
+        if self._net is None:
             return ""
-        return {
-            "ok":      "synced",
-            "no-wifi": "no wifi",
-            "failed":  "failed",
-            "never":   "tap A",
-        }.get(status, "tap A")
+        if self._sync_note:
+            return self._sync_note
+        return sync_summary(self._net, self._wifi)
 
     def _open_wifi(self):
         try:
@@ -294,24 +364,7 @@ class App(oreoOS.App):
             pass
 
     def _wifi_summary(self):
-        if not self._wifi:
-            return "—"
-        try:
-            if self._wifi.is_connected():
-                return self._wifi.ssid() or self._wifi.ip() or "on"
-            try:
-                if self._wifi.connect_target():
-                    return "joining..."
-            except Exception:
-                pass
-            try:
-                if self._wifi.is_radio_on():
-                    return "on"
-            except Exception:
-                pass
-            return "off"
-        except Exception:
-            return "—"
+        return wifi_summary(self._wifi, self._net)
 
     def _open_bt(self):
         try:
@@ -363,7 +416,27 @@ class App(oreoOS.App):
             row.setter(None)
 
     def update(self, dt):
-        pass
+        # The WiFi and Sync rows show live state (a join, a retry
+        # countdown, a sync landing on the worker). Re-read them twice a
+        # second and repaint only when one changed.
+        try:
+            import time
+            now = time.ticks_ms()
+            if time.ticks_diff(now, self._live_ms) < LIVE_MS:
+                return
+            self._live_ms = now
+        except Exception:
+            pass
+        if self._sync_note:
+            try:
+                if self._wifi is not None and self._wifi.is_connected():
+                    self._sync_note = ""
+            except Exception:
+                pass
+        vals = (self._wifi_summary(), self._sync_time_summary())
+        if vals != self._live_vals:
+            self._live_vals = vals
+            self._dirty = True
 
     # ── render ───────────────────────────────────────────────────────────
     def draw(self, d):

@@ -12,6 +12,7 @@ oreo wifi scan
 oreo wifi connect "Home Net"     # password asked without echo
 oreo add holiday.jpg talk.md
 oreo apps install snake
+oreo update                      # newest OreoOS, downloaded by the badge itself
 oreo help <command>
 ```
 
@@ -33,7 +34,7 @@ curl --proto '=https' --tlsv1.2 -LsSf \
 irm https://raw.githubusercontent.com/elixpo/oreo/main/cli/install.ps1 | iex
 ```
 
-Pin a release with `OREO_CLI_VERSION=cli-v0.1.0`. Or download
+Pin a release with `OREO_CLI_VERSION=cli-v1.0.0`. Or download
 `oreo_cli-<version>-py3-none-any.whl` and `SHA256SUMS` from the
 [releases](https://github.com/elixpo/oreo/releases), check them, and run
 `pipx install oreo_cli-<version>-py3-none-any.whl`; each release also has a
@@ -62,18 +63,25 @@ checks this.
 | `oreo shell` | MicroPython REPL; OreoOS restarts when you leave (Ctrl-] / Ctrl-X) |
 | `oreo ls / push / pull / rm` | Files, with progress bars; pushes are atomic and SHA-256 checked |
 | `oreo add <file>...` | Photo/video into the Gallery, `.md`/`.txt` into the Reader, after a space check |
+| `oreo transfer send <file>...` (or `oreo send`) | Sends files to the badge's **Transfer** app with the code it shows; OreoOS keeps running. Also `oreo transfer list` / `rm` |
 | `oreo apps [list\|refresh\|install\|update\|remove]` | The badge's App Store, over the badge's Wi-Fi |
 | `oreo run <file>` | Runs a script and streams its output |
 | `oreo dev <folder>` | Mounts a folder at `/remote` for live editing |
 | `oreo logs [--restart]` | Follows the console without stopping OreoOS |
 | `oreo wifi [scan\|connect\|saved\|forget]` | Wi-Fi setup; Wi-Fi is for the internet only (#120) |
-| `oreo update --repo <checkout>` | Runs the checkout's `./deploy --board` |
+| `oreo update [--check] [--channel beta]` | Newest OreoOS release: the badge downloads it over its Wi-Fi, the CLI shows versions and progress, confirms, installs, restarts and checks the new version |
+| `oreo update --repo <checkout>` | Developers: runs the checkout's `./deploy --board` |
 | `oreo flash --repo <checkout>` | Runs `./deploy --full` (erases the badge; asks first) |
-| `oreo doctor` | Cable, port, permissions (Linux `dialout`), firmware banner |
+| `oreo doctor` | Cable, port, permissions (Linux `dialout`), firmware, OreoOS; numbered next steps |
 
 Global options: `--port` (or `$OREO_PORT`), `--reset soft|hard|none` (how
 OreoOS is restarted after a command; default `soft`), `--yes`, `--no-color`,
-`-v` (show the badge's log lines).
+`-v` (show the badge's log lines). The command is also installed as
+`oreo-cli`.
+
+Exit status: `0` ok, `1` error, `2` usage error, `3` no badge (or several
+and no `--port`), `4` badge unreachable or busy (port busy, no answer,
+unplugged), `5` OreoOS missing on the badge, `130` cancelled.
 
 ## Behaviour
 
@@ -86,13 +94,20 @@ OreoOS is restarted after a command; default `soft`), `--yes`, `--no-color`,
 - **Wi-Fi passwords** are read with `getpass` (or `--password-stdin`), sent
   to the badge once and never printed, logged, returned or stored on the
   computer. `oreo wifi saved` only lists names.
+- **`oreo transfer`** never stops OreoOS: open Transfer on the badge
+  (Tools), run the command and type the six-character code the badge
+  shows. Files are converted like `oreo add`, sent over USB in chunks,
+  checked on the badge with SHA-256 and their format header, then renamed
+  into place. Five wrong codes lock the badge for a minute; every session
+  gets a new code. Without the app open it waits (`--wait`, default 60 s)
+  and then explains; it never falls back to the raw REPL.
 - **Space** is checked before copying; converted media is validated before
   it is sent, and its stored size (not the source size) is what counts.
 - **Erasing** (`rm -r`, `apps remove`, `update --clean`, `flash`) asks
   first; without a terminal it answers no unless `--yes` is given.
 
-`oreo update` / `oreo flash` need an OreoOS checkout for now. Updating
-from GitHub releases without one is future work.
+`oreo update` needs no checkout: it drives the badge's own updater
+(`oreoOS.ota`). `oreo flash` (firmware) still needs one.
 
 ## Development
 

@@ -26,6 +26,33 @@ import oreoOS
 import time
 from oreoOS import api, theme, widgets
 
+# A background probe (or the clock sync) still on its thread when this
+# app checks: wait this long for it, so two TLS sessions never share the
+# heap. Longer than ota.T_GH_API plus a DNS lookup.
+WAIT_BG_MS = 12000
+
+
+def wait_background(pulse=None, limit_ms=WAIT_BG_MS, net=None):
+    """Block (repainting through `pulse`) while netsvc.fetch_busy() is
+    True, at most `limit_ms`. Returns True if the way is clear."""
+    if net is None:
+        try:
+            from oreoOS import netsvc as net
+        except Exception:
+            return True
+    t0 = time.ticks_ms()
+    while True:
+        try:
+            if not net.fetch_busy():
+                return True
+        except Exception:
+            return True
+        if time.ticks_diff(time.ticks_ms(), t0) >= limit_ms:
+            return False
+        if pulse is not None:
+            pulse("wait")
+        time.sleep_ms(50)
+
 
 SW = api.SCREEN_W
 SH = api.SCREEN_H
@@ -146,6 +173,8 @@ class App(oreoOS.App):
         except Exception:
             pass
 
+        wait_background(self._network_pulse)
+
         # Always fetch the latest tag — we need to compare against the
         # device's current VERSION to pick the right state, not just
         # "is there a newer one?".
@@ -215,6 +244,7 @@ class App(oreoOS.App):
             "request":  "REQUESTING RELEASE",
             "read":     "READING UPDATE DATA",
             "redirect": "OPENING RELEASE",
+            "wait":     "FINISHING CHECK",
         }
         self._loader_phase = labels.get(phase, "CHECKING")
 

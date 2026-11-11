@@ -23,6 +23,15 @@ the same visual hierarchy cheaply.
 Controls:
   A      force refresh
   HOME   apps drawer
+
+Network: the fetch runs off the UI loop (oreoOS.cache.Refresh on a
+thread) through oreoOS._http, whose socket timeouts are honoured. The
+last reading is drawn at once on re-entry; the first automatic fetch
+waits for netsvc's boot quiet window, for Wi-Fi and for any other
+background network thread (netsvc.fetch_busy()), and never runs inline
+on a build without threads (A still fetches there). The fetch job lives
+at module level: leaving and re-opening Weather while a fetch is in
+flight re-attaches to it instead of starting a second one.
 """
 
 import time
@@ -35,6 +44,15 @@ SH = api.SCREEN_H
 
 REFRESH_SEC = 600
 DIM_FACTOR  = 0.22
+T_FETCH     = 8             # seconds, DNS + TLS + GET
+
+# Last reading, kept across app entries so re-opening draws it at once.
+_last_data  = None
+_last_ms    = None
+# The fetch job and what it fetches, kept across entries (see above).
+_job        = None
+_cfg        = (12.97, 77.59, "")
+_try_ms     = None              # ticks_ms when the running fetch started
 
 
 def _bucket(code):
@@ -91,16 +109,9 @@ def _upscale_dim_bg(data, w, h, sw, sh, factor):
     return out
 
 
-def _fetch_owm(lat, lon, api_key):
+def parse_owm(j):
+    """OpenWeatherMap /weather JSON (dict) -> the fields drawn."""
     try:
-        import urequests
-        url = ("https://api.openweathermap.org/data/2.5/weather"
-               "?lat=%.3f&lon=%.3f&units=metric&appid=%s" % (lat, lon, api_key))
-        r = urequests.get(url, headers={"User-Agent": "OreoBadge"})
-        if r.status_code != 200:
-            r.close()
-            return None
-        j = r.json(); r.close()
         return {
             "temp":  round(float(j.get("main", {}).get("temp", 0))),
             "feels": round(float(j.get("main", {}).get("feels_like", 0))),
@@ -113,19 +124,101 @@ def _fetch_owm(lat, lon, api_key):
         return None
 
 
+def _fetch_owm(lat, lon, api_key):
+    # Runs on the Refresh worker thread: network and parsing only.
+    try:
+        import json
+        from oreoOS import _http
+        url = ("https://api.openweathermap.org/data/2.5/weather"
+               "?lat=%.3f&lon=%.3f&units=metric" % (lat, lon))
+        # The key rides only on the request line, never in a logged URL.
+        body = _http.get_url(url, accept="application/json",
+                             timeout_s=T_FETCH,
+                             secret_query="appid=" + api_key)
+        if not body:
+            return None
+        return parse_owm(json.loads(body.decode("utf-8")))
+    except Exception:
+        return None
+
+
+def _fetch_cfg():
+    # Runs on the Refresh worker thread.
+    lat, lon, key = _cfg
+    return _fetch_owm(lat, lon, key)
+
+
+def _online():
+    try:
+        from oreoWare import wifi
+        return bool(wifi.is_connected())
+    except Exception:
+        return False
+
+
+def auto_fetch_ok(net=None):
+    """True when an automatic fetch may start: past netsvc's boot quiet
+    window, on a build with threads, with Wi-Fi up."""
+    if net is None:
+        try:
+            from oreoOS import netsvc as net
+        except Exception:
+            net = None
+    if net is not None:
+        try:
+            if net.in_quiet() or not net.has_threads():
+                return False
+        except Exception:
+            pass
+        try:
+            if net.fetch_busy():
+                return False
+        except Exception:
+            pass
+    return _online()
+
+
+def _owner_location():
+    """(lat, lon, key) for the owner. With no location the key is "" and
+    the setup card explains what to set.
+
+    Reads /profile.json then secrets.py through oreoOS.profile. An OS
+    built before oreoOS.profile existed falls back to reading secrets.py
+    directly, so an App Store update never loses a location that worked.
+    """
+    try:
+        from oreoOS import profile
+    except ImportError:
+        profile = None
+    lat = lon = None
+    key = ""
+    try:
+        if profile is not None:
+            lat = profile.get("WEATHER_LAT")
+            lon = profile.get("WEATHER_LON")
+            key = profile.get("OWM_API_KEY", "") or ""
+        else:
+            import secrets
+            lat = getattr(secrets, "WEATHER_LAT", None)
+            lon = getattr(secrets, "WEATHER_LON", None)
+            key = getattr(secrets, "OWM_API_KEY", "") or ""
+            lat = None if lat is None else float(lat)
+            lon = None if lon is None else float(lon)
+    except Exception:
+        lat = lon = None
+    if lat is None or lon is None:
+        return None, None, ""
+    return lat, lon, key
+
+
 class App(oreoOS.App):
     name         = "Weather"
     SHOW_LOADING = True
 
     def on_enter(self, os):
+        global _job, _cfg
         self._os = os
-        try:
-            from secrets import WEATHER_LAT, WEATHER_LON, OWM_API_KEY
-            self._lat = float(WEATHER_LAT)
-            self._lon = float(WEATHER_LON)
-            self._key = OWM_API_KEY
-        except Exception:
-            self._lat, self._lon, self._key = 12.97, 77.59, ""
+        self._lat, self._lon, self._key = _owner_location()
 
         play_h = SH - widgets.HEADER_H - widgets.HINT_H
 
@@ -140,14 +233,44 @@ class App(oreoOS.App):
         self._pandas = {k: _try_sprite("panda_" + k)
                         for k in ("sun", "cloud", "rain", "snow", "storm")}
 
-        self._data  = None
-        self._last  = 0
-        self._refresh()
+        _cfg = (self._lat, self._lon, self._key)
+        self._data  = _last_data
+        self._last  = _last_ms
+        if _job is None:
+            try:
+                from oreoOS import cache
+                _job = cache.Refresh(_fetch_cfg)
+            except Exception:
+                _job = None
+        # A fetch started on an earlier visit may still be running (or
+        # finished while the app was closed): update() picks it up.
+        self._job = _job
         self._dirty = True
 
+    def on_exit(self):
+        # A running fetch finishes on its own; the module keeps the job,
+        # so the next visit collects its result instead of fetching again.
+        self._job = None
+
+    def _due(self):
+        return (self._last is None or
+                time.ticks_diff(time.ticks_ms(), self._last)
+                > REFRESH_SEC * 1000)
+
     def _refresh(self):
-        self._data = _fetch_owm(self._lat, self._lon, self._key) if self._key else None
-        self._last = time.ticks_ms()
+        """Start a fetch; returns at once. update() picks the result up."""
+        job = self._job
+        if not self._key or job is None or job.busy():
+            return
+        try:
+            # Import on the UI thread, not on the worker.
+            import json                 # noqa: F401
+            from oreoOS import _http    # noqa: F401
+        except Exception:
+            pass
+        global _try_ms
+        self._last = _try_ms = time.ticks_ms()
+        job.start()
         self._dirty = True
 
     def on_button_press(self, btn):
@@ -155,7 +278,17 @@ class App(oreoOS.App):
             self._refresh()
 
     def update(self, dt):
-        if time.ticks_diff(time.ticks_ms(), self._last) > REFRESH_SEC * 1000:
+        global _last_data, _last_ms
+        job = self._job
+        if job is None:
+            return
+        if job.poll():
+            if job.result is not None:
+                self._data = job.result
+                _last_data, _last_ms = self._data, _try_ms
+                self._last = _try_ms
+            self._dirty = True
+        elif not job.busy() and self._key and self._due() and auto_fetch_ok():
             self._refresh()
 
     # ── render ─────────────────────────────────────────────────────────
@@ -181,7 +314,8 @@ class App(oreoOS.App):
             self._dirty = False
             return
         if self._data is None:
-            self._draw_offline(d)
+            busy = self._job is not None and self._job.busy()
+            self._draw_offline(d, busy)
             self._dirty = False
             return
 
@@ -251,18 +385,18 @@ class App(oreoOS.App):
         d.rect(cx, cy, cw, 2,  theme.PRIMARY, fill=True)
         d.text("setup needed", (SW - 12 * 16) // 2, cy + 14, theme.PRIMARY, scale=2)
         for i, ln in enumerate([
-                "Set on your laptop:",
+                "Set your location and key:",
                 "",
-                "  OWM_API_KEY=...",
-                "  WEATHER_LAT=...",
-                "  WEATHER_LON=...",
+                "  OWM_API_KEY",
+                "  WEATHER_LAT / WEATHER_LON",
                 "",
-                "edit .env then redeploy."]):
+                "in /profile.json or .env.local"]):
             d.text(ln, cx + 16, cy + 38 + i * 14, theme.TEXT_BRIGHT)
 
-    def _draw_offline(self, d):
-        msg = "offline — press A to retry"
+    def _draw_offline(self, d, busy=False):
+        title = "loading" if busy else "offline"
+        msg = "fetching weather..." if busy else "offline — press A to retry"
         d.rect(20, 110, SW - 40, 36, theme.CARD, fill=True)
         d.rect(20, 110, SW - 40,  2, theme.PRIMARY, fill=True)
-        d.text("offline", (SW - 7 * 16) // 2, 118, theme.PRIMARY, scale=2)
+        d.text(title, (SW - len(title) * 16) // 2, 118, theme.PRIMARY, scale=2)
         d.text(msg, (SW - len(msg) * 8) // 2, 138, theme.TEXT_BRIGHT)

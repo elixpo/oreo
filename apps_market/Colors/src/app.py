@@ -12,7 +12,7 @@ Layout:
 Controls:
   arrows  move the crosshair (long-press accelerates ~5x after ~0.4 s held)
   B       cycle display model RGB -> HSL -> CMYK -> RGB
-  A       save the current colour to apps/color_picker/state.txt
+  A       save the current colour (kept in /state/color_picker.json)
   C       show the colour on the badge's RGB LED, or turn it off
           (a double-tap of C opens the notification panel)
   HOME    back to the apps drawer
@@ -24,6 +24,10 @@ artefacts). The HSL / CMYK readouts are derived on the fly from RGB.
 
 import oreoOS
 from oreoOS import api, theme, widgets
+try:
+    from oreoOS import state
+except ImportError:   # OS before the /state helper: keep the old file save
+    state = None
 
 
 SW = api.SCREEN_W                    # 320
@@ -32,7 +36,7 @@ PLAY_TOP  = widgets.HEADER_H
 PLAY_BOT  = SH - widgets.HINT_H
 PLAY_H    = PLAY_BOT - PLAY_TOP      # 196
 PLAY_W    = SW                       # full width
-STATE_PATH = "apps/color_picker/state.txt"
+LEGACY_STATE_PATH = "apps/color_picker/state.txt"   # pre-/state save
 
 # Movement tuning. Tap = 1 px nudge; hold for ACCEL_AFTER seconds and the
 # cursor steps by FAST_PX_PER_FRAME each frame for fast traversal.
@@ -156,17 +160,27 @@ def _try_load_spectrum():
 # ── persistence ─────────────────────────────────────────────────────────────
 
 def _save_rgb(rgb):
-    try:
-        with open(STATE_PATH, "w") as f:
-            f.write("%d,%d,%d" % rgb)
-    except Exception:
-        pass
+    if state is None:
+        try:
+            with open(LEGACY_STATE_PATH, "w") as f:
+                f.write("%d,%d,%d" % tuple(int(c) for c in rgb))
+        except Exception:
+            pass
+        return
+    state.save("color_picker", {"r": int(rgb[0]), "g": int(rgb[1]),
+                                "b": int(rgb[2])})
 
 
 def _load_rgb():
     try:
-        with open(STATE_PATH) as f:
-            r, g, b = (int(x) for x in f.read().strip().split(","))
+        if state is None:
+            with open(LEGACY_STATE_PATH) as f:
+                r, g, b = (int(x) for x in f.read().strip().split(","))
+            s = {"r": r, "g": g, "b": b}
+        else:
+            s = state.load_migrating("color_picker", {"r": 255, "g": 93, "b": 104},
+                                     LEGACY_STATE_PATH, ("r", "g", "b"))
+        r, g, b = int(s["r"]), int(s["g"]), int(s["b"])
         return (max(0, min(255, r)),
                 max(0, min(255, g)),
                 max(0, min(255, b)))

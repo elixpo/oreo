@@ -246,14 +246,13 @@ class NetsvcLinkTest(unittest.TestCase):
     def test_quiet_window_defers_link_jobs(self):
         self._link_up()
         self.env.tick()                       # before Home: always quiet
-        self.assertEqual(self.env.http.calls, [])
         self.net.home_shown()
         self.env.tick(100)
-        self.assertEqual(self.env.http.calls, [])
         self.assertEqual(self.env.thread.started, [])
         self.env.tick(self.net.QUIET_MS)
-        self.assertEqual(self.env.http.calls, ["start"])
         self.assertEqual(len(self.env.thread.started), 1)
+        # Wi-Fi carries no files: nothing starts a LAN server on link-up.
+        self.assertEqual(self.env.http.calls, [])
         self.assertEqual(self.env.tu.calls, 0)    # not on the UI thread
 
     def test_ntp_runs_on_worker_and_resyncs(self):
@@ -311,7 +310,6 @@ class NetsvcLinkTest(unittest.TestCase):
         begins = self.env.wifi.begins
         self.env.wifi.connected = False          # router restart
         self.env.tick(self.net.POLL_MS)
-        self.assertIn("stop", self.env.http.calls)
         self.assertEqual(self.net.status(), ("retrying", self.net.REJOIN_S[0]))
         self.assertEqual(self.net.status_text(),
                          "retrying in %d s" % self.net.REJOIN_S[0])
@@ -324,11 +322,10 @@ class NetsvcLinkTest(unittest.TestCase):
         self.assertEqual(self.net.status()[0], "retrying")
         self.env.tick(self.net.REJOIN_S[1] * 1000)
         self.assertEqual(self.env.wifi.begins, begins + 2)
-        # Back up: link jobs run again.
-        self.env.http.calls[:] = []
+        # Back up, still without any LAN server.
         self._link_up()
         self.env.tick(self.net.POLL_MS)
-        self.assertEqual(self.env.http.calls, ["start"])
+        self.assertEqual(self.env.http.calls, [])
         self.assertEqual(self.net.status(), ("connected", 0))
 
     def test_rejoin_respects_switch_setting_and_wifi_app(self):
@@ -442,7 +439,7 @@ class NetsvcBackgroundOkTest(unittest.TestCase):
 
     def test_launcher_gates_ota_probe(self):
         src = (ROOT / "oreoOS/launcher.py").read_text()
-        i = src.index("_ota.background_check(os_obj)")
+        i = src.index("_ota.background_check(os_obj, foreground=app_name)")
         head = src[:i]
         self.assertIn("_net.background_ok()", head[-600:])
         # Inside the timed network tail, so perf's net_ms covers it.

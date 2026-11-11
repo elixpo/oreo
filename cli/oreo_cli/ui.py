@@ -49,7 +49,10 @@ MARK_BRAND = "◆"  # black diamond
 # boxes, the Wi-Fi signal bars, separators). If stdout cannot encode these it
 # is not UTF-8: a Windows pipe or redirect uses the ANSI code page (cp1252).
 _PROBE = "✓✗→◆─│╭▂▄▆█·…"
-_ASCII_MARKS = {"MARK_OK": "+", "MARK_ERR": "x", "MARK_STEP": ">", "MARK_BRAND": "*"}
+SEP = "·"         # middle dot, between "oreo" and the command in headers
+BARS = ("▂▄▆█", "·")  # Wi-Fi signal: filled levels, empty level
+_ASCII_MARKS = {"MARK_OK": "+", "MARK_ERR": "x", "MARK_STEP": ">", "MARK_BRAND": "*",
+                "SEP": "-", "BARS": ("||||", ".")}
 
 
 def _can_encode(stream, text=_PROBE):
@@ -154,7 +157,7 @@ class UI:
         self.console.print(text)
 
     def header(self, title, subtitle=None):
-        line = "[brand]%s oreo[/] [dim]·[/] [title]%s[/]" % (MARK_BRAND, title)
+        line = "[brand]%s oreo[/] [dim]%s[/] [title]%s[/]" % (MARK_BRAND, SEP, title)
         if self.rich:
             self.console.rule(line, align="left", style="rule")
         else:

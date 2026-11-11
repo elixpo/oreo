@@ -8,6 +8,7 @@ individual screens (splash, home, app-menu) live in separate modules.
 import gc
 import json
 import os as _os
+import sys as _sys
 import time
 
 from oreoOS import api
@@ -36,46 +37,207 @@ APPS_DIR = _find_apps_dir() or "/apps"
 
 
 # ── app discovery ─────────────────────────────────────────────────────────────
+#
+# Live dev loop: `oreo dev <folder>` mounts a folder from the computer at
+# /remote. When it holds apps/<name>/ (manifest.json + main.py), the
+# launcher lists that app and imports it from there instead of from
+# /apps/<name>, so an edit on the computer shows up the next time the app
+# opens. Without a /remote mount this costs one failed stat per listing and
+# per launch; the import path is the usual one.
+
+REMOTE_APPS = "/remote/apps"
+
+
+def _exists(path):
+    try:
+        _os.stat(path)
+        return True
+    except Exception:
+        return False
+
+
+def _remote_root():
+    """REMOTE_APPS when a dev mount provides it (and it is not already the
+    main apps folder), else None."""
+    if APPS_DIR == REMOTE_APPS or not _exists(REMOTE_APPS):
+        return None
+    return REMOTE_APPS
+
+
+def app_root(app_dir, remote=-1):
+    """The folder app_dir loads from: REMOTE_APPS when the dev mount has
+    a complete copy of it, otherwise APPS_DIR."""
+    if remote == -1:
+        remote = _remote_root()
+    if remote and _exists("%s/%s/manifest.json" % (remote, app_dir)) and (
+            _exists("%s/%s/main.py" % (remote, app_dir)) or
+            _exists("%s/%s/main.mpy" % (remote, app_dir))):
+        return remote
+    return APPS_DIR
+
+
+def _read_manifest(root, entry):
+    with open("%s/%s/manifest.json" % (root, entry)) as f:
+        return json.loads(f.read())
+
 
 def list_apps():
-    """Return [{'dir':..., 'name':..., 'type':...}, ...]  sorted by dir name."""
-    apps = []
-    try:
-        entries = _os.listdir(APPS_DIR)
-    except OSError:
-        return apps
-    for entry in sorted(entries):
+    """Return [{'dir':..., 'name':..., 'type':...}, ...]  sorted by dir name.
+
+    Apps from a dev mount (REMOTE_APPS) are listed too, replacing an
+    installed app of the same name, and carry 'dev': True."""
+    roots = [APPS_DIR]
+    remote = _remote_root()
+    if remote:
+        roots.append(remote)
+    found = {}
+    for root in roots:
         try:
-            with open("%s/%s/manifest.json" % (APPS_DIR, entry)) as f:
-                manifest = json.loads(f.read())
-            apps.append({
+            entries = _os.listdir(root)
+        except OSError:
+            continue
+        for entry in entries:
+            try:
+                manifest = _read_manifest(root, entry)
+            except (OSError, ValueError):
+                continue
+            if root == remote and app_root(entry, remote) != remote:
+                continue                    # incomplete copy: keep /apps
+            found[entry] = {
                 "dir":    entry,
                 "name":   manifest.get("name", entry),
                 "type":   manifest.get("type", "app"),
                 "color":  manifest.get("color", None),
                 "icon":   manifest.get("icon", None),
                 "author": manifest.get("author", None),
-            })
-        except (OSError, ValueError):
-            continue
+            }
+            if root == remote:
+                found[entry]["dev"] = True
+    apps = [found[k] for k in sorted(found)]
     return [a for a in apps if a["type"] == "app"]
+
+
+def _import_app(module_path, root):
+    """__import__ module_path, with the apps package pointed at `root`
+    while it runs when root is not the usual folder.
+
+    MicroPython finds a package's submodules through the package's
+    __path__ (one string, "<search path>/apps"), so pointing apps.__path__
+    at /remote/apps for this one import makes apps.<name> and everything it
+    imports relatively come from the mount. apps.<name> keeps its own
+    __path__ afterwards; the apps package gets its old one back."""
+    if root == APPS_DIR:
+        return __import__(module_path, None, None, ["App"])
+    import apps as pkg
+    had = hasattr(pkg, "__path__")
+    old = getattr(pkg, "__path__", None)
+    pkg.__path__ = root if (old is None or isinstance(old, str)) else [root]
+    try:
+        return __import__(module_path, None, None, ["App"])
+    finally:
+        if had:
+            pkg.__path__ = old
+        else:
+            try:
+                del pkg.__path__
+            except Exception:
+                pass
 
 
 def load_app(app_dir):
     module_path = "apps.%s.main" % app_dir
-    mod = __import__(module_path, None, None, ["App"])
+    root = app_root(app_dir)
+    if module_path not in _sys.modules:
+        # Leftovers from an earlier failed import, or modules other code
+        # imported out of the app (icons): start from the files on disk.
+        unload_app(app_dir, collect=False)
+    mod = _import_app(module_path, root)
     app = mod.App()
+    if root != APPS_DIR:
+        print("[dev] %s from %s" % (app_dir, root))
     # Pull the `author` field off the manifest and stamp it onto the app
     # instance so `_show_loading()` can render "By @author" without each
     # app needing to declare the attribute on the class.
     try:
-        with open("%s/%s/manifest.json" % (APPS_DIR, app_dir)) as f:
-            manifest = json.loads(f.read())
+        manifest = _read_manifest(root, app_dir)
         if manifest.get("author"):
             app.author = manifest["author"]
     except (OSError, ValueError):
         pass
     return app
+
+
+# ── unloading apps ───────────────────────────────────────────────────────────
+#
+# When an app exits its modules leave sys.modules, so the next launch
+# imports the files again: an App Store install or update made while
+# OreoOS runs (or an edit under an `oreo dev` mount) runs without a reboot,
+# and the heap gets the app's code and module globals back. Only apps.<name> and its
+# submodules are touched; oreoOS, oreoWare and other apps stay.
+#
+# An app that leaves work running after on_exit (a thread, a timer or IRQ
+# callback, a module-level job a later visit re-attaches to) opts out with
+# KEEP_LOADED = True, or keep_loaded() returning True while that work runs.
+# A thread or callback keeps its module alive anyway, so unloading one is
+# not a crash, but the next launch would get a second, separate copy.
+
+RESIDENT_APPS = ("launcher",)    # the drawer opens on every HOME press
+
+
+def _valid_dir(app_dir):
+    return bool(app_dir) and isinstance(app_dir, str) and \
+        "." not in app_dir and "/" not in app_dir
+
+
+def unload_app(app_dir, collect=True):
+    """Drop apps.<app_dir> and its submodules from sys.modules. Returns
+    how many modules were removed."""
+    if not _valid_dir(app_dir):
+        return 0
+    name = "apps." + app_dir
+    prefix = name + "."
+    mods = _sys.modules
+    gone = [k for k in mods if k == name or k.startswith(prefix)]
+    for k in gone:
+        try:
+            del mods[k]
+        except Exception:
+            pass
+    if gone:
+        # The apps package holds each imported app as an attribute too.
+        pkg = mods.get("apps")
+        if pkg is not None:
+            try:
+                delattr(pkg, app_dir)
+            except Exception:
+                pass
+        if collect:
+            gc.collect()
+    return len(gone)
+
+
+def keeps_loaded(app):
+    """True when `app` asked to stay imported after it exits."""
+    if app is None:
+        return False
+    try:
+        hook = getattr(app, "keep_loaded", None)
+        if hook is not None:
+            return bool(hook())
+        return bool(getattr(app, "KEEP_LOADED", False))
+    except Exception:
+        return True                 # unsure: leave it alone
+
+
+def release_app(app_dir, app=None):
+    """After app_dir's run (or failed load/crash): unload it unless it is
+    resident or asked to stay. Never raises."""
+    try:
+        if app_dir in RESIDENT_APPS or keeps_loaded(app):
+            return 0
+        return unload_app(app_dir)
+    except Exception:
+        return 0
 
 
 def _invalidate(app):
@@ -197,6 +359,10 @@ def run_app(os_obj, app):
     # error is sticky. Reset on every successful frame.
     frame_errs = 0
     FRAME_ERR_LIMIT = 8
+    # Whether this run already printed a frame's full traceback. Kept
+    # apart from frame_errs (which a good frame resets), so an app that
+    # fails every other frame prints one traceback, not one per failure.
+    tb_printed = False
 
     # Long-press auto-repeat for navigation buttons. Held UP/DOWN/LEFT/
     # RIGHT will fire on_button_press repeatedly at REPEAT_MS cadence
@@ -434,10 +600,11 @@ def run_app(os_obj, app):
                 # framebuf state mid-failure is unknown. After
                 # FRAME_ERR_LIMIT consecutive bad frames we give up and
                 # let the outer handler crash-screen this app.
-                try:
-                    print("frame error in", getattr(app, "name", "?"), ":", e)
-                except Exception:
-                    pass
+                # The first error of a run prints its traceback (console
+                # only: a flaky frame must not write flash every time);
+                # the rest print one line. A run that reaches the limit
+                # is logged to /crash.log by show_crash().
+                tb_printed = _frame_error(app, e, tb_printed)
                 frame_errs += 1
                 if frame_errs >= FRAME_ERR_LIMIT:
                     raise
@@ -481,14 +648,6 @@ def run_app(os_obj, app):
                 except Exception:
                     pass
 
-            # LAN HTTP upload server tick. Non-blocking accept on the
-            # listening socket — costs one syscall per frame on the
-            # idle path. Handles one request synchronously when a
-            # phone POSTs, which briefly stalls the UI for the
-            # duration of the upload (fine for sub-second photo
-            # transfers; we'll move to a background worker later if
-            # uploads ever grow above a few hundred KB).
-            #
             # Wi-Fi auto-connect, keep-alive and the on-link-up jobs live
             # in netsvc (#118): it only polls here; the clock sync runs on
             # its worker thread and nothing starts in the quiet window
@@ -501,23 +660,19 @@ def run_app(os_obj, app):
                         _net.tick(app_name)
                     except Exception:
                         pass
-                try:
-                    from oreoOS import http_server as _hs
-                    _hs.tick()
-                except Exception:
-                    pass
                 # Background OTA probe: rate-limited inside ota to one
-                # check every 6 h, only with Wi-Fi up. check() is still a
-                # blocking GitHub GET (up to T_GH_API plus DNS), so it is
-                # gated on a ticks-based grace after Home here: ota's own
-                # grace compares time.time() against a stamp taken before
-                # the clock sync, and the first sync after a cold boot
-                # jumps the clock by years and defeats it. Timed with the
-                # network tail so perf reports it.
+                # check every 6 h, only with Wi-Fi up. The GitHub GET runs
+                # on its own thread; this call only starts it and, on a
+                # later frame, writes the result to settings (UI thread).
+                # Still gated on a ticks-based grace after Home here: ota's
+                # own grace compares time.time() against a stamp taken
+                # before the clock sync, and the first sync after a cold
+                # boot jumps the clock by years and defeats it. Timed with
+                # the network tail so perf reports it.
                 if _net is None or _net.background_ok():
                     try:
                         from oreoOS import ota as _ota
-                        _ota.background_check(os_obj)
+                        _ota.background_check(os_obj, foreground=app_name)
                     except Exception:
                         pass
                 net_ms = time.ticks_diff(time.ticks_ms(), net_t0)
@@ -531,15 +686,69 @@ def run_app(os_obj, app):
             if elapsed < frame_floor:
                 time.sleep_ms(frame_floor - elapsed)
     finally:
-        app.on_exit()
+        # on_exit runs after a crash too; its own error is logged instead
+        # of hiding the one that got us here.
+        try:
+            app.on_exit()
+        except Exception as e:
+            _log_crash(e, "on_exit " + str(getattr(app, "name", "?")))
         gc.collect()
 
 
 # ── crash screen ──────────────────────────────────────────────────────────────
 
-def show_crash(os_obj, name, err):
+def _frame_error(app, err, tb_printed):
+    """Report one failed frame: the full traceback (console only) the
+    first time in a run, one line after that. Returns the new tb_printed."""
+    name = getattr(app, "name", "?")
+    if not tb_printed:
+        _log_crash(err, "frame " + str(name), save=False)
+        return True
+    try:
+        print("frame error in", name, ":", err)
+    except Exception:
+        pass
+    return True
+
+
+def _log_crash(err, context, save=True):
+    """oreoOS.crashlog.record(), or a minimal summary when even that
+    fails. Never raises, so logging can never take the launcher down."""
+    try:
+        from oreoOS import crashlog
+        return crashlog.record(err, context, save=save)
+    except Exception:
+        pass
+    try:
+        print("crash in %s: %r" % (context, err))
+    except Exception:
+        pass
+    try:
+        return {"message": str(err), "where": "", "traceback": ""}
+    except Exception:
+        return {"message": "?", "where": "", "traceback": ""}
+
+
+def crash_lines(info, max_chars):
+    """Text lines for the crash screen: the wrapped message, then the
+    innermost file:line (trimmed from the left so the line number shows).
+    Pure, for tests."""
+    lines = _wrap_text(info.get("message") or "(no message)", max_chars)
+    where = info.get("where") or ""
+    if where:
+        if len(where) > max_chars:
+            where = ".." + where[-(max_chars - 2):]
+        lines = lines[:6] + ["", where]
+    return lines
+
+
+def show_crash(os_obj, name, err, info=None):
     """Centred, themed crash screen — Pixelify Sans title + app name,
-    framebuf body text. Press any button to dismiss."""
+    the error and the file:line it came from. The full traceback goes to
+    the USB console and /crash.log first. Press any button to dismiss."""
+    if info is None:
+        gc.collect()                # a MemoryError leaves little to log with
+        info = _log_crash(err, "app " + str(name))
     d  = os_obj.display
     SW = api.SCREEN_W
     SH = api.SCREEN_H
@@ -587,11 +796,12 @@ def show_crash(os_obj, name, err):
     d.rect(8, panel_y - 4, SW - 16, panel_h + 8, api.rgb(56, 16, 24), fill=True)
     d.rect(8, panel_y - 4, SW - 16, 1, HDR, fill=True)
 
-    msg       = str(err)
     max_chars = (SW - 32) // 8
-    lines     = _wrap_text(msg, max_chars)
+    lines     = crash_lines(info, max_chars)
     max_lns   = panel_h // 12
-    lines     = lines[:max_lns]
+    if len(lines) > max_lns:
+        # Keep the file:line (the last line) when the message is long.
+        lines = lines[:max_lns - 1] + lines[-1:]
     block_h   = len(lines) * 12
     text_y    = panel_y + max(0, (panel_h - block_h) // 2)
     for i, line in enumerate(lines):
@@ -599,7 +809,7 @@ def show_crash(os_obj, name, err):
         d.text(line, (SW - lw) // 2, text_y + i * 12, TEXT)
 
     # ── centred footer hint ──────────────────────────────────────────────
-    hint = "press any button to continue"
+    hint = "log: /crash.log  any button: back"
     hw   = len(hint) * 8
     d.text(hint, (SW - hw) // 2, SH - 18, DIM)
 
@@ -766,8 +976,7 @@ def _warm_up(os_obj):
             os_obj._power = PowerManager(os_obj)
     except Exception:
         pass
-    for mod in ("oreoOS.http_server", "oreoOS.ota", "oreoOS.netsvc",
-                "oreoOS.perf"):
+    for mod in ("oreoOS.ota", "oreoOS.netsvc", "oreoOS.perf"):
         try:
             __import__(mod)
         except Exception:
@@ -952,12 +1161,19 @@ def boot():
             if not target:
                 break    # nothing queued; outer loop returns to Home
 
+            app = None
             try:
                 app = load_app(target)
                 run_app(os_obj, app)
             except Exception as e:
                 show_crash(os_obj, target, e)
                 break
+            finally:
+                # Unload the app's modules (unless it asked to stay), so
+                # files the Store or a dev mount changed load fresh next
+                # launch. (`oreo push` restarts OreoOS anyway.)
+                release_app(target, app)
+                app = None
 
 
 if __name__ == "__main__":

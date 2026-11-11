@@ -5,6 +5,8 @@ so `oreo devs` and `oreo doctor`'s first checks never disturb a badge.
 """
 
 import os
+import re
+import sys
 
 from . import OREO_PID, OREO_VID
 from .errors import ManyBadges, NoBadge
@@ -88,6 +90,31 @@ def find_badges(comports=None):
     return [p for p in all_ports(comports) if p.is_badge]
 
 
+def normalize_port(port, platform=None, exists=None):
+    """Tidy a port name typed by a person. Never opens anything.
+
+    - Windows: `com5` -> `COM5` (pyserial handles COM10+ itself).
+    - macOS: `/dev/tty.usbmodem*` -> `/dev/cu.usbmodem*` when that exists;
+      opening the tty.* twin waits for carrier detect and can hang.
+    - Linux/macOS: a bare `ttyACM0` -> `/dev/ttyACM0` when that exists.
+    """
+    if not port:
+        return port
+    platform = platform or sys.platform
+    exists = exists or os.path.exists
+    port = port.strip()
+    if platform.startswith("win"):
+        m = re.match(r"^(?:\\\\\.\\)?com(\d+)$", port, re.I)
+        return ("COM%s" % m.group(1)) if m else port
+    if platform == "darwin" and port.startswith("/dev/tty."):
+        cu = "/dev/cu." + port[len("/dev/tty."):]
+        if exists(cu):
+            return cu
+    if "/" not in port and exists("/dev/" + port):
+        return "/dev/" + port
+    return port
+
+
 def pick(port=None, comports=None, env=None):
     """The port to use: --port, else $OREO_PORT, else the one badge found.
 
@@ -95,9 +122,9 @@ def pick(port=None, comports=None, env=None):
     """
     env = os.environ if env is None else env
     if port:
-        return port
+        return normalize_port(port)
     if env.get("OREO_PORT"):
-        return env["OREO_PORT"]
+        return normalize_port(env["OREO_PORT"])
     badges = find_badges(comports)
     if len(badges) == 1:
         return badges[0].device
@@ -112,3 +139,21 @@ def pick(port=None, comports=None, env=None):
     raise ManyBadges("%d badges connected: %s" % (
         len(badges), ", ".join(b.device for b in badges)),
         hint="choose one with --port <device> (see `oreo devs`)")
+
+
+def find_again(device, serial=None, comports=None):
+    """After a reboot: the badge's port now, or None while it is away.
+
+    USB re-enumeration can give the badge a new name (ttyACM0 -> ttyACM1,
+    another COM number), so a known serial number wins over the old name."""
+    badges = find_badges(comports)
+    if serial:
+        for b in badges:
+            if b.serial == serial:
+                return b.device
+    for b in badges:
+        if b.device == device:
+            return b.device
+    if not serial and len(badges) == 1:
+        return badges[0].device
+    return None

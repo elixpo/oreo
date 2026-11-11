@@ -1,4 +1,27 @@
-"""Errors the CLI reports to the user (one line plus an optional hint)."""
+"""Errors the CLI reports to the user (one line plus an optional hint).
+
+Exit status (documented in docs/CLI.md, "Exit status"):
+
+    0    success
+    1    error (the command failed; the message says why)
+    2    usage error (bad arguments, missing argument)
+    3    no badge found, or more than one and no --port
+    4    the badge could not be reached: port busy or missing, no answer,
+         connection lost
+    5    the badge is not running OreoOS (or the OreoOS on it is too old
+         for this command)
+    130  cancelled (Ctrl-C, or "no" at a confirmation)
+"""
+
+import contextlib
+
+EXIT_OK = 0
+EXIT_ERROR = 1
+EXIT_USAGE = 2
+EXIT_NO_BADGE = 3
+EXIT_LINK = 4
+EXIT_NO_OREOOS = 5
+EXIT_CANCELLED = 130
 
 
 class OreoError(Exception):
@@ -7,7 +30,7 @@ class OreoError(Exception):
     `hint` says what to do about it; `code` is the process exit status.
     """
 
-    code = 1
+    code = EXIT_ERROR
 
     def __init__(self, message, hint=None):
         super().__init__(message)
@@ -15,12 +38,22 @@ class OreoError(Exception):
         self.hint = hint
 
 
+class UsageError(OreoError):
+    """The command line is incomplete or contradictory."""
+    code = EXIT_USAGE
+
+
 class NoBadge(OreoError):
-    code = 3
+    code = EXIT_NO_BADGE
 
 
 class ManyBadges(OreoError):
-    code = 3
+    code = EXIT_NO_BADGE
+
+
+class LinkError(OreoError):
+    """The serial link failed: port busy or gone, no answer, unplugged."""
+    code = EXIT_LINK
 
 
 class BadgeError(OreoError):
@@ -31,8 +64,51 @@ class BadgeError(OreoError):
         self.detail = detail
 
 
+class NoOreoOS(BadgeError):
+    """The badge answers, but OreoOS (or the part of it needed) is missing."""
+    code = EXIT_NO_OREOOS
+
+
 class Cancelled(OreoError):
-    code = 130
+    code = EXIT_CANCELLED
+
+
+def is_serial_error(e):
+    """pyserial's SerialException (an OSError), without importing pyserial
+    eagerly. Other OSErrors come from files on this computer."""
+    try:
+        from serial import SerialException
+    except ImportError:
+        return False
+    return isinstance(e, SerialException)
+
+
+def local_error_message(e, path=None):
+    """'<path>: <reason>' for an OSError about a file on this computer."""
+    where = getattr(e, "filename", None) or path
+    reason = getattr(e, "strerror", None) or str(e) or type(e).__name__
+    return "%s: %s" % (where, reason) if where else reason
+
+
+class LocalFileError(OreoError):
+    """A file or folder on this computer could not be read or written."""
+
+    def __init__(self, e, path=None):
+        super().__init__(local_error_message(e, path))
+
+
+@contextlib.contextmanager
+def local_file(path=None):
+    """Turn an OSError from reading or writing a file on this computer into
+    a clear message (exit 1) instead of a lost-badge report."""
+    try:
+        yield
+    except BrokenPipeError:
+        raise
+    except OSError as e:
+        if is_serial_error(e):
+            raise
+        raise LocalFileError(e, path)
 
 
 def redact(text, secrets):

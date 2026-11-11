@@ -2,27 +2,35 @@
 
 The minimal skeleton for a new OreoOS app. Copy this directory, rename
 it, and start editing. Everything here is intentionally tiny — the
-exhaustive reference (lifecycle hooks, drawing API, manifest fields,
-persistence options) lives on the website:
+full reference (lifecycle hooks, input, drawing, saving state, the
+network, the PR checklist) is in the repo:
 
-➡ **<https://oreo.elixpo.com/docs/apps/>**
+➡ **[`docs/APPS.md`](../docs/APPS.md)** (also on the website:
+<https://oreo.elixpo.com/docs/apps/>)
 
 ---
 
 ## Quick start
 
 ```bash
-# From the repo root, with the badge connected over USB:
+# From the repo root:
 cp -r app_templates apps/my_app
+python3 tools/app_icon.py apps/my_app        # after replacing icon.png
+python3 tools/validate_app.py apps/my_app
+# With the badge connected over USB:
 python tools/deploy.py /dev/ttyACM0
 ```
 
 Open the **Apps** drawer on the badge and you'll see *Example*. Press
 **A** to increment the counter, **B** to decrement, **HOME** to exit.
+The counter is still there after a reboot: `src/app.py` saves it with
+`oreoOS.state` when the app closes.
 
-To rename it: edit the `name` field in `manifest.json` and `name =` on
-the `App` class in `src/app.py`. The on-device tile updates after the
-next deploy.
+To rename it: edit `name` and `description` in `manifest.json` and
+`name =` on the `App` class in `src/app.py`. The on-device tile updates
+after the next deploy. For your own icon, replace `icon.png` (any size)
+and re-run `tools/app_icon.py`; set `"icon"` in the manifest first if you
+want the module named after your app.
 
 ---
 
@@ -31,12 +39,18 @@ next deploy.
 ```
 app_templates/
 ├── __init__.py            empty — makes the folder a Python package
-├── manifest.json          name, version, author, icon
+├── manifest.json          name, version, description, author, icon
 ├── main.py                3-line entry shim — re-exports App
+├── icon.png               source icon (stays on your computer)
+├── assets/optimized/
+│   └── example_icon.py    the icon the badge draws (tools/app_icon.py)
 └── src/                   all real code lives here
     ├── __init__.py
-    └── app.py             the App class — lifecycle + counter logic
+    └── app.py             the App class — lifecycle + saved counter
 ```
+
+Add a `README.md` of your own (what it does, the controls, a screenshot)
+when you copy the template; `tools/validate_app.py` reminds you.
 
 `main.py` is a shim because the launcher imports it by convention.
 Real code goes in `src/`. As your app grows, split it:
@@ -50,15 +64,15 @@ src/
 ```
 
 There's no rule about *how* to split — pick what makes the file you're
-reading right now under 200 lines. `apps/snake/` is the reference for
-a fully-split app; `apps/bt/` is the reference for an app that's
+reading right now under 200 lines. `apps_market/snake/` is the reference for
+a fully-split app; `apps_market/bt/` is the reference for an app that's
 small enough to live as a single `src/app.py`.
 
 ---
 
 ## The contract (TL;DR)
 
-Your app subclasses `oreoOS.App` and implements four methods, all
+Your app subclasses `oreoOS.App` and implements a few methods, all
 optional except `draw`:
 
 ```python
@@ -74,7 +88,10 @@ class App(oreoOS.App):
     def draw(self, d):            # per-frame render
         ...
 
-    def on_button_press(self, btn):  # btn is api.BTN_A / B / UP / etc.
+    def on_button_press(self, btn):  # api.BTN_SELECT (A), BTN_BACK (B), BTN_UP, ...
+        ...
+
+    def on_exit(self):            # once, when the app closes: save here
         ...
 ```
 
@@ -119,5 +136,10 @@ When in doubt, ship to `apps_market/` so the drawer stays curated.
   `theme.TEAL` etc. — your app stays consistent if the brand palette
   shifts.
 
-For everything else, the docs page has you covered:
-**<https://oreo.elixpo.com/docs/apps/>**.
+- **Save with `oreoOS.state`**, not files in your app folder:
+  `state.load("my_app", {"hi": 0})` / `state.save("my_app", data)`. Saves
+  live in `/state/` and survive updates and reinstalls.
+- **The owner's details** (GitHub user, name, timezone) come from
+  `oreoOS.profile.get(...)`; see [`docs/PROFILE.md`](../docs/PROFILE.md).
+
+For everything else: **[`docs/APPS.md`](../docs/APPS.md)**.

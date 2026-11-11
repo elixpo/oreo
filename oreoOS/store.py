@@ -61,7 +61,7 @@ T_API       = 8           # seconds, catalogue / icon requests
 # checks it).
 DEFAULT_APPS = (
     "about", "badge", "commits", "gallery", "gamepad", "identity", "reader",
-    "settings", "store", "storage",
+    "settings", "store", "storage", "transfer",
     # system apps the OS needs
     "launcher", "updates", "wifi",
 )
@@ -428,19 +428,53 @@ def needs_refresh(max_age_ms=15 * 60 * 1000):
         return True
 
 
-def refresh():
-    """Fetch the catalogue. Returns True on success; on failure the cached
-    catalogue stays and last_error() says why."""
-    global _apps, _featured, _refreshed_ms, _last_error
-    catalogue()
-    if not wifi_up():
-        _last_error = "offline"
+def refresh_due(max_age_ms=15 * 60 * 1000, net=None):
+    """needs_refresh(), and also past netsvc's boot quiet window with no
+    other background network thread running (netsvc.fetch_busy(): the
+    clock sync or the OTA probe). The automatic refresh on opening the
+    Store waits for both; a user's A press does not."""
+    if not needs_refresh(max_age_ms):
         return False
+    if net is None:
+        try:
+            from oreoOS import netsvc as net
+        except Exception:
+            return True
+    try:
+        if net.in_quiet():
+            return False
+    except Exception:
+        return True
+    try:
+        return not net.fetch_busy()
+    except Exception:
+        return True
+
+
+def fetch_index():
+    """Network half of refresh(): GET and parse the catalogue. Touches no
+    module state and no files, so it can run on a worker thread (the
+    Store app runs it in an oreoOS.cache.Refresh job). Returns
+    (body, parsed) or (None, error)."""
+    if not wifi_up():
+        return None, "offline"
     _bc("refresh " + STORE_REF)
     body = _http_get(raw_url(INDEX_PATH))
     parsed = parse_index(body) if body else None
     if not parsed:
-        _last_error = "catalogue unavailable"
+        return None, "catalogue unavailable"
+    return body, parsed
+
+
+def apply_index(result):
+    """UI-thread half of refresh(): adopt a fetch_index() result, write
+    the flash cache and prune. Returns True on success; on failure the
+    cached catalogue stays and last_error() says why."""
+    global _apps, _featured, _refreshed_ms, _last_error
+    catalogue()
+    body, parsed = result if result else (None, "catalogue unavailable")
+    if body is None:
+        _last_error = parsed or "catalogue unavailable"
         return False
     _apps, _featured = parsed
     _last_error = ""
@@ -462,6 +496,14 @@ def refresh():
             _rm_tree(old)
     gc.collect()
     return True
+
+
+def refresh():
+    """Fetch the catalogue, blocking. Returns True on success; on failure
+    the cached catalogue stays and last_error() says why. The Store app
+    runs fetch_index() on a thread and apply_index() itself instead."""
+    catalogue()
+    return apply_index(fetch_index())
 
 
 def last_error():
@@ -529,24 +571,62 @@ def local_icon(entry_id, icon):
     return None
 
 
-def fetch_icon(entry):
-    """Download an app's optimized icon module into the icon cache.
-    Returns True when a usable icon is now cached."""
+def icon_fetch_ok(net=None):
+    """True when the Store may start an icon download now: past netsvc's
+    boot quiet window and with no other background network thread
+    (netsvc.fetch_busy(): the clock sync or the OTA probe), the same gate
+    as the automatic catalogue refresh, so two TLS sessions never share
+    the heap. Not netsvc.background_ok(): that is a 15-minute grace for
+    work nobody asked for (the OTA probe); the user opened the Store."""
+    if net is None:
+        try:
+            from oreoOS import netsvc as net
+        except Exception:
+            return True
+    try:
+        if net.in_quiet():
+            return False
+    except Exception:
+        pass
+    try:
+        return not net.fetch_busy()
+    except Exception:
+        return True
+
+
+def fetch_icon_body(entry):
+    """Network half of fetch_icon(): the icon module's bytes, or None.
+    Touches no files and no module state, so it can run on a worker
+    thread (the Store runs it in an oreoOS.cache.Refresh job)."""
     icon = entry.get("icon")
     if not icon or not wifi_up():
-        return False
+        return None
     url = raw_url("%s/assets/optimized/%s.py" % (entry["path"],
                                                  _icon_stem(icon)))
     body = _http_get(url)
     if not body or not _valid_icon_module(body):
+        return None
+    return body
+
+
+def save_icon(entry_id, body):
+    """UI-thread half: write a fetch_icon_body() result into the icon
+    cache. Returns True when a usable icon is now cached."""
+    if not body or not valid_id(entry_id) or not _valid_icon_module(body):
         return False
     _ensure_dir(ICONS_DIR)
     try:
-        with open(ICONS_DIR + "/" + entry["id"] + ".py", "wb") as f:
+        with open(ICONS_DIR + "/" + entry_id + ".py", "wb") as f:
             f.write(body)
         return True
     except Exception:
         return False
+
+
+def fetch_icon(entry):
+    """Download an app's optimized icon module into the icon cache,
+    blocking. Returns True when a usable icon is now cached."""
+    return save_icon(entry["id"], fetch_icon_body(entry))
 
 
 def _prune_icons():

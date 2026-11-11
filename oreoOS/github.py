@@ -30,9 +30,10 @@ GRAPH_BYTES = 260 * 1024   # typical page size, for progress estimates only
 
 
 def user(default="octocat"):
+    """The owner's GitHub login (/profile.json, then secrets.py)."""
     try:
-        from secrets import GITHUB_USER
-        return GITHUB_USER or default
+        from oreoOS import profile
+        return profile.get("GITHUB_USER", default)
     except Exception:
         return default
 

@@ -43,14 +43,22 @@ def _try_avatar():
 
 
 def _load_identity():
+    """Owner details from /profile.json or secrets.py (oreoOS.profile)."""
     try:
-        from secrets import GITHUB_USER, DISPLAY_NAME, DESIGNATION
+        from oreoOS import profile
+        login = profile.get("GITHUB_USER", "")
+        name = profile.get("DISPLAY_NAME", "")
+        title = profile.get("DESIGNATION", "")
     except Exception:
-        GITHUB_USER, DISPLAY_NAME, DESIGNATION = "octocat", "Octo Cat", ""
+        login, name, title = "", "", ""
+    if not (login or name):
+        # Not set up yet: say how, instead of showing someone else.
+        return {"name": "Your Name", "login": "your-github",
+                "designation": "see docs/PROFILE.md"}
     return {
-        "name":        DISPLAY_NAME or GITHUB_USER,
-        "login":       GITHUB_USER,
-        "designation": DESIGNATION or "",
+        "name":        name or login,
+        "login":       login,
+        "designation": title or "",
     }
 
 

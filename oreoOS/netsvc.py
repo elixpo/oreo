@@ -6,9 +6,12 @@ inside a UI frame for longer than a poll:
   * boot auto-connect: begin() applies the boot gates (secrets flag, the
     Settings auto-connect switch, the brownout skip, safe mode) and starts
     wifi.auto_begin(); tick() drives wifi.auto_tick() from the run loop.
-  * link-up jobs: when the link comes up (however it came up: boot
-    auto-connect, a re-join, or the WiFi app), the LAN upload server is
-    (re)bound and a clock sync is scheduled.
+  * link-up: when the link comes up (however it came up: boot
+    auto-connect, a re-join, or the WiFi app), a clock sync is scheduled.
+    Wi-Fi is for the internet only (App Store, OTA, GitHub data, weather,
+    time); files reach the badge over USB through the Transfer app, so
+    nothing listens on the LAN. A drop and re-join between two polls is
+    still caught when link_seq() moves or the station's IP changes.
   * time sync: timeutil.sync_from_ntp() (DNS lookup + UDP query, up to a
     few seconds) runs on a one-shot _thread worker, retries with backoff
     and re-syncs every NTP_RESYNC_S.
@@ -24,10 +27,12 @@ loop (launcher.run_app), and the slow part, socket.getaddrinfo(), is a
 blocking call with no asyncio variant on MicroPython. Under asyncio it
 would still stall the loop. A _thread worker releases the GIL inside the
 blocking lwIP calls, so the UI keeps running. The wifi state machine
-(auto_begin/auto_tick) and the HTTP listener stay on the UI thread: they
-are non-blocking already and are not written to be thread-safe.
+(auto_begin/auto_tick) stays on the UI thread: it is non-blocking
+already and is not written to be thread-safe.
 
-Status for the status bar and the C panel: status() / status_text().
+Status for the status bar and the C panel: status() / status_text() /
+short_text(). The manual "Sync time" rows call request_sync() and watch
+sync_result() for the outcome (#118 follow-up).
 """
 
 import time
@@ -60,7 +65,6 @@ _reason     = ""                # why boot auto-connect did not start
 _link       = False
 _home_ms    = None
 _next_poll  = None
-_jobs_due   = False
 _rejoin_at  = None
 _rejoin_n   = 0
 _ntp_at     = None
@@ -69,6 +73,10 @@ _ntp_ok_ms  = None
 _ntp_last   = ""                # last result message
 _busy       = False             # worker thread running
 _result     = None              # (ok, msg) handed back by the worker
+_link_seen  = None              # wifi.link_seq() at the last link-up
+_link_ip    = None              # wifi.ip() at the last link-up
+_sync_seq   = 0                 # bumps on every finished sync attempt
+_sync_ok    = False             # outcome of that attempt
 
 
 def _wifi():
@@ -209,26 +217,53 @@ def tick(foreground=None, now=None):
             conn = bool(wifi.is_connected())
         except Exception:
             conn = False
+        seq = _seq(wifi)
+        ip = _ip(wifi) if conn else None
         if conn and not _link:
-            _link_up(now)
+            _link_up(now, seq, ip)
+        elif conn and ((seq is not None and seq != _link_seen) or
+                       (ip and _link_ip and ip != _link_ip)):
+            # Dropped and re-joined between two polls: is_connected() was
+            # never seen False, but the join counter moved (a join through
+            # connect_poll()) or the address changed (a driver reconnect
+            # that got a new lease). Close the listener so the link-up
+            # jobs rebind it, and run them again.
+            _log("re-joined between polls")
+            _link_up(now, seq, ip)
         elif not conn and _link:
             _link_down(now)
         if not conn:
             _keep_alive(now, foreground)
     if _link and not in_quiet(now):
-        if _jobs_due:
-            _run_link_jobs(now)
         if _due(now, _ntp_at) and not _busy:
             _start_ntp(now)
 
 
-def _link_up(now):
-    global _link, _hold, _rejoin_at, _rejoin_n, _jobs_due, _ntp_at, _ntp_n
+def _seq(wifi):
+    """wifi.link_seq(), or None on a driver without it."""
+    try:
+        return wifi.link_seq()
+    except Exception:
+        return None
+
+
+def _ip(wifi):
+    """wifi.ip(), or None on a driver without it."""
+    try:
+        return wifi.ip() or None
+    except Exception:
+        return None
+
+
+def _link_up(now, seq=None, ip=None):
+    global _link, _hold, _rejoin_at, _rejoin_n, _ntp_at, _ntp_n
+    global _link_seen, _link_ip
     _link = True
+    _link_seen = seq
+    _link_ip = ip
     _hold = False           # connected, so the radio is evidently wanted
     _rejoin_at = None
     _rejoin_n = 0
-    _jobs_due = True
     if (_ntp_ok_ms is None or
             time.ticks_diff(now, _ntp_ok_ms) > NTP_FRESH_S * 1000):
         _ntp_at = now
@@ -242,17 +277,11 @@ def _link_up(now):
 
 
 def _link_down(now):
-    global _link, _jobs_due, _rejoin_at, _rejoin_n
+    global _link, _rejoin_at, _rejoin_n
     _link = False
-    _jobs_due = False
     _rejoin_n = 0
     _rejoin_at = _later(now, REJOIN_S[0])
     _log("link lost, re-join in %d s" % REJOIN_S[0])
-    try:
-        from oreoOS import http_server
-        http_server.stop()
-    except Exception:
-        pass
 
 
 def _may_rejoin():
@@ -322,16 +351,6 @@ def _keep_alive(now, foreground):
         _log("auto_begin failed: %s" % e)
 
 
-def _run_link_jobs(now):
-    global _jobs_due
-    _jobs_due = False
-    try:
-        from oreoOS import http_server
-        http_server.start(_os)
-    except Exception as e:
-        _log("http start failed: %s" % e)
-
-
 # ── time sync worker ────────────────────────────────────────────────────
 
 def _ntp_worker():
@@ -385,8 +404,11 @@ def _collect(now):
 
 
 def _ntp_finished(now, ok, msg):
-    global _ntp_at, _ntp_n, _ntp_ok_ms, _ntp_last
+    global _ntp_at, _ntp_n, _ntp_ok_ms, _ntp_last, _sync_seq, _sync_ok
     _ntp_last = msg
+    if msg != "busy":
+        _sync_seq += 1
+        _sync_ok = bool(ok)
     if ok:
         _ntp_n = 0
         _ntp_ok_ms = now
@@ -404,13 +426,52 @@ def _ntp_finished(now, ok, msg):
 
 def request_sync(now=None):
     """Ask for a clock sync on the worker instead of on the UI thread
-    (for the panel's and Settings' "Sync" rows). False when offline."""
+    (for the panel's and Settings' "Sync" rows). False when offline.
+    A sync already running counts as the requested one. Watch
+    sync_result() for the outcome: its sequence number moves when the
+    attempt finishes."""
     global _ntp_at, _ntp_n
     if not _link:
         return False
-    _ntp_at = time.ticks_ms() if now is None else now
-    _ntp_n = 0
+    if not _busy:
+        _ntp_at = time.ticks_ms() if now is None else now
+        _ntp_n = 0
     return True
+
+
+def sync_result():
+    """(seq, ok, msg) of the last finished sync attempt. seq is 0 before
+    the first one and bumps on every attempt, so a caller can take seq
+    when it asks and wait for it to change."""
+    return (_sync_seq, _sync_ok, _ntp_last)
+
+
+def worker_busy():
+    """True while the clock-sync worker thread runs. The OTA probe waits
+    for it before starting."""
+    return _busy
+
+
+def fetch_busy():
+    """True while a background network thread runs: the clock-sync
+    worker or the OTA background probe. Apps' automatic fetches (Commits,
+    Weather, the App Store) and the Updates app's check wait for it, so
+    two TLS sessions never share the heap. ota is only looked up, never
+    imported here: if it was never loaded, no probe can be running."""
+    if _busy:
+        return True
+    try:
+        import sys
+        ota = sys.modules.get("oreoOS.ota")
+        return bool(ota is not None and ota.background_busy())
+    except Exception:
+        return False
+
+
+def has_threads():
+    """False on a build without _thread: background fetches would run
+    inline, so automatic ones should wait for a user action instead."""
+    return _thread is not None
 
 
 # ── status ──────────────────────────────────────────────────────────────
@@ -446,6 +507,21 @@ def status_text(now=None):
     if state == "off":
         return "Wi-Fi off"
     return state
+
+
+def short_text(state, secs):
+    """At most 10 characters for a status(): fits the C panel's WiFi tile
+    and the gap in Home's status bar. "" when connected (the SSID or the
+    icon says it)."""
+    if state == "connected":
+        return ""
+    if state == "retrying":
+        return "retry %ds" % secs
+    if state == "connecting":
+        return "joining"
+    if state == "off":
+        return "off"
+    return "no link"
 
 
 def time_status():

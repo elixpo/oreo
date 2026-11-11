@@ -104,7 +104,7 @@ class NoTouchTest(unittest.TestCase):
         fake = FakeTransport()
         self.addCleanup(fake.cleanup)
         r = run_cli(["wifi", "connect", "Home"], fake=fake)
-        self.assertEqual(r.rc, 1)
+        self.assertEqual(r.rc, 2)
         self.assertIn("--password-stdin", r.out)
         self.assertEqual(fake.sent, [])
 

@@ -1,7 +1,8 @@
 """Badge — GitHub identity card.
 
-Reads GITHUB_USER from secrets.py and draws the profile cached on flash the
-moment the app opens, Wi-Fi or not. When the cache is older than
+Reads GITHUB_USER from the owner profile (oreoOS.profile: /profile.json,
+then secrets.py) and draws the profile cached on flash the moment the app
+opens, Wi-Fi or not. When the cache is older than
 oreoOS.github.PROFILE_TTL_S (or A is pressed) and Wi-Fi is up, a fresh copy
 is fetched in the background (oreoOS.cache.Refresh) while the cached card
 stays on screen and buttons keep working.
@@ -115,26 +116,46 @@ def _age_label(age_s):
     return "%dd ago" % (age_s // 86400)
 
 
+# Shown when no GITHUB_USER is set: the badge never borrows someone
+# else's profile.
+SETUP_LINES = (
+    "No GitHub user yet.",
+    "",
+    "Set GITHUB_USER in",
+    ".env.local and redeploy,",
+    "or in /profile.json",
+    "on the badge.",
+    "",
+    "See docs/PROFILE.md.",
+)
+
+
 class App(oreoOS.App):
     name         = "Badge"
     SHOW_LOADING = False      # the cached card is drawn immediately
 
     def on_enter(self, os):
         self._os = os
-        self._user = github.user("octocat")
+        # "" until the owner sets GITHUB_USER: then nothing is fetched and
+        # draw() shows how to set it (never a stranger's profile).
+        self._user = github.user("")
         self._avatar = _try_avatar()
         try:
             self._pf = pixelfont.load("pixelify_16")
         except (ImportError, AttributeError):
             self._pf = None
-        self._profile, self._age0 = github.cached_profile(self._user)
+        if self._user:
+            self._profile, self._age0 = github.cached_profile(self._user)
+        else:
+            self._profile, self._age0 = None, None
         self._opened_ms = time.ticks_ms()
         self._age_txt = ""
         self._age_s = -1
         self._note = None           # "offline" / "sync failed" footnote
         user = self._user
-        self._job = cache.Refresh(lambda: github.fetch_profile(user))
-        if github.stale(self._age0, github.PROFILE_TTL_S):
+        self._job = (cache.Refresh(lambda: github.fetch_profile(user))
+                     if user else None)
+        if user and github.stale(self._age0, github.PROFILE_TTL_S):
             self._refresh(quiet=True)
         self._update_age()
         self._dirty = True
@@ -203,7 +224,9 @@ class App(oreoOS.App):
         d.rect(CX,     CY,     CW, CH, theme.CARD,   fill=True)
         d.rect(CX,     CY,     CW,  3, theme.PRIMARY, fill=True)
 
-        if self._profile is None:
+        if not self._user:
+            self._draw_setup(d)
+        elif self._profile is None:
             self._draw_empty(d)
         else:
             self._draw_card(d, self._profile)
@@ -292,6 +315,14 @@ class App(oreoOS.App):
         if bg is not None:
             d.rect(x, y, w, 12, bg, fill=True)
         d.text(label, x + 5, y + 2, fg)
+
+    def _draw_setup(self, d):
+        self._draw_avatar(d, "")
+        y = CY + 22
+        for i, line in enumerate(SETUP_LINES):
+            col = theme.PRIMARY if i == 0 else theme.TEXT_BRIGHT
+            d.text(_fit(line, 24), TEXT_X, y, col)
+            y += 14
 
     def _draw_empty(self, d):
         self._draw_avatar(d, self._user)

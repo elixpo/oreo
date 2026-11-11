@@ -85,7 +85,7 @@ class RealWifiContractTest(unittest.TestCase):
     def setUp(self):
         self.fake = FakeTransport()
         self.addCleanup(self.fake.cleanup)
-        self.wlan = FakeWLAN({"Home": ("hunter2", -48), "Cafe": ("", -71)})
+        self.wlan = FakeWLAN({"Home": ("hunter2!", -48), "Cafe": ("", -71)})
         net = types.ModuleType("network")
         net.STA_IF = 0
         net.WLAN = lambda _if: self.wlan
@@ -112,7 +112,7 @@ class RealWifiContractTest(unittest.TestCase):
         self.assertFalse(nets[0]["saved"])
 
     def test_connect_save_list_forget(self):
-        r = self.badge.wifi_connect("Home", "hunter2")
+        r = self.badge.wifi_connect("Home", "hunter2!")
         self.assertEqual(r["result"], "ok")
         self.assertEqual(r["ip"], "10.0.0.7")
         self.assertTrue(r["saved"])
@@ -121,7 +121,7 @@ class RealWifiContractTest(unittest.TestCase):
         self.assertNotIn("password", saved[0])
         self.assertTrue(saved[0]["last"])
         for out in self.fake.outputs:
-            self.assertNotIn(b"hunter2", out)
+            self.assertNotIn(b"hunter2!", out)
         self.assertEqual(self.badge.wifi_forget("Home"), (True, False))
         self.assertEqual(self.badge.wifi_forget("Home"), (False, False))
 

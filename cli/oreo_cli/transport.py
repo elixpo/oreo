@@ -12,13 +12,26 @@ Interface used by `badge.Badge` (and implemented by the test FakeTransport):
     close()
 """
 
+import contextlib
+import io
 import os
 import sys
 import time
 
-from .errors import BadgeError, OreoError
+from .errors import BadgeError, LinkError, OreoError
 
 RAW_BANNER = b"raw REPL; CTRL-B to exit\r\n"
+
+# Bound on a single blocking read while code is being sent (raw-paste
+# handshake and flow control). Without it pyserial blocks forever if the
+# badge stops answering half way.
+SEND_READ_TIMEOUT = 10
+
+BUSY_HINT = ("OreoOS may be busy (a download, or an app that blocks Ctrl-C). "
+             "Wait a few seconds and try again; if it stays stuck, press RESET "
+             "or unplug and replug the badge, then run `oreo doctor`")
+LOST_HINT = ("the badge was unplugged or rebooted. Plug it back in, "
+             "check with `oreo devs`, and run the command again")
 
 
 def _import_mpremote():
@@ -47,6 +60,11 @@ def explain_open_failure(device):
             "another `oreo`); close it and try again")
 
 
+def struct_error():
+    import struct
+    return struct.error
+
+
 class SerialLink:
     def __init__(self, device, baudrate=115200):
         self.device = device
@@ -55,6 +73,7 @@ class SerialLink:
         self._have_prompt = False   # we already read the raw REPL '>' prompt
         self._busy = False          # code sent (or being sent) and not finished
         self.mounted = False
+        self._restart_sent = False  # restart(): the reboot request is on the wire
 
     # ── lifecycle ────────────────────────────────────────────────────
     def open(self):
@@ -63,23 +82,58 @@ class SerialLink:
         SerialTransport, TransportError = _import_mpremote()
         try:
             self.t = SerialTransport(self.device, baudrate=self.baudrate)
-        except (TransportError, OSError):
+        except (TransportError, OSError, ValueError):
             msg, hint = explain_open_failure(self.device)
-            raise OreoError(msg, hint=hint)
+            raise LinkError(msg, hint=hint)
         return self
 
-    def enter(self, soft_reset=True):
+    def enter(self, soft_reset=True, attempts=2):
         """Interrupt OreoOS and enter the raw REPL (soft reset: clean heap,
-        main.py does not run while we are in the raw REPL)."""
+        main.py does not run while we are in the raw REPL).
+
+        OreoOS can take a moment to notice Ctrl-C (a network call, a frame
+        being drawn), so a failed attempt is retried once after a burst of
+        Ctrl-C and a short wait before the badge is reported as busy."""
         self.open()
         _, TransportError = _import_mpremote()
-        try:
-            self.t.enter_raw_repl(soft_reset=soft_reset)
-        except (TransportError, OSError) as e:
-            raise OreoError("the badge did not answer on %s (%s)" % (self.device, e),
-                            hint="unplug and replug the badge, then run `oreo doctor`")
-        self._have_prompt = False
+        last = None
+        for attempt in range(max(1, attempts)):
+            try:
+                if attempt:
+                    self.t.serial.write(b"\r\x03\x03")
+                    time.sleep(1.0)
+                    self._drain()
+                # mpremote prints what it read when this fails; keep that
+                # out of our output (it is in the error below instead).
+                with contextlib.redirect_stdout(io.StringIO()):
+                    self.t.enter_raw_repl(soft_reset=soft_reset)
+                self._have_prompt = False
+                self._busy = False
+                return
+            except (TransportError, OSError) as e:
+                last = e
+                if isinstance(e, OSError):
+                    self._lost()
+                    raise LinkError("lost the connection to the badge on %s" % self.device,
+                                    hint=LOST_HINT)
+        raise LinkError("the badge did not answer on %s (%s)" % (self.device, last),
+                        hint=BUSY_HINT)
+
+    def _drain(self, limit=1.0):
+        ser = self.t.serial
+        end = time.monotonic() + limit
+        while time.monotonic() < end:
+            n = ser.inWaiting()
+            if not n:
+                return
+            ser.read(n)
+
+    def _lost(self):
+        """The port went away (unplugged, USB re-enumerated): drop it."""
         self._busy = False
+        self._have_prompt = False
+        self.mounted = False
+        self.close()
 
     def close(self):
         if self.t is None:
@@ -91,39 +145,66 @@ class SerialLink:
         self.t = None
 
     def restart(self, mode="soft"):
-        """Leave OreoOS running again, then close the port."""
+        """Leave OreoOS running again, then close the port.
+
+        Shielded against Ctrl-C: an interrupt while the sequence is being
+        sent (the person pressing Ctrl-C again while oreo cleans up) makes
+        it start over, and the port is closed only afterwards. Every step
+        is safe to repeat, so a repeat cannot leave the badge at the
+        MicroPython prompt with OreoOS stopped. The interrupt is raised
+        again once the badge has been restarted."""
         if self.t is None:
             return
+        interrupted = None
+        self._restart_sent = False
         try:
-            if self._busy and self.t.in_raw_repl:
-                self._recover()
-            if self.mounted:
+            for _ in range(3):
+                if self._restart_sent:
+                    break       # only the pause after it was cut short
                 try:
-                    if self.t.in_raw_repl:
-                        self._resync()
-                    else:   # leaving `oreo dev`'s REPL: same as mpremote's disconnect
-                        self.t.enter_raw_repl(soft_reset=False)
-                        self._have_prompt = False
-                    self.t.umount_local()
+                    self._restart_sequence(mode)
+                    break
+                except KeyboardInterrupt as e:
+                    interrupted = e
                 except Exception:
-                    pass
-                self.mounted = False
-            if mode == "hard":
-                if not self.t.in_raw_repl:
-                    self.t.enter_raw_repl(soft_reset=False)
-                    self._have_prompt = False
-                self._send(b"import machine\nmachine.reset()\n")
-            else:
-                if self.t.in_raw_repl:
-                    self.t.exit_raw_repl()           # ctrl-B: friendly REPL
-                    time.sleep(0.05)
-                if mode == "soft":
-                    self.t.serial.write(b"\x04")     # ctrl-D: soft reboot -> main.py
-                    time.sleep(0.2)
-        except Exception:
-            pass
+                    break       # port gone or badge not answering: nothing more to do
         finally:
             self.close()
+        if interrupted is not None:
+            raise interrupted
+
+    def _restart_sequence(self, mode):
+        if self._busy and self.t.in_raw_repl:
+            self._recover()
+        if self.mounted:
+            try:
+                if self.t.in_raw_repl:
+                    self._resync()
+                else:   # leaving `oreo dev`'s REPL: same as mpremote's disconnect
+                    self.t.enter_raw_repl(soft_reset=False)
+                    self._have_prompt = False
+                self.t.umount_local()
+            except Exception:
+                pass
+            self.mounted = False
+        if mode == "hard":
+            if not self.t.in_raw_repl:
+                self.t.enter_raw_repl(soft_reset=False)
+                self._have_prompt = False
+            self._busy = True    # a retry must end a half-sent paste first
+            self._send(b"import machine\nmachine.reset()\n")
+            self._busy = False
+            self._restart_sent = True
+        else:
+            if self.t.in_raw_repl:
+                self.t.exit_raw_repl()           # ctrl-B: friendly REPL
+                time.sleep(0.05)
+            if mode == "soft":
+                self.t.serial.write(b"\x04")     # ctrl-D: soft reboot -> main.py
+                self._restart_sent = True
+                time.sleep(0.2)
+            else:
+                self._restart_sent = True
 
     def _recover(self, quiet=0.15, limit=2.0):
         """Back to a clean raw REPL prompt after an exec was cut short (Ctrl-C
@@ -157,15 +238,35 @@ class SerialLink:
             self.t.read_until(1, RAW_BANNER, timeout=5)
             self._have_prompt = False
 
+    @contextlib.contextmanager
+    def _read_timeout(self, seconds):
+        """Bound pyserial's blocking reads while sending, then restore."""
+        ser = self.t.serial
+        old = getattr(ser, "timeout", None)
+        try:
+            ser.timeout = seconds
+        except Exception:
+            pass
+        try:
+            yield
+        finally:
+            try:
+                ser.timeout = old
+            except Exception:
+                pass
+
     def _send(self, code):
         """mpremote's exec_raw_no_follow, aware of a prompt we already read."""
+        with self._read_timeout(SEND_READ_TIMEOUT):
+            self._send_inner(code)
+
+    def _send_inner(self, code):
         _, TransportError = _import_mpremote()
         ser = self.t.serial
         if not self._have_prompt:
             data = self.t.read_until(1, b">", timeout=10)
             if not data.endswith(b">"):
-                raise OreoError("the badge is not at the raw REPL prompt",
-                                hint="unplug and replug the badge")
+                raise LinkError("the badge is not at the raw REPL prompt", hint=BUSY_HINT)
         self._have_prompt = False
         if self.t.use_raw_paste:
             ser.write(b"\x05A\x01")
@@ -173,20 +274,20 @@ class SerialLink:
             if data == b"R\x01":
                 try:
                     self.t.raw_paste_write(code)
-                except TransportError as e:
-                    raise OreoError("transfer to the badge failed: %s" % e)
+                except (TransportError, struct_error()) as e:
+                    raise LinkError("transfer to the badge failed: %s" % e, hint=BUSY_HINT)
                 return
             if data != b"R\x00":
                 data = self.t.read_until(1, b"w REPL; CTRL-B to exit\r\n>")
                 if not data.endswith(b"w REPL; CTRL-B to exit\r\n>"):
-                    raise OreoError("the badge left the raw REPL")
+                    raise LinkError("the badge left the raw REPL", hint=BUSY_HINT)
             self.t.use_raw_paste = False
         for i in range(0, len(code), 256):
             ser.write(code[i:i + 256])
             time.sleep(0.01)
         ser.write(b"\x04")
         if ser.read(2) != b"OK":
-            raise OreoError("the badge refused the command")
+            raise LinkError("the badge refused the command", hint=BUSY_HINT)
 
     def _follow(self, timeout, consumer):
         """Read stdout up to the first EOF and stderr up to the second, in
@@ -199,8 +300,8 @@ class SerialLink:
             n = ser.inWaiting()
             if not n:
                 if timeout is not None and time.monotonic() - last > timeout:
-                    raise OreoError("the badge stopped answering (%ss without output)" % timeout,
-                                    hint="it may be busy; unplug and replug if it stays stuck")
+                    raise LinkError("the badge stopped answering (%ss without output)" % timeout,
+                                    hint=BUSY_HINT)
                 time.sleep(0.003)
                 continue
             data = ser.read(n)
@@ -226,13 +327,19 @@ class SerialLink:
     def exec(self, code, timeout=15, consumer=None):
         if self.t is None or not self.t.in_raw_repl:
             self.enter()
-        elif self._busy:     # the previous exec was cut short (Ctrl-C)
-            self._recover()
         if isinstance(code, str):
             code = code.encode("utf-8")
-        self._busy = True
-        self._send(code)
-        out, err = self._follow(timeout, consumer)
+        try:
+            if self._busy:     # the previous exec was cut short (Ctrl-C)
+                self._recover()
+            self._busy = True
+            self._send(code)
+            out, err = self._follow(timeout, consumer)
+        except OSError:
+            # pyserial's SerialException is an OSError: the port vanished.
+            self._lost()
+            raise LinkError("lost the connection to the badge on %s" % self.device,
+                            hint=LOST_HINT)
         self._busy = False
         if err:
             text = err.decode("utf-8", "replace")
@@ -242,7 +349,10 @@ class SerialLink:
 
     def interrupt(self):
         if self.t is not None:
-            self.t.serial.write(b"\x03")
+            try:
+                self.t.serial.write(b"\x03")
+            except OSError:
+                self._lost()
 
     # ── interactive helpers (shell, dev) ─────────────────────────────
     def mount(self, path):

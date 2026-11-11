@@ -8,10 +8,14 @@ and commands run with no badge plugged in never touch the hardware.
 import argparse
 import contextlib
 import sys
+import time
 
 from . import __version__, commands, discovery
+from . import transfer  # noqa: F401  registers `transfer` and `send`
+from . import devtools, owner  # noqa: F401  register `new`, `app` and `setup`
 from .badge import Badge
-from .errors import Cancelled, OreoError
+from .errors import (EXIT_CANCELLED, EXIT_ERROR, EXIT_LINK, Cancelled, OreoError,
+                     is_serial_error, local_error_message)
 from .ui import UI, adapt_stdio, esc
 
 HOME = "https://oreo.elixpo.com/docs"
@@ -53,6 +57,15 @@ HELP = {
             "  oreo add holiday.jpg\n"
             "  oreo add clip.mp4 --seconds 8\n"
             "  oreo add talk-notes.md"),
+    "transfer": ("Send files to the badge's Transfer app (code shown on the badge)",
+                 "Open Transfer on the badge, run this, and type the code the badge\n"
+                 "shows. Files are converted like `oreo add`, sent over USB, checked\n"
+                 "with SHA-256 and land in the Gallery or Reader. OreoOS keeps running.\n\n"
+                 "  oreo transfer send holiday.jpg clip.mp4 notes.md\n"
+                 "  oreo transfer list\n"
+                 "  oreo transfer rm holiday.rz565"),
+    "send": ("Same as `oreo transfer send`",
+             "  oreo send holiday.jpg notes.md"),
     "apps": ("List, install, update and remove apps",
              "Uses the badge's App Store (oreoOS.store). Installing and updating\n"
              "download over the badge's Wi-Fi, so set that up first (`oreo wifi`).\n\n"
@@ -64,10 +77,16 @@ HELP = {
     "run": ("Run a script on the badge",
             "Stops OreoOS, runs the file and streams its output. Ctrl-C stops it.\n\n"
             "  oreo run blink.py"),
-    "dev": ("Mount a folder for live editing",
-            "Mounts a folder from your computer at /remote on the badge and opens\n"
-            "the REPL: edit files locally, import them on the badge.\n\n"
-            "  oreo dev ./myapp\n  oreo dev ./myapp --run main.py"),
+    "dev": ("Mount a folder for live editing in the REPL",
+            "Stops OreoOS, mounts a folder from your computer at /remote on the\n"
+            "badge and opens the REPL there: `import mymodule` loads your local\n"
+            "copy, so edits need no copying. A module is imported once; after an\n"
+            "edit, `del sys.modules['mymodule']` and import it again. OreoOS does\n"
+            "not run meanwhile, and its drawer lists apps from /apps only, so to\n"
+            "try an app in OreoOS use `oreo app install`. Leave with Ctrl-] or\n"
+            "Ctrl-X (Ctrl-D starts OreoOS and ends live editing).\n\n"
+            "  oreo dev ./scripts\n"
+            "  oreo dev ./scripts --run blink.py"),
     "logs": ("Follow the badge's console output",
              "Prints what OreoOS writes to the console without stopping it.\n"
              "Ctrl-C to stop.\n\n"
@@ -80,10 +99,17 @@ HELP = {
              "  oreo wifi connect \"Home Net\"\n"
              "  oreo wifi saved\n"
              "  oreo wifi forget \"Old Net\""),
-    "update": ("Deploy OreoOS from a checkout",
-               "Runs ./deploy --board from an OreoOS checkout. --clean wipes the\n"
-               "badge's files first and asks before doing so. Updating from GitHub\n"
-               "releases (no checkout) is future work.\n\n"
+    "update": ("Update OreoOS to the newest release",
+               "Has the badge download the newest OreoOS release from GitHub over\n"
+               "its own Wi-Fi (the same update its Updates page does), shows the\n"
+               "versions and the download size, asks, installs it, restarts the\n"
+               "badge and checks the new version. Apps, photos, documents and\n"
+               "saved Wi-Fi stay. Set up Wi-Fi first (`oreo wifi`).\n\n"
+               "  oreo update                  newest stable release\n"
+               "  oreo update --check          only say whether there is one\n"
+               "  oreo update --channel beta   newest beta release\n\n"
+               "Developers: --repo deploys from an OreoOS checkout (./deploy --board)\n"
+               "instead; --clean wipes the badge's files first and asks.\n\n"
                "  oreo update --repo ~/src/oreo\n"
                "  oreo update --repo ~/src/oreo --clean"),
     "flash": ("Reflash the firmware from a checkout",
@@ -93,8 +119,40 @@ HELP = {
               "  oreo flash --repo ~/src/oreo"),
     "doctor": ("Check cable, port, permissions and firmware",
                "Looks for the badge and explains what is wrong: wrong cable or\n"
-               "port, missing serial permissions (Linux dialout), wrong firmware.\n\n"
+               "port, missing serial permissions (Linux dialout), port busy, wrong\n"
+               "firmware, OreoOS missing. Ends with numbered next steps.\n"
+               "Exit status 0 when nothing failed, 1 otherwise.\n\n"
                "  oreo doctor"),
+    "setup": ("Set the owner profile: GitHub user, name, timezone, weather",
+              "Shows what the badge has now, asks for each value (Enter keeps it,\n"
+              "- removes it) and writes /profile.json on the badge, which Badge,\n"
+              "Identity, Commits, Weather and the clock read (docs/PROFILE.md).\n"
+              "No .env.local or checkout needed. Values given as options are saved\n"
+              "without prompting. The OpenWeatherMap key is asked without echo and\n"
+              "never shown; an empty value removes a key. OreoOS restarts after.\n\n"
+              "  oreo setup\n"
+              "  oreo setup --show\n"
+              "  oreo setup --github-user octocat --name \"Mona Lisa\" --timezone 5.5\n"
+              "  oreo setup --lat 12.97 --lon 77.59 --weather-name Bengaluru\n"
+              "  oreo setup --owm-key-stdin < owm-key.txt\n"
+              "  oreo setup --designation \"\"     remove the title"),
+    "new": ("Make a new app folder from the app template",
+            "Copies the OreoOS app template (a counter: A adds, B subtracts) into\n"
+            "./<id>, with your app's name, id, author and icon module filled in.\n"
+            "The id comes from the name: \"My Game\" -> my_game.\n\n"
+            "  oreo new my_game\n"
+            "  oreo new \"My Game\" --author octocat --dir ~/oreo-apps\n"
+            "  oreo app install ./my_game      then try it on the badge"),
+    "app": ("Install an app from a folder on this computer",
+            "install checks the folder with the same rules as the repo's\n"
+            "tools/validate_app.py, copies the files that belong on the badge\n"
+            "to /apps/<id>/ (each one checked with SHA-256), removes files an\n"
+            "earlier install left behind, and restarts OreoOS so the Apps drawer\n"
+            "lists it. Built-in apps are not replaced without --force.\n"
+            "Saved data (/state/<id>.json) stays. Store apps: `oreo apps`.\n\n"
+            "  oreo app install ./my_game\n"
+            "  oreo app list\n"
+            "  oreo app remove my_game"),
     "help": ("Help for a command", "  oreo help wifi"),
 }
 
@@ -116,7 +174,9 @@ def build_parser():
         description="oreo %s: control the Elixpo Oreo Badge over USB.\n\n"
                     "Run `oreo` with no command to find the badge and open the\n"
                     "interactive view. Docs: %s" % (__version__, HOME),
-        epilog="`oreo help <command>` shows details and examples.")
+        epilog="`oreo help <command>` shows details and examples.\n"
+               "Exit status: 0 ok, 1 error, 2 usage, 3 no badge (or several),\n"
+               "4 badge unreachable or busy, 5 OreoOS missing, 130 cancelled.")
     p.add_argument("--version", action="version", version="oreo-cli " + __version__)
     p.add_argument("-p", "--port", help="serial port (default: the one badge found; $OREO_PORT)")
     p.add_argument("--reset", choices=("soft", "hard", "none"), default="soft",
@@ -162,10 +222,41 @@ def build_parser():
     s.add_argument("--photo-max", type=int, default=240, help="longest photo side (default 240)")
     s.add_argument("--save", metavar="DIR", help="also keep the converted files here")
 
+    transfer.add_arguments(_sub(subs, "transfer"))
+    transfer.add_send_arguments(_sub(subs, "send"))
+
     s = _sub(subs, "apps")
     s.add_argument("action", nargs="?", default="list",
                    choices=("list", "refresh", "install", "update", "remove"))
     s.add_argument("app", nargs="?", help="app id (see `oreo apps`)")
+
+    s = _sub(subs, "setup")
+    s.add_argument("--show", action="store_true", help="only print the profile (key hidden)")
+    s.add_argument("--github-user", metavar="LOGIN", help="GitHub user for Badge and Commits")
+    s.add_argument("--name", metavar="TEXT", help="name on the Identity card")
+    s.add_argument("--designation", metavar="TEXT", help="title under the name")
+    s.add_argument("--timezone", metavar="HOURS",
+                   help="hours from UTC, -12 to +14: 5.5, -4, +05:30")
+    s.add_argument("--lat", metavar="DEG", help="weather latitude, -90 to 90")
+    s.add_argument("--lon", metavar="DEG", help="weather longitude, -180 to 180")
+    s.add_argument("--weather-name", metavar="TEXT", help="place name shown by Weather")
+    s.add_argument("--owm-key", metavar="KEY", help="OpenWeatherMap API key (prefer the prompt)")
+    s.add_argument("--owm-key-stdin", action="store_true",
+                   help="read the OpenWeatherMap key from standard input")
+
+    s = _sub(subs, "new")
+    s.add_argument("name", help="app name or id, e.g. my_game or \"My Game\"")
+    s.add_argument("--name", dest="display_name", metavar="TEXT",
+                   help="name shown on the badge (default: from the id)")
+    s.add_argument("--author", help="your GitHub handle (default: from git config)")
+    s.add_argument("--dir", metavar="PATH", help="where to create it (default: here)")
+
+    s = _sub(subs, "app")
+    s.add_argument("action", choices=("install", "list", "remove"))
+    s.add_argument("target", nargs="?", metavar="folder|id",
+                   help="install: the app folder; remove: the app id")
+    s.add_argument("--force", action="store_true", help="install over a built-in app")
+    s.add_argument("--no-verify", action="store_true", help="skip the SHA-256 check")
 
     s = _sub(subs, "run")
     s.add_argument("file")
@@ -189,16 +280,19 @@ def build_parser():
                    help="read the password from standard input (for scripts)")
     s.add_argument("--timeout", type=float, default=15.0, help="seconds to wait (default 15)")
 
-    for name in ("update", "flash"):
-        s = _sub(subs, name)
-        s.add_argument("--repo", help="path to an OreoOS checkout (required for now)")
-        if name == "update":
-            s.add_argument("--clean", action="store_true", help="wipe the badge's files first")
-            s.add_argument("--force", action="store_true", help="upload every file")
-            s.add_argument("--no-bump", action="store_true", help="keep the OreoOS version")
-            s.add_argument("--override", metavar="APPS", help="replace these app folders")
-        else:
-            s.add_argument("--build", action="store_true", help="build the firmware first")
+    s = _sub(subs, "update")
+    s.add_argument("--check", action="store_true", help="only check for a newer release")
+    s.add_argument("--channel", choices=("stable", "beta"), default="stable",
+                   help="release channel (default: stable)")
+    s.add_argument("--repo", help="developers: deploy from this OreoOS checkout instead")
+    s.add_argument("--clean", action="store_true", help="with --repo: wipe the badge's files first")
+    s.add_argument("--force", action="store_true", help="with --repo: upload every file")
+    s.add_argument("--no-bump", action="store_true", help="with --repo: keep the OreoOS version")
+    s.add_argument("--override", metavar="APPS", help="with --repo: replace these app folders")
+
+    s = _sub(subs, "flash")
+    s.add_argument("--repo", help="path to an OreoOS checkout (required)")
+    s.add_argument("--build", action="store_true", help="build the firmware first")
 
     _sub(subs, "doctor")
 
@@ -210,12 +304,15 @@ def build_parser():
 class Ctx:
     """What a command needs: options, UI, and a lazily opened badge."""
 
-    def __init__(self, args, ui, comports=None, link_factory=None, runner=None):
+    def __init__(self, args, ui, comports=None, link_factory=None, runner=None,
+                 sleep=None, monotonic=None):
         self.args = args
         self.ui = ui
         self.comports = comports
         self._link_factory = link_factory
         self.runner = runner
+        self.sleep = sleep or time.sleep          # injectable for tests
+        self.monotonic = monotonic or time.monotonic
 
     def port(self):
         return discovery.pick(self.args.port, self.comports)
@@ -239,10 +336,25 @@ class Ctx:
         try:
             yield b
         finally:
-            b.finish(reset or self.args.reset)
+            finish_shielded(b, reset or self.args.reset)
 
 
-def main(argv=None, ui=None, comports=None, link_factory=None, runner=None):
+def finish_shielded(b, mode):
+    """Restart OreoOS; a second Ctrl-C must not cut that short and leave
+    the badge at the MicroPython prompt."""
+    try:
+        b.finish(mode)
+    except KeyboardInterrupt:
+        b.finish(mode)
+
+
+def _transport_error(e):
+    """mpremote's TransportError, without importing mpremote eagerly."""
+    return type(e).__name__ == "TransportError"
+
+
+def main(argv=None, ui=None, comports=None, link_factory=None, runner=None,
+         sleep=None, monotonic=None):
     if ui is None:
         adapt_stdio()   # a non-UTF-8 pipe (Windows) must not crash on the marks
     parser = build_parser()
@@ -261,7 +373,8 @@ def main(argv=None, ui=None, comports=None, link_factory=None, runner=None):
             ui.error("no command called %r" % topic, hint="commands: " + ", ".join(sorted(HELP)))
             return 2
         build_parser().parse_args([topic, "--help"])  # prints and exits 0
-    ctx = Ctx(args, ui, comports=comports, link_factory=link_factory, runner=runner)
+    ctx = Ctx(args, ui, comports=comports, link_factory=link_factory, runner=runner,
+              sleep=sleep, monotonic=monotonic)
     handler = commands.HANDLERS.get(args.cmd or "")
     try:
         if handler is None:
@@ -273,7 +386,30 @@ def main(argv=None, ui=None, comports=None, link_factory=None, runner=None):
         return e.code
     except KeyboardInterrupt:
         ui.warn("stopped")
-        return 130
+        return EXIT_CANCELLED
     except OreoError as e:
         ui.error(e.message, hint=e.hint, detail=getattr(e, "detail", None) if args.verbose else None)
         return e.code
+    except BrokenPipeError:
+        # stdout closed early (`oreo cat ... | head`): nothing left to tell.
+        return EXIT_ERROR
+    except OSError as e:
+        if is_serial_error(e):
+            # a port that vanished outside the places that already explain it
+            ui.error("lost the connection to the badge (%s)" % esc(e),
+                     hint="plug it back in, check with `oreo devs`, then run the command again")
+            return EXIT_LINK
+        # anything else is a file or folder on this computer
+        ui.error(esc(local_error_message(e)))
+        return EXIT_ERROR
+    except Exception as e:   # never a bare traceback for the person
+        if _transport_error(e):
+            ui.error("the badge did not answer (%s)" % esc(e),
+                     hint="unplug and replug the badge, then run `oreo doctor`")
+            return EXIT_LINK
+        import traceback
+        ui.error("unexpected error: %s: %s" % (type(e).__name__, esc(e)),
+                 hint="this is a bug in oreo; please report it with `oreo -v ...` output "
+                      "at https://github.com/elixpo/oreo/issues",
+                 detail=traceback.format_exc() if args.verbose else None)
+        return EXIT_ERROR

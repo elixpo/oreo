@@ -53,7 +53,7 @@ _BENCHMARK_RECORD_SIZE = _BENCHMARK_FIELDS * 4
 def _list_photos():
     """Both formats land here:
       .py    — laptop-optimised, baked at deploy time
-      .r565  — uploaded over WiFi, written by oreoOS.http_server in the
+      .r565  — uploaded over WiFi, written by the old Wi-Fi upload server in the
                on-device-renderable binary format defined below.
     Returned names include their extension so _load_photo can dispatch."""
     try:

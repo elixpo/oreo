@@ -56,6 +56,9 @@ def load_commits():
     try:
         package.github = _load("oreoOS/github.py", "oreo_github_commits_test")
         app = _load("apps/commits/src/app.py", "commits_app_under_test")
+        # No boot quiet window in these tests (netsvc is not loaded);
+        # AutoFetchTest covers the gate itself.
+        app.auto_fetch_ok = lambda net=None: True
     finally:
         for k, v in saved.items():
             if v is None:

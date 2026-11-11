@@ -20,7 +20,21 @@ SAFE_HINT = ("if this loops, hold HOME while it",
              "boots: safe mode, no Wi-Fi or BT")
 
 
-def _crash_message(err):
+def _record(err):
+    """Print the full traceback to serial and append it to /crash.log.
+    Returns a summary dict, or None if even that failed."""
+    try:
+        from oreoOS import crashlog
+        return crashlog.record(err, "boot")
+    except Exception:
+        try:
+            print("FATAL: boot() escaped:", err)
+        except Exception:
+            pass
+        return None
+
+
+def _crash_message(err, info=None):
     """Try to surface the error on the LCD. Best-effort — if drawing
     itself fails (display not initialized, OOM, etc.) we silently fall
     through to the reset path so the badge never gets stuck."""
@@ -33,8 +47,21 @@ def _crash_message(err):
         d.text("rebooting...",   16, 70,  api.WHITE, scale=1)
         # Truncate so a long traceback line doesn't blow past 36 chars
         # at scale=1 (≈8 px/glyph on a 320 px-wide screen).
-        msg = (str(err) or "(no message)")[:36]
-        d.text(msg, 16, 100, api.WHITE, scale=1)
+        if info:
+            msg = info["message"]
+        else:
+            msg = str(err) or "(no message)"
+        d.text(msg[:36], 16, 100, api.WHITE, scale=1)
+        if len(msg) > 36:
+            d.text(msg[36:72], 16, 112, api.WHITE, scale=1)
+        # Innermost file:line, trimmed from the left so the line number
+        # always shows. The full traceback is in /crash.log.
+        where = info["where"] if info else ""
+        if where:
+            if len(where) > 36:
+                where = ".." + where[-34:]
+            d.text(where, 16, 132, api.WHITE, scale=1)
+            d.text("details: /crash.log", 16, 148, api.WHITE, scale=1)
         # Safe mode is real: launcher._safe_boot_requested() checks HOME
         # at boot and skips Wi-Fi/BT auto-start (the usual loop causes).
         for i, line in enumerate(SAFE_HINT):
@@ -64,11 +91,7 @@ def main():
     try:
         launcher.boot()
     except Exception as e:
-        try:
-            print("FATAL: boot() escaped:", e)
-        except Exception:
-            pass
-        _crash_message(e)
+        _crash_message(e, _record(e))
         _settle_then_reset()
 
 

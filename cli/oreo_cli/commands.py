@@ -7,7 +7,7 @@ from pathlib import Path
 
 from . import discovery, doctor as doctor_mod, media, repo
 from .badge import PROTECTED, norm
-from .errors import Cancelled, OreoError
+from .errors import Cancelled, LinkError, OreoError, UsageError, local_file
 from . import ui as ui_mod
 from .ui import esc, human
 
@@ -116,9 +116,17 @@ def _repl(link, ui):
         console.exit()
 
 
+def need_terminal(ui, what):
+    if not ui.interactive:
+        raise UsageError("`oreo %s` needs a terminal (standard input is not one)" % what,
+                         hint="run it in a terminal window; to run a script without one, "
+                              "use `oreo run <file>`")
+
+
 @command("shell")
 def cmd_shell(ctx):
     ui = ctx.ui
+    need_terminal(ui, "shell")
     with ctx.session() as b:
         b.connect()
         ui.header("shell", "MicroPython on %s. Ctrl-] or Ctrl-X to leave; OreoOS restarts after."
@@ -129,6 +137,34 @@ def cmd_shell(ctx):
     ui.ok("left the shell; OreoOS is starting" if ctx.args.reset != "none" else "left the shell")
 
 
+def dev_notes(folder):
+    """What `oreo dev` can and cannot do, true to how OreoOS loads apps:
+    OreoOS does not run while the REPL is open, but started from the REPL
+    it loads any app found under /remote/apps/<id>/ from the mount instead
+    of /apps/<id>, and re-reads its files on every launch (apps are
+    unloaded when they exit). See docs/APPS.md, "Live editing"."""
+    notes = ["The REPL starts in /remote, so `import mymodule` loads your local copy. "
+             "A module is imported once: after an edit, "
+             "import sys; del sys.modules['mymodule'] and import it again.",
+             "Ctrl-D here soft-resets the badge, which starts OreoOS (main.py) and ends "
+             "live editing; leave with Ctrl-] or Ctrl-X instead.",
+             "OreoOS is stopped while you are here. To reach its modules: "
+             "import sys; sys.path.append('/')"]
+    root = Path(folder)
+    if (root / "apps").is_dir() and any((p / "manifest.json").is_file()
+                                         for p in (root / "apps").iterdir() if p.is_dir()):
+        notes.append("This folder has apps/<id>/: start OreoOS with "
+                     "import os; os.chdir('/'); exec(open('/main.py').read()) "
+                     "and those apps load from the computer (the console prints "
+                     "[dev] <id> from /remote/apps). Save, press HOME, reopen the app.")
+    elif (root / "manifest.json").is_file():
+        notes.append("This is an app folder. For live editing, mount its parent with the "
+                     "app under apps/%s/ and start OreoOS from the REPL "
+                     "(see docs/APPS.md, \"Live editing\"); or run `oreo app install %s` "
+                     "to copy it to the badge." % (esc(root.name), esc(folder)))
+    return notes
+
+
 @command("dev")
 def cmd_dev(ctx):
     ui = ctx.ui
@@ -137,10 +173,13 @@ def cmd_dev(ctx):
         raise OreoError("%s is not a folder" % folder)
     if ctx.args.run and not (folder / ctx.args.run).is_file():
         raise OreoError("%s has no %s" % (folder, ctx.args.run))
+    need_terminal(ui, "dev")
     with ctx.session() as b:
         b.connect()
         b.link.mount(str(folder))
         ui.header("dev", "%s is mounted at /remote. Ctrl-] or Ctrl-X to leave." % esc(folder))
+        for line in dev_notes(folder):
+            ui.note(line)
         b.link.friendly()
         if ctx.args.run:
             b.link.t.serial.write(("exec(open(%r).read())\r" % ctx.args.run).encode())
@@ -155,7 +194,8 @@ def cmd_run(ctx):
     path = Path(ctx.args.file)
     if not path.is_file():
         raise OreoError("%s: no such file" % path)
-    source = path.read_bytes()
+    with local_file(path):
+        source = path.read_bytes()
     out = getattr(sys.stdout, "buffer", None)
 
     def stream(chunk):
@@ -175,31 +215,104 @@ def cmd_run(ctx):
     ui.ok("finished")
 
 
+class _Console:
+    """Writes badge output to the terminal as text, whatever its encoding."""
+
+    def __init__(self, stream=None):
+        import codecs
+        self.stream = stream or sys.stdout
+        self.decoder = codecs.getincrementaldecoder("utf-8")("replace")
+
+    def write(self, data):
+        text = self.decoder.decode(data)
+        if not text:
+            return
+        try:
+            self.stream.write(text)
+        except UnicodeEncodeError:
+            enc = getattr(self.stream, "encoding", None) or "ascii"
+            self.stream.write(text.encode(enc, "replace").decode(enc, "replace"))
+        self.stream.flush()
+
+
+# After the badge comes back, how long a port that is listed but will not
+# open (udev still applying permissions, the badge still enumerating) is
+# retried before the real reason is reported.
+REOPEN_TRIES = 20          # x 0.5 s
+
+
+def follow_console(ctx, port, restart=False, out=None, idle=None):
+    """Print the badge's console until Ctrl-C. Survives the badge rebooting
+    or being unplugged: it waits for the port to come back and carries on.
+
+    A port that cannot be opened at the start (busy in another program, no
+    permission) is an error with its reason, not a reboot to wait out; the
+    same goes for a port that comes back but stays unopenable.
+    `idle` (tests): stop after this many empty reads in a row."""
+    ui = ctx.ui
+    out = out or _Console()
+    serial = next((p.serial for p in discovery.find_badges(ctx.comports)
+                   if p.device == port), None)
+    quiet = 0
+    first = True
+    open_failures = 0
+    while True:
+        link = ctx.link(port)
+        try:
+            try:
+                link.open()
+            except LinkError:
+                open_failures += 1
+                if first or open_failures > REOPEN_TRIES:
+                    raise
+                link = None
+            if link is not None:
+                first = False
+                open_failures = 0
+                ser = link.t.serial
+                try:
+                    ser.timeout = 0.2      # so Ctrl-C is seen promptly on Windows too
+                except Exception:
+                    pass
+                if restart:
+                    ser.write(b"\r\x03\x03")   # stop OreoOS (friendly REPL)
+                    ser.write(b"\x04")         # soft reboot: main.py starts OreoOS again
+                    restart = False
+                while True:
+                    data = ser.read(max(1, ser.inWaiting()))
+                    if data:
+                        quiet = 0
+                        out.write(data)
+                    else:
+                        quiet += 1
+                        if idle is not None and quiet >= idle:
+                            return
+        except OSError:
+            ui.print("")
+            ui.warn("the badge went away (restart or unplugged); waiting for it to come back")
+        finally:
+            if link is not None:
+                link.close()
+        announced = open_failures > 0     # "back on" was already said for this port
+        while True:
+            ctx.sleep(0.5)
+            again = discovery.find_again(port, serial, ctx.comports)
+            if again:
+                if not announced or again != port:
+                    ui.note("back on %s" % esc(again))
+                port = again
+                break
+
+
 @command("logs")
 def cmd_logs(ctx):
     ui = ctx.ui
     port = ctx.port()
-    link = ctx.link(port)
-    link.open()
-    ser = link.t.serial
     ui.header("logs", "following %s; Ctrl-C to stop (OreoOS keeps running)" % esc(port))
-    if ctx.args.restart:
-        ser.write(b"\r\x03\x03")   # stop OreoOS (friendly REPL)
-        ser.write(b"\x04")         # soft reboot: main.py starts OreoOS again
-    out = getattr(sys.stdout, "buffer", sys.stdout)
     try:
-        while True:
-            data = ser.read(max(1, ser.inWaiting()))
-            if data:
-                if out is sys.stdout:
-                    out.write(data.decode("utf-8", "replace"))
-                else:
-                    out.write(data)
-                out.flush()
+        follow_console(ctx, port, restart=ctx.args.restart)
     except KeyboardInterrupt:
         pass
-    finally:
-        link.close()
     ui.print("")
     return 0
 
@@ -238,6 +351,9 @@ def _local_files(sources, recursive):
             out.append((p, p.name))
         else:
             raise OreoError("%s: no such file" % p)
+    for f, _ in out:   # before the badge is touched
+        if not os.access(f, os.R_OK):
+            raise OreoError("%s: permission denied" % f)
     return out
 
 
@@ -275,9 +391,11 @@ def cmd_push(ctx):
                             % (human(total), human(free)))
         ui.header("push", "%d file(s), %s -> %s" % (len(files), human(total), esc(norm(args.dest))))
         for (local, rel), target in zip(files, targets):
-            data = local.read_bytes()
+            with local_file(local):
+                data = local.read_bytes()
             with ui.progress(esc(rel), total=len(data)) as update:
-                b.write_file(data, target, progress=update, verify=not args.no_verify)
+                b.write_file(data, target, progress=update, verify=not args.no_verify,
+                             check_space=False)
         ui.ok("copied %d file(s) to %s" % (len(files), esc(norm(args.dest))))
 
 
@@ -287,6 +405,9 @@ def cmd_pull(ctx):
     args = ctx.args
     src = norm(args.source)
     local = Path(args.dest).expanduser()
+    if args.dest.endswith(("/", os.sep)) and not local.exists():
+        with local_file(local):
+            local.mkdir(parents=True)
     with ctx.session() as b:
         st = b.stat(src)
         if st is None:
@@ -304,8 +425,9 @@ def cmd_pull(ctx):
         for remote, target in jobs:
             with ui.progress(esc(posixpath.basename(remote)), total=None) as update:
                 data = b.read_file(remote, progress=update)
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(data)
+            with local_file(target):
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(data)
         ui.ok("saved %d file(s) under %s" % (len(jobs), esc(local)))
 
 
@@ -320,7 +442,7 @@ SYSTEM_FILES = ("/secrets.py", "/wifi.json")
 # Built-in apps: must equal DEFAULT_APPS in oreoOS/store.py (a contract
 # test in cli/tests/test_contract.py checks this inside the repo).
 DEFAULT_APPS = ("about", "badge", "commits", "gallery", "gamepad", "identity", "reader",
-                "settings", "store", "storage", "launcher", "updates", "wifi")
+                "settings", "store", "storage", "transfer", "launcher", "updates", "wifi")
 
 
 def _inside(p, root):
@@ -396,8 +518,9 @@ def prepare_media(ui, files, opts):
                    100.0 * len(item[2]) / src_size if src_size else 0))
         if opts.save:
             out = Path(opts.save).expanduser()
-            out.mkdir(parents=True, exist_ok=True)
-            (out / item[1]).write_bytes(item[2])
+            with local_file(out / item[1]):
+                out.mkdir(parents=True, exist_ok=True)
+                (out / item[1]).write_bytes(item[2])
     return prepared
 
 
@@ -407,7 +530,7 @@ def send_media(ui, b, prepared):
     for kind, name, blob in prepared:
         dest = posixpath.join(media.destination(kind), name)
         with ui.progress(esc(name), total=len(blob)) as update:
-            b.write_file(blob, dest, progress=update, reserve=media.DEFAULT_RESERVE)
+            b.write_file(blob, dest, progress=update, check_space=False)
         app = "Gallery" if kind in ("image", "video") else "Reader"
         ui.ok("%s is in the %s (%s)" % (esc(name), app, esc(dest)))
 
@@ -449,7 +572,7 @@ def _online(ui, b):
 
 def check_app_args(action, app):
     if action in ("install", "remove") and not app:
-        raise OreoError("which app?", hint="oreo apps %s <app id>  (ids: `oreo apps`)" % action)
+        raise UsageError("which app?", hint="oreo apps %s <app id>  (ids: `oreo apps`)" % action)
 
 
 def apps_action(ui, b, action, app=None):
@@ -512,7 +635,8 @@ def cmd_apps(ctx):
 
 def bars(rssi):
     level = 4 if rssi >= -55 else 3 if rssi >= -67 else 2 if rssi >= -75 else 1
-    return "▂▄▆█"[:level].ljust(4, "·")
+    full, empty = ui_mod.BARS
+    return full[:level].ljust(4, empty)
 
 
 CONNECT_RESULTS = {
@@ -524,15 +648,42 @@ CONNECT_RESULTS = {
 }
 
 
+def check_ssid(ssid):
+    n = len(ssid.encode("utf-8"))
+    if not 1 <= n <= 32:
+        raise UsageError("a Wi-Fi network name is 1 to 32 bytes; this one is %d" % n,
+                         hint="copy the name from `oreo wifi scan`")
+
+
+def check_password(password):
+    """WPA/WPA2 passphrases are 8-63 characters (or 64 hex digits)."""
+    if not password:
+        return password
+    if len(password) == 64 and all(c in "0123456789abcdefABCDEF" for c in password):
+        return password
+    if not 8 <= len(password) <= 63:
+        raise UsageError("Wi-Fi passwords are 8 to 63 characters; this one has %d"
+                         % len(password),
+                         hint="check it and try again (use --open for a network without one)")
+    return password
+
+
 def read_password(ui, ssid, open_net=False, from_stdin=False):
     if open_net:
         return ""
     if from_stdin:
-        return sys.stdin.readline().rstrip("\r\n")
+        line = sys.stdin.readline()
+        if not line.strip("\r\n"):
+            raise UsageError("no password on standard input",
+                             hint="pipe it in, or use --open for a network without one")
+        return check_password(line.rstrip("\r\n"))
     if not ui.interactive:
-        raise OreoError("no terminal to ask for the password",
-                        hint="use --password-stdin, or --open for a network without one")
-    return ui.secret("Password for %s (empty for an open network)" % ssid)
+        raise UsageError("no terminal to ask for the password",
+                         hint="use --password-stdin, or --open for a network without one")
+    try:
+        return check_password(ui.secret("Password for %s (empty for an open network)" % ssid))
+    except EOFError:
+        raise Cancelled("no password entered; nothing changed")
 
 
 def wifi_scan(ui, b, timeout_s=15):
@@ -593,7 +744,10 @@ def cmd_wifi(ctx):
     args = ctx.args
     action = args.action
     if action in ("connect", "forget") and not args.ssid:
-        raise OreoError("which network?", hint="oreo wifi %s <name>  (see `oreo wifi scan`)" % action)
+        raise UsageError("which network?",
+                         hint="oreo wifi %s <name>  (see `oreo wifi scan`)" % action)
+    if args.ssid is not None and action in ("connect", "forget"):
+        check_ssid(args.ssid)
     password = None
     if action == "connect":
         # Ask before touching the badge, so a cancelled prompt changes nothing.
@@ -617,6 +771,27 @@ def cmd_wifi(ctx):
 def cmd_update(ctx):
     ui = ctx.ui
     args = ctx.args
+    if args.repo:
+        return update_from_repo(ctx)
+    dev_flags = [f for f, on in (("--clean", args.clean), ("--force", args.force),
+                                 ("--no-bump", args.no_bump), ("--override", args.override))
+                 if on]
+    if dev_flags:
+        raise UsageError("%s only work with --repo <checkout>" % ", ".join(dev_flags),
+                         hint="`oreo update` alone installs the newest release from GitHub")
+    from . import update
+    ui.header("update", "OreoOS from GitHub releases (%s channel), through the badge's Wi-Fi"
+              % args.channel)
+    with ctx.session() as b:
+        return update.run_update(ctx, b, channel=args.channel, check_only=args.check)
+
+
+def update_from_repo(ctx):
+    ui = ctx.ui
+    args = ctx.args
+    if args.check or args.channel != "stable":
+        raise UsageError("--check and --channel are for release updates, not --repo",
+                         hint="drop --repo to update from GitHub releases")
     root = repo.check_repo(args.repo)
     port = ctx.port()
     ui.header("update", "deploying OreoOS from %s to %s" % (esc(root), esc(port)))
@@ -627,7 +802,6 @@ def cmd_update(ctx):
     repo.run(repo.deploy_cmd(root, port, clean=args.clean, force=args.force,
                              no_bump=args.no_bump, override=args.override), root, ctx.runner)
     ui.ok("OreoOS deployed")
-    ui.note("updating from GitHub releases without a checkout is not available yet (#117)")
 
 
 @command("flash")
@@ -650,18 +824,28 @@ def cmd_flash(ctx):
 @command("doctor")
 def cmd_doctor(ctx):
     ui = ctx.ui
-    ui.header("doctor")
+    ui.header("doctor", "checks the computer first, then the badge")
     marks = {doctor_mod.OK: "[ok]%s[/]" % ui_mod.MARK_OK, doctor_mod.WARN: "[warn]![/]",
              doctor_mod.FAIL: "[err]%s[/]" % ui_mod.MARK_ERR}
     worst = doctor_mod.OK
+    steps = []
     for status, title, msg, hint in doctor_mod.run_checks(
             ctx.args.port or os.environ.get("OREO_PORT"), ctx.comports,
             badge_factory=lambda port: ctx.badge(port), reset=ctx.args.reset):
         ui.print("%s [key]%-12s[/] %s" % (marks[status], title, esc(msg)))
-        if hint:
-            ui.print("  [dim]%s %s[/]" % (" " * 12, esc(hint)))
+        if hint and status != doctor_mod.OK:
+            steps.append((status, title, hint))
         if status == doctor_mod.FAIL or (status == doctor_mod.WARN and worst == doctor_mod.OK):
             worst = status
+    if steps:
+        ui.print("")
+        ui.print("[title]Next steps[/]")
+        # failures first: they block everything after them
+        steps.sort(key=lambda x: 0 if x[0] == doctor_mod.FAIL else 1)
+        for i, (status, title, hint) in enumerate(steps, 1):
+            ui.print("  %d. [key]%s:[/] %s" % (i, title, esc(hint)))
     if worst == doctor_mod.OK:
-        ui.ok("all good")
+        ui.ok("all good: try `oreo info`, or just `oreo`")
+    elif worst == doctor_mod.WARN:
+        ui.ok("the badge works; the warnings above are optional")
     return 1 if worst == doctor_mod.FAIL else 0

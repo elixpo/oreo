@@ -62,7 +62,7 @@ A 2-inch full-colour LCD running at 33 fps with PWM-dimmed backlight. Every app 
 <td width="33%" valign="top">
 
 ### 🐼 Built-in app SDK
-`class App(oreoOS.App):` with three methods is all it takes. Copy [`app_templates/`](app_templates/), edit, deploy. Your icon shows up in the launcher.
+`class App(oreoOS.App):` with three methods is all it takes. Copy [`app_templates/`](app_templates/), edit, deploy. Your icon shows up in the launcher. Guide: [`docs/APPS.md`](docs/APPS.md).
 
 </td>
 <td width="33%" valign="top">
@@ -119,7 +119,7 @@ Bluetooth and WiFi don't get their own drawer tiles — they live inside **Setti
 
 ### 📦 App Store — install, update and remove apps on-device
 
-The badge ships a small default set (About, Badge, Commits, Gallery, Gamepad, Identity, Reader, Settings, Storage and the App Store, plus the system apps Apps, Updates and WiFi). Everything else lives under [`apps_market/`](apps_market/) and installs from the **App Store** tile: Racer, Flappy Oreo, Snake, Elixpo Pet, IR Quest, Bluetooth, Weather, Color, Gestures and the Diwali special, Patakha.
+The badge ships a small default set (About, Badge, Commits, Gallery, Gamepad, Identity, Reader, Settings, Storage, Transfer and the App Store, plus the system apps Apps, Updates and WiFi). Everything else lives under [`apps_market/`](apps_market/) and installs from the **App Store** tile: Racer, Flappy Oreo, Snake, Elixpo Pet, IR Quest, Bluetooth, Weather, Color, Gestures and the Diwali special, Patakha.
 
 - **Discover** (first page): a featured card plus every app with its icon, tagline, category, size and an **INSTALL / OPEN / UPDATE** button. **A** opens the app's page (author, version, size, description) where you install it, with a progress bar.
 - **Installed** (press **B**): every app on the badge. Built-in apps can only be opened; others can be updated or uninstalled behind a confirm dialog, and reinstalled from Discover any time.
@@ -149,6 +149,29 @@ git fetch origin doom-edition && git switch doom-edition
 ./deploy --full               # firmware, Freedoom data and OS
 ```
 
+## 💻 Use your badge from a computer
+
+Plug the badge in over USB and install **oreo-cli**, which gives you the
+`oreo` command. It finds the badge by itself, so you never need to look up a
+port name.
+
+```sh
+# Linux, macOS (Windows: irm https://raw.githubusercontent.com/elixpo/oreo/main/cli/install.ps1 | iex)
+curl --proto '=https' --tlsv1.2 -LsSf https://raw.githubusercontent.com/elixpo/oreo/main/cli/install.sh | sh
+
+oreo                                   # status and an interactive menu
+oreo transfer send photo.jpg notes.md  # with Tools > Transfer open on the badge; type the code it shows
+oreo wifi connect "Home Net"           # Wi-Fi is for the internet: App Store, updates, GitHub, weather, time
+oreo update                            # newest OreoOS, downloaded by the badge
+```
+
+- [`docs/CLI.md`](docs/CLI.md): the oreo-cli manual (every command, exit
+  codes, troubleshooting, FAQ).
+- [`docs/USB.md`](docs/USB.md): ports, drivers, permissions, and raw
+  `mpremote`.
+- [`docs/TRANSFER.md`](docs/TRANSFER.md): how the Transfer app and its code
+  exchange work.
+
 ## 🚀 Get going
 
 ```bash
@@ -159,9 +182,11 @@ pip install -r oreoOS/requirements.txt
 python tools/deploy.py /dev/ttyACM0      # flash to a connected board
 ```
 
-Connecting over USB (which port, the REPL, copying files, flashing) is covered in [`docs/USB.md`](docs/USB.md).
+Connecting over USB (which port, the oreo CLI, the Transfer app, flashing) is covered in [`docs/USB.md`](docs/USB.md).
 
-For step-by-step app-writing + OS internals, see [`CONTRIBUTING.md`](CONTRIBUTING.md).
+To set your GitHub user, name, timezone and weather location, see
+[`docs/PROFILE.md`](docs/PROFILE.md). For writing apps, see
+[`docs/APPS.md`](docs/APPS.md); for OS internals, [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 Host tools need Python 3.9 or newer on Linux, macOS, or Windows via WSL. The
 badge itself runs MicroPython 1.28.
@@ -315,11 +340,10 @@ splash. Use it from any app that wants a "how full am I?" readout.
 ### Markdown rendering — the Reader app
 
 The Reader app (`apps/reader/`) renders **`.md`** and **`.txt`** files
-landed in `documents/` (BT inbox) or `apps/reader/assets/` (flashed).
+copied to `documents/` over USB or flashed into `apps/reader/assets/`.
 Supports `# / ## / ###` headings, `**bold**`, `*italic*`, `` `code` ``,
 bullets, numbered lists, fenced ``` ``` ``` blocks, and `---` rules —
-small enough to ship to flash, big enough for README-style notes
-someone sideloaded over BT. New files appear in the picker within
+small enough to ship to flash, big enough for README-style notes. New files appear in the picker within
 200 ms (5 Hz poll) — no restart.
 
 ### Wireless networking and Bluetooth
@@ -329,11 +353,15 @@ wrappers (`oreoWare.wifi`, `oreoWare.bt`) add config handling and
 power capping on top.
 
 - **WiFi** — [`network.WLAN`](https://docs.micropython.org/en/latest/library/network.WLAN.html).
-  Credentials come from `.env` (`WIFI_SSID`, `WIFI_PASSWORD`); the OS
+  Wi-Fi is for the internet only (App Store, updates, GitHub data,
+  weather, the clock). Networks are added over USB with the `oreo` CLI
+  (see [`docs/CLI.md`](docs/CLI.md)) or at deploy time from `.env.local`
+  (`WIFI_SSID`, `WIFI_PASSWORD`; see [`.env.example`](.env.example)); the OS
   applies `wlan.config(txpower=…)` and `pm=PM_POWERSAVE` from
   `oreoOS/config.py` so a sealed badge doesn't melt its LDO.
 - **Bluetooth** — [`bluetooth`](https://docs.micropython.org/en/latest/library/bluetooth.html).
-  The badge advertises as **Oreo** and exposes a tiny GATT "transfer"
+  Bluetooth is the last feature on the roadmap (#124); files go over USB
+  for now. The current build advertises as **Oreo** and exposes a tiny GATT "transfer"
   service so a paired device can push **one image (max 250 KB)** or
   **one text document (deflate-compressed)** at a time. Images land in
   `apps/gallery/assets/raw/`, text in `documents/`. BLE adv interval is
@@ -425,7 +453,7 @@ user through this exact workflow.
 |---|---|
 | **MCU** | ESP32-S3-DevKitC-1-N16R8 (16 MB flash, 8 MB PSRAM) |
 | **Display** | ST7789 IPS, 2.0", 320×240, 4-wire SPI @ 40 MHz |
-| **Input** | 8 tactile buttons — also the wake-from-sleep source (TTP223 capacitive pads planned for v2) |
+| **Input** | 8 tactile buttons (HOME, A, B, C and a D-pad), also the wake-from-sleep source. Touch pads are not fitted (#102) |
 | **Sensors** | MPU-6050 (6-DoF IMU), TSOP38238 (IR RX) |
 | **Output** | 4 corner LEDs, WS2812 status NeoPixel, IR LED (940 nm) + 2N2222 driver |
 | **Comms** | WiFi 802.11 b/g/n, BLE 5.0, IR, USB-C |
@@ -467,8 +495,8 @@ The Gallery's video playback grew into **RV565**, a standalone library and file 
 | | |
 |---|---|
 | 👋 **Just want to use it?** | this README + [`docs/HARDWARE.md`](docs/HARDWARE.md) |
-| 🔌 **Connecting it to a computer?** | [`docs/USB.md`](docs/USB.md): REPL, copying files, deploying, flashing |
-| 🧑‍💻 **Want to write an app?** | [`CONTRIBUTING.md`](CONTRIBUTING.md) + [`templates/example_app/`](templates/example_app/) |
+| 🔌 **Connecting it to a computer?** | [`docs/USB.md`](docs/USB.md) + [`docs/CLI.md`](docs/CLI.md): the oreo CLI, Transfer, flashing |
+| 🧑‍💻 **Want to write an app?** | [`docs/APPS.md`](docs/APPS.md) + [`app_templates/`](app_templates/) |
 | 🔌 **Building your own PCB?** | [`docs/DATASHEET.md`](docs/DATASHEET.md) + [`oreoWare/pins.py`](oreoWare/pins.py) |
 | 🤝 **Joining the community?** | [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) + [`SUPPORT.md`](SUPPORT.md) |
 | 🛡 **Found a vulnerability?** | [`SECURITY.md`](SECURITY.md) |
