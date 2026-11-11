@@ -25,12 +25,20 @@ Keys use the secrets.py names so both sources line up:
 
 /profile.json is a flat JSON object with those keys. Unknown keys are
 kept but ignored. Nothing in this module touches the network.
+
+The owner's GitHub avatar lives next to it in /avatar.bin, outside every
+app folder so OTA updates and deploys never replace it. `oreo setup`
+makes it on the computer (cli/oreo_cli/avatar.py has the format) and
+records the GitHub user it belongs to; avatar() hands it out only for
+that user.
 """
 
 from oreoOS import state as _state
 
 
 PATH = "/profile.json"
+AVATAR_PATH = "/avatar.bin"
+AVATAR_MAGIC = b"OAV1"
 
 KEYS = ("GITHUB_USER", "DISPLAY_NAME", "DISPLAY_DESIGNATION", "TIMEZONE_OFFSET",
         "WEATHER_LAT", "WEATHER_LON", "WEATHER_NAME", "OWM_API_KEY")
@@ -100,6 +108,40 @@ def values():
 def is_set_up():
     """True when the owner has at least told the badge their GitHub user."""
     return not _empty(get("GITHUB_USER"))
+
+
+def avatar(user, max_side=72):
+    """(pixels, w, h) from /avatar.bin when it was made for GitHub user
+    `user` (case-insensitive), else None. pixels is a bytearray of
+    big-endian RGB565 (0xF81F transparent), ready for display.blit.
+
+    Reads the 7-byte header, the login and then the pixels straight into
+    one buffer (about 6 KB for 56x56); never raises."""
+    if _empty(user) or not isinstance(user, str):
+        return None
+    want = user.strip().lstrip("@").lower()
+    try:
+        f = open(AVATAR_PATH, "rb")
+    except OSError:
+        return None
+    try:
+        head = f.read(7)
+        if len(head) != 7 or head[:4] != AVATAR_MAGIC:
+            return None
+        w, h, n = head[4], head[5], head[6]
+        if not (0 < w <= max_side and 0 < h <= max_side):
+            return None
+        login = f.read(n)
+        if len(login) != n or str(login, "ascii").lower() != want:
+            return None
+        buf = bytearray(w * h * 2)
+        if f.readinto(buf) != len(buf):
+            return None
+        return buf, w, h
+    except Exception:
+        return None
+    finally:
+        f.close()
 
 
 def save(updates):

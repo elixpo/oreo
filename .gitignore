@@ -35,3 +35,8 @@ oreoWare/doom/
 *.wad
 *.WAD
 *.owz
+
+# The owner's avatar belongs to one person (#133): `oreo setup` puts it on
+# the badge as /avatar.bin; never commit or ship one.
+apps/badge/assets/optimized/avatar.py
+avatar.bin

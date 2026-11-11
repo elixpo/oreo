@@ -19,6 +19,9 @@ Everything `tools/deploy.py` would push to a badge EXCEPT:
   * secrets.py (generated on the fly from .env at deploy time)
   * any per-user caches (apps/*/cache.txt, apps/*/state.txt)
   * pycache, .deploy_hashes.json, raw assets
+  * NEVER_SHIP: personal files a checkout may still hold, such as the
+    avatar module older tools/fetch_avatar.py wrote (the owner's avatar
+    is /avatar.bin on the badge, made by `oreo setup`, #133)
 
 i.e. exactly what the runtime needs to boot the next version cleanly.
 """
@@ -123,13 +126,19 @@ SHIP_GLOBS = [
 ]
 
 
+# Never in a release, even when a checkout still has them on disk.
+NEVER_SHIP = frozenset((
+    "apps/badge/assets/optimized/avatar.py",
+))
+
+
 def _collect_paths():
     """Return [(local_path, remote_path)] for every shipping file, sorted."""
     seen = set()
     out  = []
     def _add(p):
-        rel = str(p.relative_to(REPO_ROOT))
-        if rel in seen:
+        rel = p.relative_to(REPO_ROOT).as_posix()
+        if rel in seen or rel in NEVER_SHIP:
             return
         seen.add(rel)
         out.append((p, rel))
