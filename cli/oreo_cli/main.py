@@ -8,10 +8,11 @@ and commands run with no badge plugged in never touch the hardware.
 import argparse
 import contextlib
 import sys
+import time
 
 from . import __version__, commands, discovery
 from .badge import Badge
-from .errors import Cancelled, OreoError
+from .errors import EXIT_CANCELLED, EXIT_ERROR, EXIT_LINK, Cancelled, OreoError
 from .ui import UI, adapt_stdio, esc
 
 HOME = "https://oreo.elixpo.com/docs"
@@ -80,10 +81,17 @@ HELP = {
              "  oreo wifi connect \"Home Net\"\n"
              "  oreo wifi saved\n"
              "  oreo wifi forget \"Old Net\""),
-    "update": ("Deploy OreoOS from a checkout",
-               "Runs ./deploy --board from an OreoOS checkout. --clean wipes the\n"
-               "badge's files first and asks before doing so. Updating from GitHub\n"
-               "releases (no checkout) is future work.\n\n"
+    "update": ("Update OreoOS to the newest release",
+               "Has the badge download the newest OreoOS release from GitHub over\n"
+               "its own Wi-Fi (the same update its Updates page does), shows the\n"
+               "versions and the download size, asks, installs it, restarts the\n"
+               "badge and checks the new version. Apps, photos, documents and\n"
+               "saved Wi-Fi stay. Set up Wi-Fi first (`oreo wifi`).\n\n"
+               "  oreo update                  newest stable release\n"
+               "  oreo update --check          only say whether there is one\n"
+               "  oreo update --channel beta   newest beta release\n\n"
+               "Developers: --repo deploys from an OreoOS checkout (./deploy --board)\n"
+               "instead; --clean wipes the badge's files first and asks.\n\n"
                "  oreo update --repo ~/src/oreo\n"
                "  oreo update --repo ~/src/oreo --clean"),
     "flash": ("Reflash the firmware from a checkout",
@@ -93,7 +101,9 @@ HELP = {
               "  oreo flash --repo ~/src/oreo"),
     "doctor": ("Check cable, port, permissions and firmware",
                "Looks for the badge and explains what is wrong: wrong cable or\n"
-               "port, missing serial permissions (Linux dialout), wrong firmware.\n\n"
+               "port, missing serial permissions (Linux dialout), port busy, wrong\n"
+               "firmware, OreoOS missing. Ends with numbered next steps.\n"
+               "Exit status 0 when nothing failed, 1 otherwise.\n\n"
                "  oreo doctor"),
     "help": ("Help for a command", "  oreo help wifi"),
 }
@@ -116,7 +126,9 @@ def build_parser():
         description="oreo %s: control the Elixpo Oreo Badge over USB.\n\n"
                     "Run `oreo` with no command to find the badge and open the\n"
                     "interactive view. Docs: %s" % (__version__, HOME),
-        epilog="`oreo help <command>` shows details and examples.")
+        epilog="`oreo help <command>` shows details and examples.\n"
+               "Exit status: 0 ok, 1 error, 2 usage, 3 no badge (or several),\n"
+               "4 badge unreachable or busy, 5 OreoOS missing, 130 cancelled.")
     p.add_argument("--version", action="version", version="oreo-cli " + __version__)
     p.add_argument("-p", "--port", help="serial port (default: the one badge found; $OREO_PORT)")
     p.add_argument("--reset", choices=("soft", "hard", "none"), default="soft",
@@ -189,16 +201,19 @@ def build_parser():
                    help="read the password from standard input (for scripts)")
     s.add_argument("--timeout", type=float, default=15.0, help="seconds to wait (default 15)")
 
-    for name in ("update", "flash"):
-        s = _sub(subs, name)
-        s.add_argument("--repo", help="path to an OreoOS checkout (required for now)")
-        if name == "update":
-            s.add_argument("--clean", action="store_true", help="wipe the badge's files first")
-            s.add_argument("--force", action="store_true", help="upload every file")
-            s.add_argument("--no-bump", action="store_true", help="keep the OreoOS version")
-            s.add_argument("--override", metavar="APPS", help="replace these app folders")
-        else:
-            s.add_argument("--build", action="store_true", help="build the firmware first")
+    s = _sub(subs, "update")
+    s.add_argument("--check", action="store_true", help="only check for a newer release")
+    s.add_argument("--channel", choices=("stable", "beta"), default="stable",
+                   help="release channel (default: stable)")
+    s.add_argument("--repo", help="developers: deploy from this OreoOS checkout instead")
+    s.add_argument("--clean", action="store_true", help="with --repo: wipe the badge's files first")
+    s.add_argument("--force", action="store_true", help="with --repo: upload every file")
+    s.add_argument("--no-bump", action="store_true", help="with --repo: keep the OreoOS version")
+    s.add_argument("--override", metavar="APPS", help="with --repo: replace these app folders")
+
+    s = _sub(subs, "flash")
+    s.add_argument("--repo", help="path to an OreoOS checkout (required)")
+    s.add_argument("--build", action="store_true", help="build the firmware first")
 
     _sub(subs, "doctor")
 
@@ -210,12 +225,15 @@ def build_parser():
 class Ctx:
     """What a command needs: options, UI, and a lazily opened badge."""
 
-    def __init__(self, args, ui, comports=None, link_factory=None, runner=None):
+    def __init__(self, args, ui, comports=None, link_factory=None, runner=None,
+                 sleep=None, monotonic=None):
         self.args = args
         self.ui = ui
         self.comports = comports
         self._link_factory = link_factory
         self.runner = runner
+        self.sleep = sleep or time.sleep          # injectable for tests
+        self.monotonic = monotonic or time.monotonic
 
     def port(self):
         return discovery.pick(self.args.port, self.comports)
@@ -239,10 +257,25 @@ class Ctx:
         try:
             yield b
         finally:
-            b.finish(reset or self.args.reset)
+            finish_shielded(b, reset or self.args.reset)
 
 
-def main(argv=None, ui=None, comports=None, link_factory=None, runner=None):
+def finish_shielded(b, mode):
+    """Restart OreoOS; a second Ctrl-C must not cut that short and leave
+    the badge at the MicroPython prompt."""
+    try:
+        b.finish(mode)
+    except KeyboardInterrupt:
+        b.finish(mode)
+
+
+def _transport_error(e):
+    """mpremote's TransportError, without importing mpremote eagerly."""
+    return type(e).__name__ == "TransportError"
+
+
+def main(argv=None, ui=None, comports=None, link_factory=None, runner=None,
+         sleep=None, monotonic=None):
     if ui is None:
         adapt_stdio()   # a non-UTF-8 pipe (Windows) must not crash on the marks
     parser = build_parser()
@@ -261,7 +294,8 @@ def main(argv=None, ui=None, comports=None, link_factory=None, runner=None):
             ui.error("no command called %r" % topic, hint="commands: " + ", ".join(sorted(HELP)))
             return 2
         build_parser().parse_args([topic, "--help"])  # prints and exits 0
-    ctx = Ctx(args, ui, comports=comports, link_factory=link_factory, runner=runner)
+    ctx = Ctx(args, ui, comports=comports, link_factory=link_factory, runner=runner,
+              sleep=sleep, monotonic=monotonic)
     handler = commands.HANDLERS.get(args.cmd or "")
     try:
         if handler is None:
@@ -273,7 +307,24 @@ def main(argv=None, ui=None, comports=None, link_factory=None, runner=None):
         return e.code
     except KeyboardInterrupt:
         ui.warn("stopped")
-        return 130
+        return EXIT_CANCELLED
     except OreoError as e:
         ui.error(e.message, hint=e.hint, detail=getattr(e, "detail", None) if args.verbose else None)
         return e.code
+    except OSError as e:
+        # pyserial's SerialException is an OSError: a port that vanished
+        # outside the places that already explain it.
+        ui.error("lost the connection to the badge (%s)" % esc(e),
+                 hint="plug it back in, check with `oreo devs`, then run the command again")
+        return EXIT_LINK
+    except Exception as e:   # never a bare traceback for the person
+        if _transport_error(e):
+            ui.error("the badge did not answer (%s)" % esc(e),
+                     hint="unplug and replug the badge, then run `oreo doctor`")
+            return EXIT_LINK
+        import traceback
+        ui.error("unexpected error: %s: %s" % (type(e).__name__, esc(e)),
+                 hint="this is a bug in oreo; please report it with `oreo -v ...` output "
+                      "at https://github.com/elixpo/oreo/issues",
+                 detail=traceback.format_exc() if args.verbose else None)
+        return EXIT_ERROR

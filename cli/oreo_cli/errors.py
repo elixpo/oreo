@@ -1,4 +1,25 @@
-"""Errors the CLI reports to the user (one line plus an optional hint)."""
+"""Errors the CLI reports to the user (one line plus an optional hint).
+
+Exit status (documented in docs/CLI.md, "Exit status"):
+
+    0    success
+    1    error (the command failed; the message says why)
+    2    usage error (bad arguments, missing argument)
+    3    no badge found, or more than one and no --port
+    4    the badge could not be reached: port busy or missing, no answer,
+         connection lost
+    5    the badge is not running OreoOS (or the OreoOS on it is too old
+         for this command)
+    130  cancelled (Ctrl-C, or "no" at a confirmation)
+"""
+
+EXIT_OK = 0
+EXIT_ERROR = 1
+EXIT_USAGE = 2
+EXIT_NO_BADGE = 3
+EXIT_LINK = 4
+EXIT_NO_OREOOS = 5
+EXIT_CANCELLED = 130
 
 
 class OreoError(Exception):
@@ -7,7 +28,7 @@ class OreoError(Exception):
     `hint` says what to do about it; `code` is the process exit status.
     """
 
-    code = 1
+    code = EXIT_ERROR
 
     def __init__(self, message, hint=None):
         super().__init__(message)
@@ -15,12 +36,22 @@ class OreoError(Exception):
         self.hint = hint
 
 
+class UsageError(OreoError):
+    """The command line is incomplete or contradictory."""
+    code = EXIT_USAGE
+
+
 class NoBadge(OreoError):
-    code = 3
+    code = EXIT_NO_BADGE
 
 
 class ManyBadges(OreoError):
-    code = 3
+    code = EXIT_NO_BADGE
+
+
+class LinkError(OreoError):
+    """The serial link failed: port busy or gone, no answer, unplugged."""
+    code = EXIT_LINK
 
 
 class BadgeError(OreoError):
@@ -31,8 +62,13 @@ class BadgeError(OreoError):
         self.detail = detail
 
 
+class NoOreoOS(BadgeError):
+    """The badge answers, but OreoOS (or the part of it needed) is missing."""
+    code = EXIT_NO_OREOOS
+
+
 class Cancelled(OreoError):
-    code = 130
+    code = EXIT_CANCELLED
 
 
 def redact(text, secrets):

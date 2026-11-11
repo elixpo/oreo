@@ -73,9 +73,9 @@ class RepoTest(unittest.TestCase):
         self.calls.append(cmd)
         return 0
 
-    def test_update_needs_a_checkout(self):
-        r = run_cli(["update"], runner=self.runner)
-        self.assertEqual(r.rc, 1)
+    def test_update_repo_must_be_a_checkout(self):
+        r = run_cli(["update", "--clean"], runner=self.runner)
+        self.assertEqual(r.rc, 2)                 # dev flags need --repo
         self.assertIn("--repo", r.out)
         r = run_cli(["update", "--repo", str(self.root / "oreoOS")], runner=self.runner)
         self.assertIn("does not look like an OreoOS checkout", r.out)

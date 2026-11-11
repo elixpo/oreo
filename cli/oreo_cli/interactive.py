@@ -1,8 +1,9 @@
 """`oreo` with no command: find the badge, show its status, then a menu.
 
-A simple menu-driven view (status, file browser, apps, Wi-Fi, media). The
-badge stays in the raw REPL while the view is open, so OreoOS is paused;
-it restarts when you quit.
+A simple menu-driven view (status, file browser, apps, Wi-Fi, media,
+updates). The badge stays in the raw REPL while the view is open, so OreoOS
+is paused; it restarts when you quit. Ctrl-C inside a menu action stops
+that action and returns to the menu; Ctrl-C at the menu leaves the view.
 """
 
 import posixpath
@@ -14,7 +15,8 @@ from .errors import Cancelled, OreoError
 from .ui import esc, human
 
 MENU = [("1", "status"), ("2", "files"), ("3", "apps"), ("4", "Wi-Fi"),
-        ("5", "add a photo, video or document"), ("s", "shell"), ("q", "quit")]
+        ("5", "add a photo, video or document"), ("u", "update OreoOS"),
+        ("s", "shell"), ("q", "quit")]
 
 
 def _menu(ui, items):
@@ -27,6 +29,9 @@ def _guard(ui, fn, *a):
         return fn(*a)
     except Cancelled as e:
         ui.warn(e.message)
+    except KeyboardInterrupt:
+        ui.print("")
+        ui.warn("stopped; back to the menu")
     except OreoError as e:
         ui.error(e.message, hint=e.hint)
     return None
@@ -41,7 +46,8 @@ def files_view(ui, b):
                  [[str(i + 1), ("[accent]%s/[/]" % esc(e["name"])) if e["dir"] else esc(e["name"]),
                    "" if e["dir"] else human(e["size"])] for i, e in enumerate(entries)],
                  empty="empty folder")
-        ui.note("number: open folder · ..: up · p <n>: download · d <n>: delete · q: back")
+        ui.note("number: open folder · ..: up · p <n>: download · d <n>: delete · "
+                "u <file on this computer>: upload here · q: back")
         cmd = ui.ask("files", default="q").strip()
         if cmd in ("q", ""):
             return
@@ -49,6 +55,9 @@ def files_view(ui, b):
             cwd = posixpath.dirname(cwd.rstrip("/")) or "/"
             continue
         verb, _, num = cmd.partition(" ")
+        if verb == "u":
+            _guard(ui, upload, ui, b, num.strip().strip("'\""), cwd)
+            continue
         if verb.isdigit():
             verb, num = "o", verb
         if not num.strip().isdigit() or not 1 <= int(num) <= len(entries):
@@ -63,10 +72,14 @@ def files_view(ui, b):
                 ui.note("%s: %s (p %s to download)" % (esc(path), human(e["size"]), num))
         elif verb == "p" and not e["dir"]:
             def _pull():
+                target = Path(e["name"])
+                if target.exists() and not ui.confirm(
+                        "%s already exists here. Replace it?" % esc(target.resolve())):
+                    raise Cancelled("not downloaded")
                 with ui.progress(esc(e["name"]), total=e["size"]) as update:
                     data = b.read_file(path, progress=update)
-                Path(e["name"]).write_bytes(data)
-                ui.ok("saved %s" % esc(Path(e["name"]).resolve()))
+                target.write_bytes(data)
+                ui.ok("saved %s" % esc(target.resolve()))
             _guard(ui, _pull)
         elif verb == "d":
             if commands.is_protected(path):
@@ -75,6 +88,24 @@ def files_view(ui, b):
                 _guard(ui, b.rm, path, e["dir"])
         else:
             ui.warn("unknown action")
+
+
+def upload(ui, b, local, cwd):
+    """Copy one file from this computer into the folder being viewed."""
+    if not local:
+        ui.warn("which file? u <path on this computer>")
+        return
+    src = Path(local).expanduser()
+    if not src.is_file():
+        raise OreoError("%s: no such file on this computer" % src)
+    data = src.read_bytes()
+    target = norm(posixpath.join(cwd, src.name))
+    if b.stat(target) is not None and not ui.confirm(
+            "%s exists on the badge. Replace it?" % esc(target)):
+        raise Cancelled("not uploaded")
+    with ui.progress(esc(src.name), total=len(data)) as update:
+        b.write_file(data, target, progress=update)
+    ui.ok("uploaded %s" % esc(target))
 
 
 def apps_view(ui, b):
@@ -153,7 +184,16 @@ def run(ctx):
                 _guard(ui, wifi_view, ui, b)
             elif choice == "5":
                 _guard(ui, media_view, ui, b)
+            elif choice == "u":
+                from . import update
+                ui.header("update", "OreoOS from GitHub releases, through the badge's Wi-Fi")
+                _guard(ui, update.run_update, ctx, b)
+                if getattr(b.link, "t", None) is None and not b.entered:
+                    # the badge restarted into the new OreoOS: nothing to go back to
+                    ui.note("the badge restarted; run `oreo` again to reopen this view")
+                    return 0
             elif choice == "s":
+                b.connect()
                 b.link.friendly()
                 ui.header("shell", "Ctrl-] or Ctrl-X to go back to the menu")
                 commands._repl(b.link, ui)

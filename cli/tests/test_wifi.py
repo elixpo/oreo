@@ -7,7 +7,7 @@ from unittest import mock
 from fake import FakeTransport
 from helpers import run_cli
 
-PASSWORD = "hunter2"
+PASSWORD = "hunter2!"
 
 
 class WifiTest(unittest.TestCase):
@@ -65,7 +65,7 @@ class WifiTest(unittest.TestCase):
 
     def test_not_in_range(self):
         r = run_cli(["wifi", "connect", "Far Away"], fake=self.fake,
-                    secret=lambda p: "x", interactive=True)
+                    secret=lambda p: "whatever1", interactive=True)
         self.assertEqual(r.rc, 1)
         self.assertIn("not in range", r.out)
         self.assertIn("2.4 GHz", r.out)

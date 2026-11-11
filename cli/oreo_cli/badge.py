@@ -17,7 +17,7 @@ import hashlib
 import json
 import posixpath
 
-from .errors import BadgeError, OreoError, redact
+from .errors import BadgeError, LinkError, NoOreoOS, OreoError, UsageError, redact
 
 EVENT = "@OREO:"
 DATA = "@B:"
@@ -39,9 +39,19 @@ B64 = (
 PROTECTED = ("/", "/main.py", "/boot.py", "/oreoOS", "/oreoWare", "/apps",
              "/apps/launcher", "/assets")
 
-PUSH_CHUNK = 4096        # raw bytes per exec (about 5.5 KB of base64 code)
+# Raw bytes per exec while pushing: about 11 KB of base64 code. The badge
+# holds the pasted code, the decoded literal and the chunk at once (~30 KB
+# for a moment, on a heap of several MB of PSRAM with OreoOS stopped).
+# Doubling it from 4 KiB halves the execs, but the model in
+# tests/test_push_speed.py says that gains only a few percent: raw-paste
+# flow control and flash writes dominate. The bigger win is fewer execs per
+# file (see write_file). docs/CLI.md "Transfer speed" has the numbers.
+PUSH_CHUNK = 8192
 PULL_CHUNK = 3072        # raw bytes per @B: line
 FREE_RESERVE = 64 * 1024  # keep this much flash free after a push
+
+NO_OREOOS_HINT = ("install OreoOS: `oreo flash --repo <checkout>` (firmware and OreoOS) "
+                  "or `oreo update --repo <checkout>`; see `oreo doctor`")
 
 
 def lit(value):
@@ -50,8 +60,17 @@ def lit(value):
 
 
 def norm(path):
-    """Badge path -> absolute, normalised ('/a/b'). Accepts ':a/b' too."""
+    """Badge path -> absolute, normalised ('/a/b'). Accepts ':a/b' too.
+
+    A path that looks like a Windows path (`C:/Program Files/Git/documents`)
+    is refused: Git Bash rewrites `/documents` into that before oreo sees
+    it, and copying there would be a surprise."""
     p = (path or "/").strip()
+    if len(p) > 2 and p[1] == ":" and p[0].isalpha() and p[2] in "/\\":
+        raise UsageError("%s looks like a path on this computer, not on the badge" % p,
+                         hint="Git Bash rewrites paths that start with /; write badge paths "
+                              "as :documents/ (or set MSYS_NO_PATHCONV=1)")
+    p = p.replace("\\", "/")
     if p.startswith(":"):
         p = p[1:]
     if not p.startswith("/"):
@@ -108,6 +127,16 @@ class OutputParser:
             self.on_text(s)
 
 
+def _missing_oreoos(text):
+    """A badge traceback that means OreoOS (or part of it) is not there."""
+    if "ImportError" not in text and "AttributeError" not in text:
+        return False
+    low = text.lower()
+    return ("oreoos" in low or "oreoware" in low) and (
+        "no module named" in low or "can't import name" in low
+        or "cannot import name" in low or "has no attribute" in low)
+
+
 class Badge:
     """One session with one badge. Opens on first use."""
 
@@ -115,6 +144,7 @@ class Badge:
         self.link = link
         self.on_text = on_text
         self.entered = False
+        self._dirs = set()      # folders known to exist on the badge
 
     # ── session ──────────────────────────────────────────────────────
     def connect(self):
@@ -136,10 +166,14 @@ class Badge:
         try:
             self.link.exec(PRELUDE + code, timeout=timeout, consumer=parser.feed)
         except BadgeError as e:
-            raise BadgeError(redact(e.message, secrets), redact(e.detail, secrets),
-                             hint=e.hint)
+            message, detail = redact(e.message, secrets), redact(e.detail, secrets)
+            if _missing_oreoos(message + "\n" + (detail or "")):
+                raise NoOreoOS("this needs OreoOS, and the badge does not have it "
+                               "(or has a version too old for this command)",
+                               detail=detail, hint=NO_OREOOS_HINT)
+            raise BadgeError(message, detail, hint=e.hint)
         except OreoError as e:
-            raise OreoError(redact(e.message, secrets), hint=e.hint)
+            raise type(e)(redact(e.message, secrets), hint=e.hint)
         parser.finish()
         return parser
 
@@ -285,7 +319,7 @@ class Badge:
 
     def mkdirs(self, path):
         p = norm(path)
-        if p == "/":
+        if p == "/" or p in self._dirs:
             return
         self.result(
             "import os\n"
@@ -299,56 +333,102 @@ class Badge:
             " except OSError:\n"
             "  pass\n"
             "_e({'ok':1})\n" % lit(p))
+        while p != "/":
+            self._dirs.add(p)
+            p = posixpath.dirname(p)
 
     def write_file(self, data, remote, progress=None, verify=True,
-                   chunk=PUSH_CHUNK, reserve=FREE_RESERVE):
-        """Copy bytes to `remote` atomically (temp file, then rename)."""
+                   chunk=PUSH_CHUNK, reserve=FREE_RESERVE, check_space=True):
+        """Copy bytes to `remote` atomically and verified.
+
+        The bytes go to `<remote>.part`; the badge then checks its size (and
+        SHA-256 unless verify=False) against what was sent and only renames
+        it over `remote` when they match, so a bad copy never replaces a
+        good file. The first chunk rides along with the open and the last
+        with the check-and-rename, so a small file costs two execs (plus a
+        space check unless the caller already made one, and a mkdir the
+        first time a folder is used).
+        """
         dest = norm(remote)
-        free, _ = self.free()
-        if len(data) + reserve > free:
-            from .ui import human
-            raise OreoError("not enough space on the badge: %s needed, %s free"
-                            % (human(len(data)), human(max(0, free - reserve))),
-                            hint="free some space (`oreo info`, `oreo rm`)")
+        if check_space:
+            free, _ = self.free()
+            if len(data) + reserve > free:
+                from .ui import human
+                raise OreoError("not enough space on the badge: %s needed, %s free"
+                                % (human(len(data)), human(max(0, free - reserve))),
+                                hint="free some space (`oreo info`, `oreo rm`)")
         parent = posixpath.dirname(dest)
         if parent and parent != "/":
             self.mkdirs(parent)
         tmp = dest + ".part"
-        self.run("import os\n" + B64 +
-                 "_f=open(%s,'wb')\n_w=_f.write\n_d=_b.a2b_base64\n" % lit(tmp))
-        done = 0
+        pieces = [data[i:i + chunk] for i in range(0, len(data), chunk)] or [b""]
+        want = hashlib.sha256(data).hexdigest() if verify else None
+        state = {"done": 0}
+
+        def put(piece):
+            return "_w(_d(%s))\n" % lit(base64.b64encode(piece)) if piece else ""
+
+        def advance(piece):
+            state["done"] += len(piece)
+            if progress:
+                progress(state["done"], len(data))
         try:
-            for i in range(0, len(data), chunk):
-                piece = data[i:i + chunk]
-                self.link.exec("_w(_d(%s))" % lit(base64.b64encode(piece)), timeout=15)
-                done += len(piece)
-                if progress:
-                    progress(done, len(data))
+            self.run("import os\n" + B64 +
+                     "_f=open(%s,'wb')\n_w=_f.write\n_d=_b.a2b_base64\n" % lit(tmp)
+                     + (put(pieces[0]) if len(pieces) > 1 else ""))
+            if len(pieces) > 1:
+                advance(pieces[0])
+            for piece in pieces[1:-1]:
+                self.link.exec(put(piece), timeout=15)
+                advance(piece)
             r = self.result(
+                put(pieces[-1]) +
                 "_f.close()\n"
-                "try:\n"
-                " os.rename(%(t)s,%(d)s)\n"
-                "except OSError:\n"
-                " os.remove(%(d)s)\n"
-                " os.rename(%(t)s,%(d)s)\n"
-                "_e({'size':os.stat(%(d)s)[6]})\n" % {"t": lit(tmp), "d": lit(dest)})
+                "_r={'size':os.stat(%(t)s)[6],'sha':None}\n"
+                "if %(v)s:\n"
+                " try:\n"
+                "  import hashlib\n"
+                "  _h=hashlib.sha256()\n"
+                "  _g=open(%(t)s,'rb')\n"
+                "  while 1:\n"
+                "   _c=_g.read(4096)\n"
+                "   if not _c:\n"
+                "    break\n"
+                "   _h.update(_c)\n"
+                "  _g.close()\n"
+                "  _r['sha']=_b.hexlify(_h.digest()).decode()\n"
+                " except ImportError:\n"
+                "  pass\n"
+                "_r['ok']=_r['size']==%(n)d and (_r['sha'] is None or _r['sha']==%(w)s)\n"
+                "if _r['ok']:\n"
+                " try:\n"
+                "  os.rename(%(t)s,%(d)s)\n"
+                " except OSError:\n"
+                "  os.remove(%(d)s)\n"
+                "  os.rename(%(t)s,%(d)s)\n"
+                "else:\n"
+                " os.remove(%(t)s)\n"
+                "_e(_r)\n" % {"t": lit(tmp), "d": lit(dest), "n": len(data),
+                              "w": lit(want), "v": "True" if verify else "False"},
+                timeout=60)
+            advance(pieces[-1])
+        except LinkError:
+            raise           # the badge is gone; nothing to clean up with
         except BaseException:   # Ctrl-C too: do not leave a .part file behind
             try:
                 self.link.exec("try:\n _f.close()\nexcept Exception:\n pass\n"
-                               "try:\n os.remove(%s)\nexcept Exception:\n pass\n" % lit(tmp))
-            except Exception:
+                               "try:\n import os\n os.remove(%s)\nexcept Exception:\n pass\n"
+                               % lit(tmp))
+            except BaseException:
                 pass
             raise
-        if progress and not data:
-            progress(0, 0)
         if r["size"] != len(data):
-            raise OreoError("%s: badge has %d bytes, expected %d" % (dest, r["size"], len(data)))
-        if verify:
-            want = hashlib.sha256(data).hexdigest()
-            got = self.sha256(dest)
-            if got is not None and got != want:
-                raise OreoError("%s: checksum mismatch after copy" % dest,
-                                hint="try again; if it repeats, try another cable")
+            raise OreoError("%s: the badge received %d bytes, expected %d; nothing was replaced"
+                            % (dest, r["size"], len(data)),
+                            hint="try again; if it repeats, try another cable or USB port")
+        if not r.get("ok"):
+            raise OreoError("%s: checksum mismatch after copy; nothing was replaced" % dest,
+                            hint="try again; if it repeats, try another cable or USB port")
         return dest
 
     def sha256(self, remote):
@@ -590,6 +670,100 @@ class Badge:
             "ok,msg=S.uninstall(%s)\n"
             "_e({'ok':bool(ok),'msg':msg})\n" % lit(app_id), timeout=60)
         return r["ok"], r["msg"]
+
+    # ── OreoOS updates (oreoOS.ota) ──────────────────────────────────
+    # These drive the badge's own OTA client, the same functions its
+    # Updates page calls: latest_version/check -> peek -> download into
+    # /_ota -> apply_pending. The badge downloads from GitHub over its own
+    # Wi-Fi; the computer only steers. State between steps (_rel, _pk)
+    # lives in the raw REPL's globals for the session.
+
+    def ota_status(self):
+        """{'current', 'pending', 'pending_version'} without the network."""
+        return self.result(
+            "from oreoOS import ota as O\n"
+            "from oreoOS import config as _c\n"
+            "r={'current':_c.VERSION,'pending':bool(O.is_pending()),'pending_version':None}\n"
+            "if r['pending']:\n"
+            " try:\n"
+            "  _g=open(O.STAGE_DIR+'/'+O.MANIFEST_NAME)\n"
+            "  r['pending_version']=_j.load(_g).get('version')\n"
+            "  _g.close()\n"
+            " except Exception:\n"
+            "  pass\n"
+            "_e(r)\n")
+
+    def ota_check(self, channel="stable"):
+        """Latest release on `channel` vs the badge's version.
+
+        {'current', 'latest', 'newer', 'major', 'tag'}, or {'error'} when
+        GitHub could not be reached."""
+        return self.result(
+            "from oreoOS import ota as O\n"
+            "from oreoOS import config as _c\n"
+            "_cur=_c.VERSION\n"
+            "_lv=getattr(O,'latest_version',None)\n"
+            "if _lv:\n"
+            " _v,_rel=_lv(%(ch)s)\n"
+            "else:\n"
+            " _rel=O.check(%(ch)s)\n"
+            " _v=_rel.get('version') if _rel else None\n"
+            "if not _v or not _rel:\n"
+            " _e({'error':'no answer from GitHub','current':_cur})\n"
+            "else:\n"
+            " _cmp=getattr(O,'compare_version',None)\n"
+            " _n=(_cmp(_v,_cur)>0) if _cmp else O._newer(_v,_cur)\n"
+            " _e({'current':_cur,'latest':_v,'newer':bool(_n),'major':bool(_rel.get('major')),"
+            "'tag':_rel.get('tag')})\n" % {"ch": lit(channel)}, timeout=60)
+
+    def ota_peek(self):
+        """Which files the release changes. Needs ota_check() first.
+
+        Hashes every OreoOS file on the badge, so it can take a while."""
+        r = self.result(
+            "_pk=O.peek(_rel)\n"
+            "if not _pk:\n"
+            " _e({'error':'could not read the release manifest'})\n"
+            "else:\n"
+            " _e({'files':len(_pk['changed']),'bytes':_pk['bytes'],'unchanged':_pk['unchanged'],"
+            "'major':bool(_pk['major']),'version':_pk['manifest'].get('version')})\n",
+            timeout=300)
+        return r
+
+    def ota_download(self, progress=None):
+        """Download the changed files into /_ota. progress(i, total, path).
+        Returns True when the update is staged and sealed."""
+        def on_event(ev):
+            if progress and "i" in ev:
+                progress(ev["i"], ev.get("t") or 0, ev.get("p") or "")
+        r = self.result(
+            "def _cb(i,t,p):\n"
+            " _e({'i':i,'t':t,'p':p})\n"
+            "_ok=O.download(_pk,_cb)\n"
+            "if not _ok:\n"
+            " try:\n"
+            "  O.discard_pending()\n"
+            " except Exception:\n"
+            "  pass\n"
+            "_e({'ok':bool(_ok)})\n", timeout=120, on_event=on_event)
+        return bool(r.get("ok"))
+
+    def ota_apply(self, progress=None):
+        """Move the staged files into place (what the badge does at boot).
+        Returns the applied version, or None (the staged update stays and
+        the next boot retries it)."""
+        def on_event(ev):
+            if progress and "a" in ev:
+                progress(ev["a"], ev.get("p") or "")
+        r = self.result(
+            "from oreoOS import ota as O\n"
+            "def _cb(i,p):\n"
+            " _e({'a':i,'p':p})\n"
+            "_e({'applied':O.apply_pending(_cb)})\n", timeout=120, on_event=on_event)
+        return r.get("applied")
+
+    def ota_discard(self):
+        self.result("from oreoOS import ota as O\nO.discard_pending()\n_e({'ok':1})\n")
 
     # ── running code ─────────────────────────────────────────────────
     def run_source(self, source, on_output):

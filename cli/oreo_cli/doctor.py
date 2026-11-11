@@ -6,11 +6,12 @@ firmware banner (which stops OreoOS briefly; it is restarted afterwards).
 """
 
 import os
+import shutil
 import sys
 
 from . import OREO_PID, OREO_VID, __version__
 from . import discovery
-from .errors import OreoError
+from .errors import NoOreoOS, OreoError
 
 OK, WARN, FAIL = "ok", "warn", "fail"
 
@@ -50,7 +51,8 @@ def check_permissions(device, platform=None, access=None, groups=None):
 
 def run_checks(port=None, comports=None, badge_factory=None, reset="soft"):
     """Yield (status, title, message, hint) rows."""
-    yield OK, "oreo", "oreo-cli %s on Python %s" % (__version__, sys.version.split()[0]), None
+    yield OK, "oreo", "oreo-cli %s on Python %s, %s" % (
+        __version__, sys.version.split()[0], sys.platform), None
 
     try:
         import serial  # noqa: F401
@@ -67,6 +69,13 @@ def run_checks(port=None, comports=None, badge_factory=None, reset="soft"):
     except Exception:
         yield FAIL, "mpremote", "not installed", "pip install 'mpremote>=1.28,<1.29'"
         return
+
+    if shutil.which("ffmpeg"):
+        yield OK, "ffmpeg", "found (videos can be added)", None
+    else:
+        yield WARN, "ffmpeg", "not found: photos and documents work, videos do not", \
+            "install ffmpeg to add videos: Linux `sudo apt install ffmpeg`, " \
+            "macOS `brew install ffmpeg`, Windows `winget install ffmpeg`"
 
     ports = discovery.all_ports(comports)
     badges = [p for p in ports if p.is_badge]
@@ -89,7 +98,8 @@ def run_checks(port=None, comports=None, badge_factory=None, reset="soft"):
                     "`oreo flash --repo <checkout>`, or use the native USB port"
         elif ports:
             yield FAIL, "badge", "no Oreo Badge among %d USB serial port(s)" % len(ports), \
-                "plug the badge into its native USB port"
+                "plug the badge into its native USB port (on the DevKitC-1, the one " \
+                "labelled USB), and check it is switched on"
         else:
             yield FAIL, "cable", "no USB serial device at all", \
                 "try another cable (many only charge) and another USB port"
@@ -103,8 +113,11 @@ def run_checks(port=None, comports=None, badge_factory=None, reset="soft"):
     badge = badge_factory(target)
     try:
         info = badge.banner()
-    except OreoError as e:
+    except NoOreoOS as e:
         yield FAIL, "firmware", e.message, e.hint
+        return
+    except OreoError as e:
+        yield FAIL, "connection", e.message, e.hint
         return
     finally:
         badge.finish(reset)
@@ -113,7 +126,7 @@ def run_checks(port=None, comports=None, badge_factory=None, reset="soft"):
         "MicroPython %s on %s" % (mpy, info.get("machine") or "?"), \
         None if mpy.startswith("1.28") else "OreoOS needs MicroPython 1.28; reflash"
     if info.get("os"):
-        yield OK, "OreoOS", info["os"], None
+        yield OK, "OreoOS", "%s (check for a newer one: `oreo update --check`)" % info["os"], None
     else:
         yield FAIL, "OreoOS", "not installed on this badge", \
-            "install it with `oreo update --repo <checkout>`"
+            "install it with `oreo flash --repo <checkout>` (see docs/CLI.md)"

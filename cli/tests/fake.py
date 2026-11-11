@@ -141,7 +141,7 @@ class FakeWifi(types.ModuleType):
 
     def __init__(self):
         super().__init__("oreoWare.wifi")
-        self.air = {"Home": ("hunter2", -50), "Cafe": ("", -70)}   # ssid -> (password, rssi)
+        self.air = {"Home": ("hunter2!", -50), "Cafe": ("", -70)}   # ssid -> (password, rssi)
         self.saved = []
         self.deploy = []
         self.connected = None
@@ -407,7 +407,8 @@ class FakeTransport:
                     for f in fromlist:
                         key = name + "." + f
                         if key in mods and mods[key] is None:
-                            raise ImportError(key)
+                            # MicroPython's wording for a missing submodule
+                            raise ImportError("can't import name %s (%s)" % (f, key))
                         if mods.get(key) is not None:
                             setattr(top, f, mods[key])
                 return top
