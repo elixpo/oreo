@@ -11,7 +11,7 @@ from pathlib import Path
 
 from . import commands
 from .badge import norm
-from .errors import Cancelled, OreoError
+from .errors import Cancelled, OreoError, local_file
 from .ui import esc, human
 
 MENU = [("1", "status"), ("2", "files"), ("3", "apps"), ("4", "Wi-Fi"),
@@ -78,7 +78,8 @@ def files_view(ui, b):
                     raise Cancelled("not downloaded")
                 with ui.progress(esc(e["name"]), total=e["size"]) as update:
                     data = b.read_file(path, progress=update)
-                target.write_bytes(data)
+                with local_file(target):
+                    target.write_bytes(data)
                 ui.ok("saved %s" % esc(target.resolve()))
             _guard(ui, _pull)
         elif verb == "d":
@@ -98,7 +99,8 @@ def upload(ui, b, local, cwd):
     src = Path(local).expanduser()
     if not src.is_file():
         raise OreoError("%s: no such file on this computer" % src)
-    data = src.read_bytes()
+    with local_file(src):
+        data = src.read_bytes()
     target = norm(posixpath.join(cwd, src.name))
     if b.stat(target) is not None and not ui.confirm(
             "%s exists on the badge. Replace it?" % esc(target)):

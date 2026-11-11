@@ -3,6 +3,7 @@
 import os
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 from fake import FakeTransport
@@ -196,6 +197,39 @@ class FileCommandsTest(unittest.TestCase):
         r = run_cli(["pull", "-r", "/documents", str(self.dir / "backup")], fake=self.fake)
         self.assertEqual(r.rc, 0, r.out)
         self.assertEqual((self.dir / "backup" / "sub" / "b.txt").read_bytes(), b"BBB")
+
+    @unittest.skipIf(hasattr(os, "geteuid") and os.geteuid() == 0, "root reads anything")
+    def test_push_unreadable_source_is_a_local_error(self):
+        f = self.dir / "secret.txt"
+        f.write_text("x")
+        f.chmod(0)
+        self.addCleanup(f.chmod, 0o600)
+        r = run_cli(["push", str(f), "/documents/"], fake=self.fake)
+        self.assertEqual(r.rc, 1, r.out)
+        self.assertIn("permission denied", r.out)
+        self.assertNotIn("lost the connection", r.out)
+        self.assertEqual(r.links, [])            # refused before the badge was touched
+
+    def test_push_read_failure_is_a_local_error(self):
+        f = self.dir / "notes.txt"
+        f.write_text("x")
+        with mock.patch.object(Path, "read_bytes", side_effect=OSError(5, "Input/output error", str(f))):
+            r = run_cli(["push", str(f), "/documents/"], fake=self.fake)
+        self.assertEqual(r.rc, 1, r.out)
+        self.assertIn("notes.txt: Input/output error", r.out)
+        self.assertNotIn("lost the connection", r.out)
+
+    def test_pull_unwritable_destination_is_a_local_error(self):
+        self.fake.put("/documents/a.txt", b"AAA")
+        blocker = self.dir / "file"
+        blocker.write_text("x")             # a file where a folder is needed
+        r = run_cli(["pull", "/documents/a.txt", str(blocker / "sub" / "a.txt")], fake=self.fake)
+        self.assertEqual(r.rc, 1, r.out)
+        self.assertIn(str(blocker), r.out)
+        self.assertNotIn("lost the connection", r.out)
+        r = run_cli(["pull", "/documents/a.txt", str(blocker / "dir") + "/"], fake=self.fake)
+        self.assertEqual(r.rc, 1, r.out)
+        self.assertNotIn("lost the connection", r.out)
 
     def test_rm_guards(self):
         r = run_cli(["rm", "/oreoOS/config.py"], fake=self.fake)

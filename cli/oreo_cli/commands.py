@@ -7,7 +7,7 @@ from pathlib import Path
 
 from . import discovery, doctor as doctor_mod, media, repo
 from .badge import PROTECTED, norm
-from .errors import Cancelled, LinkError, OreoError, UsageError
+from .errors import Cancelled, LinkError, OreoError, UsageError, local_file
 from . import ui as ui_mod
 from .ui import esc, human
 
@@ -164,7 +164,8 @@ def cmd_run(ctx):
     path = Path(ctx.args.file)
     if not path.is_file():
         raise OreoError("%s: no such file" % path)
-    source = path.read_bytes()
+    with local_file(path):
+        source = path.read_bytes()
     out = getattr(sys.stdout, "buffer", None)
 
     def stream(chunk):
@@ -204,48 +205,72 @@ class _Console:
         self.stream.flush()
 
 
+# After the badge comes back, how long a port that is listed but will not
+# open (udev still applying permissions, the badge still enumerating) is
+# retried before the real reason is reported.
+REOPEN_TRIES = 20          # x 0.5 s
+
+
 def follow_console(ctx, port, restart=False, out=None, idle=None):
     """Print the badge's console until Ctrl-C. Survives the badge rebooting
     or being unplugged: it waits for the port to come back and carries on.
+
+    A port that cannot be opened at the start (busy in another program, no
+    permission) is an error with its reason, not a reboot to wait out; the
+    same goes for a port that comes back but stays unopenable.
     `idle` (tests): stop after this many empty reads in a row."""
     ui = ctx.ui
     out = out or _Console()
     serial = next((p.serial for p in discovery.find_badges(ctx.comports)
                    if p.device == port), None)
     quiet = 0
+    first = True
+    open_failures = 0
     while True:
         link = ctx.link(port)
         try:
-            link.open()
-            ser = link.t.serial
             try:
-                ser.timeout = 0.2      # so Ctrl-C is seen promptly on Windows too
-            except Exception:
-                pass
-            if restart:
-                ser.write(b"\r\x03\x03")   # stop OreoOS (friendly REPL)
-                ser.write(b"\x04")         # soft reboot: main.py starts OreoOS again
-                restart = False
-            while True:
-                data = ser.read(max(1, ser.inWaiting()))
-                if data:
-                    quiet = 0
-                    out.write(data)
-                else:
-                    quiet += 1
-                    if idle is not None and quiet >= idle:
-                        return
-        except (OSError, LinkError):
+                link.open()
+            except LinkError:
+                open_failures += 1
+                if first or open_failures > REOPEN_TRIES:
+                    raise
+                link = None
+            if link is not None:
+                first = False
+                open_failures = 0
+                ser = link.t.serial
+                try:
+                    ser.timeout = 0.2      # so Ctrl-C is seen promptly on Windows too
+                except Exception:
+                    pass
+                if restart:
+                    ser.write(b"\r\x03\x03")   # stop OreoOS (friendly REPL)
+                    ser.write(b"\x04")         # soft reboot: main.py starts OreoOS again
+                    restart = False
+                while True:
+                    data = ser.read(max(1, ser.inWaiting()))
+                    if data:
+                        quiet = 0
+                        out.write(data)
+                    else:
+                        quiet += 1
+                        if idle is not None and quiet >= idle:
+                            return
+        except OSError:
             ui.print("")
             ui.warn("the badge went away (restart or unplugged); waiting for it to come back")
         finally:
-            link.close()
+            if link is not None:
+                link.close()
+        announced = open_failures > 0     # "back on" was already said for this port
         while True:
             ctx.sleep(0.5)
             again = discovery.find_again(port, serial, ctx.comports)
             if again:
+                if not announced or again != port:
+                    ui.note("back on %s" % esc(again))
                 port = again
-                ui.note("back on %s" % esc(port))
                 break
 
 
@@ -296,6 +321,9 @@ def _local_files(sources, recursive):
             out.append((p, p.name))
         else:
             raise OreoError("%s: no such file" % p)
+    for f, _ in out:   # before the badge is touched
+        if not os.access(f, os.R_OK):
+            raise OreoError("%s: permission denied" % f)
     return out
 
 
@@ -333,7 +361,8 @@ def cmd_push(ctx):
                             % (human(total), human(free)))
         ui.header("push", "%d file(s), %s -> %s" % (len(files), human(total), esc(norm(args.dest))))
         for (local, rel), target in zip(files, targets):
-            data = local.read_bytes()
+            with local_file(local):
+                data = local.read_bytes()
             with ui.progress(esc(rel), total=len(data)) as update:
                 b.write_file(data, target, progress=update, verify=not args.no_verify,
                              check_space=False)
@@ -347,7 +376,8 @@ def cmd_pull(ctx):
     src = norm(args.source)
     local = Path(args.dest).expanduser()
     if args.dest.endswith(("/", os.sep)) and not local.exists():
-        local.mkdir(parents=True)
+        with local_file(local):
+            local.mkdir(parents=True)
     with ctx.session() as b:
         st = b.stat(src)
         if st is None:
@@ -365,8 +395,9 @@ def cmd_pull(ctx):
         for remote, target in jobs:
             with ui.progress(esc(posixpath.basename(remote)), total=None) as update:
                 data = b.read_file(remote, progress=update)
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(data)
+            with local_file(target):
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(data)
         ui.ok("saved %d file(s) under %s" % (len(jobs), esc(local)))
 
 
@@ -457,8 +488,9 @@ def prepare_media(ui, files, opts):
                    100.0 * len(item[2]) / src_size if src_size else 0))
         if opts.save:
             out = Path(opts.save).expanduser()
-            out.mkdir(parents=True, exist_ok=True)
-            (out / item[1]).write_bytes(item[2])
+            with local_file(out / item[1]):
+                out.mkdir(parents=True, exist_ok=True)
+                (out / item[1]).write_bytes(item[2])
     return prepared
 
 

@@ -84,7 +84,15 @@ docs/CLI.md ("Testing on a badge").
 - The Wi-Fi signal bars and header separator fall back to ASCII on a
   terminal that is not UTF-8.
 - A second Ctrl-C while OreoOS is being restarted no longer leaves the
-  badge at the MicroPython prompt.
+  badge at the MicroPython prompt: the restart starts over and the port is
+  closed only after the reboot request has been sent.
+- `oreo logs` on a port that is busy in another program, or that you have
+  no permission to open, says so (exit status 4) instead of waiting for
+  the badge to "come back" forever.
+- A file on this computer that cannot be read or written (`oreo push` of an
+  unreadable file, `oreo pull` into a folder that cannot be created) is
+  reported as "<path>: <reason>" with exit status 1, not as a lost badge
+  connection.
 
 ### Known limitations
 

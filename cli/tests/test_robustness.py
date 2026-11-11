@@ -17,8 +17,11 @@ from oreo_cli.errors import LinkError
 from oreo_cli.transport import SerialLink
 
 
-class Unplugged(OSError):
-    """pyserial's SerialException is an OSError."""
+from serial import SerialException
+
+
+class Unplugged(SerialException):
+    """What pyserial raises when the port vanishes (an OSError)."""
 
 
 class LinkFailureTest(unittest.TestCase):
@@ -132,6 +135,93 @@ class MainErrorTest(unittest.TestCase):
         r = run_cli(["info"], fake=fake)
         self.assertEqual(r.rc, 0, r.out)       # the command itself had finished
         self.assertEqual(calls, ["soft", "soft"])
+
+
+    def test_local_os_error_is_not_a_lost_badge(self):
+        r = self._run_with(PermissionError(13, "Permission denied", "/some/file"))
+        self.assertEqual(r.rc, 1, r.out)
+        self.assertIn("/some/file: Permission denied", r.out)
+        self.assertNotIn("lost the connection", r.out)
+
+    def test_broken_pipe_is_quiet(self):
+        r = self._run_with(BrokenPipeError(32, "Broken pipe"))
+        self.assertEqual(r.rc, 1)
+        self.assertNotIn("lost the connection", r.out)
+        self.assertNotIn("unexpected", r.out)
+
+
+class ShieldedRestartTest(unittest.TestCase):
+    """The real SerialLink.restart, against a scripted port, cut short by a
+    second Ctrl-C at each step."""
+
+    def _link(self):
+        ser = tt.ScriptedSerial([b"R\x01", b"\x04\x04>"])
+        link = tt.link_with(ser)
+        link.exec("pass")
+        ser.written.clear()
+        return ser, link
+
+    def _interrupt_once(self, obj, name):
+        real = getattr(obj, name)
+        calls = []
+
+        def once(*a, **k):
+            calls.append(a)
+            if len(calls) == 1:
+                raise KeyboardInterrupt
+            return real(*a, **k)
+        setattr(obj, name, once)
+        return calls
+
+    def test_interrupted_exit_raw_repl_still_soft_resets(self):
+        ser, link = self._link()
+        calls = self._interrupt_once(link.t, "exit_raw_repl")
+        with self.assertRaises(KeyboardInterrupt):   # handed on once restarted
+            link.restart("soft")
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(b"".join(ser.written), b"\r\x02\x04")
+        self.assertIsNone(link.t)
+
+    def test_finish_shielded_on_the_real_link(self):
+        from oreo_cli.badge import Badge
+        from oreo_cli.main import finish_shielded
+        ser, link = self._link()
+        self._interrupt_once(link.t, "exit_raw_repl")
+        b = Badge(link)
+        b.entered = True
+        finish_shielded(b, "soft")
+        self.assertIn(b"\x04", b"".join(ser.written))    # ctrl-D: OreoOS starts again
+        self.assertIsNone(link.t)
+
+    def test_interrupt_in_the_pause_after_ctrl_d_does_not_reboot_twice(self):
+        ser, link = self._link()
+        with mock.patch("oreo_cli.transport.time.sleep") as sleep:
+            sleep.side_effect = [None, KeyboardInterrupt]   # ctrl-B pause, then ctrl-D pause
+            with self.assertRaises(KeyboardInterrupt):
+                link.restart("soft")
+        self.assertEqual(b"".join(ser.written).count(b"\x04"), 1)
+        self.assertIsNone(link.t)
+
+    def test_interrupted_hard_reset_ends_the_paste_and_resends(self):
+        ser, link = self._link()
+        real = link.t.raw_paste_write
+        calls = []
+
+        def paste(code):
+            calls.append(code)
+            if len(calls) == 1:
+                ser.write(code[:5])
+                raise KeyboardInterrupt
+            real(code)
+        link.t.raw_paste_write = paste
+        ser.replies = [b"R\x01", b"", b"", b">", b"R\x01"]
+        with self.assertRaises(KeyboardInterrupt):
+            link.restart("hard")
+        self.assertEqual(len(calls), 2)
+        self.assertIn(b"machine.reset()", calls[1])
+        sent = b"".join(ser.written)
+        self.assertIn(b"\x03\x03", sent)       # the half-sent paste was ended first
+        self.assertIsNone(link.t)
 
 
 class PortNameTest(unittest.TestCase):
@@ -256,6 +346,65 @@ class LogsTest(unittest.TestCase):
         self.assertEqual([p for p, _ in opened], ["/dev/ttyACM0", "/dev/ttyACM1"])
         self.assertEqual(opened[0][1].timeout, 0.2)
         self.assertIn("went away", out_ui.getvalue())
+
+
+    def test_logs_port_that_will_not_open_is_an_error(self):
+        fake = FakeTransport()
+        self.addCleanup(fake.cleanup)
+        opens = []
+
+        def refuse():
+            opens.append(1)
+            raise LinkError("could not open /dev/ttyACM0", hint="another program has it open")
+        fake.open = refuse
+        r = run_cli(["logs"], fake=fake)
+        self.assertEqual(r.rc, 4, r.out)
+        self.assertIn("could not open /dev/ttyACM0", r.out)
+        self.assertIn("another program", r.out)
+        self.assertNotIn("went away", r.out)
+        self.assertEqual(len(opens), 1)
+
+    def test_logs_gives_up_when_the_port_comes_back_unopenable(self):
+        class Ser:
+            timeout = None
+
+            def inWaiting(self):
+                raise Unplugged("gone")
+
+            def read(self, n):
+                return b""
+
+            def write(self, b):
+                pass
+
+        state = {"opens": 0}
+
+        class Link:
+            def __init__(self, port):
+                self.t = None
+
+            def open(self):
+                state["opens"] += 1
+                if state["opens"] > 1:
+                    raise LinkError("no permission to open /dev/ttyACM0", hint="dialout")
+
+                class T:
+                    serial = Ser()
+                self.t = T()
+
+            def close(self):
+                pass
+
+        from oreo_cli.main import Ctx, build_parser
+        out_ui = io.StringIO()
+        ctx = Ctx(build_parser().parse_args(["logs"]), ui_mod.UI(file=out_ui, color=False),
+                  comports=lambda: [badge_port("/dev/ttyACM0")], link_factory=Link,
+                  sleep=lambda s: None)
+        with self.assertRaises(LinkError) as cm:
+            commands.follow_console(ctx, "/dev/ttyACM0", out=commands._Console(io.StringIO()))
+        self.assertIn("no permission", cm.exception.message)
+        self.assertEqual(state["opens"], 2 + commands.REOPEN_TRIES)
+        self.assertEqual(out_ui.getvalue().count("back on"), 1)
 
 
 class DoctorStepsTest(unittest.TestCase):

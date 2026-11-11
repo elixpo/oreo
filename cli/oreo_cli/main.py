@@ -12,7 +12,8 @@ import time
 
 from . import __version__, commands, discovery
 from .badge import Badge
-from .errors import EXIT_CANCELLED, EXIT_ERROR, EXIT_LINK, Cancelled, OreoError
+from .errors import (EXIT_CANCELLED, EXIT_ERROR, EXIT_LINK, Cancelled, OreoError,
+                     is_serial_error, local_error_message)
 from .ui import UI, adapt_stdio, esc
 
 HOME = "https://oreo.elixpo.com/docs"
@@ -311,12 +312,18 @@ def main(argv=None, ui=None, comports=None, link_factory=None, runner=None,
     except OreoError as e:
         ui.error(e.message, hint=e.hint, detail=getattr(e, "detail", None) if args.verbose else None)
         return e.code
+    except BrokenPipeError:
+        # stdout closed early (`oreo cat ... | head`): nothing left to tell.
+        return EXIT_ERROR
     except OSError as e:
-        # pyserial's SerialException is an OSError: a port that vanished
-        # outside the places that already explain it.
-        ui.error("lost the connection to the badge (%s)" % esc(e),
-                 hint="plug it back in, check with `oreo devs`, then run the command again")
-        return EXIT_LINK
+        if is_serial_error(e):
+            # a port that vanished outside the places that already explain it
+            ui.error("lost the connection to the badge (%s)" % esc(e),
+                     hint="plug it back in, check with `oreo devs`, then run the command again")
+            return EXIT_LINK
+        # anything else is a file or folder on this computer
+        ui.error(esc(local_error_message(e)))
+        return EXIT_ERROR
     except Exception as e:   # never a bare traceback for the person
         if _transport_error(e):
             ui.error("the badge did not answer (%s)" % esc(e),

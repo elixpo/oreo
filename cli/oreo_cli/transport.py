@@ -73,6 +73,7 @@ class SerialLink:
         self._have_prompt = False   # we already read the raw REPL '>' prompt
         self._busy = False          # code sent (or being sent) and not finished
         self.mounted = False
+        self._restart_sent = False  # restart(): the reboot request is on the wire
 
     # ── lifecycle ────────────────────────────────────────────────────
     def open(self):
@@ -144,39 +145,66 @@ class SerialLink:
         self.t = None
 
     def restart(self, mode="soft"):
-        """Leave OreoOS running again, then close the port."""
+        """Leave OreoOS running again, then close the port.
+
+        Shielded against Ctrl-C: an interrupt while the sequence is being
+        sent (the person pressing Ctrl-C again while oreo cleans up) makes
+        it start over, and the port is closed only afterwards. Every step
+        is safe to repeat, so a repeat cannot leave the badge at the
+        MicroPython prompt with OreoOS stopped. The interrupt is raised
+        again once the badge has been restarted."""
         if self.t is None:
             return
+        interrupted = None
+        self._restart_sent = False
         try:
-            if self._busy and self.t.in_raw_repl:
-                self._recover()
-            if self.mounted:
+            for _ in range(3):
+                if self._restart_sent:
+                    break       # only the pause after it was cut short
                 try:
-                    if self.t.in_raw_repl:
-                        self._resync()
-                    else:   # leaving `oreo dev`'s REPL: same as mpremote's disconnect
-                        self.t.enter_raw_repl(soft_reset=False)
-                        self._have_prompt = False
-                    self.t.umount_local()
+                    self._restart_sequence(mode)
+                    break
+                except KeyboardInterrupt as e:
+                    interrupted = e
                 except Exception:
-                    pass
-                self.mounted = False
-            if mode == "hard":
-                if not self.t.in_raw_repl:
-                    self.t.enter_raw_repl(soft_reset=False)
-                    self._have_prompt = False
-                self._send(b"import machine\nmachine.reset()\n")
-            else:
-                if self.t.in_raw_repl:
-                    self.t.exit_raw_repl()           # ctrl-B: friendly REPL
-                    time.sleep(0.05)
-                if mode == "soft":
-                    self.t.serial.write(b"\x04")     # ctrl-D: soft reboot -> main.py
-                    time.sleep(0.2)
-        except Exception:
-            pass
+                    break       # port gone or badge not answering: nothing more to do
         finally:
             self.close()
+        if interrupted is not None:
+            raise interrupted
+
+    def _restart_sequence(self, mode):
+        if self._busy and self.t.in_raw_repl:
+            self._recover()
+        if self.mounted:
+            try:
+                if self.t.in_raw_repl:
+                    self._resync()
+                else:   # leaving `oreo dev`'s REPL: same as mpremote's disconnect
+                    self.t.enter_raw_repl(soft_reset=False)
+                    self._have_prompt = False
+                self.t.umount_local()
+            except Exception:
+                pass
+            self.mounted = False
+        if mode == "hard":
+            if not self.t.in_raw_repl:
+                self.t.enter_raw_repl(soft_reset=False)
+                self._have_prompt = False
+            self._busy = True    # a retry must end a half-sent paste first
+            self._send(b"import machine\nmachine.reset()\n")
+            self._busy = False
+            self._restart_sent = True
+        else:
+            if self.t.in_raw_repl:
+                self.t.exit_raw_repl()           # ctrl-B: friendly REPL
+                time.sleep(0.05)
+            if mode == "soft":
+                self.t.serial.write(b"\x04")     # ctrl-D: soft reboot -> main.py
+                self._restart_sent = True
+                time.sleep(0.2)
+            else:
+                self._restart_sent = True
 
     def _recover(self, quiet=0.15, limit=2.0):
         """Back to a clean raw REPL prompt after an exec was cut short (Ctrl-C

@@ -13,6 +13,8 @@ Exit status (documented in docs/CLI.md, "Exit status"):
     130  cancelled (Ctrl-C, or "no" at a confirmation)
 """
 
+import contextlib
+
 EXIT_OK = 0
 EXIT_ERROR = 1
 EXIT_USAGE = 2
@@ -69,6 +71,44 @@ class NoOreoOS(BadgeError):
 
 class Cancelled(OreoError):
     code = EXIT_CANCELLED
+
+
+def is_serial_error(e):
+    """pyserial's SerialException (an OSError), without importing pyserial
+    eagerly. Other OSErrors come from files on this computer."""
+    try:
+        from serial import SerialException
+    except ImportError:
+        return False
+    return isinstance(e, SerialException)
+
+
+def local_error_message(e, path=None):
+    """'<path>: <reason>' for an OSError about a file on this computer."""
+    where = getattr(e, "filename", None) or path
+    reason = getattr(e, "strerror", None) or str(e) or type(e).__name__
+    return "%s: %s" % (where, reason) if where else reason
+
+
+class LocalFileError(OreoError):
+    """A file or folder on this computer could not be read or written."""
+
+    def __init__(self, e, path=None):
+        super().__init__(local_error_message(e, path))
+
+
+@contextlib.contextmanager
+def local_file(path=None):
+    """Turn an OSError from reading or writing a file on this computer into
+    a clear message (exit 1) instead of a lost-badge report."""
+    try:
+        yield
+    except BrokenPipeError:
+        raise
+    except OSError as e:
+        if is_serial_error(e):
+            raise
+        raise LocalFileError(e, path)
 
 
 def redact(text, secrets):
