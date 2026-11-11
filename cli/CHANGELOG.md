@@ -10,6 +10,13 @@ from its `## [<version>]` section below, so every release needs one.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-11
+
+First stable release. Commands, options, output and exit codes are now
+stable: later 1.x releases add to them but do not change them. Like 0.1.0,
+it is tested against a simulated badge; the on-badge checks are listed in
+docs/CLI.md ("Testing on a badge").
+
 ### Added
 
 - A full-screen view: `oreo` with no command (and the new `oreo ui`)
@@ -27,60 +34,15 @@ from its `## [<version>]` section below, so every release needs one.
   plugged in and asks which one when there are several. OreoOS stays paused
   while the view is open and restarts when it closes, also on Ctrl-C and on
   errors. It reuses the commands' own code, so behaviour matches them.
-- `oreo menu`: the numbered menu. `oreo` falls back to it where the
-  full-screen view cannot run (no terminal, `TERM=dumb`, Textual missing)
-  or when `OREO_UI=menu` is set; `oreo ui` explains instead.
-- The badge's screen shows long operations: `push`, `pull`, `add`,
-  `app install`, `apps install`/`update` and `update` (and the same in the
-  view) call `oreoOS/hostui.py` (`show(title, detail, progress)`, `clear()`)
-  on OreoOS versions that have it. The calls ride along with execs the CLI
-  sends anyway, so a push costs no extra round trips; an OreoOS without it,
-  or a failure inside it, changes nothing.
-- Dependency: `textual >= 8.2, < 9` (imported only when the view opens).
-- `oreo setup --from-file FILE` takes the profile keys from an `.env`-style
-  file such as `.env.local` (other keys are left alone and only named), and
-  `--set KEY=VALUE` sets one key at a time by its `.env` name.
-- The title is `DISPLAY_DESIGNATION`, as in `.env.local`; `DESIGNATION` is
-  still accepted.
-- `oreo setup`: the owner profile (GitHub user, name, title, timezone,
-  weather place and OpenWeatherMap key) in `/profile.json` on the badge, the
-  file `oreoOS/profile.py` reads (docs/PROFILE.md). It shows the current
-  values and where they come from, prompts for each one (or takes them as
-  options), checks the ranges before touching the badge, never echoes or
-  prints the key (the badge only reports whether one is set), merges and
-  writes atomically through `/profile.json.tmp` (the backup the badge falls
-  back to), and restarts OreoOS.
-  `oreo setup --show` prints the profile with the key hidden;
-  `--owm-key-stdin` reads the key from standard input.
-- `oreo new <name>`: a new app folder from the app template, which now ships
-  inside oreo-cli, with the id, display name, author and icon module filled
-  in.
-- `oreo app install <folder>`: checks an app folder with the same rules as
-  `tools/validate_app.py` (vendored; a test keeps them identical), refuses
-  built-in apps without `--force`, copies only the files that belong on the
-  badge to `/apps/<id>/` with the verified push, removes files left from an
-  earlier install and restarts OreoOS. `oreo app list` and
-  `oreo app remove <id>` too.
-- Interactive view: **t** sends files to the Transfer app (the
+- `oreo menu`: the numbered menu (the interactive view of 0.1.0). `oreo`
+  falls back to it where the full-screen view cannot run (no terminal,
+  `TERM=dumb`, Textual missing) or when `OREO_UI=menu` is set; `oreo ui`
+  explains instead. New in it: **t** sends files to the Transfer app (the
   `oreo transfer send` flow), **p** edits the owner profile, **i** installs
-  an app from a folder.
-
-### Changed
-
-- `oreo dev` explains how live editing relates to OreoOS: the REPL imports
-  from `/remote`, modules are imported once, OreoOS does not run meanwhile,
-  and its drawer lists apps from `/apps`, so apps are tried with
-  `oreo app install`.
-
-## [1.0.0] - 2026-11-11
-
-First stable release. Commands, options, output and exit codes are now
-stable: later 1.x releases add to them but do not change them. Like 0.1.0,
-it is tested against a simulated badge; the on-badge checks are listed in
-docs/CLI.md ("Testing on a badge").
-
-### Added
-
+  an app from a folder and **u** updates OreoOS; the file view uploads a
+  file into the folder shown (`u <path>`) and asks before overwriting a
+  local file on download; Ctrl-C stops the current action and returns to
+  the menu.
 - `oreo transfer send <files>` (alias `oreo send`), `oreo transfer list` and
   `oreo transfer rm`: send files to the badge's new Transfer app over USB,
   authorised by the six-character code the badge shows. OreoOS keeps
@@ -96,18 +58,46 @@ docs/CLI.md ("Testing on a badge").
   beta channel. An update the badge already downloaded is offered for
   installing. Ctrl-C is held while files are moved into place.
   `--repo <checkout>` remains for developers.
+- `oreo setup`: the owner profile (GitHub user, name, title, timezone,
+  weather place and OpenWeatherMap key) in `/profile.json` on the badge, the
+  file `oreoOS/profile.py` reads (docs/PROFILE.md). It shows the current
+  values and where they come from, prompts for each one (or takes them as
+  options), checks the ranges before touching the badge, never echoes or
+  prints the key (the badge only reports whether one is set), merges and
+  writes atomically through `/profile.json.tmp` (the backup the badge falls
+  back to), and restarts OreoOS. `oreo setup --show` prints the profile
+  with the key hidden; `--owm-key-stdin` reads the key from standard input.
+  `--from-file FILE` takes the profile keys from an `.env`-style file such
+  as `.env.local` (other keys are left alone and only named), and
+  `--set KEY=VALUE` sets one key at a time by its `.env` name. The title is
+  `DISPLAY_DESIGNATION`, as in `.env.local`; `DESIGNATION` is still
+  accepted.
+- `oreo new <name>`: a new app folder from the app template, which now ships
+  inside oreo-cli, with the id, display name, author and icon module filled
+  in.
+- `oreo app install <folder>`: checks an app folder with the same rules as
+  `tools/validate_app.py` (vendored; a test keeps them identical), refuses
+  built-in apps without `--force`, copies only the files that belong on the
+  badge to `/apps/<id>/` with the verified push, removes files left from an
+  earlier install and restarts OreoOS. `oreo app list` and
+  `oreo app remove <id>` too.
+- The badge's screen shows long operations: `push`, `pull`, `add`,
+  `app install`, `apps install`/`update` and `update` (and the same in the
+  full-screen view) call `oreoOS/hostui.py` (`show(title, detail,
+  progress)`, `clear()`) on OreoOS versions that have it. The calls ride
+  along with execs the CLI sends anyway, so a push costs no extra round
+  trips; an OreoOS without it, or a failure inside it, changes nothing.
 - Exit status 4 (the badge could not be reached: port busy or missing, no
   answer, connection lost) and 5 (OreoOS missing on the badge, or too old
   for the command); usage errors such as a missing app or network name now
   exit with 2. All codes are listed in `oreo --help` and docs/CLI.md.
-- The interactive view: **u** updates OreoOS; the file view uploads a file
-  into the folder shown (`u <path>`) and asks before overwriting a local
-  file on download; Ctrl-C stops the current action and returns to the menu.
 - `oreo doctor` ends with numbered next steps (failures first), checks for
   ffmpeg, and says when the badge answers but has no OreoOS.
 - `oreo logs` keeps following across a badge restart or replug, and decodes
   the console as UTF-8 for any terminal.
 - `oreo-cli` is installed as a second name for the `oreo` command.
+- Dependency: `textual >= 8.2, < 9` (imported only when the full-screen
+  view opens).
 
 ### Changed
 
@@ -121,6 +111,10 @@ docs/CLI.md ("Testing on a badge").
   execs instead of 6; 40 small files go from 240 execs to 81. Chunks are
   8 KiB instead of 4 KiB. Measurements and the model are in docs/CLI.md
   ("Transfer speed").
+- `oreo dev` explains how live editing relates to OreoOS: the REPL imports
+  from `/remote`, modules are imported once, OreoOS does not run meanwhile,
+  and its drawer lists apps from `/apps`, so apps are tried with
+  `oreo app install`.
 - `oreo wifi connect` checks the network name (1 to 32 bytes) and the
   password (8 to 63 characters, or 64 hex digits) before touching the badge,
   and refuses an empty `--password-stdin`.
@@ -218,4 +212,4 @@ problems with `oreo doctor` output attached.
 
 [Unreleased]: https://github.com/elixpo/oreo/compare/cli-v1.0.0...HEAD
 [1.0.0]: https://github.com/elixpo/oreo/releases/tag/cli-v1.0.0
-[0.1.0]: https://github.com/elixpo/oreo/releases/tag/cli-v0.1.0
+[0.1.0]: https://github.com/elixpo/oreo/pull/117

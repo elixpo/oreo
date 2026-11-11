@@ -47,7 +47,10 @@ MicroPython 1.28), `Pillow`, `textual` 8.x (the full-screen view). Videos
 also need `ffmpeg` on your PATH.
 
 Full guide (every command, Wi-Fi setup, troubleshooting):
-[docs/CLI.md](https://github.com/elixpo/oreo/blob/main/docs/CLI.md).
+[oreo.elixpo.com/docs/cli](https://oreo.elixpo.com/docs/cli/) (the same
+text as [docs/CLI.md](https://github.com/elixpo/oreo/blob/main/docs/CLI.md)).
+Connecting the badge: [/docs/usb](https://oreo.elixpo.com/docs/usb/);
+the Transfer app: [/docs/transfer](https://oreo.elixpo.com/docs/transfer/).
 Changes: [CHANGELOG.md](https://github.com/elixpo/oreo/blob/main/cli/CHANGELOG.md).
 
 On Linux, opening the port needs the `dialout` group (`uucp` on Arch):
@@ -145,4 +148,4 @@ Set `__version__` in `oreo_cli/__init__.py`, add a `## [<version>]` section
 to `CHANGELOG.md`, merge, then push a `cli-v<version>` tag. The
 `cli-release` workflow tests, builds, checksums, attests and publishes the
 release; it never touches the OreoOS (`stable/`, `beta/`) releases. Details
-in [docs/CLI.md](https://github.com/elixpo/oreo/blob/main/docs/CLI.md#releasing).
+in [docs/CLI.md](https://oreo.elixpo.com/docs/cli/#releasing).

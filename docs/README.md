@@ -7,6 +7,12 @@ Everything in this folder is here for one of three audiences:
 - **People who want to copy the design** → start with [`DATASHEET.md`](DATASHEET.md)
 - **People who want to read the dev journal** → the per-subsystem `.md` files (lcd, buttons, breadboard BOM, badge layout)
 
+`CLI.md`, `USB.md` and `TRANSFER.md` are also published on the website,
+rendered from these files when the site is built:
+[oreo.elixpo.com/docs/cli](https://oreo.elixpo.com/docs/cli/),
+[/docs/usb](https://oreo.elixpo.com/docs/usb/) and
+[/docs/transfer](https://oreo.elixpo.com/docs/transfer/). Edit them here.
+
 If you're writing an app, start with [`APPS.md`](APPS.md). For the OS
 itself, see the root [`CONTRIBUTING.md`](../CONTRIBUTING.md) and
 [`AGENTS.md`](../AGENTS.md).
@@ -17,7 +23,7 @@ itself, see the root [`CONTRIBUTING.md`](../CONTRIBUTING.md) and
 
 | File | What it covers | Audience |
 |---|---|---|
-| [`USB.md`](USB.md) | Using the badge from a computer: which USB-C port, REPL, copying files, Send Files over Wi-Fi, deploying, flashing, troubleshooting | Everyone with a badge |
+| [`USB.md`](USB.md) | Using the badge from a computer: which USB-C port, ports and permissions, the oreo CLI, raw `mpremote`, deploying, flashing, troubleshooting | Everyone with a badge |
 | [`HARDWARE.md`](HARDWARE.md) | Narrative build guide — BOM, pinout, power, wake-from-sleep, soldering tips | Anyone building or repairing the badge |
 | [`DATASHEET.md`](DATASHEET.md) | Formal specs — electrical, mechanical, communication interfaces, component reference | Someone designing a PCB or porting OreoOS |
 | [`BADGE_LAYOUT.md`](BADGE_LAYOUT.md) | Mechanical layout drawings + dimensions | PCB designers, case-makers |
@@ -30,6 +36,7 @@ itself, see the root [`CONTRIBUTING.md`](../CONTRIBUTING.md) and
 | [`APPS.md`](APPS.md) | Writing an app: layout, lifecycle, input, drawing, saving state, network, validation, PR checklist | App developers |
 | [`PROFILE.md`](PROFILE.md) | Setting the owner's GitHub user, name, timezone and weather location (`/profile.json`, `.env.local`) | Badge owners, app developers |
 | [`CLI.md`](CLI.md) | The `oreo` command-line tool: talking to the badge over USB | Badge owners, app developers |
+| [`TRANSFER.md`](TRANSFER.md) | The Transfer app: sending photos, videos and documents over USB with the code the badge shows, and its protocol | Badge owners, contributors |
 | [`OS_ROADMAP.md`](OS_ROADMAP.md) | What the OS does today and what is planned | Contributors |
 | [`MEDIA_INGESTION.md`](MEDIA_INGESTION.md) | Turning photos and videos into Gallery assets | Anyone adding media |
 | [`BLUETOOTH.md`](BLUETOOTH.md) | The BLE transfer service (Bluetooth is the last feature on the roadmap, #124) | Contributors |

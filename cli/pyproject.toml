@@ -57,7 +57,7 @@ oreo-cli = "oreo_cli.main:main"
 Homepage      = "https://oreo.elixpo.com"
 Repository    = "https://github.com/elixpo/oreo"
 Issues        = "https://github.com/elixpo/oreo/issues"
-Documentation = "https://github.com/elixpo/oreo/blob/main/docs/CLI.md"
+Documentation = "https://oreo.elixpo.com/docs/cli/"
 Changelog     = "https://github.com/elixpo/oreo/blob/main/cli/CHANGELOG.md"
 
 [tool.setuptools]

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, BookOpen, Boxes, Code2, FileText } from "lucide-react";
+import { ArrowRight, BookOpen, Boxes, Code2, FileText, Send, Terminal, Usb } from "lucide-react";
 import { pageMetadata } from "@/lib/seo";
 
 export const metadata = pageMetadata({
@@ -10,6 +10,27 @@ export const metadata = pageMetadata({
 });
 
 const docs = [
+  {
+    href: "/docs/cli/",
+    title: "The oreo CLI",
+    description: "Install oreo-cli, then control the badge over USB: the full-screen view, Transfer, files, apps, Wi-Fi, profile setup, updates and troubleshooting.",
+    icon: Terminal,
+    accent: "text-primary",
+  },
+  {
+    href: "/docs/usb/",
+    title: "Connecting the badge",
+    description: "Which USB-C port, port names, Linux permissions, the CLI first, and raw mpremote for advanced use.",
+    icon: Usb,
+    accent: "text-gold",
+  },
+  {
+    href: "/docs/transfer/",
+    title: "The Transfer app",
+    description: "Send photos, videos and documents with the code the badge shows; the safety checks and the protocol.",
+    icon: Send,
+    accent: "text-teal",
+  },
   {
     href: "/docs/apps/",
     title: "Writing OreoOS apps",

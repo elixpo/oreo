@@ -155,4 +155,4 @@ fi
 echo
 echo "  Plug in the badge and run:  oreo"
 echo "  Check the setup:            oreo doctor"
-echo "  Docs: https://github.com/${repository}/blob/main/docs/CLI.md"
+echo "  Docs: https://oreo.elixpo.com/docs/cli/"

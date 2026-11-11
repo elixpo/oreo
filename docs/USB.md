@@ -58,7 +58,7 @@ native USB port.
 4. **Use it:**
 
    ```sh
-   oreo                              # status and an interactive menu
+   oreo                              # the full-screen Oreo view
    oreo wifi connect "Home Net"      # put the badge online (password asked without echo)
    oreo update                       # newest OreoOS
    ```
