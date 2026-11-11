@@ -34,7 +34,11 @@ Hi-score persists in /state/racer.json (oreoOS.state).
 import time
 
 import oreoOS
-from oreoOS import api, state
+from oreoOS import api
+try:
+    from oreoOS import state
+except ImportError:   # OS before the /state helper: keep the old file save
+    state = None
 
 from .spawn import Rng, choose_x
 
@@ -102,12 +106,33 @@ LEGACY_HI_PATH = "apps/racer/hi.txt"   # pre-/state save, migrated once
 
 
 def _load_hi():
+    if state is None:
+        return _legacy_read_int(LEGACY_HI_PATH)
     return int(state.load_migrating("racer", {"hi": 0},
                                     LEGACY_HI_PATH, ("hi",))["hi"])
 
 
 def _save_hi(v):
+    if state is None:
+        _legacy_write(LEGACY_HI_PATH, str(int(v)))
+        return
     state.save("racer", {"hi": int(v)})
+
+
+def _legacy_read_int(p):
+    try:
+        with open(p) as f:
+            return int(f.read().strip() or "0")
+    except Exception:
+        return 0
+
+
+def _legacy_write(p, text):
+    try:
+        with open(p, "w") as f:
+            f.write(text)
+    except Exception:
+        pass
 
 
 def _try_sprite(name):

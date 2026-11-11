@@ -19,7 +19,11 @@ High score persists in /state/patakha.json (oreoOS.state).
 import time
 
 import oreoOS
-from oreoOS import api, state, theme
+from oreoOS import api, theme
+try:
+    from oreoOS import state
+except ImportError:   # OS before the /state helper: keep the old file save
+    state = None
 
 from . import game as g
 from . import render as r
@@ -35,12 +39,33 @@ TILT_FULL_DEG = 15.0
 
 
 def _load_hi():
+    if state is None:
+        return _legacy_read_int(LEGACY_HI_PATH)
     return int(state.load_migrating("patakha", {"hi": 0},
                                     LEGACY_HI_PATH, ("hi",))["hi"])
 
 
 def _save_hi(v):
+    if state is None:
+        _legacy_write(LEGACY_HI_PATH, str(int(v)))
+        return
     state.save("patakha", {"hi": int(v)})
+
+
+def _legacy_read_int(p):
+    try:
+        with open(p) as f:
+            return int(f.read().strip() or "0")
+    except Exception:
+        return 0
+
+
+def _legacy_write(p, text):
+    try:
+        with open(p, "w") as f:
+            f.write(text)
+    except Exception:
+        pass
 
 
 class App(oreoOS.App):

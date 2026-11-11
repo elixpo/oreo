@@ -2,8 +2,22 @@
 
 Badge, Identity, Commits, Weather and the clock show the owner's details:
 GitHub user, name, title, timezone and weather location. Nothing is set
-by default, so a new badge shows a setup hint instead of someone else's
-profile.
+by default. Until you set `GITHUB_USER`, Badge, Commits and Identity show
+a setup hint instead of someone else's profile, and nothing is fetched.
+Weather shows its setup card until it has a location and a key, and the
+clock runs on UTC until `TIMEZONE_OFFSET` is set.
+
+## Upgrading from stable/v2.0.5 or older
+
+Older builds had the maintainer's GitHub user, name, weather location
+and timezone (`+5.5`) hardcoded in `oreoOS/config.py`. They now come
+only from `.env.local` or `/profile.json`. If your `.env.local` does not
+set them, the next deploy writes them blank: Identity loses your name,
+Weather loses its location and the clock drops to UTC. Before you
+deploy, add `GITHUB_USER`, `DISPLAY_NAME`, `DESIGNATION`,
+`TIMEZONE_OFFSET`, `WEATHER_LAT` and `WEATHER_LON` to `.env.local`, or
+put them in `/profile.json` on the badge. `tools/deploy.py` prints one
+note listing every key that is still blank.
 
 ## The keys
 

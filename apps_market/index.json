@@ -12,7 +12,7 @@
       "author": "Circuit-Overtime",
       "version": "0.2",
       "icon": "patakha_icon.png",
-      "size": 51817,
+      "size": 52377,
       "files": [
         ["__init__.py", 0],
         ["assets/__init__.py", 0],
@@ -21,7 +21,7 @@
         ["main.py", 243],
         ["manifest.json", 224],
         ["src/__init__.py", 0],
-        ["src/app.py", 11394],
+        ["src/app.py", 11954],
         ["src/game.py", 18691],
         ["src/render.py", 12458]
       ]
@@ -36,7 +36,7 @@
       "author": "Circuit-Overtime",
       "version": "0.2",
       "icon": "racer_icon.png",
-      "size": 133031,
+      "size": 133591,
       "files": [
         ["__init__.py", 0],
         ["assets/__init__.py", 0],
@@ -50,7 +50,7 @@
         ["main.py", 241],
         ["manifest.json", 172],
         ["src/__init__.py", 0],
-        ["src/app.py", 24836],
+        ["src/app.py", 25396],
         ["src/spawn.py", 2716]
       ]
     },
@@ -64,7 +64,7 @@
       "author": "Circuit-Overtime",
       "version": "0.2",
       "icon": "flappy_icon.png",
-      "size": 164337,
+      "size": 164907,
       "files": [
         ["__init__.py", 0],
         ["assets/__init__.py", 0],
@@ -82,7 +82,7 @@
         ["main.py", 242],
         ["manifest.json", 186],
         ["src/__init__.py", 0],
-        ["src/app.py", 23343]
+        ["src/app.py", 23913]
       ]
     },
     {
@@ -95,7 +95,7 @@
       "author": "Circuit-Overtime",
       "version": "0.2",
       "icon": "snake_icon.png",
-      "size": 31129,
+      "size": 31586,
       "files": [
         ["__init__.py", 0],
         ["assets/__init__.py", 0],
@@ -107,7 +107,7 @@
         ["src/__init__.py", 0],
         ["src/app.py", 6097],
         ["src/game.py", 3291],
-        ["src/highscore.py", 766],
+        ["src/highscore.py", 1223],
         ["src/render.py", 5460]
       ]
     },
@@ -121,7 +121,7 @@
       "author": "Circuit-Overtime",
       "version": "0.2",
       "icon": "elixpo_pet_icon.png",
-      "size": 199297,
+      "size": 199791,
       "files": [
         ["__init__.py", 0],
         ["assets/__init__.py", 0],
@@ -136,7 +136,7 @@
         ["main.py", 244],
         ["manifest.json", 205],
         ["src/__init__.py", 0],
-        ["src/app.py", 13167]
+        ["src/app.py", 13661]
       ]
     },
     {
@@ -190,7 +190,7 @@
       "author": "Circuit-Overtime",
       "version": "0.2",
       "icon": "wallpaper_icon.png",
-      "size": 324210,
+      "size": 324881,
       "files": [
         ["__init__.py", 0],
         ["assets/__init__.py", 0],
@@ -204,7 +204,7 @@
         ["main.py", 243],
         ["manifest.json", 186],
         ["src/__init__.py", 0],
-        ["src/app.py", 10363]
+        ["src/app.py", 11034]
       ]
     },
     {
@@ -217,7 +217,7 @@
       "author": "Circuit-Overtime",
       "version": "0.3",
       "icon": "color_icon.png",
-      "size": 57822,
+      "size": 58360,
       "files": [
         ["__init__.py", 0],
         ["assets/__init__.py", 0],
@@ -227,7 +227,7 @@
         ["main.py", 242],
         ["manifest.json", 250],
         ["src/__init__.py", 0],
-        ["src/app.py", 15100]
+        ["src/app.py", 15638]
       ]
     },
     {

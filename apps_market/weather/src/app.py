@@ -113,23 +113,46 @@ def _fetch_owm(lat, lon, api_key):
         return None
 
 
+def _owner_location():
+    """(lat, lon, key) for the owner. With no location the key is "" and
+    the setup card explains what to set.
+
+    Reads /profile.json then secrets.py through oreoOS.profile. An OS
+    built before oreoOS.profile existed falls back to reading secrets.py
+    directly, so an App Store update never loses a location that worked.
+    """
+    try:
+        from oreoOS import profile
+    except ImportError:
+        profile = None
+    lat = lon = None
+    key = ""
+    try:
+        if profile is not None:
+            lat = profile.get("WEATHER_LAT")
+            lon = profile.get("WEATHER_LON")
+            key = profile.get("OWM_API_KEY", "") or ""
+        else:
+            import secrets
+            lat = getattr(secrets, "WEATHER_LAT", None)
+            lon = getattr(secrets, "WEATHER_LON", None)
+            key = getattr(secrets, "OWM_API_KEY", "") or ""
+            lat = None if lat is None else float(lat)
+            lon = None if lon is None else float(lon)
+    except Exception:
+        lat = lon = None
+    if lat is None or lon is None:
+        return None, None, ""
+    return lat, lon, key
+
+
 class App(oreoOS.App):
     name         = "Weather"
     SHOW_LOADING = True
 
     def on_enter(self, os):
         self._os = os
-        # Owner's location and key from /profile.json or secrets.py. With
-        # no location there is nothing to fetch: the setup card explains.
-        try:
-            from oreoOS import profile
-            self._lat = profile.get("WEATHER_LAT")
-            self._lon = profile.get("WEATHER_LON")
-            self._key = profile.get("OWM_API_KEY", "")
-        except Exception:
-            self._lat, self._lon, self._key = None, None, ""
-        if self._lat is None or self._lon is None:
-            self._key = ""
+        self._lat, self._lon, self._key = _owner_location()
 
         play_h = SH - widgets.HEADER_H - widgets.HINT_H
 

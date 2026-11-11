@@ -16,7 +16,11 @@ Controls:
 
 import time
 import oreoOS
-from oreoOS import api, state
+from oreoOS import api
+try:
+    from oreoOS import state
+except ImportError:   # OS before the /state helper: keep the old file save
+    state = None
 from oreoOS import theme, widgets
 
 SW = api.SCREEN_W
@@ -45,14 +49,25 @@ def _load_state():
     outside apps/pet/, so it survives reboots, App Store updates and an
     uninstall/reinstall.
     """
-    s = state.load_migrating("pet", {"hunger": 100, "happy": 100, "health": 100},
-                             LEGACY_STATE_PATH, ("hunger", "happy", "health"))
     try:
+        if state is None:
+            with open(LEGACY_STATE_PATH) as f:
+                a, b, c = f.read().strip().split(",")
+            return (int(a), int(b), int(c))
+        s = state.load_migrating("pet", {"hunger": 100, "happy": 100, "health": 100},
+                                 LEGACY_STATE_PATH, ("hunger", "happy", "health"))
         return (int(s["hunger"]), int(s["happy"]), int(s["health"]))
     except Exception:
         return (100, 100, 100)
 
 def _save_state(h, hp, hl):
+    if state is None:
+        try:
+            with open(LEGACY_STATE_PATH, "w") as f:
+                f.write("%d,%d,%d" % (h, hp, hl))
+        except Exception:
+            pass
+        return
     state.save("pet", {"hunger": int(h), "happy": int(hp), "health": int(hl)})
 
 def _clamp(v):

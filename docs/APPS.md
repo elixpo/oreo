@@ -208,6 +208,11 @@ def on_exit(self):
   `save()` returns False instead of raising (for example, flash full).
 - Save on exit or at a checkpoint, not every frame: flash writes are slow.
 - Values go through JSON, so tuples come back as lists.
+- App Store apps: the Store serves the newest version to every badge and
+  does not check the OS version, and badges on stable/v2.0.5 or older
+  have no `oreoOS.state` or `oreoOS.profile`. Import them inside
+  `try: ... except ImportError:` and keep a fallback (Racer, Snake and
+  Weather show how), so an update cannot break the app on an older OS.
 
 For small OS-wide preferences, `os.settings_get(key, default)` and
 `os.settings_set(key, value)` persist too (in `/state/os.json`). Keys

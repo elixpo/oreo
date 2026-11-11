@@ -23,7 +23,11 @@ artefacts). The HSL / CMYK readouts are derived on the fly from RGB.
 """
 
 import oreoOS
-from oreoOS import api, state, theme, widgets
+from oreoOS import api, theme, widgets
+try:
+    from oreoOS import state
+except ImportError:   # OS before the /state helper: keep the old file save
+    state = None
 
 
 SW = api.SCREEN_W                    # 320
@@ -156,14 +160,26 @@ def _try_load_spectrum():
 # ── persistence ─────────────────────────────────────────────────────────────
 
 def _save_rgb(rgb):
+    if state is None:
+        try:
+            with open(LEGACY_STATE_PATH, "w") as f:
+                f.write("%d,%d,%d" % tuple(int(c) for c in rgb))
+        except Exception:
+            pass
+        return
     state.save("color_picker", {"r": int(rgb[0]), "g": int(rgb[1]),
                                 "b": int(rgb[2])})
 
 
 def _load_rgb():
     try:
-        s = state.load_migrating("color_picker", {"r": 255, "g": 93, "b": 104},
-                                 LEGACY_STATE_PATH, ("r", "g", "b"))
+        if state is None:
+            with open(LEGACY_STATE_PATH) as f:
+                r, g, b = (int(x) for x in f.read().strip().split(","))
+            s = {"r": r, "g": g, "b": b}
+        else:
+            s = state.load_migrating("color_picker", {"r": 255, "g": 93, "b": 104},
+                                     LEGACY_STATE_PATH, ("r", "g", "b"))
         r, g, b = int(s["r"]), int(s["g"]), int(s["b"])
         return (max(0, min(255, r)),
                 max(0, min(255, g)),

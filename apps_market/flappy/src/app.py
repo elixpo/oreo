@@ -16,7 +16,11 @@ Controls: A or UP = flap.
 """
 
 import oreoOS
-from oreoOS import api, font, state
+from oreoOS import api, font
+try:
+    from oreoOS import state
+except ImportError:   # OS before the /state helper: keep the old file save
+    state = None
 
 SW = api.SCREEN_W   # 320
 SH = api.SCREEN_H   # 240
@@ -60,11 +64,32 @@ C_HI       = api.rgb(255, 230,  80)
 LEGACY_HISCORE_PATH = "apps/flappy/hiscore.txt"   # pre-/state save
 
 def _load_hiscore():
+    if state is None:
+        return _legacy_read_int(LEGACY_HISCORE_PATH)
     return int(state.load_migrating("flappy", {"hi": 0},
                                     LEGACY_HISCORE_PATH, ("hi",))["hi"])
 
 def _save_hiscore(v):
+    if state is None:
+        _legacy_write(LEGACY_HISCORE_PATH, str(int(v)))
+        return
     state.save("flappy", {"hi": int(v)})
+
+
+def _legacy_read_int(p):
+    try:
+        with open(p) as f:
+            return int(f.read().strip() or "0")
+    except Exception:
+        return 0
+
+
+def _legacy_write(p, text):
+    try:
+        with open(p, "w") as f:
+            f.write(text)
+    except Exception:
+        pass
 
 # ── asset loaders ────────────────────────────────────────────────────────────
 
