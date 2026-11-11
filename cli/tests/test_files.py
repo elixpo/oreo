@@ -3,6 +3,7 @@
 import os
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 from fake import FakeTransport
@@ -54,8 +55,41 @@ class TransferTest(unittest.TestCase):
         self.assertEqual(self.fake.get("/documents/blob.bin"), data)
         self.assertFalse(self.fake.exists("/documents/blob.bin.part"))
         self.assertEqual(seen, [4096, 8192, 10000])
-        self.assertEqual(sum(1 for c in self.fake.sent if c.startswith("_w(_d(")), 3)
+        self.assertEqual(sum(c.count("_w(_d(") for c in self.fake.sent), 3)
+        # first chunk rides with the open, the last with the check-and-rename
+        self.assertEqual(sum(1 for c in self.fake.sent if c.startswith("_w(_d(")), 1)
         self.assertTrue(any("hashlib.sha256" in c for c in self.fake.sent))
+
+    def test_small_file_costs_two_execs_after_the_space_check(self):
+        self.badge.write_file(b"hello", "/hello.txt", check_space=False)
+        self.assertEqual(len(self.fake.sent), 2)
+        self.assertEqual(self.fake.get("/hello.txt"), b"hello")
+
+    def test_folder_is_created_once_per_session(self):
+        self.badge.write_file(b"a", "/d/e/a.txt", check_space=False)
+        before = len(self.fake.sent)
+        self.badge.write_file(b"b", "/d/e/b.txt", check_space=False)
+        self.assertEqual(len(self.fake.sent) - before, 2)
+
+    def test_bad_copy_never_replaces_the_old_file(self):
+        self.fake.put("/documents/keep.txt", b"old")
+        real = self.badge.result
+
+        def corrupt(code, **kw):   # the badge hashes something else than was sent
+            return real(code.replace("_r['sha']==", "_r['sha']+'x'=="), **kw)
+        self.badge.result = corrupt
+        with self.assertRaises(OreoError) as cm:
+            self.badge.write_file(b"new!", "/documents/keep.txt")
+        self.assertIn("checksum", cm.exception.message)
+        self.assertEqual(self.fake.get("/documents/keep.txt"), b"old")
+        self.assertFalse(self.fake.exists("/documents/keep.txt.part"))
+
+    def test_windows_rewritten_paths_are_refused(self):
+        from oreo_cli.errors import UsageError
+        with self.assertRaises(UsageError) as cm:
+            norm("C:/Program Files/Git/documents/")
+        self.assertIn(":documents", cm.exception.hint)
+        self.assertEqual(norm("\\documents\\a.txt"), "/documents/a.txt")
 
     def test_write_creates_folders_and_overwrites(self):
         self.badge.write_file(b"one", "/a/b/c.txt")
@@ -163,6 +197,39 @@ class FileCommandsTest(unittest.TestCase):
         r = run_cli(["pull", "-r", "/documents", str(self.dir / "backup")], fake=self.fake)
         self.assertEqual(r.rc, 0, r.out)
         self.assertEqual((self.dir / "backup" / "sub" / "b.txt").read_bytes(), b"BBB")
+
+    @unittest.skipIf(hasattr(os, "geteuid") and os.geteuid() == 0, "root reads anything")
+    def test_push_unreadable_source_is_a_local_error(self):
+        f = self.dir / "secret.txt"
+        f.write_text("x")
+        f.chmod(0)
+        self.addCleanup(f.chmod, 0o600)
+        r = run_cli(["push", str(f), "/documents/"], fake=self.fake)
+        self.assertEqual(r.rc, 1, r.out)
+        self.assertIn("permission denied", r.out)
+        self.assertNotIn("lost the connection", r.out)
+        self.assertEqual(r.links, [])            # refused before the badge was touched
+
+    def test_push_read_failure_is_a_local_error(self):
+        f = self.dir / "notes.txt"
+        f.write_text("x")
+        with mock.patch.object(Path, "read_bytes", side_effect=OSError(5, "Input/output error", str(f))):
+            r = run_cli(["push", str(f), "/documents/"], fake=self.fake)
+        self.assertEqual(r.rc, 1, r.out)
+        self.assertIn("notes.txt: Input/output error", r.out)
+        self.assertNotIn("lost the connection", r.out)
+
+    def test_pull_unwritable_destination_is_a_local_error(self):
+        self.fake.put("/documents/a.txt", b"AAA")
+        blocker = self.dir / "file"
+        blocker.write_text("x")             # a file where a folder is needed
+        r = run_cli(["pull", "/documents/a.txt", str(blocker / "sub" / "a.txt")], fake=self.fake)
+        self.assertEqual(r.rc, 1, r.out)
+        self.assertIn(str(blocker), r.out)
+        self.assertNotIn("lost the connection", r.out)
+        r = run_cli(["pull", "/documents/a.txt", str(blocker / "dir") + "/"], fake=self.fake)
+        self.assertEqual(r.rc, 1, r.out)
+        self.assertNotIn("lost the connection", r.out)
 
     def test_rm_guards(self):
         r = run_cli(["rm", "/oreoOS/config.py"], fake=self.fake)

@@ -9,14 +9,18 @@ The code lives in [`cli/`](../cli) (Python package `oreo-cli`, command
 `oreo`). It is released separately from OreoOS, with tags `cli-v<version>`;
 see [cli/CHANGELOG.md](../cli/CHANGELOG.md).
 
-> **Status: 0.1.0, first release.** Every command is covered by host tests
-> against a simulated badge, but the CLI has not yet been run against a real
-> badge. If something misbehaves, run `oreo doctor` and attach its output to
-> an issue.
+> **Status: 1.0.0, stable.** Commands, options, output and exit codes are
+> stable: later 1.x releases add to them but do not change them. Every
+> command is covered by host tests against a simulated badge, and the
+> on-badge checks are listed in [Testing on a badge](#testing-on-a-badge).
+> If something misbehaves, run `oreo doctor` and attach its output to an
+> issue.
 
 Contents: [Install](#install) · [First run](#first-run) ·
 [Commands](#commands) · [Wi-Fi setup](#wi-fi-setup) ·
-[Troubleshooting](#troubleshooting) · [Releasing](#releasing)
+[Exit status](#exit-status) · [Transfer speed](#transfer-speed) ·
+[Troubleshooting](#troubleshooting) · [Testing on a badge](#testing-on-a-badge) ·
+[Releasing](#releasing)
 
 ## Install
 
@@ -45,7 +49,7 @@ Run the same command again to upgrade: it replaces the installed version.
 
 | Variable | Meaning |
 |---|---|
-| `OREO_CLI_VERSION` | Release to install: `latest` (default), or `cli-v0.1.0`, `v0.1.0`, `0.1.0` |
+| `OREO_CLI_VERSION` | Release to install: `latest` (default), or `cli-v1.0.0`, `v1.0.0`, `1.0.0` |
 | `OREO_CLI_INSTALLER` | `pipx` or `uv` (default: pipx if present, else uv) |
 | `OREO_CLI_REPOSITORY` | GitHub repository to install from (default `elixpo/oreo`) |
 | `OREO_CLI_DOWNLOAD_BASE` | Fetch the wheel from this URL instead of the release (testing; needs a pinned version) |
@@ -55,11 +59,11 @@ Pin a version:
 ```sh
 curl --proto '=https' --tlsv1.2 -LsSf \
   https://raw.githubusercontent.com/elixpo/oreo/main/cli/install.sh |
-  OREO_CLI_VERSION=cli-v0.1.0 sh
+  OREO_CLI_VERSION=cli-v1.0.0 sh
 ```
 
 ```powershell
-$env:OREO_CLI_VERSION = "cli-v0.1.0"
+$env:OREO_CLI_VERSION = "cli-v1.0.0"
 irm https://raw.githubusercontent.com/elixpo/oreo/main/cli/install.ps1 | iex
 ```
 
@@ -80,7 +84,7 @@ Every release has fixed asset names:
 | `SHA256SUMS` | Both checksums in one file |
 
 ```sh
-V=0.1.0
+V=1.0.0
 curl -LO https://github.com/elixpo/oreo/releases/download/cli-v$V/oreo_cli-$V-py3-none-any.whl
 curl -LO https://github.com/elixpo/oreo/releases/download/cli-v$V/SHA256SUMS
 sha256sum --check --ignore-missing SHA256SUMS      # macOS: shasum -a 256 -c --ignore-missing
@@ -126,6 +130,9 @@ sudo usermod -aG dialout "$USER"     # then log out and back in
 pipx uninstall oreo-cli      # or: uv tool uninstall oreo-cli
 ```
 
+The package is `oreo-cli`; it installs the command as both `oreo` and
+`oreo-cli`.
+
 Nothing else is stored on the computer.
 
 ## First run
@@ -141,7 +148,9 @@ Nothing else is stored on the computer.
 
    `oreo` with no command shows the badge's status and a menu: **1** status,
    **2** files, **3** apps, **4** Wi-Fi, **5** add a photo, video or
-   document, **s** shell, **q** quit. OreoOS stays paused while the menu is
+   document, **u** update OreoOS, **s** shell, **q** quit. In the file
+   view, `u <path>` uploads a file from the computer into the folder shown.
+   Ctrl-C stops the current action and returns to the menu. OreoOS stays paused while the menu is
    open and starts again when you quit. Without a terminal (for example in a
    script), `oreo` prints the status and exits.
 3. If no badge is found, run `oreo doctor`.
@@ -173,8 +182,7 @@ Put these before the command, e.g. `oreo --port /dev/ttyACM1 info`.
 | `-v`, `--verbose` | Show the badge's log lines and full tracebacks |
 | `--version` | Print the CLI version |
 
-Exit status: `0` success, `1` error, `2` usage error, `3` no badge (or more
-than one) found, `130` cancelled.
+Exit status: see [Exit status](#exit-status).
 
 ## Commands
 
@@ -307,22 +315,63 @@ oreo logs              # follow what OreoOS prints; Ctrl-C to stop
 oreo logs --restart    # restart OreoOS first, to see the boot log
 ```
 
-`logs` does not stop OreoOS.
+`logs` does not stop OreoOS. It keeps following when the badge restarts or
+is unplugged and plugged back in (even under a new port name).
 
-### `oreo update` / `oreo flash` — OreoOS and firmware
+### `oreo update` — update OreoOS
+
+```sh
+oreo update                    # newest stable release
+oreo update --check            # only say whether there is a newer one
+oreo update --channel beta     # newest beta release
+```
+
+The badge updates itself, the same way its **Settings > Updates** page
+does (`oreoOS/ota.py`), and `oreo` steers it and shows what happens:
+
+1. reads the OreoOS version on the badge;
+2. brings up the badge's Wi-Fi from its saved networks (set one up first,
+   see [Wi-Fi setup](#wi-fi-setup));
+3. asks GitHub, from the badge, for the newest release on the channel;
+4. compares the badge's files with the release and shows how many change
+   and how much will be downloaded;
+5. asks, checks the free space, and has the badge download the changed
+   files into `/_ota`, checking each one's SHA-256;
+6. moves them into place, as the badge does when it boots with an update
+   waiting;
+7. restarts the badge, waits for it to come back on USB (it may come back
+   under another port name) and reports the version it booted.
+
+Apps, photos, documents and saved Wi-Fi are kept. Ctrl-C works until step
+6; during step 6 it is held until the files are in place. If the badge
+loses power during step 6, it finishes the update when it next starts. If
+the badge has already downloaded an update by itself, `oreo update` offers
+to install that one.
+
+Without a terminal, `oreo update` answers "no" unless you pass `--yes`.
+The badge asks GitHub without a token, which allows 60 requests an hour per
+network.
+
+**Developers:** `--repo` deploys from an OreoOS checkout instead of a
+release:
 
 ```sh
 oreo update --repo ~/src/oreo            # ./deploy --board from that checkout
 oreo update --repo ~/src/oreo --clean    # wipe the badge's files first (asks)
+```
+
+With `--repo`, `update` also takes `--force` (upload every file),
+`--no-bump` (keep the OreoOS version) and `--override APPS` (replace these
+app folders).
+
+### `oreo flash` — firmware
+
+```sh
 oreo flash  --repo ~/src/oreo            # erase, write firmware, install OreoOS (asks)
 oreo flash  --repo ~/src/oreo --build    # run ./build-firmware first
 ```
 
-Both need an OreoOS checkout for now. `update` also takes `--force` (upload
-every file), `--no-bump` (keep the OreoOS version) and `--override APPS`
-(replace these app folders). Updating from GitHub releases without a
-checkout is planned; the badge itself can also update over Wi-Fi from its
-Updates page.
+Needs an OreoOS checkout. Erasing always asks first.
 
 ### `oreo doctor` — diagnose the connection
 
@@ -330,9 +379,12 @@ Updates page.
 oreo doctor
 ```
 
-Checks pyserial and mpremote, looks for the badge's USB ID and explains
-other IDs it finds, checks Linux `dialout` / `uucp` membership, and reads
-the firmware banner and the OreoOS version. Each problem comes with a hint.
+Checks the computer first (Python, pyserial, mpremote, ffmpeg), then looks
+for the badge's USB ID and explains other IDs it finds, checks Linux
+`dialout` / `uucp` membership, and only then opens the port to read the
+firmware and OreoOS versions. It ends with numbered **next steps**,
+failures first. Exit status `0` when nothing failed (warnings are fine),
+`1` otherwise.
 
 ### `oreo help`
 
@@ -382,6 +434,52 @@ Networks written into the deploy-time `.env` file come back at the next
 boot even after `forget`; `oreo` warns about that. Remove them from `.env`
 and deploy again to forget them for good.
 
+## Exit status
+
+Stable across 1.x, for scripts:
+
+| Code | Meaning |
+|---|---|
+| `0` | Success |
+| `1` | The command failed; the message says why |
+| `2` | Usage error: a missing or invalid argument (checked before the badge is touched) |
+| `3` | No badge found, or several and no `--port` |
+| `4` | The badge could not be reached: port missing or busy, no answer, connection lost |
+| `5` | The badge answers but has no OreoOS (or one too old for the command) |
+| `130` | Cancelled: Ctrl-C, or "no" at a confirmation |
+
+`oreo devs` exits `3` when no badge is connected; `oreo doctor` exits `1`
+when a check failed.
+
+## Transfer speed
+
+`push`, `add` and the interactive upload send files as base64 inside short
+MicroPython snippets over the raw REPL ("raw paste" mode). Each file goes
+to a `.part` file in 8 KiB chunks; the first chunk rides along with the
+open, and the last with a step on the badge that checks the size and
+SHA-256 and only then renames the file into place. Free space is checked
+once per command and each folder is created once per session.
+
+Measured on the simulated badge (execs and bytes of code; `python3
+cli/tests/test_push_speed.py`) and turned into time with a model of the USB
+link (1.5 ms round trip, MicroPython's 256-byte raw-paste window, 150 KB/s
+flash), so the times are estimates until measured on a badge:
+
+| Case | Execs | Code per file byte | Estimate |
+|---|---|---|---|
+| 1 MiB file, 4 KiB chunks (0.1.0) | 257 | 1.34 | ~43 KiB/s |
+| 1 MiB file, 8 KiB chunks (1.0.0) | 129 | 1.34 | ~44 KiB/s |
+| 40 files of 1.5 KiB, 0.1.0 | 240 | | |
+| 40 files of 1.5 KiB, 1.0.0 | 81 | 1.99 | ~32 KiB/s |
+
+What this shows: for big files the chunk size hardly matters; the time
+goes to raw-paste flow control (one round trip per 256 bytes of code) and
+to flash writes. For many small files, the fewer execs per file (2 instead
+of 6) are what count. A binary transfer that streams raw bytes to a
+receiver on the badge would remove both the base64 overhead and the
+flow-control round trips (about a third of the estimate above), but it
+needs measuring on a badge before it replaces the current, simple path.
+
 ## Troubleshooting
 
 Start with `oreo doctor`. Common cases:
@@ -396,6 +494,14 @@ Start with `oreo doctor`. Common cases:
 | `2 badges connected` | Pick one: `oreo --port /dev/ttyACM1 info` or `export OREO_PORT=/dev/ttyACM1`. |
 | `Permission denied` on Linux | Join `dialout` (`uucp` on Arch), then log out and back in. |
 | Port busy | Close other programs using it: another `oreo`, `mpremote`, Thonny, a serial monitor, the Arduino IDE. |
+| `the badge did not answer` (exit 4) | OreoOS is busy with something that delays Ctrl-C (a download, an app). Wait a few seconds and retry; if it stays stuck, press RESET or replug. |
+| `lost the connection to the badge` (exit 4) | It was unplugged or restarted. Plug it back in, `oreo devs`, run the command again. |
+| `this needs OreoOS` (exit 5) | The badge has MicroPython but no OreoOS: `oreo flash --repo <checkout>`. |
+| Git Bash: `looks like a path on this computer` | Git Bash rewrote `/documents` into a Windows path. Write `:documents/`, or set `MSYS_NO_PATHCONV=1`. |
+| `oreo update`: `could not get online` | Set up Wi-Fi first: `oreo wifi scan`, `oreo wifi connect <name>`. |
+| `oreo update`: `could not reach GitHub` | Check the network; GitHub allows 60 requests an hour per network without a token. |
+| `oreo update`: `did not come back on USB` | It may still be installing; wait and run `oreo info`. If the screen stays dark, press RESET. |
+| `oreo update`: `too old to be updated from the CLI` | Update once from the badge (Settings > Updates) or with `oreo update --repo`. |
 | `not enough space on the badge` | See what uses it with `oreo info`; free some with `oreo rm` or `oreo apps remove`. |
 | `ffmpeg was not found` | Install ffmpeg (see [Dependencies](#dependencies)); only videos need it. |
 | `checksum mismatch after copy` | Run it again; if it repeats, try another cable or USB port. |
@@ -404,6 +510,32 @@ Start with `oreo doctor`. Common cases:
 | The badge stays at the `>>>` prompt | A command ran with `--reset none`, or OreoOS failed to start. Try `oreo --reset hard info`, then `oreo logs --restart`. |
 | An installer says `pipx or uv ... neither was found` | Install one of them (the message has the command), then run it again. |
 | Something else | Re-run with `-v` and include `oreo doctor` output in an issue. |
+
+## Testing on a badge
+
+CI has no badge; these are the checks to run by hand on a badge (and the
+output to attach when reporting a problem):
+
+1. `oreo doctor`: all checks pass, ending in "all good".
+2. `oreo info`, then `oreo` (menu): status, files (open a folder, `u` an
+   upload, `p` a download), apps list, Wi-Fi saved, **q** restarts OreoOS.
+3. `oreo push` a 1 MiB file and a folder of small files; note the time
+   and speed shown, `oreo pull` them back and compare (`sha256sum`).
+4. Pull the cable during a large `oreo push`: the error is "lost the
+   connection" (exit 4), no traceback; after replugging, the old file at
+   the destination is intact and there is no `.part` left after the next
+   push.
+5. `oreo wifi scan`, `oreo wifi connect <name>`, `oreo apps install <app>`.
+6. `oreo update --check`, then `oreo update` on a badge one release behind:
+   versions shown, progress, restart, "installed and running". Also with
+   the badge offline (expect the Wi-Fi hint) and when up to date.
+7. `oreo logs`, press RESET on the badge: logging carries on after the
+   restart. Ctrl-C stops it (also on Windows).
+8. `oreo shell` and `oreo run` a script that prints; Ctrl-C stops it and
+   OreoOS restarts.
+9. On Windows (PowerShell and Git Bash) and macOS: `oreo devs`, `oreo info`,
+   `oreo push notes.txt :documents/`, `oreo --port com5 info` /
+   `oreo --port /dev/tty.usbmodem* info`.
 
 ## Releasing
 
@@ -420,8 +552,8 @@ release stays OreoOS.
 2. Tag the merge commit and push the tag:
 
    ```sh
-   git tag cli-v0.1.0 <commit-on-main>
-   git push origin cli-v0.1.0
+   git tag cli-v1.0.0 <commit-on-main>
+   git push origin cli-v1.0.0
    ```
 
 3. The workflow then:
@@ -438,5 +570,5 @@ release stays OreoOS.
      Versions with `a`, `b` or `rc` are marked as pre-releases.
 
 If a release run fails after the tag was pushed, fix the problem, delete the
-tag (`git push origin :refs/tags/cli-v0.1.0`), and tag again. The installers
+tag (`git push origin :refs/tags/cli-v1.0.0`), and tag again. The installers
 skip a tag that has no published release.

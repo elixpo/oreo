@@ -17,8 +17,23 @@ class Run:
         self.ui = ui
 
 
+class FakeClock:
+    """time.sleep / time.monotonic stand-ins: sleeping advances the clock."""
+
+    def __init__(self):
+        self.now = 0.0
+        self.slept = []
+
+    def sleep(self, s):
+        self.slept.append(s)
+        self.now += s
+
+    def monotonic(self):
+        return self.now
+
+
 def run_cli(argv, fake=None, ports=None, inputs=(), secret=None, interactive=False,
-            runner=None):
+            runner=None, clock=None):
     buf = io.StringIO()
     secret_calls = []
 
@@ -34,7 +49,9 @@ def run_cli(argv, fake=None, ports=None, inputs=(), secret=None, interactive=Fal
         if fake is None:
             raise AssertionError("the badge was touched")
         return fake
+    clock = clock or FakeClock()
     rc = main(argv, ui=ui,
-              comports=(lambda: list(ports)) if ports is not None else (lambda: [badge_port()]),
-              link_factory=factory, runner=runner)
+              comports=ports if callable(ports) else
+              (lambda: list(ports)) if ports is not None else (lambda: [badge_port()]),
+              link_factory=factory, runner=runner, sleep=clock.sleep, monotonic=clock.monotonic)
     return Run(rc, buf.getvalue(), links, fake, ui)
