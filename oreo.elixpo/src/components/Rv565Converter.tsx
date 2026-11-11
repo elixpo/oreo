@@ -5,7 +5,7 @@ import {
   AlertTriangle, Download, FileCode, Film, Loader2, Pause, Play, ShieldCheck, Upload, X,
 } from "lucide-react";
 import {
-  RV565_BAND_LINES, RV565_MAX_FPS, RV565_MAX_FPS_V6, Rv565Encoder, checkSchedule, convertPixels, decodeFrame,
+  RV565_BAND_LINES, RV565_MOTION_RANGE, RV565_MAX_FPS, RV565_MAX_FPS_V6, Rv565Encoder, checkSchedule, convertPixels, decodeFrame,
   frameTypeCounts, linesSentFraction,
   parseContainer, toCArray, toRgba, verify, type Codec, type PixelFormat, type Rv565Clip, type ScheduleReport,
 } from "@/lib/rv565";
@@ -100,6 +100,7 @@ export default function Rv565Converter() {
   const [keyCustom, setKeyCustom] = useState(24);
   const [bandLines, setBandLines] = useState(RV565_BAND_LINES);
   const [tolerance, setTolerance] = useState(0);
+  const [motionRange, setMotionRange] = useState(RV565_MOTION_RANGE);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -171,7 +172,7 @@ export default function Rv565Converter() {
 
       const encoder = new Rv565Encoder(size.w, size.h, fps, {
         version: v6 ? 6 : 7, pixelFormat: v6 ? "rgb565be" : pixelFormat, codec: v6 ? "zlib" : codec, keyframeInterval,
-        bandLines: v6 ? 0 : bandLines, tolerance,
+        bandLines: v6 ? 0 : bandLines, tolerance, motionRange,
       });
       for (let i = 0; i < frameCount; i++) {
         if (cancelRef.current) throw new Error("Cancelled.");
@@ -187,6 +188,8 @@ export default function Rv565Converter() {
         const pixels = ctx.getImageData(0, 0, size.w, size.h).data;
         await encoder.add(convertPixels(pixels, size.w, size.h, encoder.pixelFormat, 4));
         setProgress((i + 1) / frameCount);
+        // The shift search is synchronous: give the page a turn between frames.
+        await new Promise((resolve) => setTimeout(resolve, 0));
       }
 
       const clip = parseContainer(encoder.finish());
@@ -198,7 +201,7 @@ export default function Rv565Converter() {
     } finally {
       setBusy(false);
     }
-  }, [videoUrl, file, size, fit, fps, start, frameCount, v6, pixelFormat, codec, keyframeInterval, bandLines, tolerance]);
+  }, [videoUrl, file, size, fit, fps, start, frameCount, v6, pixelFormat, codec, keyframeInterval, bandLines, tolerance, motionRange]);
 
   // Preview: decode each frame on the fly, as the microcontroller does, then
   // show it as RGB (grayscale and monochrome formats as white on black).
@@ -310,7 +313,7 @@ export default function Rv565Converter() {
           <p className="text-xs leading-relaxed text-muted sm:col-span-2">
             Between keyframes, a frame identical to the one before is stored as a repeat. Any other frame is stored as
             whichever is smallest of a keyframe, an XOR delta and a partial delta, which carries only the bands of rows
-            that changed. The partial delta wins even when it is slightly larger, because the board then sends only those
+            that changed, each predicted from the previous frame, shifted to follow motion. The partial delta wins even when it is slightly larger, because the board then sends only those
             bands to the display. A keyframe every second keeps seeking to at most one second of frames.
           </p>
           <label className="block text-sm sm:col-span-2">
@@ -337,6 +340,17 @@ export default function Rv565Converter() {
               <span className="mt-2 block text-xs leading-snug text-muted">
                 Partial deltas mark changes in bands of this many rows (pages of 8 rows for SSD1306-style monochrome). Smaller
                 bands send less to the display but add a few bytes of mask. Default {RV565_BAND_LINES}; 0 turns partial deltas off.
+              </span>
+            </label>
+            <label className="mt-4 block">
+              <span className="eyebrow">Motion search (pixels)</span>
+              <input type="number" min={0} max={64} value={v6 ? 0 : motionRange} disabled={v6} aria-label="Motion search range in pixels"
+                     onChange={(e) => setMotionRange(Math.min(64, Math.max(0, Math.round(+e.target.value) || 0)))}
+                     className="mt-2 w-full rounded-pill border border-border bg-bg px-4 py-2" />
+              <span className="mt-2 block text-xs leading-snug text-muted">
+                Each changed band may be predicted from the previous frame shifted by up to this many pixels sideways and
+                up to a band height up or down, so scrolling text, lists and pans cost little. Larger ranges search longer
+                while converting; the board&apos;s decoding cost does not change. Default {RV565_MOTION_RANGE}; 0 turns the search off.
               </span>
             </label>
           </details>

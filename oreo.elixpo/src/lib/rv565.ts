@@ -12,8 +12,9 @@
  *            zlib keyframes of big-endian RGB565
  *
  * A partial delta carries only the bands of lines that changed (u8 band
- * height, a band mask, then the XOR of those bands), so a player decodes and
- * sends only those bands to the display.
+ * height, a band mask, a (dx, dy) shift per changed band, then each band's
+ * residual against its shifted prediction from the previous frame), so a
+ * player decodes and sends only those bands to the display.
  *
  * Colour conversion follows the reference rules exactly, so a frame
  * converted here is byte-identical to `rv565.convert` in Python; the
@@ -48,6 +49,8 @@ export type FrameType = typeof KEYFRAME | typeof DELTA | typeof REPEAT | typeof 
 export const FRAME_TYPE_NAMES = ["key", "delta", "repeat", "partial"] as const;
 /** Default band height, in lines, of the reference encoder's partial deltas. */
 export const RV565_BAND_LINES = 8;
+/** Default shift search range, in pixels, of the reference encoder. */
+export const RV565_MOTION_RANGE = 8;
 
 export type Rv565Header = {
   version: number;
@@ -64,9 +67,12 @@ export type Rv565Header = {
   frameBytes: number;
 };
 
-/** A parsed partial delta body: band height, changed bands, where the
- * codec-encoded data starts in the body and how long it decodes to. */
-export type PartialLayout = { band: number; changed: number[]; start: number; size: number };
+/** A parsed partial delta body: band height, changed bands, each changed
+ * band's shift [dx bytes, dy lines], where the codec-encoded residuals start
+ * in the body and how long they decode to. */
+export type PartialLayout = {
+  band: number; changed: number[]; shifts: Array<[number, number]>; start: number; size: number;
+};
 
 export type Rv565Record = { type: FrameType; offset: number; length: number; partial?: PartialLayout };
 
@@ -123,7 +129,79 @@ export function partialLayout(body: Uint8Array, lines: number, lineBytes: number
     size += (Math.min(lines, (b + 1) * band) - b * band) * lineBytes;
   }
   if (!changed.length) throw new Rv565Error("partial delta with no changed band");
-  return { band, changed, start: 1 + maskLen, size };
+  const start = 1 + maskLen + 2 * changed.length;
+  if (body.length < start) throw new Rv565Error("partial delta too short for its band shifts");
+  const shifts: Array<[number, number]> = [];
+  for (let k = 0; k < changed.length; k++) {
+    const dx = (body[1 + maskLen + 2 * k] << 24) >> 24, dy = (body[2 + maskLen + 2 * k] << 24) >> 24;
+    if (Math.abs(dy) >= band) throw new Rv565Error(`partial delta shifts a band by ${dy} lines, more than it has`);
+    shifts.push([dx, dy]);
+  }
+  return { band, changed, shifts, start, size };
+}
+
+/* Prediction of a band: byte j of line y is byte j - dx of line y - dy of
+ * prev when that line is in the same band [first, end) and 0 <= j - dx < R,
+ * else 0. residual = band XOR prediction; band = prediction XOR residual. */
+
+/** Band lines [first, end) of `cur` XOR their shifted prediction from prev. */
+function bandResidual(cur: Uint8Array, prev: Uint8Array, first: number, end: number, R: number, dx: number, dy: number): Uint8Array {
+  const out = cur.slice(first * R, end * R);
+  for (let y = first; y < end; y++) {
+    const src = y - dy;
+    if (src < first || src >= end) continue;
+    const o = (y - first) * R, s = src * R;
+    for (let j = Math.max(0, dx); j < Math.min(R, R + dx); j++) out[o + j] ^= prev[s + j - dx];
+  }
+  return out;
+}
+
+/** Nonzero bytes of bandResidual, stopping once it reaches `limit`. */
+function residualCost(cur: Uint8Array, prev: Uint8Array, first: number, end: number, R: number, dx: number, dy: number, limit: number): number {
+  let cost = 0;
+  for (let y = first; y < end; y++) {
+    const src = y - dy, o = y * R;
+    const inBand = src >= first && src < end, s = src * R;
+    for (let j = 0; j < R; j++) {
+      const k = j - dx;
+      const p = inBand && k >= 0 && k < R ? prev[s + k] : 0;
+      if (cur[o + j] !== p && ++cost >= limit) return cost;
+    }
+  }
+  return cost;
+}
+
+/** Decode one changed band in place: out's lines [first, end) become the
+ * prediction from prev XOR the residual at data[pos...]. */
+function decodeBand(out: Uint8Array, prev: Uint8Array, data: Uint8Array, pos: number, first: number, end: number, R: number, dx: number, dy: number) {
+  for (let y = first; y < end; y++) {
+    const src = y - dy, o = y * R, r = pos + (y - first) * R;
+    const inBand = src >= first && src < end, s = src * R;
+    for (let j = 0; j < R; j++) {
+      const k = j - dx;
+      out[o + j] = (inBand && k >= 0 && k < R ? prev[s + k] : 0) ^ data[r + j];
+    }
+  }
+}
+
+/** (step, max) of the horizontal shift search in bytes, for a range in pixels
+ * (rv565._shift_steps). */
+export function shiftSteps(format: PixelFormat, m: number): [number, number] {
+  switch (format) {
+    case "rgb565be": case "rgb565le": return [2, 2 * m];
+    case "rgb666": case "rgb888": return [3, 3 * m];
+    case "rgb444": return [3, 3 * Math.floor(m / 2)];
+    case "gray8": case "mono_vpage": return [1, m];
+    case "gray4": return [1, Math.floor(m / 2)];
+    case "mono": return [1, Math.floor(m / 8)];
+  }
+}
+
+/** 0, -step, +step, -2 step, ... up to limit. */
+function alternating(limit: number, step = 1): number[] {
+  const out = [0];
+  for (let k = step; k <= limit; k += step) out.push(-k, k);
+  return out;
 }
 
 const luma = (r: number, g: number, b: number) => Math.floor((299 * r + 587 * g + 114 * b + 500) / 1000);
@@ -313,6 +391,8 @@ export type EncodeOptions = {
   /** 0-255, default 0 (lossless): keep a pixel of the previous decoded frame
    * wherever every channel of the new one, in 8 bits, is within this. */
   tolerance?: number;
+  /** Shift search range of partial-delta bands, in pixels (0-255, default 8); 0 turns it off. */
+  motionRange?: number;
 };
 
 /** Writes a clip one frame at a time, holding only the previous frame and the
@@ -322,7 +402,9 @@ export type EncodeOptions = {
  * keyframe, a delta (zlib only: a stored delta is never smaller) and a partial
  * delta, except that the partial delta wins whenever it is at most 2% (and at
  * least 16 bytes) larger, since it saves the display transfer of every
- * unchanged band. With a tolerance, each frame first keeps the previous
+ * unchanged band. Each changed band of a partial delta gets the first shift,
+ * in the reference search order, with the fewest nonzero residual bytes.
+ * With a tolerance, each frame first keeps the previous
  * decoded pixel wherever the new one is within the tolerance. */
 export class Rv565Encoder {
   readonly width: number;
@@ -334,6 +416,7 @@ export class Rv565Encoder {
   readonly keyframeInterval: number;
   readonly bandLines: number;
   readonly tolerance: number;
+  readonly motionRange: number;
   readonly frameBytes: number;
   private prev: Uint8Array | null = null;
   private records: Array<{ type: FrameType; body: Uint8Array }> = [];
@@ -348,6 +431,7 @@ export class Rv565Encoder {
     this.keyframeInterval = options.keyframeInterval ?? 1;
     this.bandLines = options.bandLines ?? RV565_BAND_LINES;
     this.tolerance = options.tolerance ?? 0;
+    this.motionRange = options.motionRange ?? RV565_MOTION_RANGE;
     if (!(Number.isInteger(width) && width > 0 && width <= 0xffff && Number.isInteger(height) && height > 0 && height <= 0xffff)) {
       throw new Rv565Error(`size ${width}x${height} out of range`);
     }
@@ -357,6 +441,7 @@ export class Rv565Encoder {
     if (!(Number.isInteger(k) && k >= 1 && k <= RV565_MAX_KEYFRAME_INTERVAL)) throw new Rv565Error("keyframe interval must be 1-255");
     if (!(Number.isInteger(this.bandLines) && this.bandLines >= 0 && this.bandLines <= 255)) throw new Rv565Error("band height must be 0-255");
     if (!(Number.isInteger(this.tolerance) && this.tolerance >= 0 && this.tolerance <= 255)) throw new Rv565Error("tolerance must be 0-255");
+    if (!(Number.isInteger(this.motionRange) && this.motionRange >= 0 && this.motionRange <= 255)) throw new Rv565Error("motion range must be 0-255");
     if (this.version === RV565_VERSION_6) {
       if (this.pixelFormat !== "rgb565be" || this.codec !== "zlib" || k !== 1) {
         throw new Rv565Error("version 6 supports only rgb565be, zlib, keyframe interval 1");
@@ -396,23 +481,47 @@ export class Rv565Encoder {
     const [lines, lineBytes] = frameLines(this.pixelFormat, this.width, this.height);
     const count = Math.ceil(lines / band);
     const mask = new Uint8Array((count + 7) >> 3);
+    const shifts: number[] = [];
     const parts: Uint8Array[] = [];
+    const m = this.motionRange;
+    let [step, maxDx] = m ? shiftSteps(this.pixelFormat, m) : [1, 0];
+    const maxDy = m ? Math.min(band - 1, 127) : 0;
+    maxDx = Math.min(maxDx, 127 - (127 % step));
+    const dxs = alternating(maxDx, step);
     for (let b = 0; b < count; b++) {
-      const lo = b * band * lineBytes, hi = Math.min(lines, (b + 1) * band) * lineBytes;
-      const a = frame.subarray(lo, hi), p = prev.subarray(lo, hi);
-      if (!equal(a, p)) {
-        mask[b >> 3] |= 1 << (b & 7);
-        parts.push(xor(a, p));
+      const first = b * band, end = Math.min(lines, (b + 1) * band);
+      const lo = first * lineBytes, hi = end * lineBytes;
+      if (equal(frame.subarray(lo, hi), prev.subarray(lo, hi))) continue;
+      mask[b >> 3] |= 1 << (b & 7);
+      // The search of rv565._partial_body: dy 0, -1, +1, ...; for each, dx
+      // 0, -s, +s, ...; the first shift with the fewest nonzero bytes wins.
+      let bestCost = residualCost(frame, prev, first, end, lineBytes, 0, 0, Infinity), best: [number, number] = [0, 0];
+      if (bestCost && (maxDx || maxDy)) {
+        search: for (const dy of alternating(Math.min(maxDy, end - first - 1))) {
+          for (const dx of dxs) {
+            if (dx === 0 && dy === 0) continue;
+            const cost = residualCost(frame, prev, first, end, lineBytes, dx, dy, bestCost);
+            if (cost < bestCost) {
+              bestCost = cost;
+              best = [dx, dy];
+              if (cost === 0) break search;
+            }
+          }
+        }
       }
+      shifts.push(best[0] & 0xff, best[1] & 0xff);
+      parts.push(bandResidual(frame, prev, first, end, lineBytes, best[0], best[1]));
     }
     if (!parts.length) return null;
     const joined = new Uint8Array(parts.reduce((n, x) => n + x.length, 0));
     parts.reduce((at, x) => (joined.set(x, at), at + x.length), 0);
     const data = await this.encode(joined);
-    const out = new Uint8Array(1 + mask.length + data.length);
+    const head = 1 + mask.length + shifts.length;
+    const out = new Uint8Array(head + data.length);
     out[0] = band;
     out.set(mask, 1);
-    out.set(data, 1 + mask.length);
+    out.set(shifts, 1 + mask.length);
+    out.set(data, head);
     return out;
   }
 
@@ -571,19 +680,21 @@ async function body(clip: Rv565Clip, i: number): Promise<Uint8Array> {
   return clip.header.codec === "stored" ? raw.slice() : inflateExact(raw, clip.header.frameBytes, i);
 }
 
-/** prev with the changed bands of partial delta i XORed in. */
+/** prev with each changed band of partial delta i replaced by its prediction
+ * XOR its residual. */
 async function applyPartial(clip: Rv565Clip, i: number, prev: Uint8Array): Promise<Uint8Array> {
   const { offset, length, partial } = clip.index[i];
-  const { band, changed, start, size } = partial!;
+  const { band, changed, shifts, start, size } = partial!;
   const raw = clip.data.subarray(offset + start, offset + length);
   const data = clip.header.codec === "stored" ? raw : await inflateExact(raw, size, i);
   const [lines, lineBytes] = frameLines(clip.header.pixelFormat, clip.header.width, clip.header.height);
   const out = prev.slice();
   let pos = 0;
-  for (const b of changed) {
-    const lo = b * band * lineBytes, hi = Math.min(lines, (b + 1) * band) * lineBytes;
-    for (let k = lo; k < hi; k++) out[k] ^= data[pos++];
-  }
+  changed.forEach((b, k) => {
+    const first = b * band, end = Math.min(lines, (b + 1) * band);
+    decodeBand(out, prev, data, pos, first, end, lineBytes, shifts[k][0], shifts[k][1]);
+    pos += (end - first) * lineBytes;
+  });
   return out;
 }
 

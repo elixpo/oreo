@@ -2,7 +2,7 @@
  "width": 21,
  "height": 13,
  "fps": 12,
- "note": "Compare decoded frames by SHA-256; see tools/make_conformance.py. Subset of tests/data/v7 in github.com/elixpo/rv565 (format version 7); ../testpattern.rv565 is the version 6 reference vector.",
+ "note": "Compare decoded frames by SHA-256; see tools/make_conformance.py. Subset of tests/data/v7 in github.com/elixpo/rv565 (format version 7, commit b01cb60); ../testpattern.rv565 is the version 6 reference vector.",
  "valid": [
   {
    "file": "rgb565be_zlib_k4.rv565",
@@ -3197,6 +3197,798 @@
    ]
   },
   {
+   "file": "rgb565be_zlib_shift_k10.rv565",
+   "version": 7,
+   "width": 21,
+   "height": 13,
+   "fps": 12,
+   "frames": 10,
+   "pixel_format": "rgb565be",
+   "pixel_format_id": 0,
+   "codec": "zlib",
+   "keyframe_interval": 10,
+   "frame_bytes": 546,
+   "frame_types": [
+    "key",
+    "partial",
+    "partial",
+    "partial",
+    "partial",
+    "partial",
+    "partial",
+    "partial",
+    "partial",
+    "partial"
+   ],
+   "frame_sha256": [
+    "36235f5b62b40826482e81ec39c41a65cc4b3223a61ee2839e78f7ba988eb8f3",
+    "a401381fc6bb7d4e8e1a8a4dc12cdee1987efff5ac239777e88775187b8f0b1d",
+    "684aed4ecfee5034c382aafe62b7aea8b7fbc372baaefdca94458ec47ed5ebff",
+    "e5f669f5868280d7c018527e5e10fecfed34175c43221ec92e7c0e40453a55cd",
+    "75ad03480ea2cea5a8347f7de25ced773c00f3bfb5cee431dd42e61264e3f2ab",
+    "094176b19f90abec1bbb7737cd75f747dd78e6d0f0478157f2227532a79e6bbe",
+    "0a33a68e7ba1d7d37cc20b382df6de7e63a4ec075a0023fd005ccf68d3c73018",
+    "8a508e1b47abf05bec4a5476798143eb33814cfc9ab192eafaae133444033868",
+    "4f146ee64a252bd91baa4d6ea8fc5db337e3432c1e6d8c30c278813a78fa11ff",
+    "5afb5a6d780afdebd80c8eb422a3346a7a51dd3c891572778096521b78be7e13"
+   ],
+   "changed_lines": [
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ]
+   ]
+  },
+  {
+   "file": "rgb888_zlib_shift_k10.rv565",
+   "version": 7,
+   "width": 21,
+   "height": 13,
+   "fps": 12,
+   "frames": 10,
+   "pixel_format": "rgb888",
+   "pixel_format_id": 4,
+   "codec": "zlib",
+   "keyframe_interval": 10,
+   "frame_bytes": 819,
+   "frame_types": [
+    "key",
+    "partial",
+    "partial",
+    "partial",
+    "partial",
+    "partial",
+    "partial",
+    "partial",
+    "partial",
+    "partial"
+   ],
+   "frame_sha256": [
+    "8aa2ef664e0233001acc15bbf82a6d73c71559f27357c9fe6060ffa0340f1014",
+    "59ec0a3708578b244bd7aa5a06b3917675f59b63ee6a7d97751817bfbc708b2d",
+    "a4d5fee0825c45c85d8634b4885796eeb72aeb42f6a1f1a4f959f50d21c8725b",
+    "8ddcb37aa475fa6e065af81952a8a46fc059b8700b19073f80fd51194117af42",
+    "f091dd139d910d55bb0e3b529b7d0569a5ad0022d0f8573742a7320fae92ff31",
+    "48c7138b57fb158e9bb5ace444eab20d03599bb498fd976c61145259d82ed420",
+    "64c25c48389c9cfe9583a7ef9af622cbabc4d84f2460fa9b0598c3781672a66c",
+    "de0ccd427710d968d3ee7ba5669ee34d78a18e7f352314fa0edc216c1db171d2",
+    "dbfb00b36ef8db6ff6a3a159a78fe4aab8760fdffa6e8af9a9030f07cb287bd3",
+    "01e24d08f0e075de0b90a9609c1e819c0d0ed7e234aef087be79294ac259655c"
+   ],
+   "changed_lines": [
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ]
+   ]
+  },
+  {
+   "file": "rgb444_zlib_shift_k10.rv565",
+   "version": 7,
+   "width": 21,
+   "height": 13,
+   "fps": 12,
+   "frames": 10,
+   "pixel_format": "rgb444",
+   "pixel_format_id": 2,
+   "codec": "zlib",
+   "keyframe_interval": 10,
+   "frame_bytes": 416,
+   "frame_types": [
+    "key",
+    "partial",
+    "partial",
+    "partial",
+    "partial",
+    "partial",
+    "partial",
+    "partial",
+    "partial",
+    "partial"
+   ],
+   "frame_sha256": [
+    "dce8fdc436d9df31ea5ebad38c66c7818401f92cd2aaa5d0b3d88a75bd551bf7",
+    "274292e88fd051d033aea34a953448766f049751ad412787dfd4ff22544ea410",
+    "b1ebc8c277852d2f065a19086e360ff35a4c49e56e1d82f0fb7dc7e347975163",
+    "476975ad5d1d3970d7c82aca2723278eefb9503c0732cb1021b16863f48fe696",
+    "f6f7a2cfe79667da2e27f1125c80f4c09e99f691db7d76b4cb187ada701eccfa",
+    "78782e22b68048ea20f24fcd6d416c788cc6a1c1726e04a402e0c7eda1aeaa09",
+    "cb4bc2354b89f89027b69e57dbce295e4ab558d248cb654fd6c91a5863771100",
+    "c0039b65e77479f39b2cdb1868b6c453b3d4d87bbb194a7eedee91d0078222fe",
+    "935356b9b19751acbb368e6e34f87da82f78d8d0c8f64814d252cfe1d6eb54b3",
+    "2b36ad6bf7a4887c832e837835ca2e5d3df4b2a142919ee16aa3556fc39f6922"
+   ],
+   "changed_lines": [
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ]
+   ]
+  },
+  {
+   "file": "gray8_zlib_shift_k10.rv565",
+   "version": 7,
+   "width": 21,
+   "height": 13,
+   "fps": 12,
+   "frames": 10,
+   "pixel_format": "gray8",
+   "pixel_format_id": 5,
+   "codec": "zlib",
+   "keyframe_interval": 10,
+   "frame_bytes": 273,
+   "frame_types": [
+    "key",
+    "partial",
+    "partial",
+    "partial",
+    "partial",
+    "partial",
+    "partial",
+    "partial",
+    "partial",
+    "partial"
+   ],
+   "frame_sha256": [
+    "b0d3624af3f59be8827136142121a1f4c0dc4b22f136928d0b74f3272df41473",
+    "b08841fffb48b6b1c3ea7e1b1fe8189e6ef5b81bcdff4903ec6a11b98604350d",
+    "490629d65a623652ebc2804282be21c213e3c0ed285d51d2dbf3924a911092ba",
+    "931820573f7b13859fcf7cebb55ba469e1cfa5f15a7591ca618f77b16f4c3084",
+    "0253baac2e3ea2ee7e40b94a281b0fbb38b51c72835af1c1c8402cbf8cbdfd7a",
+    "90a713d4c2613a7fb092b52b1183a794b3dc8b21ba5beaafa3ce418951c5eef0",
+    "141f34cc141fea2409897b9a81e18414720132a6f7167ce4c80fe79369f03b31",
+    "897427af5b500fd4dec7a160da92121ebda5e484f7de07722a09b9eb1cfd84f9",
+    "b30c26188863d085d13e94307dce0f51a579636d8822a76f508d8ea904291ac9",
+    "c6f3216f91a6a1632fcfb45f013952b6c474b0fa2a3457e82926731e35619120"
+   ],
+   "changed_lines": [
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ]
+   ]
+  },
+  {
+   "file": "gray4_zlib_shift_k10.rv565",
+   "version": 7,
+   "width": 21,
+   "height": 13,
+   "fps": 12,
+   "frames": 10,
+   "pixel_format": "gray4",
+   "pixel_format_id": 6,
+   "codec": "zlib",
+   "keyframe_interval": 10,
+   "frame_bytes": 143,
+   "frame_types": [
+    "key",
+    "partial",
+    "partial",
+    "partial",
+    "partial",
+    "partial",
+    "partial",
+    "partial",
+    "partial",
+    "partial"
+   ],
+   "frame_sha256": [
+    "e1386f869268bb7954b8735dfcf809de4a541e3ccff914e8c046c3b13ad8ccb2",
+    "8025f7e25be15a30195fe89330908a5f25e2676bebee7381fec559d6ad6ffd82",
+    "e0dec6f20cf0e6250533c8f3a1cc12e44734a54d18398fbe2e6ecd4104071e33",
+    "d4270e42721ab858735730884875db2fceda29ad337e629b3b27d24b0961e016",
+    "e8a78cb679ad4d0230bc01903114a3fc47a2c62189ca153f2a61dea10dc3d0fc",
+    "b5462ce75e46b9f9343b62f8e624970158625fc2ea3c299ed4fe2629d562fd44",
+    "479375f32db9a65feb4413988678df6726c236d0de93677c2779d43ece9ec961",
+    "d51ba7852e923a99baac234e109b60d9074a40c7459e5485350945702326cafa",
+    "26e57463569e4421866e5fc015fdac74635dde2656da895a69e5a058dcfe86db",
+    "09807d7e60666fb2dd1aa1dc1b37328de7573e708feec15e80c3a31b5aa2df76"
+   ],
+   "changed_lines": [
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ]
+   ]
+  },
+  {
+   "file": "mono_zlib_shift_k10.rv565",
+   "version": 7,
+   "width": 21,
+   "height": 13,
+   "fps": 12,
+   "frames": 10,
+   "pixel_format": "mono",
+   "pixel_format_id": 7,
+   "codec": "zlib",
+   "keyframe_interval": 10,
+   "frame_bytes": 39,
+   "frame_types": [
+    "key",
+    "partial",
+    "partial",
+    "partial",
+    "partial",
+    "partial",
+    "partial",
+    "partial",
+    "partial",
+    "partial"
+   ],
+   "frame_sha256": [
+    "76ab0b1d8b130703d82bd5fcab6d7927d56dff699c9c4b71a54ed3eda232ca18",
+    "ee9f9cba89dacb5702da95a0d5e3ff4cac5172f44c0ef71becd4942db6f2d0ca",
+    "7933320ac606777ed6bbf8adb3649fcd66c84290cf8e405e54d908575a44cea1",
+    "0b40a8838af8f13041cd0b69dc9c7b583b3a85ee4602aadb461e3331b692216e",
+    "3ada86d8dbc5b9f7cc9534ff552c5754a64b99ad7993db368ef360bd205aa4d8",
+    "8dbe1849dfcb460dc699d159bde1e9ef377f3852513c554e9d4831100f7df129",
+    "6f489d2176fc23006d5c5f609c67cd80363305144fdfb399556654dae45eda2d",
+    "1c157f7f3dfc70ff358a32e3af9ae6b5ed5716a76d98cb87c3e56106bf201c53",
+    "cc476a94cfb8946ee0e4bdc2484d495126ea29a18b69d13b1c5eef316bd75e51",
+    "42c74975b83cd0cab30ad165023fa9338c47ed863c24df8104e425c117f25eca"
+   ],
+   "changed_lines": [
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ]
+   ]
+  },
+  {
+   "file": "mono_vpage_zlib_shift_k10.rv565",
+   "version": 7,
+   "width": 21,
+   "height": 13,
+   "fps": 12,
+   "frames": 10,
+   "pixel_format": "mono_vpage",
+   "pixel_format_id": 8,
+   "codec": "zlib",
+   "keyframe_interval": 10,
+   "frame_bytes": 42,
+   "frame_types": [
+    "key",
+    "partial",
+    "partial",
+    "partial",
+    "partial",
+    "partial",
+    "partial",
+    "partial",
+    "partial",
+    "partial"
+   ],
+   "frame_sha256": [
+    "bb7b45363e44db5800dcc6eed047e344a48f85335407f19bfb4aa1e5b1ced4e0",
+    "e00512e5bf0ed822e3751874b21344d220659f7b26fa00a665a543c9fd201010",
+    "a42e0101e11ef72bd05e91289d5d16c4223f4d93831d660c2bcafc7f6ed599a6",
+    "a9a1ed9aecb8bc7aa440ff0d0e4c1f73c6cb37bbce6bbc9fb3af1ee77f725568",
+    "dc0ce1a610b7bb3fb882b20371f57026104e117121efffc0421d58833cc131d3",
+    "0ecc63b014d20358a31bb3cfdd1dd6b273755537e659c5573825cc0cabfcfb7a",
+    "d8f6247f3c36b9dd10521afeb5be146f5903b9de17318982dce51b8c374e7dd2",
+    "55249a9f936c92349079e4c8c15b9bcb3b00e48887dda9408b693b5a15271010",
+    "f27bafda27fa88043bdb0984c3101af09c1b4173480789e3ecdf2c3d1a56c32e",
+    "2dfebd76136f30990fc0049c509013e022a9bf919099cf66aa334740bd5c0966"
+   ],
+   "changed_lines": [
+    [
+     [
+      0,
+      2
+     ]
+    ],
+    [
+     [
+      0,
+      2
+     ]
+    ],
+    [
+     [
+      0,
+      2
+     ]
+    ],
+    [
+     [
+      0,
+      2
+     ]
+    ],
+    [
+     [
+      0,
+      2
+     ]
+    ],
+    [
+     [
+      0,
+      2
+     ]
+    ],
+    [
+     [
+      0,
+      2
+     ]
+    ],
+    [
+     [
+      0,
+      2
+     ]
+    ],
+    [
+     [
+      0,
+      2
+     ]
+    ],
+    [
+     [
+      0,
+      2
+     ]
+    ]
+   ]
+  },
+  {
+   "file": "rgb565le_stored_shift_k10.rv565",
+   "version": 7,
+   "width": 21,
+   "height": 13,
+   "fps": 12,
+   "frames": 10,
+   "pixel_format": "rgb565le",
+   "pixel_format_id": 1,
+   "codec": "stored",
+   "keyframe_interval": 10,
+   "frame_bytes": 546,
+   "frame_types": [
+    "key",
+    "partial",
+    "partial",
+    "partial",
+    "partial",
+    "partial",
+    "partial",
+    "partial",
+    "partial",
+    "partial"
+   ],
+   "frame_sha256": [
+    "56e05e349d462768a5a5ead0a7ea7214fdfd1c73d4ca3f0f7e2e1ac6d524b664",
+    "2b3388f93322014f522ca181635698ec429da3ad3d9004c1efa75c50a66bf9da",
+    "31ab1a37c7faba480fd2124827615e0d064ce28ca85eca5ace0879b61e90a861",
+    "25b363acdbabd8e4e902e6ef5c096202eed84677da4cd426edba7bd41135044e",
+    "e3fd9bdc064f507d201c6884270ece561800ec3440c63ae50ae2a9416c054982",
+    "b9f098828f031a3c698791d4dc394d447e08a186fa44294d6d3da9b7947db230",
+    "347a1a0afc33403460f5e60b15c185d1f118911411bbce94d0aadce5833a798f",
+    "460fe193c81e715ccfc29bb6b1b97591630ed368b9044c05b7fd879a0e60420e",
+    "ea5b3c2e0d10269ee64500a26333b7f68df3ecbdf6746169f0ceb167840dbb17",
+    "32ea4ff402f843568836b1eb9799c5c5dd740c1a3fdae5dbf592acc84d782dee"
+   ],
+   "changed_lines": [
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ],
+    [
+     [
+      0,
+      13
+     ]
+    ]
+   ]
+  },
+  {
    "file": "mono_stored_forced_delta_k8.rv565",
    "version": 7,
    "width": 21,
@@ -3673,12 +4465,22 @@
    "reason": "partial"
   },
   {
+   "file": "invalid_partial_short_shifts.rv565",
+   "stage": "open",
+   "reason": "partial"
+  },
+  {
    "file": "invalid_partial_no_band.rv565",
    "stage": "open",
    "reason": "partial"
   },
   {
    "file": "invalid_partial_band_past_end.rv565",
+   "stage": "open",
+   "reason": "partial"
+  },
+  {
+   "file": "invalid_partial_shift_dy_too_far.rv565",
    "stage": "open",
    "reason": "partial"
   },
