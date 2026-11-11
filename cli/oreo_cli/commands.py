@@ -320,7 +320,7 @@ SYSTEM_FILES = ("/secrets.py", "/wifi.json")
 # Built-in apps: must equal DEFAULT_APPS in oreoOS/store.py (a contract
 # test in cli/tests/test_contract.py checks this inside the repo).
 DEFAULT_APPS = ("about", "badge", "commits", "gallery", "gamepad", "identity", "reader",
-                "settings", "store", "storage", "launcher", "updates", "wifi")
+                "settings", "store", "storage", "transfer", "launcher", "updates", "wifi")
 
 
 def _inside(p, root):

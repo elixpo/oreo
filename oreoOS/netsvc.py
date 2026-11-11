@@ -6,9 +6,11 @@ inside a UI frame for longer than a poll:
   * boot auto-connect: begin() applies the boot gates (secrets flag, the
     Settings auto-connect switch, the brownout skip, safe mode) and starts
     wifi.auto_begin(); tick() drives wifi.auto_tick() from the run loop.
-  * link-up jobs: when the link comes up (however it came up: boot
-    auto-connect, a re-join, or the WiFi app), the LAN upload server is
-    (re)bound and a clock sync is scheduled.
+  * link-up: when the link comes up (however it came up: boot
+    auto-connect, a re-join, or the WiFi app), a clock sync is scheduled.
+    Wi-Fi is for the internet only (App Store, OTA, GitHub data, weather,
+    time); files reach the badge over USB through the Transfer app, so
+    nothing listens on the LAN.
   * time sync: timeutil.sync_from_ntp() (DNS lookup + UDP query, up to a
     few seconds) runs on a one-shot _thread worker, retries with backoff
     and re-syncs every NTP_RESYNC_S.
@@ -24,8 +26,8 @@ loop (launcher.run_app), and the slow part, socket.getaddrinfo(), is a
 blocking call with no asyncio variant on MicroPython. Under asyncio it
 would still stall the loop. A _thread worker releases the GIL inside the
 blocking lwIP calls, so the UI keeps running. The wifi state machine
-(auto_begin/auto_tick) and the HTTP listener stay on the UI thread: they
-are non-blocking already and are not written to be thread-safe.
+(auto_begin/auto_tick) stays on the UI thread: it is non-blocking
+already and is not written to be thread-safe.
 
 Status for the status bar and the C panel: status() / status_text().
 """
@@ -60,7 +62,6 @@ _reason     = ""                # why boot auto-connect did not start
 _link       = False
 _home_ms    = None
 _next_poll  = None
-_jobs_due   = False
 _rejoin_at  = None
 _rejoin_n   = 0
 _ntp_at     = None
@@ -216,19 +217,16 @@ def tick(foreground=None, now=None):
         if not conn:
             _keep_alive(now, foreground)
     if _link and not in_quiet(now):
-        if _jobs_due:
-            _run_link_jobs(now)
         if _due(now, _ntp_at) and not _busy:
             _start_ntp(now)
 
 
 def _link_up(now):
-    global _link, _hold, _rejoin_at, _rejoin_n, _jobs_due, _ntp_at, _ntp_n
+    global _link, _hold, _rejoin_at, _rejoin_n, _ntp_at, _ntp_n
     _link = True
     _hold = False           # connected, so the radio is evidently wanted
     _rejoin_at = None
     _rejoin_n = 0
-    _jobs_due = True
     if (_ntp_ok_ms is None or
             time.ticks_diff(now, _ntp_ok_ms) > NTP_FRESH_S * 1000):
         _ntp_at = now
@@ -242,17 +240,11 @@ def _link_up(now):
 
 
 def _link_down(now):
-    global _link, _jobs_due, _rejoin_at, _rejoin_n
+    global _link, _rejoin_at, _rejoin_n
     _link = False
-    _jobs_due = False
     _rejoin_n = 0
     _rejoin_at = _later(now, REJOIN_S[0])
     _log("link lost, re-join in %d s" % REJOIN_S[0])
-    try:
-        from oreoOS import http_server
-        http_server.stop()
-    except Exception:
-        pass
 
 
 def _may_rejoin():
@@ -320,16 +312,6 @@ def _keep_alive(now, foreground):
         _wifi().auto_begin()
     except Exception as e:
         _log("auto_begin failed: %s" % e)
-
-
-def _run_link_jobs(now):
-    global _jobs_due
-    _jobs_due = False
-    try:
-        from oreoOS import http_server
-        http_server.start(_os)
-    except Exception as e:
-        _log("http start failed: %s" % e)
 
 
 # ── time sync worker ────────────────────────────────────────────────────

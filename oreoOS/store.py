@@ -61,7 +61,7 @@ T_API       = 8           # seconds, catalogue / icon requests
 # checks it).
 DEFAULT_APPS = (
     "about", "badge", "commits", "gallery", "gamepad", "identity", "reader",
-    "settings", "store", "storage",
+    "settings", "store", "storage", "transfer",
     # system apps the OS needs
     "launcher", "updates", "wifi",
 )
