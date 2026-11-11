@@ -1,9 +1,10 @@
 # Your profile on the badge
 
-Badge, Identity, Commits, Weather and the clock show the owner's details:
-GitHub user, name, title, timezone and weather location. Nothing is set
-by default. Until you set `GITHUB_USER`, Badge, Commits and Identity show
-a setup hint instead of someone else's profile, and nothing is fetched.
+Badge, Commits, Weather and the clock show the owner's details: GitHub
+user, name, title, timezone and weather location. Nothing is set by
+default. Until you set `GITHUB_USER`, Commits shows a setup hint and Badge
+shows only your name and title (or, with no name either, a setup card)
+instead of someone else's profile, and nothing is fetched.
 Weather shows its setup card until it has an OpenWeatherMap key; its
 location comes from the badge itself (below) unless you pin one. The clock
 runs on UTC until `TIMEZONE_OFFSET` is set.
@@ -13,7 +14,7 @@ runs on UTC until `TIMEZONE_OFFSET` is set.
 Older builds had the maintainer's GitHub user, name, weather location
 and timezone (`+5.5`) hardcoded in `oreoOS/config.py`. They now come
 only from `.env.local` or `/profile.json`. If your `.env.local` does not
-set them, the next deploy writes them blank: Identity loses your name,
+set them, the next deploy writes them blank: Badge loses your name and title,
 Weather loses its location and the clock drops to UTC. Before you
 deploy, add `GITHUB_USER`, `DISPLAY_NAME`, `DISPLAY_DESIGNATION` and
 `TIMEZONE_OFFSET` (and `OWM_API_KEY` for Weather) to `.env.local`, or put
@@ -24,9 +25,9 @@ note listing every key that is still blank.
 
 | Key | Used by | Example |
 |---|---|---|
-| `GITHUB_USER` | Badge, Commits, Identity | `octocat` |
-| `DISPLAY_NAME` | Identity | `Mona Lisa` |
-| `DISPLAY_DESIGNATION` | Identity (line under the name); `DESIGNATION` is accepted as the older name | `Firmware @ Example` |
+| `GITHUB_USER` | Badge (@handle and GitHub card), Commits | `octocat` |
+| `DISPLAY_NAME` | Badge (falls back to your GitHub name, then the login) | `Mona Lisa` |
+| `DISPLAY_DESIGNATION` | Badge (title under the name); `DESIGNATION` is accepted as the older name | `Firmware @ Example` |
 | `TIMEZONE_OFFSET` | the clock, after each time sync | `5.5`, `-4` |
 | `WEATHER_LAT`, `WEATHER_LON` | Weather, **optional**: pins a place; without them the badge finds its own location | `12.97`, `77.59` |
 | `WEATHER_NAME` | Weather (optional label) | `Bengaluru` |

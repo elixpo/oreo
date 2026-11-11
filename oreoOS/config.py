@@ -94,7 +94,7 @@ WIFI_POWERSAVE    = True
 BT_ADV_INTERVAL_MS = 500
 APP_CATEGORIES = (
     ("Games",  "cat_games",  ("flappy", "snake", "racer", "pet", "patakha")),
-    ("GitHub", "cat_github", ("badge",  "identity", "commits")),
+    ("GitHub", "cat_github", ("badge", "commits")),
     ("Utils",  "cat_utils",  ("weather",)),
     ("Tools",  "cat_tools",  ("gallery", "transfer", "color_picker", "gamepad", "quest")),
     ("System", "cat_system", ("settings", "about")),

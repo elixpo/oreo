@@ -70,12 +70,14 @@ export const PRELOADED: AppEntry[] = [
              "folder and only swap in when complete, and updates keep an app's " +
              "saved files." }),
   app("badge",   { name: "Badge",       category: "core", tint: "primary", icon: "Contact",
-    pngIcon: "/icons/badge_icon.png",
-    blurb:   "Conference badge with your name, role, pronouns.",
-    details: "Your digital identity card with live GitHub stats pulled from your " +
-             "handle. It opens instantly from the last cached values and refreshes " +
-             "them in the background. Designed to be held up at conferences and " +
-             "read across a table." }),
+    version: "0.2", pngIcon: "/icons/badge_icon.png",
+    blurb:   "Your conference badge: name, title and GitHub card.",
+    details: "One screen, no scrolling: your avatar (or initials), your name and " +
+             "title from your profile, your GitHub handle, location and bio, and " +
+             "your repos, followers and following in one row. It opens instantly " +
+             "from the last cached GitHub profile, works offline, and refreshes " +
+             "in the background (press A to refresh now). Designed to be held up " +
+             "at conferences and read across a table." }),
   app("gallery", { name: "Gallery",     category: "core", tint: "gold",    icon: "Image",
     version: "0.2", pngIcon: "/icons/gallery_icon.png",
     blurb:   "Browse photos, pixel art, and uploaded videos.",
@@ -95,11 +97,6 @@ export const PRELOADED: AppEntry[] = [
     details: "Lightweight markdown renderer supporting headings, lists, code blocks " +
              "and inline emphasis. Files arrive over Wi-Fi and land in " +
              "`documents/`. UP/DOWN scrolls, LEFT/RIGHT skips a page." }),
-  app("identity", { name: "Identity",  category: "core", tint: "lilac",   icon: "User",
-    pngIcon: "/icons/identity_icon.png",
-    blurb:   "Name, handle, contact card. Share it over IR.",
-    details: "Holds your contact card and beams a copy to a peer badge over IR " +
-             "when they tap A on the matching screen." }),
 ];
 
 export const ALL_APPS: AppEntry[] = [
