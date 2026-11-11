@@ -56,7 +56,19 @@ Documentation = "https://github.com/elixpo/oreo/blob/main/docs/CLI.md"
 Changelog     = "https://github.com/elixpo/oreo/blob/main/cli/CHANGELOG.md"
 
 [tool.setuptools]
-packages = ["oreo_cli"]
+# app_template is the app skeleton `oreo new` copies (a copy of the repo's
+# app_templates/; cli/tests/test_devtools.py keeps the two the same). It is
+# listed as packages so setuptools ships its .py files; nothing imports it.
+packages = [
+    "oreo_cli",
+    "oreo_cli.app_template",
+    "oreo_cli.app_template.src",
+    "oreo_cli.app_template.assets",
+    "oreo_cli.app_template.assets.optimized",
+]
+
+[tool.setuptools.package-data]
+"oreo_cli.app_template" = ["manifest.json", "icon.png", "README.md"]
 
 [tool.setuptools.dynamic]
 version = { attr = "oreo_cli.__version__" }

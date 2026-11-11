@@ -198,6 +198,9 @@ The CLI stores nothing else on the computer.
 | **3** | apps |
 | **4** | Wi-Fi |
 | **5** | add a photo, video or document |
+| **t** | send files to Transfer (the same flow as `oreo transfer send`) |
+| **p** | owner profile (the same flow as `oreo setup`) |
+| **i** | install an app from a folder (the same checks as `oreo app install`) |
 | **u** | update OreoOS |
 | **s** | shell |
 | **q** | quit |
@@ -207,6 +210,13 @@ shown, and `p` downloads one. Ctrl-C stops the current action and goes back
 to the menu. OreoOS stays paused while the menu is open and starts again when
 you quit. Without a terminal (in a script, for example), `oreo` prints the
 status and exits.
+
+**t** is the one entry that needs OreoOS running: it checks and converts the
+files first, then restarts OreoOS and asks for the code the Transfer app shows
+(apps drawer -> Tools -> Transfer). OreoOS keeps running afterwards; the next
+entry that needs the badge pauses it again. A profile saved with **p** and an
+app installed with **i** take effect when OreoOS restarts, which happens when
+you quit the menu.
 
 To send photos and documents while OreoOS keeps running, use the Transfer app
 instead (see [`oreo transfer`](#oreo-transfer-send-files-to-the-transfer-app)).
@@ -224,7 +234,7 @@ instead (see [`oreo transfer`](#oreo-transfer-send-files-to-the-transfer-app)).
   leaves the badge at the MicroPython prompt.
 - **Some commands do not stop OreoOS.** `oreo transfer` talks to the Transfer
   app while it runs, and `oreo logs` only listens.
-- **Destructive actions ask first.** These are `rm -r`, `apps remove`,
+- **Destructive actions ask first.** These are `rm -r`, `apps remove`, `app remove`,
   `transfer rm`, `update`, `update --clean` and `flash`. Without a terminal,
   the answer is "no" unless you pass `--yes`.
 
@@ -252,6 +262,9 @@ Put these before the command, for example `oreo --port /dev/ttyACM1 info`.
 | [`oreo add`](#oreo-add-photos-videos-and-documents-without-the-transfer-app) | Send photos, videos and documents without opening an app | briefly |
 | [`oreo ls` / `push` / `pull` / `rm`](#oreo-ls--push--pull--rm-files) | Any file on the badge | briefly |
 | [`oreo apps`](#oreo-apps-the-app-store) | App Store: list, install, update, remove | briefly |
+| [`oreo setup`](#oreo-setup-owner-profile) | Owner profile: GitHub user, name, timezone, weather | briefly, then restarts |
+| [`oreo new`](#oreo-new-start-an-app) | Make a new app folder from the app template | no (never opens a port) |
+| [`oreo app`](#oreo-app-install-an-app-from-a-folder) | Install, list or remove an app from a folder on this computer | briefly, then restarts |
 | [`oreo wifi`](#wi-fi-setup) | Scan, connect, list and forget networks | briefly |
 | [`oreo update`](#oreo-update-update-oreoos) | Update OreoOS (downloaded by the badge) | yes, then restarts |
 | [`oreo logs`](#oreo-logs-console-output) | Follow the console | no |
@@ -452,6 +465,86 @@ The badge downloads apps itself, over its own Wi-Fi, so set up Wi-Fi first
 `oreo` brings Wi-Fi up from the badge's saved networks and then shows the
 download progress. Built-in apps (including Transfer) cannot be removed.
 
+### `oreo setup`: owner profile
+
+```sh
+oreo setup                                     # show the profile, ask for each value
+oreo setup --show                              # only print it (the key is hidden)
+oreo setup --github-user octocat --name "Mona Lisa" --timezone 5.5
+oreo setup --lat 12.97 --lon 77.59 --weather-name Bengaluru
+oreo setup --owm-key-stdin < owm-key.txt       # the OpenWeatherMap key, kept out of history
+oreo setup --designation ""                    # remove a value
+```
+
+Writes `/profile.json` on the badge, which Badge, Identity, Commits, Weather
+and the clock read through `oreoOS/profile.py` (see [PROFILE.md](PROFILE.md)).
+No checkout or `.env.local` is needed.
+
+- It first shows what the badge has now and where each value comes from
+  (`profile.json` or `secrets.py`, which `tools/deploy.py` writes).
+- Asked interactively, **Enter** keeps the value shown and `-` removes it, so
+  the `secrets.py` value (if any) shows through again. Values given as options
+  are saved without prompting; an empty option value removes the key.
+- Values are checked before the badge is touched: the timezone is hours from
+  UTC between -12 and +14 in quarter hours (`5.5`, `-4`, `+05:30`,
+  `UTC+5:45`), latitude -90 to 90, longitude -180 to 180, GitHub user names
+  as GitHub allows them, and short plain-ASCII names that fit the screen
+  (the badge font has no other characters).
+- The OpenWeatherMap key is read without echo and never printed. The badge
+  only reports whether one is set, so the key never comes back to the
+  computer. `--owm-key KEY` works but warns that the key may land in your
+  shell history; prefer the prompt or `--owm-key-stdin`.
+- The new file is merged on the badge, written to `/profile.json.tmp`, read
+  back and then renamed over `/profile.json`, so a cut-off save never leaves
+  a half-written profile. If the power goes between removing the old file
+  and the rename, OreoOS reads the `.tmp` copy, and the next save repairs it.
+- OreoOS restarts afterwards so the apps read the new profile (`--reset none`
+  leaves it at the MicroPython prompt). A new timezone applies at the next
+  time sync, which happens as OreoOS starts.
+
+### `oreo new`: start an app
+
+```sh
+oreo new my_game                               # ./my_game, shown as "My Game"
+oreo new "My Game" --author octocat --dir ~/oreo-apps
+```
+
+Copies the app template (a counter: **A** adds, **B** takes one away; the same
+files as `app_templates/` in the OreoOS repo, shipped inside oreo-cli) into a
+new folder, and fills in the app id, the name shown on the badge, the author
+(from `--author`, else `git config github.user` or `user.name`) and the icon
+module. The id comes from the name: `My Game` -> `my_game`. Edit
+`src/app.py`, then `oreo app install ./my_game`. The app guide is
+[APPS.md](APPS.md).
+
+### `oreo app`: install an app from a folder
+
+```sh
+oreo app install ./my_game      # check, copy to /apps/my_game/, restart OreoOS
+oreo app install ./badge --force   # over a built-in app (working on OreoOS itself)
+oreo app list                   # installed apps
+oreo app remove my_game         # asks first
+```
+
+`install`:
+
+1. checks the folder with the same rules as `tools/validate_app.py` (a copy
+   ships in oreo-cli, and a test keeps them the same). Errors stop it before
+   the badge is touched; warnings are shown;
+2. refuses to replace a built-in app unless you add `--force`;
+3. checks free space, then copies only the files that belong on the badge
+   (`manifest.json`, `main.py`, `__init__.py`, `src/`, `assets/optimized/`)
+   to `/apps/<id>/`, each one through a `.part` file checked with SHA-256
+   (`--no-verify` skips the hash);
+4. removes files an earlier install left that are no longer in the folder.
+   Saved data in `/state/<id>.json` stays;
+5. restarts OreoOS, so the app is in the Apps drawer.
+
+OreoOS imports an app once per boot, so to try a change run
+`oreo app install` again: OreoOS restarts and loads the new code.
+
+`list` and `remove` are the same as `oreo apps list` and `oreo apps remove`.
+
 ### `oreo wifi`: Wi-Fi
 
 ```sh
@@ -547,13 +640,23 @@ Runs a file from the computer on the badge and streams its output.
 ### `oreo dev`: live editing
 
 ```sh
-oreo dev ./myapp                 # mount ./myapp at /remote, open the REPL
-oreo dev ./myapp --run main.py   # and run main.py from it
+oreo dev ./scripts                 # mount ./scripts at /remote, open the REPL
+oreo dev ./scripts --run blink.py  # and run blink.py from it
 ```
 
-The folder on the computer appears on the badge at `/remote`. Edit files on
-the computer and `import` them on the badge without copying. Leave with
-Ctrl-] or Ctrl-X.
+OreoOS stops, the folder on the computer appears on the badge at `/remote`,
+and the REPL opens there. `import mymodule` loads your local copy, so edits
+need no copying. MicroPython imports a module once: after an edit, run
+`import sys; del sys.modules['mymodule']` and import it again. To reach
+OreoOS's own modules, `import sys; sys.path.append('/')`.
+
+OreoOS does not run while you are in the REPL, and its Apps drawer lists apps
+from `/apps` (it only falls back to `/remote/apps` on a badge with no `/apps`
+folder), so an app in the mounted folder does not show up in the drawer. To
+try an app in OreoOS, use [`oreo app install`](#oreo-app-install-an-app-from-a-folder).
+
+Leave with Ctrl-] or Ctrl-X. Ctrl-D soft-resets the badge, which starts
+OreoOS and ends live editing.
 
 ### `oreo flash`: firmware
 

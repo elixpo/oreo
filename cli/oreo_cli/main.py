@@ -12,6 +12,7 @@ import time
 
 from . import __version__, commands, discovery
 from . import transfer  # noqa: F401  registers `transfer` and `send`
+from . import devtools, owner  # noqa: F401  register `new`, `app` and `setup`
 from .badge import Badge
 from .errors import (EXIT_CANCELLED, EXIT_ERROR, EXIT_LINK, Cancelled, OreoError,
                      is_serial_error, local_error_message)
@@ -76,10 +77,16 @@ HELP = {
     "run": ("Run a script on the badge",
             "Stops OreoOS, runs the file and streams its output. Ctrl-C stops it.\n\n"
             "  oreo run blink.py"),
-    "dev": ("Mount a folder for live editing",
-            "Mounts a folder from your computer at /remote on the badge and opens\n"
-            "the REPL: edit files locally, import them on the badge.\n\n"
-            "  oreo dev ./myapp\n  oreo dev ./myapp --run main.py"),
+    "dev": ("Mount a folder for live editing in the REPL",
+            "Stops OreoOS, mounts a folder from your computer at /remote on the\n"
+            "badge and opens the REPL there: `import mymodule` loads your local\n"
+            "copy, so edits need no copying. A module is imported once; after an\n"
+            "edit, `del sys.modules['mymodule']` and import it again. OreoOS does\n"
+            "not run meanwhile, and its drawer lists apps from /apps only, so to\n"
+            "try an app in OreoOS use `oreo app install`. Leave with Ctrl-] or\n"
+            "Ctrl-X (Ctrl-D starts OreoOS and ends live editing).\n\n"
+            "  oreo dev ./scripts\n"
+            "  oreo dev ./scripts --run blink.py"),
     "logs": ("Follow the badge's console output",
              "Prints what OreoOS writes to the console without stopping it.\n"
              "Ctrl-C to stop.\n\n"
@@ -116,6 +123,36 @@ HELP = {
                "firmware, OreoOS missing. Ends with numbered next steps.\n"
                "Exit status 0 when nothing failed, 1 otherwise.\n\n"
                "  oreo doctor"),
+    "setup": ("Set the owner profile: GitHub user, name, timezone, weather",
+              "Shows what the badge has now, asks for each value (Enter keeps it,\n"
+              "- removes it) and writes /profile.json on the badge, which Badge,\n"
+              "Identity, Commits, Weather and the clock read (docs/PROFILE.md).\n"
+              "No .env.local or checkout needed. Values given as options are saved\n"
+              "without prompting. The OpenWeatherMap key is asked without echo and\n"
+              "never shown; an empty value removes a key. OreoOS restarts after.\n\n"
+              "  oreo setup\n"
+              "  oreo setup --show\n"
+              "  oreo setup --github-user octocat --name \"Mona Lisa\" --timezone 5.5\n"
+              "  oreo setup --lat 12.97 --lon 77.59 --weather-name Bengaluru\n"
+              "  oreo setup --owm-key-stdin < owm-key.txt\n"
+              "  oreo setup --designation \"\"     remove the title"),
+    "new": ("Make a new app folder from the app template",
+            "Copies the OreoOS app template (a counter: A adds, B subtracts) into\n"
+            "./<id>, with your app's name, id, author and icon module filled in.\n"
+            "The id comes from the name: \"My Game\" -> my_game.\n\n"
+            "  oreo new my_game\n"
+            "  oreo new \"My Game\" --author octocat --dir ~/oreo-apps\n"
+            "  oreo app install ./my_game      then try it on the badge"),
+    "app": ("Install an app from a folder on this computer",
+            "install checks the folder with the same rules as the repo's\n"
+            "tools/validate_app.py, copies the files that belong on the badge\n"
+            "to /apps/<id>/ (each one checked with SHA-256), removes files an\n"
+            "earlier install left behind, and restarts OreoOS so the Apps drawer\n"
+            "lists it. Built-in apps are not replaced without --force.\n"
+            "Saved data (/state/<id>.json) stays. Store apps: `oreo apps`.\n\n"
+            "  oreo app install ./my_game\n"
+            "  oreo app list\n"
+            "  oreo app remove my_game"),
     "help": ("Help for a command", "  oreo help wifi"),
 }
 
@@ -192,6 +229,34 @@ def build_parser():
     s.add_argument("action", nargs="?", default="list",
                    choices=("list", "refresh", "install", "update", "remove"))
     s.add_argument("app", nargs="?", help="app id (see `oreo apps`)")
+
+    s = _sub(subs, "setup")
+    s.add_argument("--show", action="store_true", help="only print the profile (key hidden)")
+    s.add_argument("--github-user", metavar="LOGIN", help="GitHub user for Badge and Commits")
+    s.add_argument("--name", metavar="TEXT", help="name on the Identity card")
+    s.add_argument("--designation", metavar="TEXT", help="title under the name")
+    s.add_argument("--timezone", metavar="HOURS",
+                   help="hours from UTC, -12 to +14: 5.5, -4, +05:30")
+    s.add_argument("--lat", metavar="DEG", help="weather latitude, -90 to 90")
+    s.add_argument("--lon", metavar="DEG", help="weather longitude, -180 to 180")
+    s.add_argument("--weather-name", metavar="TEXT", help="place name shown by Weather")
+    s.add_argument("--owm-key", metavar="KEY", help="OpenWeatherMap API key (prefer the prompt)")
+    s.add_argument("--owm-key-stdin", action="store_true",
+                   help="read the OpenWeatherMap key from standard input")
+
+    s = _sub(subs, "new")
+    s.add_argument("name", help="app name or id, e.g. my_game or \"My Game\"")
+    s.add_argument("--name", dest="display_name", metavar="TEXT",
+                   help="name shown on the badge (default: from the id)")
+    s.add_argument("--author", help="your GitHub handle (default: from git config)")
+    s.add_argument("--dir", metavar="PATH", help="where to create it (default: here)")
+
+    s = _sub(subs, "app")
+    s.add_argument("action", choices=("install", "list", "remove"))
+    s.add_argument("target", nargs="?", metavar="folder|id",
+                   help="install: the app folder; remove: the app id")
+    s.add_argument("--force", action="store_true", help="install over a built-in app")
+    s.add_argument("--no-verify", action="store_true", help="skip the SHA-256 check")
 
     s = _sub(subs, "run")
     s.add_argument("file")

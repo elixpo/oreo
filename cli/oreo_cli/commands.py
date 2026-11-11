@@ -137,6 +137,25 @@ def cmd_shell(ctx):
     ui.ok("left the shell; OreoOS is starting" if ctx.args.reset != "none" else "left the shell")
 
 
+def dev_notes(folder):
+    """What `oreo dev` can and cannot do, true to how OreoOS loads apps:
+    the launcher lists apps from /apps (it only looks at /remote/apps on a
+    badge with no /apps folder), imports apps.<id>.main once, and never runs
+    while the REPL is open."""
+    notes = ["The REPL starts in /remote, so `import mymodule` loads your local copy. "
+             "A module is imported once: after an edit, "
+             "import sys; del sys.modules['mymodule'] and import it again.",
+             "Ctrl-D here soft-resets the badge, which starts OreoOS (main.py) and ends "
+             "live editing; leave with Ctrl-] or Ctrl-X instead.",
+             "OreoOS is stopped while you are here. To reach its modules: "
+             "import sys; sys.path.append('/')"]
+    if (Path(folder) / "manifest.json").is_file():
+        notes.append("This is an app folder. OreoOS loads apps from /apps, not /remote, "
+                     "so to try it in OreoOS run `oreo app install %s` (OreoOS restarts "
+                     "and opens it from the drawer)." % esc(folder))
+    return notes
+
+
 @command("dev")
 def cmd_dev(ctx):
     ui = ctx.ui
@@ -150,6 +169,8 @@ def cmd_dev(ctx):
         b.connect()
         b.link.mount(str(folder))
         ui.header("dev", "%s is mounted at /remote. Ctrl-] or Ctrl-X to leave." % esc(folder))
+        for line in dev_notes(folder):
+            ui.note(line)
         b.link.friendly()
         if ctx.args.run:
             b.link.t.serial.write(("exec(open(%r).read())\r" % ctx.args.run).encode())
