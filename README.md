@@ -159,6 +159,8 @@ pip install -r oreoOS/requirements.txt
 python tools/deploy.py /dev/ttyACM0      # flash to a connected board
 ```
 
+Connecting over USB (which port, the REPL, copying files, flashing) is covered in [`docs/USB.md`](docs/USB.md).
+
 For step-by-step app-writing + OS internals, see [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 Host tools need Python 3.9 or newer on Linux, macOS, or Windows via WSL. The
@@ -465,6 +467,7 @@ The Gallery's video playback grew into **RV565**, a standalone library and file 
 | | |
 |---|---|
 | 👋 **Just want to use it?** | this README + [`docs/HARDWARE.md`](docs/HARDWARE.md) |
+| 🔌 **Connecting it to a computer?** | [`docs/USB.md`](docs/USB.md): REPL, copying files, deploying, flashing |
 | 🧑‍💻 **Want to write an app?** | [`CONTRIBUTING.md`](CONTRIBUTING.md) + [`templates/example_app/`](templates/example_app/) |
 | 🔌 **Building your own PCB?** | [`docs/DATASHEET.md`](docs/DATASHEET.md) + [`oreoWare/pins.py`](oreoWare/pins.py) |
 | 🤝 **Joining the community?** | [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) + [`SUPPORT.md`](SUPPORT.md) |

@@ -21,8 +21,10 @@ The DevKitC-1 has **two** USB-C ports — they are not interchangeable:
 
 | Silkscreen | Internal path | Linux device | Use for |
 |---|---|---|---|
-| **UART** | USB → CP2102 bridge → UART0 (GPIO43 TX / GPIO44 RX) | `/dev/ttyUSB0` | Flashing + `Serial.print` during bring-up. Auto-reset is bulletproof. |
-| **USB** | USB → ESP32-S3 native USB-OTG peripheral (GPIO19/20) | `/dev/ttyACM0` | USB-CDC, USB-MSC (mount as drive), USB-HID (keyboard mode), DFU. |
+| **UART** | USB → USB-UART bridge (CH343 `1a86:55d3` on the tested board; CP2102N on some DevKitC-1 boards) → UART0 (GPIO43 TX / GPIO44 RX) | `/dev/ttyACM*` (CH343) or `/dev/ttyUSB*` (CP2102N) | Flashing + `Serial.print` during bring-up. Auto-reset is bulletproof. |
+| **USB** | USB → ESP32-S3 native USB-OTG peripheral (GPIO19/20); the Oreo Badge firmware enumerates as `303a:83ec` "Elixpo Oreo Badge" | `/dev/ttyACM*` | USB-CDC, USB-MSC (mount as drive), USB-HID (keyboard mode), DFU. |
+
+Day-to-day use of both ports (REPL, copying files, deploying, flashing) is in [`USB.md`](USB.md).
 
 **Default during development:** flash via the **UART** port. Reserve the **USB** port for the badge's user-facing USB features so a firmware crash on the CDC stack doesn't take your debug serial down with it.
 

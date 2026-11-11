@@ -95,9 +95,12 @@ WiFi, and fun to hack. These items close the gap.
       project in the meantime).
 - [x] 🤖 Set `MICROPY_HW_USB_VID 0x303A` and `MICROPY_HW_USB_PID 0x83EC` in
       `firmware/boards/OREO_BADGE/mpconfigboard.h`.
-- [ ] 🙋 Rebuild and flash the firmware; check `lsusb` shows `303a:83ec`.
+- [x] 🙋 Rebuild and flash the firmware; check `lsusb` shows `303a:83ec`
+      (done 2026-11-10: "Elixpo Oreo Badge" on the native port).
 - [ ] 🤖 Submit "Elixpo Oreo Badge" to the Linux USB ID database (`usb.ids`,
       linux-usb.org), so plain `lsusb` and systemd's hwdb name the badge.
+      Submitted 2026-11-10 by email to the usb.ids robot, with Espressif's
+      vendor entry (303a is not in the file yet); waiting for approval.
 - [ ] 🙋 A good photo of the badge (JPEG, plain background) for MicroPython's
       board page.
 - [ ] 🤖 **MicroPython upstream board** (`micropython/micropython`,
@@ -126,7 +129,7 @@ WiFi, and fun to hack. These items close the gap.
       ([micropython#19846](https://github.com/micropython/micropython/pull/19846)),
       now out of draft.
 - [x] 🤖 Add the allocated USB VID/PID (0x303A:0x83EC) to the upstream board.
-- [ ] 🙋 Build it on MicroPython master, flash, check banner, Wi-Fi scan,
+- [x] 🙋 Build it on MicroPython master, flash, check banner, Wi-Fi scan,
       `I2C(0).scan()` (expect 0x68) and `lsusb` (`303a:83ec`).
 - [ ] 🙋 Send the badge photo to `micropython/micropython-media`, then ask
       for review on the PR.

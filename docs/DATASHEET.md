@@ -231,8 +231,8 @@ manual.
 |---|---|---|---|
 | SPI1 (LCD) | 11 (MOSI), 12 (SCK) + 14 (CS), 15 (DC), 16 (RST) | 40 MHz | `oreoWare.display` |
 | I²C0 | 42 (SDA), 47 (SCL) | 100 kHz default | `oreoWare.imu`, MAX17048 |
-| UART0 | (CP2102 onboard) | 115 200 bps | mpremote, console |
-| USB-CDC | 19 (D-), 20 (D+) | USB FS 12 Mbps | mpremote, REPL |
+| UART0 | 43 (TX), 44 (RX), via the DevKit's USB-UART bridge (CH343 on the tested board) | 115 200 bps | boot log, recovery |
+| USB-CDC | 19 (D-), 20 (D+); `303a:83ec` "Elixpo Oreo Badge" | USB FS 12 Mbps | mpremote, REPL, deploy ([USB.md](USB.md)) |
 | WiFi | internal | 802.11 b/g/n | `oreoWare.wifi`, OTA |
 | BLE | internal | BLE 5.0 LE | `oreoWare.bt` |
 | IR-NEC | 2 (TX), 18 (RX) | 38 kHz carrier | `oreoWare.ir` |
