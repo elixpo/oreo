@@ -130,9 +130,11 @@ def _fetch_owm(lat, lon, api_key):
         import json
         from oreoOS import _http
         url = ("https://api.openweathermap.org/data/2.5/weather"
-               "?lat=%.3f&lon=%.3f&units=metric&appid=%s" % (lat, lon, api_key))
+               "?lat=%.3f&lon=%.3f&units=metric" % (lat, lon))
+        # The key rides only on the request line, never in a logged URL.
         body = _http.get_url(url, accept="application/json",
-                             timeout_s=T_FETCH)
+                             timeout_s=T_FETCH,
+                             secret_query="appid=" + api_key)
         if not body:
             return None
         return parse_owm(json.loads(body.decode("utf-8")))

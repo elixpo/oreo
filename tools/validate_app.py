@@ -35,7 +35,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 _ID_RE = re.compile(r"^[a-z][a-z0-9_]{0,31}$")
 
-_SECRET_PATTERNS = (
+_LEAK_PATTERNS = (
     (re.compile(r"gh[pousr]_[A-Za-z0-9]{30,}"), "GitHub token"),
     (re.compile(r"github_pat_[A-Za-z0-9_]{40,}"), "GitHub token"),
     (re.compile(r"""(WIFI_PASSWORD|OWM_API_KEY|GH_TOKEN|GITHUB_TOKEN)\s*=\s*["'][^"']+["']"""),
@@ -169,7 +169,7 @@ def validate(folder, repo=REPO):
             continue
         if rel.startswith("assets/optimized/"):
             continue   # generated bitmaps: big, never contain secrets
-        for rx, what in _SECRET_PATTERNS:
+        for rx, what in _LEAK_PATTERNS:
             m = rx.search(src)
             if m:
                 line = src.count("\n", 0, m.start()) + 1
