@@ -10,13 +10,15 @@ from its `## [<version>]` section below, so every release needs one.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-12
+
 ### Added
 
 - `oreo setup` puts the owner's GitHub avatar on the badge for the Badge
   app (#133): it downloads the avatar of GITHUB_USER on this computer,
-  converts it to a 56x56 circular RGB565 tile with Pillow (already a
-  dependency) and copies it to `/avatar.bin` with the user it was made
-  for. It is fetched only when missing or made for another user;
+  converts it with Pillow (already a dependency) to a 72x72 circular RGB565
+  tile that fills the Badge app's disc (OreoOS v2.0.10 and later read up to
+  72 px), and copies it to `/avatar.bin` with the user it was made for. It is fetched only when missing or made for another user;
   `--avatar` fetches it again (alone, it does only that) and `--no-avatar`
   skips it. A failed download never fails setup, and an avatar made for
   someone else is removed rather than left behind. `--show` names whose
@@ -24,7 +26,6 @@ from its `## [<version>]` section below, so every release needs one.
 
 ### Changed
 
-- `oreo setup` makes the avatar 72x72 (was 56x56), so it fills the Badge app's disc. OreoOS v2.0.10 and later read up to 72 px, so the larger file works on the current release.
 - `oreo update` says why a download failed: the file, host and reason the badge reports (for example `Downloading oreoOS/splash.rv565: release-assets.githubusercontent.com: timed out`), and the same for a failed check or manifest read. The time allowed for the download now grows with its size and file count (was a flat 120 s). OreoOS releases without the error report keep the old messages.
 
 ## [1.0.0] - 2026-11-11
@@ -232,6 +233,7 @@ problems with `oreo doctor` output attached.
   updating from GitHub releases is future work.
 - No Bluetooth transfers yet (#103).
 
-[Unreleased]: https://github.com/elixpo/oreo/compare/cli-v1.0.0...HEAD
+[Unreleased]: https://github.com/elixpo/oreo/compare/cli-v1.1.0...HEAD
+[1.1.0]: https://github.com/elixpo/oreo/releases/tag/cli-v1.1.0
 [1.0.0]: https://github.com/elixpo/oreo/releases/tag/cli-v1.0.0
 [0.1.0]: https://github.com/elixpo/oreo/pull/117
