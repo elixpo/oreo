@@ -5,7 +5,9 @@ contract test at the end runs the same flow against the real oreoOS/ota.py
 (with a fake oreoOS._http serving a release) when inside a checkout.
 """
 
+import contextlib
 import hashlib
+import io
 import importlib.util
 import json
 import sys
@@ -334,6 +336,20 @@ class RealOtaContractTest(unittest.TestCase):
         self.assertEqual(self.fake.get("/oreoOS/config.py"), b"VERSION = 'v2.1.0'\n")
         self.assertEqual(self.fake.get("/oreoOS/added.py"), b"print('new')\n")
         self.assertFalse(self.fake.exists("/_ota/manifest.json"))
+
+    def test_download_failure_says_which_file_and_why(self):
+        self.badge.ota_check("stable")
+        self.badge.ota_peek()
+        http = sys.modules["oreoOS._http"]
+        http.download_to_file = lambda *a, **k: False
+        http.error_mark = lambda: 0
+        http.error_since = lambda mark: "release-assets.example: timed out"
+        self.ota.time = types.SimpleNamespace(sleep_ms=lambda ms: None)
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertFalse(self.badge.ota_download())
+        self.assertIn("Downloading oreoOS/", self.badge.ota_error)
+        self.assertIn("release-assets.example: timed out", self.badge.ota_error)
+        self.assertFalse(self.badge.ota_status()["pending"])
 
     def test_beta_channel_and_up_to_date(self):
         self.assertEqual(self.badge.ota_check("beta")["latest"], "v2.2.0")

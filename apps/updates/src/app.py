@@ -84,9 +84,18 @@ def _tls_mark():
 
 
 def _tls_error(mark, fallback):
-    """'TLS: <reason>' when a certificate check (or the clock it needs)
+    """Why the last OTA step failed, in plain words: oreoOS.ota's
+    error_text() (step, file, host, reason) on an OS that has it, else
+    'TLS: <reason>' when a certificate check (or the clock it needs)
     failed since `mark`, else `fallback`. Never a silent retry without
     verification: the user sees why the update could not be fetched."""
+    try:
+        from oreoOS import ota
+        text = ota.error_text()
+        if text:
+            return text
+    except Exception:
+        pass
     if mark is None:
         return fallback
     try:
@@ -105,6 +114,27 @@ def _busy(display, title, detail="", progress=None):
         return busy.start(title, detail, progress, display=display)
     except Exception:
         return None
+
+def _wrap(text, width):
+    """Word-wrap one string to lines of at most `width` characters."""
+    out, cur = [], ""
+    for w in text.split():
+        while len(w) > width:
+            if cur:
+                out.append(cur)
+                cur = ""
+            out.append(w[:width])
+            w = w[width:]
+        cand = (cur + " " + w) if cur else w
+        if len(cand) <= width:
+            cur = cand
+        else:
+            out.append(cur)
+            cur = w
+    if cur:
+        out.append(cur)
+    return out
+
 
 S_IDLE        = "idle"
 S_CHECKING    = "checking"
@@ -455,9 +485,11 @@ class App(oreoOS.App):
             self._draw_beta(d)
             return
         if self._state == S_FAILED:
-            msg = (self._error or "something went wrong")[:34]
-            d.text(msg, (SW - len(msg) * 8) // 2,
-                   LOAD_Y + 6, theme.PRIMARY, scale=1)
+            msg = self._error or "something went wrong"
+            y = LOAD_Y - 6
+            for ln in _wrap(msg, (SW - 2 * PAD_X) // 8)[:5]:
+                d.text(ln, (SW - len(ln) * 8) // 2, y, theme.PRIMARY, scale=1)
+                y += 12
             return
         if self._state in (S_AVAILABLE, S_READY):
             self._draw_available(d)

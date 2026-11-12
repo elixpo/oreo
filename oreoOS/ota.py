@@ -101,8 +101,15 @@ SMALL_PATCH_BYTES = 80 * 1024     # 80 KB
 T_GH_API       = 8         # GitHub releases API listing (per_page=10 keeps
                            # the body in the low single-KB range; 8 s is
                            # the slow-WiFi + SSL handshake headroom)
-T_MANIFEST     = 4         # manifest.json download (tiny)
-T_FILE         = 25        # individual file download (user-triggered)
+T_MANIFEST     = 20        # manifest.json (~55 KB: two TLS handshakes,
+                           # github.com then its asset CDN, plus the body;
+                           # 4 s cut it short on a slow link)
+T_FILE         = 20        # per file: each connect and each wait for data
+MIN_RATE_BPS   = 4096      # a file's whole-request budget is
+                           # T_FILE + size / MIN_RATE_BPS: the 400-490 KB
+                           # assets needed 16-20 KB/s within a flat 25 s
+FILE_TRIES     = 3         # attempts per file before the update gives up
+SPACE_RESERVE  = 128 * 1024  # flash left free after staging (as oreo-cli)
 
 # Don't auto-probe in the first minute of boot — gives the UI time to
 # settle, lets the user open the home screen / press a button without
@@ -114,6 +121,97 @@ _OTA_BOOT_GRACE_S = 15 * 60   # 15 min — boot finishes in seconds, but
                               # for at least one drink-of-water window.
                               # Manual "Check Update" from Settings is
                               # unaffected.
+
+
+# ── errors in plain words ───────────────────────────────────────────────────
+#
+# The Updates app (and oreo-cli) used to say only "download failed". Every
+# failing step now records what it was doing, on which file, and why (the
+# host and reason come from oreoOS._http): last_error() for code,
+# error_text() for a screen.
+
+_err = None
+
+STEP_WORDS = {
+    "check":    "Checking for updates",
+    "manifest": "Reading the release",
+    "space":    "Not enough storage",
+    "download": "Downloading",
+    "seal":     "Saving the update",
+    "apply":    "Installing",
+}
+
+
+def _fail(step, reason, path=""):
+    global _err
+    _err = {"step": step, "path": path or "", "reason": reason or "failed"}
+    try:
+        print("[ota] %s %s: %s" % (step, path, reason))
+    except Exception:
+        pass
+    return None
+
+
+def clear_error():
+    global _err
+    _err = None
+
+
+def last_error():
+    """{'step', 'path', 'reason'} of the last failure, or None."""
+    return _err
+
+
+def error_text(e=None):
+    """The last failure as one plain line, e.g. 'Downloading
+    oreoOS/splash.rv565: release-assets.githubusercontent.com: timed out'."""
+    e = e or _err
+    if not e:
+        return ""
+    head = STEP_WORDS.get(e.get("step"), e.get("step") or "Update")
+    if e.get("path"):
+        head += " " + e["path"]
+    return head + ": " + (e.get("reason") or "failed")
+
+
+def _http_mark(h):
+    try:
+        return h.error_mark()
+    except Exception:
+        return None
+
+
+def _http_reason(h, mark, fallback):
+    if mark is None:
+        return fallback
+    try:
+        return h.error_since(mark) or fallback
+    except Exception:
+        return fallback
+
+
+def _reason_of(e):
+    try:
+        from oreoOS import _http as _httpx
+        return _httpx._reason(e)
+    except Exception:
+        return str(e) or repr(e)
+
+
+def _free_bytes(path="/"):
+    """Free bytes on the filesystem holding `path`; None if unknown."""
+    try:
+        st = _os.statvfs(path)
+        return (st[1] or st[0]) * st[4]
+    except Exception:
+        return None
+
+
+def _file_size(p):
+    try:
+        return _os.stat(p)[6]
+    except OSError:
+        return -1
 
 
 # ── helpers ─────────────────────────────────────────────────────────────────
@@ -241,41 +339,57 @@ def latest_version(channel=DEFAULT_CHANNEL, on_progress=None):
 
     Used by the Updates page to decide BETA / LTS / OUTDATED.
     """
+    clear_error()
     if _json is None:
         return None, None
     try:
         from oreoOS import _http as _httpx
     except Exception:
+        _fail("check", "network module missing")
         return None, None
+    mark = _http_mark(_httpx)
     body = _httpx.get_url(
         "https://api.github.com/repos/%s/tags?per_page=10" % OTA_REPO,
         accept="application/vnd.github+json", timeout_s=T_GH_API,
         on_progress=on_progress)
     if body is None:
+        _fail("check", _http_reason(_httpx, mark, "no answer from GitHub"))
         return None, None
     try:
         data = _json.loads(body.decode("utf-8"))
     except Exception:
+        _fail("check", "GitHub sent an unreadable answer")
         return None, None
     if not isinstance(data, list):
+        _fail("check", "GitHub sent an unexpected answer")
         return None, None
+    # The newest version on the channel, by number: GitHub's own order is
+    # not a promise (a string sort puts v2.0.9 above v2.0.13).
     prefix = channel + "/"
+    best = None
     for t in data:
-        tag = t.get("name", "")
-        if not (tag == channel or tag.startswith(prefix)):
+        tag = t.get("name", "") if isinstance(t, dict) else ""
+        if not tag.startswith(prefix):
             continue
-        ver = tag[len(prefix):] if tag.startswith(prefix) else tag
-        manifest_url = (
-            "https://github.com/%s/releases/download/%s/%s"
-            % (OTA_REPO, tag, MANIFEST_NAME))
-        return ver, {
-            "version":      ver,
-            "notes":        "",
-            "manifest_url": manifest_url,
-            "tag":          tag,
-            "major":        _is_major_bump(ver, _current_version()),
-        }
-    return None, None
+        ver = tag[len(prefix):]
+        if _parse_version(ver) == (0, 0, 0):
+            continue
+        if best is None or _parse_version(ver) > _parse_version(best[0]):
+            best = (ver, tag)
+    if best is None:
+        _fail("check", "no %s release found" % channel)
+        return None, None
+    ver, tag = best
+    manifest_url = (
+        "https://github.com/%s/releases/download/%s/%s"
+        % (OTA_REPO, tag, MANIFEST_NAME))
+    return ver, {
+        "version":      ver,
+        "notes":        "",
+        "manifest_url": manifest_url,
+        "tag":          tag,
+        "major":        _is_major_bump(ver, _current_version()),
+    }
 
 
 def _is_major_bump(new_ver, cur_ver):
@@ -346,22 +460,33 @@ def peek(release, on_progress=None):
     manifest itself is a few KB. The expensive part (file-by-file
     download) lives in download().
     """
+    clear_error()
     if not release or _json is None:
         return None
     try:
         from oreoOS import _http as _httpx
     except Exception:
-        return None
-    body = _httpx.get_url(release["manifest_url"], timeout_s=T_MANIFEST,
-                          on_progress=on_progress)
-    if body is None:
-        return None
-    try:
-        manifest = _json.loads(body.decode("utf-8"))
-    except Exception:
-        return None
+        return _fail("manifest", "network module missing")
+    manifest = None
+    reason = "no answer"
+    for _try in range(2):
+        mark = _http_mark(_httpx)
+        body = _httpx.get_url(release["manifest_url"], timeout_s=T_MANIFEST,
+                              on_progress=on_progress)
+        if body is None:
+            reason = _http_reason(_httpx, mark, "no answer")
+            continue
+        try:
+            manifest = _json.loads(body.decode("utf-8"))
+        except Exception:
+            manifest = None
+            reason = "release manifest unreadable"
+            continue
+        body = None
+        break
     if not isinstance(manifest, dict):
-        return None
+        return _fail("manifest", reason)
+    gc.collect()
 
     changed   = []
     unchanged = 0
@@ -381,6 +506,7 @@ def peek(release, on_progress=None):
 
     return {
         "manifest":  manifest,
+        "notes":     manifest.get("notes", "") or "",
         "changed":   changed,
         "unchanged": unchanged,
         "bytes":     total_b,
@@ -390,36 +516,57 @@ def peek(release, on_progress=None):
     }
 
 
-def download(peeked, on_progress=None):
+def download(peeked, on_progress=None, on_bytes=None):
     """Stage 3 — download only the changed files into /_ota.
 
     `peeked` is the dict returned by peek(). Pre-passing it means the
     expensive SHA scan only happens once (during peek), not again here.
 
-    on_progress(file_index, total_files, path) lets the UI render a
-    progress bar. Every HTTP call is timeout-bounded so a hung server
-    can't freeze the OS loop — the worst case is total = T_FILE * len(changed).
+    on_progress(file_index, total_files, path) after each file;
+    on_bytes(bytes_done, bytes_total, path) as data arrives. Every request
+    is bounded (T_FILE per stall, plus a size-based budget per file); a
+    file that fails is retried (FILE_TRIES) on fresh connections before
+    the update gives up. Free space is checked first. On failure
+    last_error() / error_text() say which file, host and reason. Returns
+    True when the update is staged and sealed (manifest written last).
     """
     if not peeked:
         return False
+    clear_error()
     _rm_tree(STAGE_DIR)
+
+    changed = peeked["changed"]
+    total_b = int(peeked.get("bytes", 0) or 0)
+    need = total_b + SPACE_RESERVE
+    free = _free_bytes("/")
+    if free is not None and free < need:
+        _fail("space", "need %d KB, %d KB free"
+              % (need // 1024, free // 1024))
+        return False
+
     try:
         _os.mkdir(STAGE_DIR)
     except OSError:
         pass
 
-    changed = peeked["changed"]
-    total   = len(changed)
+    total = len(changed)
+    done_b = 0
     try:
         for i, entry in enumerate(changed):
             path = entry.get("path", "")
-            url  = entry.get("url", "")
-            want = entry.get("sha256", "")
-            if not (path and url):
+            if not (path and entry.get("url", "")):
+                _fail("download", "release lists a file without a URL", path)
                 return False
-            if not _download_file(url, path, want,
-                                  int(entry.get("size", 0) or 0)):
+            cb = None
+            if on_bytes is not None:
+                def cb(got, _exp, _base=done_b, _path=path):
+                    try:
+                        on_bytes(_base + got, total_b, _path)
+                    except Exception:
+                        pass
+            if not fetch_file(entry, STAGE_DIR, cb):
                 return False
+            done_b += int(entry.get("size", 0) or 0)
             if on_progress:
                 try:
                     on_progress(i + 1, total, path)
@@ -434,16 +581,68 @@ def download(peeked, on_progress=None):
             pass
 
     # Manifest written LAST as the all-good marker. Until this file
-    # exists, apply_pending() won't promote anything from staging.
+    # exists, apply_pending() won't promote anything from staging. It is
+    # written beside its real name and renamed, so a power cut mid-write
+    # cannot leave a half-written marker.
+    final = STAGE_DIR + "/" + MANIFEST_NAME
+    tmp = final + ".tmp"
     try:
-        with open(STAGE_DIR + "/" + MANIFEST_NAME, "w") as f:
+        with open(tmp, "w") as f:
             _json.dump(peeked["manifest"], f)
-    except Exception:
+        _os.rename(tmp, final)
+    except Exception as e:
+        _fail("seal", _reason_of(e))
         return False
     return True
 
 
-def _download_file(url, dest_remote, expected_sha=None, size=0):
+def fetch_file(entry, stage=STAGE_DIR, on_data=None, tries=FILE_TRIES):
+    """Download one manifest entry to <stage>/<path>, verified against its
+    SHA-256 and size, retrying on fresh connections. True on success; on
+    failure last_error() names the file, host and reason. Also used by
+    tools/ota_probe.py with a scratch `stage`."""
+    path = entry.get("path", "")
+    url = entry.get("url", "")
+    want = entry.get("sha256", "") or None
+    size = int(entry.get("size", 0) or 0)
+    try:
+        from oreoOS import _http as _httpx
+    except Exception:
+        _fail("download", "network module missing", path)
+        return False
+    reason = "failed"
+    for attempt in range(max(1, tries)):
+        if attempt:
+            # A fresh start: drop kept-alive connections (one may be what
+            # broke) and give the link a moment.
+            _httpx.close_pool()
+            gc.collect()
+            try:
+                time.sleep_ms(300 * attempt)
+            except AttributeError:
+                time.sleep(0.3 * attempt)
+        mark = _http_mark(_httpx)
+        try:
+            ok = _download_file(url, path, want, size, stage, on_data)
+        except Exception as e:      # e.g. the flash filling up mid-write
+            ok = False
+            reason = _reason_of(e)
+        else:
+            if not ok:
+                reason = _http_reason(_httpx, mark, "failed")
+        if ok:
+            if size and _file_size(stage + "/" + path) != size:
+                reason = "size mismatch"
+            else:
+                return True
+        if "TLS:" in reason or "HTTP 404" in reason:
+            break               # retrying cannot fix these
+    _fail("download", reason, path)
+    return False
+
+
+def _download_file(url, dest_remote, expected_sha=None, size=0,
+                   stage=STAGE_DIR, on_data=None):
     """Download into the staging area mirroring the eventual remote path.
 
     Streams to flash through _http.download_to_file: flat RAM use, SHA-256
@@ -451,17 +650,25 @@ def _download_file(url, dest_remote, expected_sha=None, size=0):
     asset CDN are reused across every file of the patch instead of two
     fresh handshakes per file. A file that fails the hash is removed.
     """
-    stage_path = STAGE_DIR + "/" + dest_remote
+    stage_path = stage + "/" + dest_remote
     parent = stage_path.rsplit("/", 1)[0]
     _ensure_dir(parent)
     try:
         from oreoOS import _http as _httpx
     except Exception:
         return False
-    cap = max(4 * 1024 * 1024, size + 64 * 1024)
-    return _httpx.download_to_file(url, stage_path,
-                                   expected_sha or None,
-                                   timeout_s=T_FILE, max_bytes=cap)
+    cap = (size + 64 * 1024) if size else 4 * 1024 * 1024
+    budget = T_FILE + size // MIN_RATE_BPS
+    try:
+        return _httpx.download_to_file(url, stage_path,
+                                       expected_sha or None,
+                                       timeout_s=T_FILE, max_bytes=cap,
+                                       total_s=budget, on_data=on_data)
+    except TypeError:
+        # An oreoOS._http from before total_s / on_data (mixed install).
+        return _httpx.download_to_file(url, stage_path,
+                                       expected_sha or None,
+                                       timeout_s=budget, max_bytes=cap)
 
 
 def is_pending():
@@ -507,9 +714,10 @@ def apply_pending(on_progress=None):
             _ensure_dir(parent)
         try:
             _copy_file(src, dst)
-        except Exception:
+        except Exception as e:
             # Half-applied state is the worst case; the manifest still
             # exists so apply_pending() will retry on the next boot.
+            _fail("apply", _reason_of(e), path)
             return None
         if on_progress:
             try:
