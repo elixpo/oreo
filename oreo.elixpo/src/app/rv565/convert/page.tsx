@@ -32,7 +32,7 @@ const FAQ = [
   },
   {
     q: "What is the RV565 format?",
-    a: "A small video container for microcontrollers whose frames decode straight to the display's native pixels, so the board runs no colour conversion. Version 7 declares one of nine pixel formats (RGB565 in either byte order, RGB444, RGB666, RGB888, 8- and 4-bit grayscale, and 1-bit monochrome in rows or SSD1306-style pages) and a codec (zlib or stored). Frames are keyframes, XOR deltas from the previous frame, or repeats, with a keyframe at least every K frames so seeking stays fast. Version 6, the format the paper arXiv:2610.35935 measured, is the RGB565 + zlib + every-frame-a-keyframe case. Both are specified in the RV565 repository.",
+    a: "A small video container for microcontrollers whose frames decode straight to the display's native pixels, so the board runs no colour conversion. Version 7 declares one of nine pixel formats (RGB565 in either byte order, RGB444, RGB666, RGB888, 8- and 4-bit grayscale, and 1-bit monochrome in rows or SSD1306-style pages) and a codec (zlib or stored). Frames are keyframes, XOR deltas from the previous frame, repeats, or partial deltas that carry only the bands of rows that changed (each predicted from the previous frame, optionally shifted to follow motion), so the board sends only those rows to the display. A keyframe comes at least every K frames, so seeking stays fast. Version 6, the format the paper arXiv:2610.35935 measured, is the RGB565 + zlib + every-frame-a-keyframe case. Both are specified in the RV565 repository.",
   },
   {
     q: "Which boards and displays work?",
