@@ -504,7 +504,7 @@ The Gallery's video playback grew into **RV565**, a standalone library and file 
 | 🧑‍💻 **Want to write an app?** | [`docs/APPS.md`](docs/APPS.md) + [`app_templates/`](app_templates/) |
 | 🔌 **Building your own PCB?** | [`docs/DATASHEET.md`](docs/DATASHEET.md) + [`oreoWare/pins.py`](oreoWare/pins.py) |
 | 🤝 **Joining the community?** | [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) + [`SUPPORT.md`](SUPPORT.md) |
-| 🛡 **Found a vulnerability?** | [`SECURITY.md`](SECURITY.md) |
+| 🛡 **Found a vulnerability?** | [`docs/SECURITY.md`](docs/SECURITY.md) |
 | 📖 **Citing OreoOS or RV565?** | [`CITATION.cff`](CITATION.cff) + [`paper/`](paper/) |
 
 A docs index lives at [`docs/README.md`](docs/README.md).
@@ -518,7 +518,7 @@ We love new contributors. The bar is low; the welcome is warm.
 - 🐛 Bugs / ideas: open an [issue](https://github.com/elixpo/oreo/issues/new/choose)
 - 🔧 Code: read [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - 🧑‍🤝‍🧑 Community: read the [`Code of Conduct`](CODE_OF_CONDUCT.md)
-- 🔐 Security disclosures: read [`SECURITY.md`](SECURITY.md)
+- 🔐 Security disclosures: read [`docs/SECURITY.md`](docs/SECURITY.md)
 
 ---
 
@@ -605,7 +605,7 @@ accepted. Oreo hosts one proposed project idea:
 2. Run the tests (`python3 -m unittest discover -s tests` and
    `python3 tools/validate_app.py`, standard library only), install the CLI
    from the checkout (`pip install -e cli/`) and try `oreo new my_app`. Read
-   [LEARN.md](LEARN.md) for a guided tour of OreoOS.
+   [docs/LEARN.md](docs/LEARN.md) for a guided tour of OreoOS.
 3. Read [`docs/CLI.md`](docs/CLI.md), [`docs/README.md`](docs/README.md) and
    [`docs/HARDWARE.md`](docs/HARDWARE.md): the simulator stands in for the
    display and buttons, and answers the `oreo` CLI like a badge.
@@ -651,6 +651,12 @@ Hardware Association, UID [IN000107](https://certification.oshwa.org/in000107.ht
     <img src="oreo.elixpo/public/oshw_mark.png" alt="Certified open source hardware, OSHWA UID IN000107" width="260">
   </picture>
 </a>
+
+> **Dedication.** OreoOS is dedicated to [@anwe-ch](https://github.com/anwe-ch),
+> for its full runtime. Read why in the [preamble](PREAMBLE.md).
+>
+> _Psst: she is the co-author of [RV565](https://arxiv.org/abs/2610.35935),
+> the video format the Gallery plays._
 
 - **Code** (OreoOS, oreoWare, apps, tooling) - [MIT](LICENSE).
 - **Hardware** (KiCad schematics, PCB, symbols, BOMs and generated files under

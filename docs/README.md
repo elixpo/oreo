@@ -13,6 +13,12 @@ rendered from these files when the site is built:
 [/docs/usb](https://oreo.elixpo.com/docs/usb/) and
 [/docs/transfer](https://oreo.elixpo.com/docs/transfer/). Edit them here.
 
+New here? Read the [preamble](../PREAMBLE.md) first: what OreoOS is, the
+rules it is built by and how it is put together. Then
+[`LEARN.md`](LEARN.md) is a guided tour of the code. How the project is run:
+[`GOVERNANCE.md`](GOVERNANCE.md); reporting a vulnerability:
+[`SECURITY.md`](SECURITY.md).
+
 If you're writing an app, start with [`APPS.md`](APPS.md). For the OS
 itself, see the root [`CONTRIBUTING.md`](../CONTRIBUTING.md) and
 [`AGENTS.md`](../AGENTS.md).
