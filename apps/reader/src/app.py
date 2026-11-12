@@ -23,6 +23,8 @@ import os
 import oreoOS
 from oreoOS import api, theme, widgets
 
+OPEN_CARD_MS = 120
+
 
 SW = api.SCREEN_W
 SH = api.SCREEN_H
@@ -544,7 +546,18 @@ class App(oreoOS.App):
     def _open(self, entry):
         name, path = entry
         self._title  = name
-        self._blocks = _layout(_read_lines(path))
+        # Reading, inflating and wrapping a long document takes seconds:
+        # a card shows unless it is done within OPEN_CARD_MS.
+        try:
+            from oreoOS import busy
+            card = busy.show("Opening", name, delay_ms=OPEN_CARD_MS)
+        except ImportError:
+            card = None
+        if card is None:
+            self._blocks = _layout(_read_lines(path))
+        else:
+            with card:
+                self._blocks = _layout(_read_lines(path))
         self._total_h = sum(b[2] for b in self._blocks)
         self._scroll  = 0
         self._mode    = "view"
