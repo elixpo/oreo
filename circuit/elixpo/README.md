@@ -42,6 +42,12 @@ flat engineering export that is regenerated directly from the schematic model.
 
 ## Before PCB layout
 
+- Bring the schematic in line with the breadboard (#106): microSD on its
+  own SDMMC bus (GPIO38/39/40) instead of the LCD's SPI bus, and the
+  MAX98357A I2S amplifier (GPIO41/21/46) powered from VSYS. The corner LEDs
+  that held GPIO38–41 move to the I2C GPIO expander.
+- Add the I2C GPIO expander for the eight buttons, the corner LEDs and the
+  touch pad (#102), with its interrupt on a freed GPIO.
 - Freeze the exact display module and battery connector orientation.
 - Confirm the selected LiPo capacity, protection board, NTC curve and maximum
   permitted charge current.
@@ -51,6 +57,28 @@ flat engineering export that is regenerated directly from the schematic model.
 - Confirm every regulator inductor, capacitor DC-bias curve and thermal margin.
 - Treat this as an engineering prototype, not a production-certified charger
   or RF design, until layout review, bring-up and compliance testing complete.
+
+## Contributing
+
+Open work is labelled
+[hardware](https://github.com/elixpo/oreo/issues?q=is%3Aopen+label%3Ahardware),
+and new ideas go in the
+[hardware issue form](https://github.com/elixpo/oreo/issues/new?template=hardware.yml).
+In short:
+
+- Change the schematic by changing `generate_badge_schematic.py`, then run
+  `build.sh` and commit what it writes. Edits made only in the schematic
+  editor are lost on the next run.
+- Lay out the PCB by hand in `elixpo.kicad_pcb`.
+- CI (`.github/workflows/hardware.yml`, KiCad 10.0.5) fails if the committed
+  schematic differs from the generator, if ERC reports anything, or, once
+  the board has footprints, if DRC or schematic parity fails. Its artifact
+  holds the schematic PDF, the BOM and the reports.
+- A pin change also changes `oreoWare/pins.py`, the drivers and
+  `docs/HARDWARE.md` in the same pull request.
+
+The full guide is the
+[hardware section of CONTRIBUTING.md](../../CONTRIBUTING.md#work-on-the-hardware).
 
 ## Licence
 
