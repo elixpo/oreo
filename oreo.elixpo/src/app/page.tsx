@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Cpu, Wifi, Bluetooth, Code2, Film } from "lucide-react";
+import { Cpu, Usb, Bluetooth, Code2, Film } from "lucide-react";
 import { Reveal } from "@/components/MotionWrap";
 import AppCard from "@/components/AppCard";
 import WavesHero from "@/components/WavesHero";
@@ -13,10 +13,10 @@ const FEATURES = [
       "MicroPython on ESP32-S3. Apps are a manifest.json + main.py — write one in ~30 lines and it shows up in the drawer.",
   },
   {
-    Icon: Wifi,
-    title: "AirDrop, the open-hardware way",
+    Icon: Usb,
+    title: "Files over USB, guarded by a code",
     body:
-      "WiFi-based file transfer with on-badge approval. 6-digit code, beacon handshake, RGB565 conversion in the browser.",
+      "Open Transfer on the badge, run `oreo transfer send`, type the code it shows. No Wi-Fi setup, and nothing listens on your network.",
   },
   {
     Icon: Bluetooth,
