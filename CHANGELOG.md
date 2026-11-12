@@ -18,6 +18,7 @@ Format for a new entry (add to the top, push, CI does the rest):
 
 ## Unreleased
 
+- **tools/release.py publishes to the repository badges update from** (#134): the repository comes from `OTA_REPO` in oreoOS/ota.py, or `--repo owner/name`, and is used for the manifest's download URLs and every `gh release` command; `--dry-run` shows it. A fork no longer edits release.py. A release stops when `origin`, where the tag is pushed, is another repository.
 - **Badge shows its owner's avatar, not the maintainer's** (#133): no avatar ships with OreoOS any more. `oreo setup` fetches the avatar of the profile's GITHUB_USER on the computer and copies it over USB to /avatar.bin (outside the app folders, so updates keep it), and Badge shows it only while that user is GITHUB_USER; otherwise it draws the owner's initials. Badge deletes the old shipped avatar module, deploys remove it, and deploy and release builds never include it. tools/fetch_avatar.py now writes the same /avatar.bin file, sharing the CLI's code.
 
 ## v2.0.0 — 2026-11-07
