@@ -31,7 +31,7 @@ from urllib.request import Request, urlopen
 # contract test checks them inside an OreoOS checkout).
 PATH = "/avatar.bin"
 MAGIC = b"OAV1"
-SIZE = 56                       # fits the Badge app's 72 px disc with a margin
+SIZE = 72                       # fills the Badge app's 72 px disc; OreoOS reads up to 72
 CHROMA_KEY_RGB = (248, 0, 248)
 CHROMA_KEY_565 = 0xF81F
 HEADER = len(MAGIC) + 3

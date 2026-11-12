@@ -6,7 +6,7 @@ fetches it again). This script is the same conversion without a badge,
 for checking the result or copying it by hand. The code is shared with
 the CLI: cli/oreo_cli/avatar.py, loaded by path, so the two never drift.
 
-The file is a 56x56 circular tile in big-endian RGB565 (corners magenta
+The file is a 72x72 circular tile in big-endian RGB565 (corners magenta
 0xF81F, transparent on the badge) with the GitHub user it was made for;
 the Badge app shows it only while that user is the profile's GITHUB_USER.
 It belongs to one person, so it is never committed or shipped

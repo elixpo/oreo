@@ -116,7 +116,7 @@ def avatar(user, max_side=72):
     big-endian RGB565 (0xF81F transparent), ready for display.blit.
 
     Reads the 7-byte header, the login and then the pixels straight into
-    one buffer (about 6 KB for 56x56); never raises."""
+    one buffer (about 10 KB for 72x72); never raises."""
     if _empty(user) or not isinstance(user, str):
         return None
     want = user.strip().lstrip("@").lower()

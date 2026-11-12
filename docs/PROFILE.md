@@ -37,7 +37,7 @@ note listing every key that is still blank.
 
 The Badge app draws your GitHub avatar in its ring. It is not a profile
 key and the badge never downloads it: `oreo setup` fetches the avatar of
-`GITHUB_USER` on your computer, converts it to a 56x56 circle and copies it
+`GITHUB_USER` on your computer, converts it to a 72x72 circle and copies it
 over USB to **`/avatar.bin`**, next to `/profile.json` and outside every
 app folder, so OreoOS updates and deploys never replace it. The file
 records the GitHub user it was made for, and Badge shows it only while
