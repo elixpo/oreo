@@ -293,6 +293,15 @@ for a moment. Without `_thread`, or on an OS whose display has no
 `push_buffer()`, the card is drawn by your thread instead and moves on
 `progress()`, `detail()` and `pump()` calls.
 
+A C call that holds the GIL for its whole duration stops the animator
+too: `wlan.active()`, `ble.active()`, `wlan.connect()`, a large flash
+erase. For those, answer the press first: draw the control's pending
+state ("turning on...", a spinner frame), call `display.present()`, and
+only then make the call; afterwards show the real state, or say in words
+that it failed. A press latched while the call ran reaches your app in
+the next frame, so drop a repeat of the same toggle in that frame. The
+notification panel's WiFi/BT tiles and the WiFi app work this way.
+
 Rules: do not draw or present from another thread while a card is up,
 and repaint your app after it (`self._dirty = True`). App Store apps
 should import `oreoOS.busy` inside `try: ... except ImportError:` (older

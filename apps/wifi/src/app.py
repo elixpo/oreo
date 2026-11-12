@@ -23,9 +23,17 @@ Pages (self._mode):
              keyboard, so it explains how to add it over USB with
              `oreo wifi connect`.
 
-Nothing here blocks: scans run in oreoWare.wifi's background worker and
-joins use connect_begin()/connect_poll(). Saved networks live in
-/wifi.json, managed by oreoWare.wifi.
+Nothing here waits in a frame: scans run in oreoWare.wifi's background
+worker and joins use connect_begin()/connect_poll(), polled from update().
+What is left are the radio's own C calls (wlan.active(), wlan.connect(),
+set_power_mode()): they hold MicroPython's interpreter lock while they
+run, so no spinner thread could draw during them. Every press that makes
+one paints its answer first ("turning on...", "setting Eco...", the
+connect overlay) and presents it, then makes the call; a row whose call
+did not take says "failed" for NOTE_MS instead of snapping back. A press
+of A on such a row in the first frame after the call was made during it
+and is dropped, so a second tap never queues a second toggle.
+Saved networks live in /wifi.json, managed by oreoWare.wifi.
 """
 
 import oreoOS
@@ -51,6 +59,7 @@ NET_ROWS     = (LIST_BOTTOM - NET_TOP_Y) // ROW_H
 ANIM_MS      = 90          # repaint cadence while something animates
 RESULT_MS    = 2600        # how long the connect result stays up
 FORGET_MS    = 2000        # window for the second B press on Saved
+NOTE_MS      = 3000        # a row's "failed" note stays this long
 
 POWER_LABELS = {
     "off":      "Off",
@@ -165,6 +174,7 @@ class App(oreoOS.App):
         self._c_save    = None        # (ssid, pw) to save once joined
         self._c_ip      = ""
         self._c_pending = None        # (ssid, pw) waiting for a scan to end
+        self._c_phase   = ""          # "starting" while connect_begin runs
         self._c_code    = ""          # raw driver reason shown on failure
         self._pw_ssid   = ""
         self._n_saved   = 0
@@ -173,6 +183,14 @@ class App(oreoOS.App):
         self._speed_label = ""
         self._ping_label  = ""
         self._busy        = ""
+
+        # Radio rows: (row, text) while a radio call runs, row ->
+        # (start_ms, text) failure notes, and the frame count when the
+        # last call ended (a press latched during it arrives next frame).
+        self._pending   = None
+        self._row_note  = {}
+        self._frames    = 0
+        self._call_end  = None
 
     # ── data ────────────────────────────────────────────────────────────
     def _read(self):
@@ -274,26 +292,73 @@ class App(oreoOS.App):
             return sel - rows + 1
         return top
 
+    # ── radio calls: answer the press before the blocking call ──────────
+    def _radio_call(self, row, text, fn):
+        """Show `text` on the row and present it, then run fn() (blocking
+        radio work; truthy when it took). A failure leaves "failed" on
+        the row for NOTE_MS."""
+        self._pending = (row, text)
+        self._row_note.pop(row, None)
+        self._present_now()
+        try:
+            ok = fn()
+        except Exception:
+            ok = False
+        self._pending = None
+        self._call_end = self._frames
+        self._snap = self._read()
+        if not ok:
+            self._row_note[row] = time.ticks_ms()
+        self._dirty = True
+
+    def _echo(self):
+        """True for a press in the first frame after a radio call: it was
+        latched while the call held the badge, so it is not a new tap."""
+        return (self._call_end is not None and
+                self._frames - self._call_end <= 1)
+
+    def _present_now(self):
+        """Paint the page and push it to the screen now, before a call
+        that blocks the frame."""
+        self._dirty = True
+        try:
+            self.draw(self._os.display)
+            self._os.display.present()
+        except Exception:
+            pass
+
+    def _noted(self, row):
+        t = self._row_note.get(row)
+        if t is None:
+            return False
+        if time.ticks_diff(time.ticks_ms(), t) > NOTE_MS:
+            del self._row_note[row]
+            self._dirty = True
+            return False
+        return True
+
     def _activate_row(self):
         if not self._wifi:
             return
         r = self._sel
+        if r in (self.ROW_STATUS, self.ROW_POWER) and self._echo():
+            return                      # pressed while the last call ran
         if r == self.ROW_STATUS:
+            w = self._wifi
             if self._snap.get("radio_on"):
-                try:
-                    self._wifi.auto_stop()
-                    self._wifi.connect_cancel()
-                    self._wifi.radio_off()
-                except Exception:
-                    pass
+                def off():
+                    w.auto_stop()
+                    w.connect_cancel()
+                    w.radio_off()
+                    return not w.is_radio_on()
+                self._radio_call(r, "turning off...", off)
             else:
-                # Non-blocking: the run loop's auto_tick() joins the best
-                # saved network in range.
-                try:
-                    self._wifi.auto_begin()
-                except Exception:
-                    pass
-            self._snap = self._read()
+                # The join itself is non-blocking: the run loop's
+                # auto_tick() joins the best saved network in range.
+                def on():
+                    w.auto_begin()
+                    return w.is_radio_on()
+                self._radio_call(r, "turning on...", on)
         elif r == self.ROW_NEARBY:
             self._open_nearby()
         elif r == self.ROW_SAVED:
@@ -305,12 +370,13 @@ class App(oreoOS.App):
                 nxt = modes[(modes.index(cur) + 1) % len(modes)]
             except ValueError:
                 nxt = modes[0]
-            try:
-                self._wifi.set_power_mode(nxt)
+            def power():
+                if self._wifi.set_power_mode(nxt) is False:
+                    return False
                 self._os.settings_set("wifi_power_mode", nxt)
-            except Exception:
-                pass
-            self._snap = self._read()
+                return True
+            self._radio_call(r, "setting %s..." % POWER_LABELS.get(nxt, nxt),
+                             power)
         elif r == self.ROW_AUTOCONNECT:
             try:
                 self._os.settings_set("wifi_autoconnect",
@@ -344,6 +410,16 @@ class App(oreoOS.App):
             return
         self._scan_want = False
         self._scan_note = ""
+        try:
+            radio_off = not w.is_radio_on()
+        except Exception:
+            radio_off = False
+        if radio_off:
+            # scan_start() powers the radio up first (a blocking C call):
+            # say so on screen before it runs.
+            self._scan_note = "starting the radio..."
+            self._present_now()
+            self._scan_note = ""
         if not w.scan_start():
             self._scan_note = "scan failed"
 
@@ -473,10 +549,17 @@ class App(oreoOS.App):
         self._c_pending = (ssid, pw)
         if not w.scan_busy():
             self._begin_pending()
+        else:
+            self._present_now()         # "waiting for the scan"
 
     def _begin_pending(self):
         ssid, pw = self._c_pending
         self._c_pending = None
+        # connect_begin() powers the radio and hands the network to the
+        # driver (C calls that block the frame): the overlay goes up first.
+        self._c_phase = "starting"
+        self._present_now()
+        self._c_phase = ""
         ok = False
         try:
             ok = self._wifi.connect_begin(ssid, pw)
@@ -637,6 +720,7 @@ class App(oreoOS.App):
 
     # ── update ──────────────────────────────────────────────────────────
     def update(self, dt):
+        self._frames += 1
         self._poll_t += dt
         if self._poll_t >= self._poll_dt:
             self._poll_t = 0.0
@@ -724,9 +808,19 @@ class App(oreoOS.App):
             n_near = 0
         n_saved = self._n_saved
         scanning = bool(self._wifi and self._wifi.scan_busy())
+        status = ("ON" if on else "OFF", theme.PRIMARY if on else theme.MUTED)
+        power = (POWER_LABELS.get(self._power_mode(), "?"), theme.TEAL)
+        pend = self._pending
+        if pend is not None and pend[0] == self.ROW_STATUS:
+            status = (pend[1], theme.GOLD)
+        elif self._noted(self.ROW_STATUS):
+            status = ("failed (" + status[0] + ")", theme.PRIMARY)
+        if pend is not None and pend[0] == self.ROW_POWER:
+            power = (pend[1], theme.GOLD)
+        elif self._noted(self.ROW_POWER):
+            power = ("failed (" + power[0] + ")", theme.PRIMARY)
         return (
-            ("Status",       "ON" if on else "OFF",
-                             theme.PRIMARY if on else theme.MUTED),
+            ("Status",       status[0], status[1]),
             ("Network",      net[0], net[1]),
             ("IP",           snap.get("ip") or "-", theme.TEXT_DIM),
             ("Nearby",       "scanning..." if scanning else
@@ -734,8 +828,7 @@ class App(oreoOS.App):
             ("Saved",        "%d saved" % n_saved, theme.TEXT_BRIGHT),
             ("Speed",        self._speed_label or "-", theme.TEAL),
             ("Ping",         self._ping_label or "-", theme.TEAL),
-            ("Power",        POWER_LABELS.get(self._power_mode(), "?"),
-                             theme.TEAL),
+            ("Power",        power[0], power[1]),
             ("Auto-connect", "ON" if self._autoconnect() else "OFF",
                              theme.TEXT_BRIGHT),
         )
@@ -762,7 +855,12 @@ class App(oreoOS.App):
             d.text("^", SW - 10, ROW_TOP_Y - 4, theme.MUTED)
         if self._top + VISIBLE_ROWS < len(rows):
             d.text("v", SW - 10, LIST_BOTTOM - 10, theme.MUTED)
-        widgets.draw_hint(d, "A=select  B=back")
+        if self._pending is not None:
+            widgets.draw_hint(d, "Please wait...")
+        elif self._noted(self.ROW_STATUS) or self._noted(self.ROW_POWER):
+            widgets.draw_hint(d, "The radio didn't change. A = retry")
+        else:
+            widgets.draw_hint(d, "A=select  B=back")
 
     def _draw_status_strip(self, d, text, color, busy):
         d.text(text, ROW_PAD_X, ROW_TOP_Y - 2, color, scale=1)
@@ -906,6 +1004,13 @@ class App(oreoOS.App):
             d.rect(40, y + 70, bw, 4, theme.MUTED2, fill=True)
             d.rect(40, y + 70, min(bw, bw * el // total), 4,
                    theme.PRIMARY, fill=True)
+            if self._c_phase:
+                note = "Starting the radio..."
+            elif self._c_pending is not None:
+                note = "Waiting for the scan to end"
+            else:
+                note = "Joining: %d of %d s" % (el // 1000, total // 1000)
+            d.text(note, cx - len(note) * 4, y + 84, theme.TEXT_DIM)
             widgets.draw_hint(d, "B=cancel")
             return
         if st == "ok":
