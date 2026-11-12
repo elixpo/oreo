@@ -6,8 +6,18 @@ Usage:
 
 Output (default into ./dist/<version>/):
     manifest.json     - listing of every shipped file, with sha256 + size
-    files/<path>      - copy of each shipped file (mirrors device layout)
+                        (plain .py; what every OreoOS release can install)
+    manifest-mpy.json - the same release with the modules tools/mpy_build.py
+                        selects precompiled to .mpy, and a "remove" list of
+                        the .py files they replace (manifest_format 2; only
+                        an ota.py that knows the format asks for it)
+    files/<path>      - copy of each shipped file (mirrors device layout),
+                        plus the compiled .mpy files
     bundle.tar        - everything in one tarball (alternative single-asset upload)
+
+--mpy require (CI) fails the build unless mpy-cross is MicroPython 1.28.0's;
+--mpy auto (default) builds manifest-mpy.json when it is, and warns and
+skips it when not; --mpy off never builds it.
 
 The CI workflow attaches `manifest.json` (and individually-named files,
 or `bundle.tar`) to the GitHub Release. The badge's OTA client downloads
@@ -36,6 +46,10 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import mpy_build  # noqa: E402
+
+MPY_MANIFEST_NAME = "manifest-mpy.json"
 
 
 # Mirrors tools/deploy.py's DEPLOY list — these are the files that
@@ -181,7 +195,45 @@ def _read_version():
     return VERSION
 
 
-def main():
+def _entry(dest, remote, base_url):
+    """Manifest entry for the file at `dest` shipped as `remote`."""
+    # GitHub Releases assets are stored at one URL per file, named to
+    # avoid path collisions. We flatten slashes to '_' for the download
+    # URL while keeping the original `path` in the manifest.
+    flat_name = remote.replace("/", "_")
+    return {
+        "path":   remote,
+        "url":    (base_url + flat_name) if base_url else flat_name,
+        "size":   dest.stat().st_size,
+        "sha256": _sha256(dest),
+    }
+
+
+def build_mpy_manifest(manifest, files_dir, mpy_cross, base_url=""):
+    """manifest-mpy.json's dict: `manifest` with every module
+    mpy_build.should_compile() picks replaced by its .mpy (compiled into
+    files_dir), and the replaced .py paths under "remove"."""
+    files = []
+    remove = []
+    for e in manifest["files"]:
+        remote = e["path"]
+        if not mpy_build.should_compile(remote):
+            files.append(dict(e))
+            continue
+        mremote = mpy_build.mpy_path(remote)
+        dest = mpy_build.compile_file(mpy_cross, files_dir / remote,
+                                      files_dir / mremote, remote)
+        files.append(_entry(dest, mremote, base_url))
+        remove.append(remote)
+    out = dict(manifest)
+    out["files"] = files
+    out["remove"] = remove
+    out["manifest_format"] = 2
+    out["mpy"] = mpy_build.MPY_ABI
+    return out
+
+
+def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--version", help="override the version string (default: read config.py)")
     ap.add_argument("--channel", default="stable",
@@ -195,7 +247,12 @@ def main():
                          "set this so OTA clients can find them. Empty = placeholder.")
     ap.add_argument("--out",     default="dist",
                     help="output directory root (default: dist/)")
-    args = ap.parse_args()
+    ap.add_argument("--mpy", choices=("auto", "require", "off"), default="auto",
+                    help="build manifest-mpy.json with precompiled modules "
+                         "(require: fail without MicroPython 1.28.0's mpy-cross)")
+    ap.add_argument("--mpy-cross", default=None,
+                    help="path to mpy-cross (default: $MPY_CROSS, PATH, ~/esp)")
+    args = ap.parse_args(argv)
 
     version  = args.version or _read_version()
     out_root = REPO_ROOT / args.out / version
@@ -221,20 +278,7 @@ def main():
         if dest.stat().st_size == 0:
             dest.write_bytes(b"\n")
 
-        sha  = _sha256(dest)
-        size = dest.stat().st_size
-
-        # GitHub Releases assets are stored at one URL per file, named to
-        # avoid path collisions. We flatten slashes to '_' for the
-        # download URL while keeping the original `path` in the manifest.
-        flat_name = remote.replace("/", "_")
-        url = (args.asset_base_url + flat_name) if args.asset_base_url else flat_name
-        files.append({
-            "path":   remote,
-            "url":    url,
-            "size":   size,
-            "sha256": sha,
-        })
+        files.append(_entry(dest, remote, args.asset_base_url))
 
     manifest = {
         "version":  version,
@@ -247,6 +291,25 @@ def main():
 
     manifest_path = out_root / "manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2))
+
+    mpy_path = out_root / MPY_MANIFEST_NAME
+    if mpy_path.exists():
+        mpy_path.unlink()
+    if args.mpy != "off":
+        tool = args.mpy_cross or mpy_build.find_mpy_cross()
+        try:
+            print("mpy-cross:", mpy_build.check(tool))
+            mpy_manifest = build_mpy_manifest(manifest, files_dir, tool,
+                                              args.asset_base_url)
+        except mpy_build.MpyError as e:
+            if args.mpy == "require":
+                sys.exit("build_release: %s" % e)
+            print("warning: %s; %s not built (badges install the .py "
+                  "release)" % (e, MPY_MANIFEST_NAME))
+        else:
+            mpy_path.write_text(json.dumps(mpy_manifest, indent=2))
+            print("  %s: %d modules precompiled"
+                  % (MPY_MANIFEST_NAME, len(mpy_manifest["remove"])))
 
     # Convenience tarball.
     bundle_path = out_root / "bundle.tar"

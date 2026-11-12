@@ -17,6 +17,15 @@ Usage:
         # diverged on device and you want the laptop copy to win. Without
         # --override the device-side content for those apps is preserved.
 
+    python tools/deploy.py --py
+        # development: push every module as plain .py (and remove the .mpy
+        # an earlier deploy or OTA left). Without --py, the modules
+        # tools/mpy_build.py selects (oreoOS/, oreoWare/, built-in apps'
+        # src/) are compiled with MicroPython 1.28.0's mpy-cross and pushed
+        # as .mpy, and their .py is removed from the badge afterwards
+        # (MicroPython imports x.py before x.mpy). No matching mpy-cross:
+        # a warning, and plain .py as with --py.
+
 Must be run from the project root.
 """
 
@@ -52,6 +61,8 @@ for _arg in sys.argv[1:]:
         except ValueError:
             pass
 SKIP_FREE_GUARD = "--no-free-guard" in sys.argv
+PLAIN_PY = "--py" in sys.argv          # development: no .mpy (see the docstring)
+MPY_DIR = Path(".deploy_mpy")          # compiled modules (git-ignored)
 
 # --override=<csv>  -- list of app dir names to wipe on device BEFORE the
 # push. The deploy still pushes the laptop copy afterwards, so the net
@@ -321,6 +332,51 @@ for subdir in ["icons", "sprites", "status"]:
             DEPLOY.append((parent_local, parent_remote))
 
 DEPLOY.append(("assets/__init__.py", "assets/__init__.py"))
+
+
+# ── precompiled modules ───────────────────────────────────────────────────────
+
+def mpy_plan(deploy, plain=False, tool=None, out_dir=MPY_DIR):
+    """(deploy list, remote paths to delete after the push, note).
+
+    Modules mpy_build.should_compile() selects are compiled into out_dir
+    and pushed as .mpy; their .py is deleted on the badge afterwards. With
+    `plain` (or no usable mpy-cross) every module goes as .py and the .mpy
+    an earlier deploy or OTA left is deleted instead, since a stale .mpy is
+    only dead weight once the .py is back (the .py wins the import)."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import mpy_build
+    note = "modules as .mpy"
+    if plain:
+        tool, note = None, "plain .py (--py)"
+    else:
+        tool = tool or mpy_build.find_mpy_cross()
+        try:
+            mpy_build.check(tool)
+        except mpy_build.MpyError as e:
+            tool, note = None, "plain .py: %s" % e
+    out, remove = [], []
+    for local, remote in deploy:
+        if mpy_build.should_compile(remote) and Path(local).exists():
+            m = mpy_build.mpy_path(remote)
+            if tool:
+                dst = Path(out_dir) / m
+                if (not dst.exists()
+                        or dst.stat().st_mtime < Path(local).stat().st_mtime):
+                    mpy_build.compile_file(tool, local, dst, remote)
+                out.append((str(dst), m))
+                remove.append(remote)
+                continue
+            remove.append(m)
+        out.append((local, remote))
+    return out, remove, note
+
+
+def remove_script(paths):
+    return ("import os\n"
+            "for p in %r:\n"
+            "    try: os.remove(p)\n"
+            "    except OSError: pass\n") % list(paths)
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -829,13 +885,17 @@ def main():
     ) % list(remote_dirs)
     mpremote("exec", mkdir_script)
 
+    # Precompiled modules (or plain .py with --py), see mpy_plan().
+    deploy_list, mpy_remove, mpy_note = mpy_plan(DEPLOY, PLAIN_PY)
+    print("Modules: %s" % mpy_note)
+
     # Build cp action list, skipping files whose hash matches the local cache.
     cache       = _load_hash_cache()
     new_cache   = dict(cache)
     actions     = []
     files       = []
     skipped_pre = 0
-    for local, remote in DEPLOY:
+    for local, remote in deploy_list:
         if not Path(local).exists():
             print("SKIP  %s (not found locally)" % local)
             continue
@@ -971,6 +1031,15 @@ def main():
     # Only trust queued hashes after the complete mpremote batch succeeds.
     # Saving them after an interrupted/failed --force run marks partial files
     # as installed and makes the next normal deploy skip repairs.
+    if rc == 0 and mpy_remove:
+        # Only now, with the new files on the badge: delete the form they
+        # replace (x.py would shadow a new x.mpy).
+        r = mpremote("exec", remove_script(mpy_remove))
+        if r.returncode != 0:
+            print("  could not remove the replaced modules; deploy again")
+            rc = r.returncode
+        for p in mpy_remove:
+            new_cache.pop(p, None)
     if rc == 0:
         _save_hash_cache(new_cache)
     else:

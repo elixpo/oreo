@@ -46,6 +46,35 @@ jobs:
         with:
           python-version: "3.12"
 
+      # mpy-cross for the precompiled (.mpy) release: built from the exact
+      # MicroPython commit the firmware uses (v1.28.0), so the bytecode
+      # matches what badges load. tools/mpy_build.py checks its version and
+      # every file's header; build_release.py --mpy require fails otherwise.
+      - name: Cache mpy-cross
+        id: mpy-cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: .mpy-cross
+          key: mpy-cross-v1.28.0-e0e9fbb17ed6fd06bb76e266ae554784c9c80804-${{ runner.os }}
+
+      - name: Build mpy-cross (MicroPython v1.28.0)
+        if: steps.mpy-cache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          git init -q micropython
+          git -C micropython fetch -q --depth 1 https://github.com/micropython/micropython.git \
+            e0e9fbb17ed6fd06bb76e266ae554784c9c80804
+          git -C micropython checkout -q FETCH_HEAD
+          test "$(git -C micropython rev-parse HEAD)" = e0e9fbb17ed6fd06bb76e266ae554784c9c80804
+          make -C micropython/mpy-cross -j"$(nproc)"
+          mkdir -p .mpy-cross
+          cp micropython/mpy-cross/build/mpy-cross .mpy-cross/mpy-cross
+
+      - name: Check mpy-cross
+        run: |
+          .mpy-cross/mpy-cross --version
+          .mpy-cross/mpy-cross --version | grep -q 'v1.28.0.*mpy v6.3'
+
       - name: Resolve channel + version
         id: meta
         # Inputs and commit text reach scripts through env, never through
@@ -107,6 +136,7 @@ jobs:
             --channel "${{ steps.meta.outputs.channel }}" \
             --notes   "$RELEASE_NOTES" \
             --asset-base-url "$ASSET_BASE" \
+            --mpy require --mpy-cross .mpy-cross/mpy-cross \
             --out dist
 
       - name: Flatten release files for upload
@@ -116,6 +146,7 @@ jobs:
           # build_release.py puts in the manifest's `url` field).
           mkdir -p upload
           cp dist/${{ steps.meta.outputs.version }}/manifest.json upload/manifest.json
+          cp dist/${{ steps.meta.outputs.version }}/manifest-mpy.json upload/manifest-mpy.json
           cp dist/${{ steps.meta.outputs.version }}/bundle.tar    upload/bundle.tar
           (cd dist/${{ steps.meta.outputs.version }}/files && \
             find . -type f -print0 | \

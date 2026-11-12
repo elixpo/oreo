@@ -50,6 +50,9 @@ Board options:
   --no-bump               Do not increment the OreoOS patch version
   --free-floor <bytes>    Minimum free flash required after deployment
   --no-free-guard         Disable the post-deployment free-space guard
+  --py                    Upload modules as plain .py (development; default:
+                          precompiled .mpy when MicroPython 1.28.0's mpy-cross
+                          is found)
 
 Examples:
   ./deploy --pages
@@ -137,7 +140,7 @@ while (($#)); do
       BOARD_ARGS+=("--free-floor=$value")
       shift
       ;;
-    --clean|--force|--no-bump|--no-free-guard)
+    --clean|--force|--no-bump|--no-free-guard|--py)
       BOARD_ARGS+=("$1")
       shift
       ;;

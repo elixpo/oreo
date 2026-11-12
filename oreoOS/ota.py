@@ -79,6 +79,11 @@ except ImportError:
 OTA_REPO       = "elixpo/oreo"      # owner/repo on GitHub
 STAGE_DIR      = "/_ota"
 MANIFEST_NAME  = "manifest.json"
+# The same release with modules precompiled to .mpy (tools/mpy_build.py)
+# and a "remove" list of the .py files they replace. Only this ota.py and
+# later ask for it; older ones keep installing manifest.json.
+MPY_MANIFEST_NAME = "manifest-mpy.json"
+PREFER_MPY     = True
 DEFAULT_CHANNEL = "stable"
 USER_AGENT     = "OreoBadge-OTA"
 
@@ -467,25 +472,20 @@ def peek(release, on_progress=None):
         from oreoOS import _http as _httpx
     except Exception:
         return _fail("manifest", "network module missing")
+    url = release["manifest_url"]
     manifest = None
-    reason = "no answer"
-    for _try in range(2):
-        mark = _http_mark(_httpx)
-        body = _httpx.get_url(release["manifest_url"], timeout_s=T_MANIFEST,
-                              on_progress=on_progress)
-        if body is None:
-            reason = _http_reason(_httpx, mark, "no answer")
-            continue
-        try:
-            manifest = _json.loads(body.decode("utf-8"))
-        except Exception:
+    # The precompiled (.mpy) variant first, when this firmware loads it;
+    # a release without one (or an unreadable one) falls back to the
+    # plain .py manifest every OreoOS can install.
+    if PREFER_MPY and url.endswith("/" + MANIFEST_NAME) and _mpy_ok("6"):
+        murl = url[:-len(MANIFEST_NAME)] + MPY_MANIFEST_NAME
+        manifest, _r = _get_manifest(_httpx, murl, on_progress)
+        if manifest is not None and not _mpy_ok(manifest.get("mpy", "")):
             manifest = None
-            reason = "release manifest unreadable"
-            continue
-        body = None
-        break
-    if not isinstance(manifest, dict):
-        return _fail("manifest", reason)
+    if manifest is None:
+        manifest, reason = _get_manifest(_httpx, url, on_progress)
+        if manifest is None:
+            return _fail("manifest", reason)
     gc.collect()
 
     changed   = []
@@ -517,6 +517,88 @@ def peek(release, on_progress=None):
 
 
 _dl_active = False
+
+
+def _get_manifest(h, url, on_progress=None, tries=2):
+    """(manifest dict, None) or (None, reason). A 404 is not retried."""
+    reason = "no answer"
+    for _try in range(tries):
+        mark = _http_mark(h)
+        body = h.get_url(url, timeout_s=T_MANIFEST, on_progress=on_progress)
+        if body is None:
+            reason = _http_reason(h, mark, "no answer")
+            if "HTTP 404" in reason:
+                break
+            continue
+        try:
+            m = _json.loads(body.decode("utf-8"))
+        except Exception:
+            reason = "release manifest unreadable"
+            continue
+        if isinstance(m, dict):
+            return m, None
+        reason = "release manifest unreadable"
+    return None, reason
+
+
+def _mpy_ok(abi):
+    """True when this firmware loads bytecode .mpy files of `abi`
+    ('6' or '6.3'): the major mpy version must match; a bytecode-only
+    .mpy does not depend on the sub-version."""
+    try:
+        import sys
+        v = sys.implementation._mpy
+    except Exception:
+        return False        # not MicroPython, or a build without .mpy
+    try:
+        return (v & 0xFF) == int(str(abi).split(".")[0])
+    except (TypeError, ValueError):
+        return False
+
+
+# Paths a release may remove (never anything outside the OS and the
+# built-in apps, and never the boot files).
+_REMOVABLE = ("oreoOS/", "oreoWare/", "apps/")
+
+
+def _removals(manifest):
+    """Files to delete once a release's files are in place: its "remove"
+    list (the .py files its .mpy replace), plus, for every module it
+    ships, the other form left by an earlier release (x.py next to a new
+    x.mpy would win the import; a stale x.mpy next to a new x.py is dead
+    weight). Never a path the release itself ships."""
+    paths = set()
+    for e in manifest.get("files", ()):
+        p = e.get("path", "")
+        if p:
+            paths.add(p)
+    out = []
+    for p in manifest.get("remove", ()) or ():
+        if isinstance(p, str):
+            out.append(p)
+    for p in paths:
+        if p.endswith(".mpy"):
+            out.append(p[:-4] + ".py")
+        elif p.endswith(".py"):
+            out.append(p[:-3] + ".mpy")
+    res = []
+    for p in out:
+        if (p and p not in paths and p not in res and ".." not in p
+                and not p.startswith("/") and p.startswith(_REMOVABLE)
+                and not p.endswith("/main.py")):
+            res.append(p)
+    return res
+
+
+def _apply_removals(manifest):
+    n = 0
+    for p in _removals(manifest):
+        try:
+            _os.remove(p)
+            n += 1
+        except OSError:
+            pass            # already gone
+    return n
 
 
 def download_busy():
@@ -750,6 +832,11 @@ def apply_pending(on_progress=None):
                 on_progress(index + 1, path)
             except Exception:
                 pass
+
+    # Every new file is in place: now delete the files they replace (an
+    # x.py would shadow the new x.mpy). Before the marker is retired, so
+    # a power cut here repeats this step at the next boot.
+    _apply_removals(manifest)
 
     # All files are in place. Retire the ready marker first so even an
     # unexpected failure while removing the remaining staging tree cannot

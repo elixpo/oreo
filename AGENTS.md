@@ -102,6 +102,11 @@ Rules that matter on the badge:
   `DEPLOY` and `tools/build_release.py` `SHIP_PATTERNS` (a test checks).
 - A retired built-in app goes into `RETIRED_APPS` in `tools/deploy.py`, so
   deploys remove it from badges.
+- OS modules, drivers and built-in apps' `src/` ship precompiled as `.mpy`
+  (`tools/mpy_build.py` decides; entry points, `__init__.py` and
+  `oreoOS/config.py` stay `.py`). Don't rely on `__file__` or a module's
+  source text. MicroPython imports `x.py` before `x.mpy`, so anything that
+  installs an `.mpy` removes the `.py` (OTA and deploy do).
 
 ## Checks
 

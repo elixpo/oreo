@@ -351,6 +351,40 @@ class RealOtaContractTest(unittest.TestCase):
         self.assertIn("release-assets.example: timed out", self.badge.ota_error)
         self.assertFalse(self.badge.ota_status()["pending"])
 
+    def test_precompiled_release_replaces_py_with_mpy(self):
+        # An OreoOS with .mpy support installs manifest-mpy.json: the .mpy
+        # lands and the .py it replaces is removed (MicroPython would
+        # import the old .py first). The CLI only steers; this is the
+        # contract it relies on.
+        fake = self.fake
+        fake.put("/oreoOS/old.py", b"old\n")
+        data = b"M\x06\x00\x1fbytecode"
+        mpy_manifest = {"version": "v2.1.0", "mpy": "6.3", "manifest_format": 2,
+                        "remove": ["oreoOS/old.py"],
+                        "files": [{"path": "oreoOS/old.mpy", "size": len(data),
+                                   "sha256": hashlib.sha256(data).hexdigest(),
+                                   "url": "https://dl/oreoOS/old.mpy"}]}
+        http = sys.modules["oreoOS._http"]
+        plain_get = http.get_url
+
+        def get_url(url, **k):
+            if url.endswith("/manifest-mpy.json"):
+                return json.dumps(mpy_manifest).encode()
+            return plain_get(url, **k)
+        http.get_url = get_url
+
+        def download_to_file(url, dest, expected_sha=None, **k):
+            fake.put(dest, data)
+            return True
+        http.download_to_file = download_to_file
+        self.ota._mpy_ok = lambda abi: True
+        self.assertTrue(self.badge.ota_check("stable")["newer"])
+        self.assertEqual(self.badge.ota_peek()["files"], 1)
+        self.assertTrue(self.badge.ota_download())
+        self.assertEqual(self.badge.ota_apply(), "v2.1.0")
+        self.assertEqual(self.fake.get("/oreoOS/old.mpy"), data)
+        self.assertFalse(self.fake.exists("/oreoOS/old.py"))
+
     def test_beta_channel_and_up_to_date(self):
         self.assertEqual(self.badge.ota_check("beta")["latest"], "v2.2.0")
         self.fake.config.VERSION = "v2.1.0"

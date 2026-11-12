@@ -181,23 +181,36 @@ def main():
     print("check: latest %s is %s (%d ms); newer than installed: %s"
           % (CHANNEL, ver, ms, ota.compare_version(ver, VERSION) > 0))
 
-    t0 = time.ticks_ms()
-    try:
-        body = _http.get_url(rel["manifest_url"], timeout_s=ota.T_MANIFEST)
-        import json
-        manifest = json.loads(body.decode()) if body else None
-    except Exception as e:
-        manifest = None
-        print("manifest: FAIL %r" % (e,))
-    ms = time.ticks_diff(time.ticks_ms(), t0)
-    if not manifest:
+    # The manifest the Updates app would install: the precompiled one
+    # (manifest-mpy.json) on firmware that loads .mpy, else manifest.json.
+    import json
+    urls = [rel["manifest_url"]]
+    mpy_ok = getattr(ota, "_mpy_ok", None)
+    mname = getattr(ota, "MPY_MANIFEST_NAME", None)
+    if mpy_ok and mname and mpy_ok("6") and urls[0].endswith(ota.MANIFEST_NAME):
+        urls.insert(0, urls[0][:-len(ota.MANIFEST_NAME)] + mname)
+    manifest = None
+    for url in urls:
+        t0 = time.ticks_ms()
+        try:
+            body = _http.get_url(url, timeout_s=ota.T_MANIFEST)
+            manifest = json.loads(body.decode()) if body else None
+        except Exception as e:
+            body, manifest = None, None
+            print("manifest %s: FAIL %r" % (url.rsplit("/", 1)[1], e))
+        ms = time.ticks_diff(time.ticks_ms(), t0)
+        if manifest:
+            break
         err = getattr(_http, "last_error", lambda: "")()
-        print("manifest: FAIL after %d ms: %s" % (ms, err or "no answer"))
+        print("manifest %s: FAIL after %d ms: %s"
+              % (url.rsplit("/", 1)[1], ms, err or "no answer"))
+    if not manifest:
         return
     files = manifest.get("files", [])
     total = sum(int(f.get("size", 0) or 0) for f in files)
-    print("manifest: %d bytes, %d files, %d KB, %d ms"
-          % (len(body), len(files), total // 1024, ms))
+    print("manifest %s: %d bytes, %d files, %d KB, %d ms; removes %d .py"
+          % (url.rsplit("/", 1)[1], len(body), len(files), total // 1024, ms,
+             len(manifest.get("remove", ()) or ())))
     body = None
     gc.collect()
 
