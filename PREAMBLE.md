@@ -27,6 +27,15 @@ according with:
 and is certified open source hardware by the Open Source Hardware
 Association, UID IN000107:
 
+> **A** badge with just one wallpaper, and it's your face it shows;<br>
+> **N**o Wi-Fi, still connected: that's how being with you goes.<br>
+> **W**hen frames change, I send the diff, but you I send in full;<br>
+> **E**ach keyframe of my life is you; the rest is fairly dull.<br>
+> **S**o scroll back up and read the start of every line I've spun:<br>
+> **H**idden in the margin is the girl who made this run,<br>
+> **A**nd yes, it spells your name, Miss Co-author. You're the one.
+
+
 <a href="https://certification.oshwa.org/in000107.html">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="oreo.elixpo/public/oshw_mark_card.png">
@@ -207,12 +216,5 @@ Where to go next: [`docs/APPS.md`](docs/APPS.md) to write an app;
 Every system has a reason it was finished. This one is dedicated to A., for
 its full runtime: the second author of the video format the Gallery plays,
 who read every frame of it before anyone else did. Her name is in the poem
-below, one letter at the start of each line.
+at the top of this preamble, one letter at the start of each line.
 
-> At power-on the panel's dark, the clock is still unset;<br>
-> No Wi-Fi and no promises: the badge boots up, and yet,<br>
-> When every frame is written, only what has changed goes through;<br>
-> Each band we never touched stays still, a format made by two.<br>
-> So every deadline that we keep is measured, line by line, and true;<br>
-> Heap and stack and every task this kernel spawns belong to you,<br>
-> And when the watchdog bites at last, it's you I'm booting to.
