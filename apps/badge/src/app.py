@@ -27,9 +27,11 @@ Everything fits one 320x240 screen, no scrolling (y on the left):
  224 └────────────── A=refresh  HOME=back ──────────┘ OS hint bar
        x: card 8..311, avatar disc centre (61, 99) r 39, text 112..302
 
-The avatar is stamped at deploy time by tools/fetch_avatar.py (committed as
-apps/badge/assets/optimized/avatar.py) so it renders without Wi-Fi; without
-one the badge draws the owner's initials in a disc.
+The avatar is the owner's own: `oreo setup` fetches GITHUB_USER's GitHub
+avatar on the computer and copies it to /avatar.bin over USB, with the user
+it was made for (oreoOS.profile.avatar). It shows only while that user is
+the profile's GITHUB_USER; otherwise, or without the file, the badge draws
+the owner's initials in a disc. Nothing is fetched or decoded here.
 
 Controls:
   A      refresh the GitHub card now
@@ -146,16 +148,28 @@ def _clean(v):
     return " ".join(v.split())
 
 
-def _try_avatar():
-    """Load the pre-fetched avatar baked at deploy time, or None."""
+def _try_avatar(user):
+    """The owner's avatar from /avatar.bin as (pixels, w, h), only when it
+    was made for `user`; None otherwise (the initials disc is drawn). Read
+    once in on_enter, never in update/draw."""
     try:
-        m = __import__("apps.badge.assets.optimized.avatar", None, None,
-                       ["DATA", "W", "H"])
-        if m.W > 2 * AV_R or m.H > 2 * AV_R:
-            return None
-        return (bytearray(m.DATA), m.W, m.H)
-    except (ImportError, AttributeError):
+        from oreoOS import profile
+        return profile.avatar(user, 2 * AV_R)
+    except Exception:
         return None
+
+
+# Releases up to v2.0.x shipped one person's avatar here to every badge.
+# OTA never deletes files, so the Badge app removes it (deploys do too).
+OLD_AVATAR = "/apps/badge/assets/optimized/avatar.py"
+
+
+def _drop_shipped_avatar():
+    try:
+        import os
+        os.remove(OLD_AVATAR)
+    except Exception:
+        pass
 
 
 def _filled_circle(d, cx, cy, r, color):
@@ -296,7 +310,8 @@ class App(oreoOS.App):
         # the badge never shows a stranger's profile.
         self._user = _clean(github.user("")).lstrip("@")
         self._name, self._title = _owner()
-        self._avatar = _try_avatar() if self._user else None
+        _drop_shipped_avatar()
+        self._avatar = _try_avatar(self._user) if self._user else None
         self._fonts = {}
         if self._user:
             self._profile, self._age0 = github.cached_profile(self._user)
@@ -325,6 +340,7 @@ class App(oreoOS.App):
         self._job = None
         self._fonts = {}
         self._layout = None
+        self._avatar = None         # ~6 KB back to the heap
 
     # ── data ─────────────────────────────────────────────────────────────
     def _refresh(self, quiet=False):

@@ -70,27 +70,31 @@ immediately, Wi-Fi or not. It refreshes in the background when the copy is
 older than six hours (`PROFILE_TTL_S` in `oreoOS/github.py`), or when you
 press **A**.
 
-## 5. Your avatar (optional)
+## 5. Your avatar
 
-The round photo comes from a module baked on your computer, not fetched by
-the badge: `apps/badge/assets/optimized/avatar.py`. Without it the badge
-draws your initials. Note that the repository currently ships the
-maintainer's avatar in that file, so replace it with yours. From an OreoOS
-checkout (it needs Pillow):
+`oreo setup` also puts your GitHub avatar in the round frame. Your computer
+downloads it, shrinks it to a 56x56 circle and copies it over USB to
+`/avatar.bin` on the badge, so the badge needs no Wi-Fi for it. The file
+remembers which GitHub user it belongs to: Badge shows it only for your
+`GITHUB_USER`, and draws your initials otherwise. It is kept through OreoOS
+updates and deploys.
+
+Changed your picture on GitHub? Fetch it again:
 
 ```bash
-python3 tools/fetch_avatar.py --user octocat
-oreo push apps/badge/assets/optimized/avatar.py /apps/badge/assets/optimized/avatar.py
+oreo setup --avatar
 ```
 
-An OreoOS update or a deploy from a checkout without your file puts the
-shipped avatar back; run the two commands again afterwards.
+If setup printed "no avatar" (offline, or a typo in the user name), fix
+that and run the same command. `--no-avatar` skips the download.
 
 ## Troubleshooting
 
 - **Only a setup card:** neither `GITHUB_USER` nor `DISPLAY_NAME` is set.
   `oreo setup --show` prints what the badge has and where each value came
   from.
+- **Initials instead of your photo:** `oreo setup --show` names whose
+  avatar is on the badge; `oreo setup --avatar` fetches yours.
 - **No GitHub card:** the badge is offline, or GitHub's limit of 60
   unauthenticated requests an hour per network was reached. The card
   appears after the next successful refresh.

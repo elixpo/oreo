@@ -29,7 +29,9 @@ library and file format (github.com/elixpo/rv565).
    the same pull request.
 6. **No personal data in the code.** The owner's name, GitHub user and
    location come from `oreoOS.profile` (`.env.local` at deploy, or
-   `/profile.json` written by `oreo setup`).
+   `/profile.json` written by `oreo setup`), and their avatar from
+   `/avatar.bin` (also `oreo setup`). Nothing personal is committed or
+   shipped in a release.
 7. **Every change is tested without hardware.** Host tests stand in for the
    badge; anything that can only be checked on a real badge is written down
    in the pull request as a test step.
@@ -57,6 +59,7 @@ Keep both sides, their tests and their docs in step:
 | Contract | Badge side | CLI side | Guard |
 |---|---|---|---|
 | Owner profile keys (`GITHUB_USER`, `DISPLAY_NAME`, `DISPLAY_DESIGNATION`, `TIMEZONE_OFFSET`, `WEATHER_*`, `OWM_API_KEY`) and the `DESIGNATION` alias | `oreoOS/profile.py` | `cli/oreo_cli/owner.py` | CLI contract test against `profile.py` |
+| Owner avatar `/avatar.bin`: `OAV1`, size, the GitHub user it was made for, RGB565 pixels | `oreoOS/profile.py` `avatar()` (Badge app) | `cli/oreo_cli/avatar.py`, written by `oreo setup` (`tools/fetch_avatar.py` loads the same module) | CLI contract and round-trip test against `profile.py` |
 | Built-in app list | `oreoOS/store.py` `DEFAULT_APPS` | `cli/oreo_cli/commands.py` `DEFAULT_APPS` | CLI contract test |
 | App checks | `tools/validate_app.py` | `cli/oreo_cli/appcheck.py` | drift test |
 | App template | `app_templates/` | `cli/oreo_cli/app_template/` | CLI test |
