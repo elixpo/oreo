@@ -119,6 +119,15 @@ WiFi, and fun to hack. These items close the gap.
 - [x] 🙋 **OSHWA Open Source Hardware certification**: certified
       2026-11-06, UID [IN000107](https://certification.oshwa.org/in000107.html); mark in the README and on the
       badge page.
+- [x] 🤖 **Verified HTTPS on the badge** (#110): certificate chain, host
+      name and dates checked against bundled root CAs, clock synced first,
+      no fallback to unverified connections ([docs/TLS.md](TLS.md)).
+- [ ] 🙋 Run `oreo run tools/tls_probe.py` on a badge (handshake time and
+      heap with verification on), then test Updates and the App Store with
+      Wi-Fi, after a power cycle (clock unset) and on a network that
+      blocks NTP.
+- [ ] 🤖 Sign OTA bundles, so an update is trusted even if TLS is bypassed
+      (#110 follow-up).
 - [x] 🤖 **OpenSSF Scorecard** workflow and badge
       ([oreo#74](https://github.com/elixpo/oreo/pull/74)).
 - [x] 🙋 **OpenSSF Best Practices** badge: **passing**

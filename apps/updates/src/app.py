@@ -74,6 +74,28 @@ PHASES = {
 }
 
 
+def _tls_mark():
+    """A mark for _tls_error(); None on an OS without verified TLS."""
+    try:
+        from oreoOS import _http
+        return _http.tls_mark()
+    except Exception:
+        return None
+
+
+def _tls_error(mark, fallback):
+    """'TLS: <reason>' when a certificate check (or the clock it needs)
+    failed since `mark`, else `fallback`. Never a silent retry without
+    verification: the user sees why the update could not be fetched."""
+    if mark is None:
+        return fallback
+    try:
+        from oreoOS import _http
+        return _http.tls_error_since(mark) or fallback
+    except Exception:
+        return fallback
+
+
 def _busy(display, title, detail="", progress=None):
     """Start an oreoOS.busy card, or None when this OS has none."""
     if display is None:
@@ -216,6 +238,7 @@ class App(oreoOS.App):
     def _check(self):
         from oreoOS import ota
         wait_background(self._network_pulse)
+        mark = _tls_mark()
 
         # Always fetch the latest tag — we need to compare against the
         # device's current VERSION to pick the right state, not just
@@ -225,7 +248,7 @@ class App(oreoOS.App):
         ) or (None, None)
         if not latest_ver:
             self._state = S_FAILED
-            self._error = "no network"
+            self._error = _tls_error(mark, "no network")
             self._dirty = True
             return
 
@@ -261,7 +284,7 @@ class App(oreoOS.App):
         )
         if not peeked:
             self._state = S_FAILED
-            self._error = "manifest fetch failed"
+            self._error = _tls_error(mark, "manifest fetch failed")
             self._dirty = True
             return
 
@@ -314,6 +337,7 @@ class App(oreoOS.App):
             self._state = S_FAILED
             self._dirty = True
             return
+        mark = _tls_mark()
         if not ota.is_pending():
             if not self._peeked:
                 self._card = _busy(self._os.display, "Checking for updates",
@@ -325,11 +349,15 @@ class App(oreoOS.App):
                 finally:
                     self._end_card()
                 if not rel:
-                    self._state = S_UP_TO_DATE
+                    # A refused certificate is not "up to date".
+                    err = _tls_error(mark, "")
+                    self._state = S_FAILED if err else S_UP_TO_DATE
+                    self._error = err
                     self._dirty = True
                     return
                 if not self._peeked:
                     self._state = S_FAILED
+                    self._error = _tls_error(mark, "manifest fetch failed")
                     self._dirty = True
                     return
             self._state = S_DOWNLOADING
@@ -350,7 +378,7 @@ class App(oreoOS.App):
                 self._end_card()
             if not ok:
                 self._state = S_FAILED
-                self._error = "download failed"
+                self._error = _tls_error(mark, "download failed")
                 try: self._os.settings_set("ota_status", "download-failed")
                 except Exception: pass
                 self._dirty = True

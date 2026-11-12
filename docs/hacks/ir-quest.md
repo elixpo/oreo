@@ -15,11 +15,19 @@ beacon" that sends a code over and over, and has a second badge pick it up.
 
 Sending works. Receiving has an open bug,
 [#48](https://github.com/elixpo/oreo/issues/48): on the ESP32-S3 the native
-RMT receiver can fail to start (`RMT RX ... failed: ESP_ERR_IN...`). The
-driver (`oreoWare/ir.py`) then falls back to timing edges with a pin
-interrupt, which works but is less exact. IR Quest shows which receiver is
-running on its **DIAG** tab. If yours shows an error, add what you see to
-#48 with `oreo logs` output; that is a useful contribution in itself.
+RMT receiver could fail to start (`RMT RX ... failed: ESP_ERR_IN...`). The
+cause found in the code is the receiver's glitch filter, which asked for
+more than the ESP32-S3 allows (`ESP_ERR_INVALID_ARG`); firmware with the fix
+still has to be confirmed on a badge. When the native receiver fails, the
+driver (`oreoWare/ir.py`) falls back to timing edges with a pin interrupt,
+which works but is less exact. IR Quest shows which receiver is running on
+its **DIAG** tab, with the complete error. If yours shows one, run the
+self-test below and add its output to #48; that is a useful contribution in
+itself.
+
+```bash
+oreo run tools/ir_selftest.py      # from an OreoOS checkout; ends in "IR48 RESULT"
+```
 
 Despite its store description, IR Quest does not keep or trade tokens
 yet: it sends, receives and shows codes. Token trading is an app still to
@@ -41,8 +49,11 @@ remote at the badge and press a button: an NEC remote shows its code, other
 remotes show as a raw recording.
 
 Press **B** to cycle the tabs: FOCUS, BEACON, SEND, DIAG. On **DIAG**, the
-backend reads `RMT RX` (native) or `pin-IRQ fallback`, with the full error
-text if the native receiver failed. **A** restarts the receiver there.
+backend reads `native RMT` or `pin IRQ (fallback)`, with the RMT channel,
+DMA, glitch filter, driver state and the full error text if the native
+receiver failed (**UP**/**DOWN** scroll it). **A** restarts the receiver
+there, and **RIGHT** turns on a serial log of every receiver step, which
+`oreo logs` shows as `[ir]` lines.
 
 ## 3. Send a code from the other badge
 
