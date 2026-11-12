@@ -130,11 +130,58 @@ frame. Rules that keep the badge responsive:
 | Attribute | Default | Meaning |
 |---|---|---|
 | `name` | `"unnamed"` | Shown in headers and crash screens. |
-| `SHOW_LOADING` | `False` | Show the loading slide while `on_enter` runs, with a spinner that keeps turning while `on_enter` blocks. Set it when `on_enter` takes more than about 200 ms. |
+| `SHOW_LOADING` | `False` | Only read by OreoOS releases before the open feedback below: show the loading slide while `on_enter` runs. Keep it if `on_enter` is slow, for badges that have not updated; newer releases cover every slow open by themselves. |
 | `CAPTURES_C` | `False` | Deliver C to the app instead of opening the notification panel. A double-tap of C still opens the panel. May be changed on the instance at runtime, for example only during play. See [The C key](#the-c-key). |
 | `BLOCK_IDLE` | `False` | Keep the badge from auto-sleeping while the app is open (video, a timer). |
 | `realtime_mode()` | `False` | Return True only while playing media or capturing; the OS then defers its housekeeping for lower latency. |
 | `on_home_press()` | not set | Return True to handle HOME yourself (for example to close a dialog). Otherwise HOME goes back to the Apps drawer. |
+
+### What the user sees while your app opens
+
+Opening an app is not free on the badge: MicroPython reads and compiles
+your `.py` files when the app is imported (on every open: an app's
+modules are unloaded when it exits), then `on_enter` runs, then your
+first `draw`. The OS gives feedback for all of it:
+
+1. On the frame of the press, an "Opening <name>" chip over the bottom
+   of the screen.
+2. If the open is not finished after 120 ms, the LOADING panel (your
+   app's name, its author, a spinner) slides over the screen and stays
+   until your first frame is presented. An app that took longer than
+   250 ms the last time it opened gets the panel at once. HOME pressed
+   while the panel is up cancels the open before `on_enter`.
+3. If the import or `on_enter` raises, the crash screen shows the error.
+
+The spinner turns while Python code runs, but stops while MicroPython
+compiles a big file (the compiler holds the interpreter lock), so a fast
+open still matters. To keep yours fast:
+
+- Do little in `on_enter`: set state and mark the screen dirty. Load
+  saved data with `oreoOS.state` (small JSON), and start anything slow
+  (network, scanning files, decoding large images) on a worker with
+  `oreoOS.cache.Refresh`, drawing a loading state meanwhile.
+- Keep big data out of module-level imports: import a large sprite or
+  bitmap module when it is first needed, not at the top of `app.py`.
+  Every kilobyte of `.py` source is compiled on each open.
+- Split a very large `app.py` only if parts of it are rarely used; the
+  compile cost is per byte of source the open imports.
+- Measure on a badge with `oreo run tools/app_open_probe.py` (below).
+
+The launcher prints one line per open on the USB console, for example
+`[open] store: 840 ms (import 610, on_enter 150, first frame 80)`.
+
+`tools/app_open_probe.py` imports, enters and draws each installed app
+once and prints per app the import time (and how much of it is compiling
+the source), the modules the import pulled in, `on_enter`, the first
+`update` + `draw`, the flush, and the heap used:
+
+```bash
+oreo run tools/app_open_probe.py
+```
+
+It closes each app with `on_exit` and unloads it again, writes nothing to
+flash, and OreoOS restarts when the CLI finishes. Edit `ONLY` or `SKIP`
+at the top of the script to choose apps.
 
 ## Input
 
@@ -253,7 +300,9 @@ OS versions do not have it).
 
 The OS uses it for App Store install, update and uninstall, the Updates
 check and download, Gallery photos that take long to decode, the Wi-Fi
-speed test and ping, and the spinner on the `SHOW_LOADING` slide.
+speed test and ping, and the LOADING panel while an app opens (`oreoOS.opening`, which extends
+`busy`), and the Reader and Storage when a document or the file count
+takes long.
 
 ### The screen while a computer drives the badge
 
@@ -324,7 +373,9 @@ app never connects or scans by itself.
 - For anything that can take more than a moment, use
   `oreoOS.cache.Refresh` to run it on a worker thread and show cached data
   meanwhile; `oreoOS/github.py` is the reference.
-- Set `SHOW_LOADING = True` if `on_enter` must wait for data.
+- Never wait for data in `on_enter`: the OS shows a LOADING panel for a
+  slow open, but the user cannot do anything until it is gone. Show what
+  you have and fill in the rest from a `Refresh`.
 
 ## When it crashes
 
