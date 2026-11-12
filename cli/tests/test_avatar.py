@@ -115,7 +115,7 @@ class ConvertTest(unittest.TestCase):
             with self.assertRaises(avatar.AvatarError) as cm:
                 avatar.download("nobody-here")
         self.assertIn("no user nobody-here", str(cm.exception))
-        self.assertEqual(urls, ["https://github.com/nobody-here.png?size=112"])
+        self.assertEqual(urls, ["https://github.com/nobody-here.png?size=%d" % (2 * avatar.SIZE)])
         with self.assertRaises(avatar.AvatarError):     # fake.py: offline
             avatar.download("octocat")
 

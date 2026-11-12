@@ -25,7 +25,7 @@ Everything fits one 320x240 screen, no scrolling (y on the left):
  189 ││ [ 42 repos | 1.2k followers | 35 following]│ │ counts, one row
  216 │╰───────────────────────────────────────────╯ │
  224 └────────────── A=refresh  HOME=back ──────────┘ OS hint bar
-       x: card 8..311, avatar disc centre (61, 99) r 39, text 112..302
+       x: card 8..311, avatar disc centre (60, 99) r 38, text 110..302
 
 The avatar is the owner's own: `oreo setup` fetches GITHUB_USER's GitHub
 avatar on the computer and copies it to /avatar.bin over USB, with the user
@@ -68,8 +68,8 @@ SLOT_Y = CARD_Y + 7
 
 TOP_Y = CARD_Y + 20                           # identity block
 TOP_B = CARD_Y + 114
-AV_R = 36                                     # avatar disc (72 px)
-RING = 3
+AV_R = 36                                     # avatar disc (72 px), filled by the
+RING = 2                                      # 72x72 avatar edge to edge
 AV_CX = IN_X + 4 + AV_R + RING
 AV_CY = (TOP_Y + TOP_B) // 2
 TX = AV_CX + AV_R + RING + 12                 # text column
@@ -340,7 +340,7 @@ class App(oreoOS.App):
         self._job = None
         self._fonts = {}
         self._layout = None
-        self._avatar = None         # ~6 KB back to the heap
+        self._avatar = None         # ~10 KB back to the heap
 
     # ── data ─────────────────────────────────────────────────────────────
     def _refresh(self, quiet=False):
