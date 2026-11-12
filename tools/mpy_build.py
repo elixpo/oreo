@@ -91,7 +91,10 @@ def check(mpy_cross):
                              text=True, timeout=30).stdout.strip()
     except (OSError, subprocess.SubprocessError) as e:
         raise MpyError("mpy-cross failed to run: %s" % e)
-    if ("v%s" % MICROPYTHON_VERSION) not in out or ("mpy v%s" % MPY_ABI) not in out:
+    # Built from a tag it reports "v1.28.0"; built from the pinned commit
+    # without tags (as CI does) it reports the commit's short hash instead.
+    named = ("v%s" % MICROPYTHON_VERSION) in out or MICROPYTHON_COMMIT[:10] in out
+    if not named or ("mpy v%s" % MPY_ABI) not in out:
         raise MpyError("mpy-cross is %r; the firmware needs MicroPython v%s "
                        "(mpy v%s)" % (out, MICROPYTHON_VERSION, MPY_ABI))
     return out

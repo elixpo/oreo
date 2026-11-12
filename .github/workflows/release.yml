@@ -73,7 +73,9 @@ jobs:
       - name: Check mpy-cross
         run: |
           .mpy-cross/mpy-cross --version
-          .mpy-cross/mpy-cross --version | grep -q 'v1.28.0.*mpy v6.3'
+          # Built from the pinned commit without tags, it names the commit
+          # ("MicroPython e0e9fbb17e ... mpy v6.3") instead of "v1.28.0".
+          .mpy-cross/mpy-cross --version | grep -Eq '(v1\.28\.0|e0e9fbb17e).*mpy v6\.3'
 
       - name: Resolve channel + version
         id: meta
