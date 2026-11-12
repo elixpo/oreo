@@ -372,3 +372,32 @@ class DeployPlanTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class MpyCrossVersionCheckTest(unittest.TestCase):
+    """mpy_build.check accepts MicroPython 1.28.0's mpy-cross whether it was
+    built from the tag ("v1.28.0") or, as CI builds it, from the pinned
+    commit without tags (the commit's short hash), and nothing else."""
+
+    def fake(self, line):
+        d = tempfile.mkdtemp()
+        p = os.path.join(d, "mpy-cross")
+        with open(p, "w") as f:
+            f.write("#!/bin/sh\necho '%s'\n" % line)
+        os.chmod(p, 0o755)
+        return p
+
+    def test_tagged_build(self):
+        mpy_build.check(self.fake(
+            "MicroPython v1.28.0 on 2026-04-06; mpy-cross emitting mpy v6.3"))
+
+    def test_pinned_commit_build_without_tags(self):
+        mpy_build.check(self.fake(
+            "MicroPython e0e9fbb17e on 2026-11-12; mpy-cross emitting mpy v6.3"))
+
+    def test_other_versions_are_refused(self):
+        for line in ("MicroPython v1.27.0 on 2025-12-01; mpy-cross emitting mpy v6.3",
+                     "MicroPython 0123456789 on 2026-11-12; mpy-cross emitting mpy v6.3",
+                     "MicroPython v1.28.0 on 2026-04-06; mpy-cross emitting mpy v6.2"):
+            with self.subTest(line=line), self.assertRaises(mpy_build.MpyError):
+                mpy_build.check(self.fake(line))
