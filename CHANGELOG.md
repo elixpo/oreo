@@ -16,6 +16,10 @@ Format for a new entry (add to the top, push, CI does the rest):
 
 ---
 
+## Unreleased
+
+- **tools/release.py publishes to the repository badges update from** (#134): the repository comes from `OTA_REPO` in oreoOS/ota.py, or `--repo owner/name`, and is used for the manifest's download URLs and every `gh release` command; `--dry-run` shows it. A fork no longer edits release.py. A release stops when `origin`, where the tag is pushed, is another repository.
+
 ## v2.0.0 — 2026-11-07
 
 Diwali release: the App Store, a smoother shell, Wi-Fi handoff and Patakha.
