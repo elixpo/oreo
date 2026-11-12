@@ -29,27 +29,22 @@ Apps, photos, documents, saved Wi-Fi and your profile are kept.
 
 ## 1. Point the code at your fork
 
-In your clone, change two lines (`you/oreo` is your fork):
+In your clone, change one line in `oreoOS/ota.py` (`you/oreo` is your
+fork):
 
-- `oreoOS/ota.py`:
+```python
+OTA_REPO       = "you/oreo"      # owner/repo on GitHub
+```
 
-  ```python
-  OTA_REPO       = "you/oreo"      # owner/repo on GitHub
-  ```
+That is the only edit. `tools/release.py` reads the same `OTA_REPO`, so
+the manifest's download URLs and the `gh release` commands use your fork
+too. `--repo owner/name` overrides it for one run.
 
-- `tools/release.py`, where the manifest's download URLs are built:
-
-  ```python
-  asset_base = "https://github.com/you/oreo/releases/download/%s/" % tag
-  ```
-
-  Without this, the manifest from your release points at `elixpo/oreo`'s
-  downloads, which do not exist for your tag.
-
-Make `gh` act on your fork rather than the upstream repository:
+The release pushes its tag to `origin`, so `origin` must be your fork
+(as it is when you cloned the fork). Check with:
 
 ```bash
-gh repo set-default you/oreo
+git remote get-url origin
 ```
 
 ## 2. Put your build on the badge once, over USB
@@ -74,11 +69,15 @@ python3 tools/release.py v9.0.0                # stable channel
 python3 tools/release.py v9.1.0 --channel beta # or a prerelease
 ```
 
+The dry run starts with `Repo: you/oreo (OTA_REPO in oreoOS/ota.py)`, and
+every download URL and `gh release` command in it names your fork. It
+warns when `origin` is another repository; a real release stops there.
+
 `release.py` sets `VERSION` in `oreoOS/config.py`, commits, tags
 `stable/v9.0.0` (or `beta/...`), pushes, builds the manifest and files with
 `tools/build_release.py` into `dist/`, and creates the GitHub release with
-them. If it stops halfway, run it again: it resumes from the tag or the
-upload.
+them, all in the repository from `OTA_REPO`. If it stops halfway, run it
+again: it resumes from the tag or the upload.
 
 Check that your tag is among the ten the badge reads:
 

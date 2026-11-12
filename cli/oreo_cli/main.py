@@ -130,7 +130,10 @@ HELP = {
               "Commits, Weather and the clock read (docs/PROFILE.md).\n"
               "No .env.local or checkout needed. Values given as options are saved\n"
               "without prompting. The OpenWeatherMap key is asked without echo and\n"
-              "never shown; an empty value removes a key. OreoOS restarts after.\n\n"
+              "never shown; an empty value removes a key. OreoOS restarts after.\n"
+              "It also copies GITHUB_USER's GitHub avatar to /avatar.bin for the\n"
+              "Badge app: downloaded and converted on this computer, only when it\n"
+              "is missing or made for another user (--avatar fetches it again).\n\n"
               "  oreo setup\n"
               "  oreo setup --show\n"
               "  oreo setup --github-user octocat --name \"Mona Lisa\" --timezone 5.5\n"
@@ -139,6 +142,7 @@ HELP = {
               "  oreo setup --designation \"\"     remove the title\n"
               "  oreo setup --from-file .env.local   the profile keys from your .env.local\n"
               "  oreo setup --set DISPLAY_NAME=\"Mona Lisa\" --set TIMEZONE_OFFSET=5.5\n"
+              "  oreo setup --avatar                 fetch your GitHub avatar again\n"
               "\n"
               "Keys: GITHUB_USER, DISPLAY_NAME, DISPLAY_DESIGNATION, TIMEZONE_OFFSET,\n"
               "OWM_API_KEY, and optionally WEATHER_LAT, WEATHER_LON, WEATHER_NAME.\n"
@@ -272,6 +276,11 @@ def build_parser():
     s.add_argument("--owm-key", metavar="KEY", help="OpenWeatherMap API key (prefer the prompt)")
     s.add_argument("--owm-key-stdin", action="store_true",
                    help="read the OpenWeatherMap key from standard input")
+    s.add_argument("--avatar", action="store_true",
+                   help="fetch GITHUB_USER's GitHub avatar again and copy it to the badge "
+                        "(alone: only that)")
+    s.add_argument("--no-avatar", action="store_true",
+                   help="leave /avatar.bin alone (no download)")
 
     s = _sub(subs, "new")
     s.add_argument("name", help="app name or id, e.g. my_game or \"My Game\"")

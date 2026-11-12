@@ -16,6 +16,13 @@ Format for a new entry (add to the top, push, CI does the rest):
 
 ---
 
+## Unreleased
+
+- **tools/release.py publishes to the repository badges update from** (#134): the repository comes from `OTA_REPO` in oreoOS/ota.py, or `--repo owner/name`, and is used for the manifest's download URLs and every `gh release` command; `--dry-run` shows it. A fork no longer edits release.py. A release stops when `origin`, where the tag is pushed, is another repository.
+- **Badge shows its owner's avatar, not the maintainer's** (#133): no avatar ships with OreoOS any more. `oreo setup` fetches the avatar of the profile's GITHUB_USER on the computer and copies it over USB to /avatar.bin (outside the app folders, so updates keep it), and Badge shows it only while that user is GITHUB_USER; otherwise it draws the owner's initials. Badge deletes the old shipped avatar module, deploys remove it, and deploy and release builds never include it. tools/fetch_avatar.py now writes the same /avatar.bin file, sharing the CLI's code.
+- **Verified HTTPS** (#110): every TLS connection (OTA, App Store, GitHub data, location, weather, speed test) now checks the server's certificate chain, host name and dates against 10 bundled root CAs (`oreoOS/tls_roots.py`, loaded on the first secure request). The clock is synced over NTP first; a connection whose certificate or clock can't be checked is refused, never retried unverified. Updates, App Store, Commits and Weather show the reason (`TLS: untrusted certificate`, `TLS: clock not set`, ...). Docs: docs/TLS.md; badge check: `oreo run tools/tls_probe.py`.
+- **Tooling**: `tools/gen_ca_bundle.py` regenerates the root bundle and `--check-hosts` verifies every host against it.
+
 ## v2.0.0 — 2026-11-07
 
 Diwali release: the App Store, a smoother shell, Wi-Fi handoff and Patakha.

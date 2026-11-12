@@ -97,6 +97,27 @@ def progress_pct(phase, received):
     return _PHASE_PCT.get(phase, 0)
 
 
+def tls_mark():
+    """A mark for tls_failed(); None on an OS without verified TLS."""
+    try:
+        from oreoOS import _http
+        return _http.tls_mark()
+    except Exception:
+        return None
+
+
+def tls_failed(mark):
+    """True when a certificate check (or the clock it needs) failed since
+    `mark`: the sync failed for security reasons, not the network."""
+    if mark is None:
+        return False
+    try:
+        from oreoOS import _http
+        return bool(_http.tls_error_since(mark))
+    except Exception:
+        return False
+
+
 BUCKETS = [
     (235, 237, 240),
     (155, 233, 168),
@@ -341,6 +362,7 @@ class App(oreoOS.App):
         self._note = None
         self._auto = False            # this fetch covers a pending auto one
         self._reset_progress()
+        self._tls_mark = tls_mark()
         job.start()
         self._dirty = True
 
@@ -383,7 +405,9 @@ class App(oreoOS.App):
                 self._live = True
                 self._note = None
             else:
-                self._note = "FAILED"
+                self._note = ("TLS ERROR"
+                              if tls_failed(getattr(self, "_tls_mark", None))
+                              else "FAILED")
             self._dirty = True
         elif job.busy():
             self._tick_progress(dt)
@@ -530,6 +554,8 @@ class App(oreoOS.App):
         d.text(line, (SW - len(line) * 8) // 2, EMPTY_Y, theme.TEXT_BRIGHT)
         if not busy:
             hint = ("Sync failed, press A to retry." if self._note == "FAILED"
+                    else "Secure link failed, A to retry."
+                    if self._note == "TLS ERROR"
                     else "Connect WiFi, then press A.")
             d.text(hint, (SW - len(hint) * 8) // 2, USER_Y + 41,
                    theme.TEXT_BRIGHT)

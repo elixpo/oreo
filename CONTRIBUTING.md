@@ -191,7 +191,10 @@ Building the firmware from source (`./build-firmware`) needs ESP-IDF; see
 
 - **OreoOS:** maintainers run `python tools/release.py`. It tags
   `stable/vX.Y.Z` (or `beta/...`) and publishes the GitHub release that
-  badges update from over the air.
+  badges update from over the air, in the repository named by `OTA_REPO`
+  in `oreoOS/ota.py` (or `--repo owner/name`); `--dry-run` shows it.
+  Forks publish to themselves this way
+  ([docs/hacks/ota-fork.md](docs/hacks/ota-fork.md)).
 - **oreo-cli:** a `cli-v<version>` tag runs
   `.github/workflows/cli-release.yml`, which tests, builds, attests and
   publishes the release with its installers.

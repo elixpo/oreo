@@ -10,6 +10,18 @@ from its `## [<version>]` section below, so every release needs one.
 
 ## [Unreleased]
 
+### Added
+
+- `oreo setup` puts the owner's GitHub avatar on the badge for the Badge
+  app (#133): it downloads the avatar of GITHUB_USER on this computer,
+  converts it to a 56x56 circular RGB565 tile with Pillow (already a
+  dependency) and copies it to `/avatar.bin` with the user it was made
+  for. It is fetched only when missing or made for another user;
+  `--avatar` fetches it again (alone, it does only that) and `--no-avatar`
+  skips it. A failed download never fails setup, and an avatar made for
+  someone else is removed rather than left behind. `--show` names whose
+  avatar is on the badge.
+
 ## [1.0.0] - 2026-11-11
 
 First stable release. Commands, options, output and exit codes are now

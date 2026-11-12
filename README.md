@@ -473,6 +473,8 @@ The single source of truth for every GPIO assignment is
 
 The badge pulls itself forward. A fast SHA-vs-version check runs in the background against the project's GitHub release channel. **Small patches** (≤ 80 KB) install themselves; **big updates** wait for your explicit yes. Files are validated by SHA-256 and atomically swapped on the next boot — if anything goes wrong mid-download, the badge keeps running its old version.
 
+Every HTTPS connection **verifies the server's certificate** (chain, host name and dates) against a small bundle of root CAs shipped with the OS, so a network attacker cannot fake an update or an App Store download. Verification needs the real date, so the badge syncs its clock over NTP before the first secure request; if the certificate or the clock can't be checked, the Updates and App Store screens say so (`TLS: ...`) instead of connecting anyway. Hosts, roots and fingerprints: [`docs/TLS.md`](docs/TLS.md).
+
 Wall-clock time follows the same pattern: NTP runs once at boot when WiFi is up, and the **Sync Time** action (Settings or the C-panel) lets you re-pull if you crossed a timezone or the clock drifted.
 
 Cutting a release takes one command: `python tools/release.py`. Details in [`CONTRIBUTING.md → Releasing`](CONTRIBUTING.md#releasing).
