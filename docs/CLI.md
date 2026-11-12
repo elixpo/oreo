@@ -20,7 +20,7 @@ the same command. The CLI is released separately from OreoOS, with tags
 `cli-v<version>`. See [cli/CHANGELOG.md](../cli/CHANGELOG.md) for what each
 release changed.
 
-> **Status: 1.0.0, stable.** Commands, options, output and exit codes are
+> **Status: 1.1.0, stable.** Commands, options, output and exit codes are
 > stable. Later 1.x releases may add to them but will not change them. Every
 > command is tested against a simulated badge, and the checks to run by hand
 > are listed in [Testing on a badge](#testing-on-a-badge). If something goes
@@ -84,11 +84,11 @@ To install a specific version:
 ```sh
 curl --proto '=https' --tlsv1.2 -LsSf \
   https://raw.githubusercontent.com/elixpo/oreo/main/cli/install.sh |
-  OREO_CLI_VERSION=cli-v1.0.0 sh
+  OREO_CLI_VERSION=cli-v1.1.0 sh
 ```
 
 ```powershell
-$env:OREO_CLI_VERSION = "cli-v1.0.0"
+$env:OREO_CLI_VERSION = "cli-v1.1.0"
 irm https://raw.githubusercontent.com/elixpo/oreo/main/cli/install.ps1 | iex
 ```
 
@@ -111,15 +111,15 @@ Every release has assets with fixed names:
 pipx and uv can install the wheel straight from its release URL:
 
 ```sh
-pipx install https://github.com/elixpo/oreo/releases/download/cli-v1.0.0/oreo_cli-1.0.0-py3-none-any.whl
+pipx install https://github.com/elixpo/oreo/releases/download/cli-v1.1.0/oreo_cli-1.1.0-py3-none-any.whl
 # or
-uv tool install https://github.com/elixpo/oreo/releases/download/cli-v1.0.0/oreo_cli-1.0.0-py3-none-any.whl
+uv tool install https://github.com/elixpo/oreo/releases/download/cli-v1.1.0/oreo_cli-1.1.0-py3-none-any.whl
 ```
 
 To check the file before you install it:
 
 ```sh
-V=1.0.0
+V=1.1.0
 curl -LO https://github.com/elixpo/oreo/releases/download/cli-v$V/oreo_cli-$V-py3-none-any.whl
 curl -LO https://github.com/elixpo/oreo/releases/download/cli-v$V/SHA256SUMS
 sha256sum --check --ignore-missing SHA256SUMS      # macOS: shasum -a 256 -c --ignore-missing SHA256SUMS
