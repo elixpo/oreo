@@ -81,6 +81,26 @@ def _read_manifest(root, entry):
         return json.loads(f.read())
 
 
+# dir -> (name, author) from the last listing: the "Opening <name>" chip
+# and the LOADING panel need them before the app is imported.
+_INFO = {}
+
+
+def launch_info(target):
+    """(label, author) to show while `target` opens."""
+    if target in ("__appmenu__", "launcher"):
+        return "Apps", None
+    info = _INFO.get(target)
+    if info is None:
+        try:
+            m = _read_manifest(app_root(target), target)
+            info = (m.get("name", target), m.get("author", None))
+            _INFO[target] = info
+        except Exception:
+            info = (target, None)
+    return info
+
+
 def list_apps():
     """Return [{'dir':..., 'name':..., 'type':...}, ...]  sorted by dir name.
 
@@ -103,6 +123,8 @@ def list_apps():
                 continue
             if root == remote and app_root(entry, remote) != remote:
                 continue                    # incomplete copy: keep /apps
+            _INFO[entry] = (manifest.get("name", entry),
+                            manifest.get("author", None))
             found[entry] = {
                 "dir":    entry,
                 "name":   manifest.get("name", entry),
@@ -337,15 +359,57 @@ def _loading_spinner(os_obj):
 
 # ── generic app run loop ──────────────────────────────────────────────────────
 
-def run_app(os_obj, app):
+def _opening():
+    """oreoOS.opening, or None (an OS without it keeps the old slide)."""
+    try:
+        from oreoOS import opening
+        return opening
+    except Exception:
+        return None
+
+
+def _stop_loader(loader):
+    if loader is not None:
+        try:
+            loader.stop(restore=False)
+        except Exception:
+            pass
+
+
+def _home_cancels(os_obj, loader):
+    """While the LOADING panel is up the UI thread cannot read buttons, so
+    a HOME pressed during the import is read here, before on_enter: it
+    cancels the open. Other presses made at the panel are dropped."""
+    if loader is None or not getattr(loader, "shown", False):
+        return False
+    try:
+        os_obj.buttons.update()
+        return bool(os_obj.buttons.just_pressed(api.BTN_HOME))
+    except Exception:
+        return False
+
+
+def run_app(os_obj, app, loader=None, opened=None):
+    """Run `app` until it quits or launches another.
+
+    loader: the oreoOS.opening.Loader started before the app was imported
+    (boot's launch loop); its panel stays up through on_enter and goes
+    away with the app's first present(). opened: (app_dir, t0 ticks,
+    import ms), to time the open."""
     os_obj._quit_requested = False
     os_obj._launch_request = None
+    op = _opening()
 
-    # Optional loading transition for heavy apps. The panel covers the screen
-    # while on_enter does its work; the very next frame fully overwrites it.
-    # If the user mashes HOME during the slide, abort the launch entirely and
-    # route them back to the apps drawer instead of waiting for on_enter.
-    loading = bool(getattr(app, "SHOW_LOADING", False))
+    if _home_cancels(os_obj, loader):
+        _stop_loader(loader)
+        os_obj._launch_request = "__appmenu__"
+        return
+
+    # Without oreoOS.opening (an older OS): the old loading slide for apps
+    # that ask for it. The panel covers the screen while on_enter does its
+    # work; the very next frame fully overwrites it. HOME during the slide
+    # aborts the launch and routes back to the apps drawer.
+    loading = op is None and bool(getattr(app, "SHOW_LOADING", False))
     if loading:
         label  = getattr(app, "name",   app.__class__.__name__)
         author = getattr(app, "author", None)
@@ -416,12 +480,18 @@ def run_app(os_obj, app):
     period_ms = 0
 
     spin = _loading_spinner(os_obj) if loading else None
+    t_enter = time.ticks_ms()
     try:
         app.on_enter(os_obj)
+    except Exception:
+        _stop_loader(loader)
+        raise
     finally:
         if spin is not None:
             # The app's first frame repaints the whole screen.
             spin.stop(restore=False)
+    enter_ms = time.ticks_diff(time.ticks_ms(), t_enter)
+    acked = False       # this run already drew the "Opening ..." chip
     last = time.ticks_ms()
     try:
         while not os_obj._quit_requested:
@@ -586,6 +656,17 @@ def run_app(os_obj, app):
                     app._present_region = None
                     if panel.is_active() or pair_pp.is_active():
                         region = None
+                # This frame asked for another app: acknowledge the press
+                # on this very frame, before the old app exits and the new
+                # one imports (oreoOS.opening).
+                if (not acked and op is not None and
+                        os_obj._quit_requested and os_obj._launch_request):
+                    acked = True
+                    label = launch_info(os_obj._launch_request)[0]
+                    if op.ack(os_obj.display, label) is not None:
+                        region = None
+                if opened is not None:
+                    region = None       # first frame after the LOADING panel
                 # First OS frame after boot: swipe in from the splash.
                 if getattr(os_obj, "_splash_frame", None) is not None:
                     from oreoOS.splash import swipe_in
@@ -602,6 +683,12 @@ def run_app(os_obj, app):
                     os_obj.display.present()
                     present_hook(time.ticks_diff(
                         time.ticks_us(), present_start_us))
+                if opened is not None:
+                    # The app's first frame is on the panel (the present
+                    # above stopped the loader's animator).
+                    _stop_loader(loader)
+                    _note_open(op, opened, enter_ms)
+                    opened = None
                 if not getattr(os_obj, "_home_marked", False):
                     # The first OS frame is on the panel (after the swipe,
                     # or without one if the splash failed): start the
@@ -721,6 +808,21 @@ def run_app(os_obj, app):
         except Exception as e:
             _log_crash(e, "on_exit " + str(getattr(app, "name", "?")))
         gc.collect()
+
+
+def _note_open(op, opened, enter_ms):
+    """Log how long an open took (USB console) and let oreoOS.opening
+    remember it, so a slow app shows its LOADING panel at once next time."""
+    try:
+        app_dir, t0, import_ms = opened
+        total = time.ticks_diff(time.ticks_ms(), t0)
+        print("[open] %s: %d ms (import %d, on_enter %d, first frame %d)" % (
+            app_dir, total, import_ms, enter_ms,
+            max(0, total - import_ms - enter_ms)))
+        if op is not None:
+            op.note(app_dir, total)
+    except Exception:
+        pass
 
 
 # ── crash screen ──────────────────────────────────────────────────────────────
@@ -988,10 +1090,12 @@ def _safe_boot_requested(buttons, hold_ms=SAFE_HOLD_MS):
         return False
 
 
-def _warm_up(os_obj):
+def _warm_up(os_obj, apps=None):
     """Do behind the splash what the first frames would otherwise pay for
     (#119): import the modules the run loop uses, build its singletons,
-    and load Home's wallpaper and dock icon into their caches."""
+    and load Home's wallpaper and dock icon into their caches. Also the
+    first press: import the apps drawer (it stays loaded anyway) and build
+    its icons, so A on Home opens it at once."""
     try:
         from oreoOS import notif_panel, pair_prompt
         notif_panel.get(os_obj)
@@ -1004,7 +1108,8 @@ def _warm_up(os_obj):
             os_obj._power = PowerManager(os_obj)
     except Exception:
         pass
-    for mod in ("oreoOS.ota", "oreoOS.netsvc", "oreoOS.perf"):
+    for mod in ("oreoOS.ota", "oreoOS.netsvc", "oreoOS.perf",
+                "oreoOS.opening"):
         try:
             __import__(mod)
         except Exception:
@@ -1015,7 +1120,56 @@ def _warm_up(os_obj):
         _home._load_apps_icon()
     except Exception:
         pass
+    try:
+        t0 = time.ticks_ms()
+        _import_app("apps.launcher.main", app_root("launcher"))
+        drawer = _sys.modules.get("apps.launcher.src.app")
+        if drawer is not None and hasattr(drawer, "warm"):
+            drawer.warm(apps)
+        _bc("drawer warm (%d ms)" % time.ticks_diff(time.ticks_ms(), t0))
+    except Exception as e:
+        _bc("drawer warm FAILED: %s" % e)
     gc.collect()
+
+
+def _begin_loading(os_obj, target):
+    """Start oreoOS.opening's LOADING panel for `target`; None without it."""
+    op = _opening()
+    if op is None:
+        return None
+    try:
+        label, author = launch_info(target)
+        return op.begin(os_obj.display, target, label, author)
+    except Exception:
+        return None
+
+
+def open_app(os_obj, target):
+    """Import `target`, run it, and unload it afterwards. Returns False
+    when it crashed (the crash screen has been shown).
+
+    Feedback first: the press already drew its "Opening" chip; the
+    LOADING panel (oreoOS.opening) follows if the open is slow, and stays
+    up through the import and on_enter until the app's first frame."""
+    app = None
+    loader = None
+    try:
+        t0 = time.ticks_ms()
+        loader = _begin_loading(os_obj, target)
+        app = load_app(target)
+        import_ms = time.ticks_diff(time.ticks_ms(), t0)
+        run_app(os_obj, app, loader, (target, t0, import_ms))
+        return True
+    except Exception as e:
+        _stop_loader(loader)
+        show_crash(os_obj, target, e)
+        return False
+    finally:
+        _stop_loader(loader)
+        # Unload the app's modules (unless it asked to stay), so files the
+        # Store or a dev mount changed load fresh next launch. (`oreo push`
+        # restarts OreoOS anyway.)
+        release_app(target, app)
 
 
 def boot():
@@ -1126,12 +1280,13 @@ def boot():
     # Build the first Home while the greeting is still rolling, so the
     # splash covers that loading too and hands straight over to Home.
     first = None
+    apps = None
     try:
         apps = list_apps()
         first = (apps, Home(apps))
     except Exception as e:
         _bc("first home FAILED: %s" % e)
-    _warm_up(os_obj)
+    _warm_up(os_obj, apps)
     _bc("warm-up done")
     if safe:
         try:
@@ -1154,8 +1309,9 @@ def boot():
             apps, home = first
             first = None
         else:
-            apps = list_apps()
-            home = Home(apps)
+            # Home keeps the list but never reads it, so returning Home
+            # does not re-read every manifest.json from flash.
+            home = Home(apps if apps is not None else [])
         # Reaching the home screen is the "I'm done" signal — clear any
         # launcher resume context so the next drawer open starts fresh
         # rather than restoring the user to where they last were inside
@@ -1194,19 +1350,8 @@ def boot():
             if not target:
                 break    # nothing queued; outer loop returns to Home
 
-            app = None
-            try:
-                app = load_app(target)
-                run_app(os_obj, app)
-            except Exception as e:
-                show_crash(os_obj, target, e)
+            if not open_app(os_obj, target):
                 break
-            finally:
-                # Unload the app's modules (unless it asked to stay), so
-                # files the Store or a dev mount changed load fresh next
-                # launch. (`oreo push` restarts OreoOS anyway.)
-                release_app(target, app)
-                app = None
 
 
 if __name__ == "__main__":

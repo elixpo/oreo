@@ -81,6 +81,7 @@ SHIP_PATTERNS = [
     "oreoOS/crashlog.py",
     "oreoOS/geo.py",
     "oreoOS/busy.py",
+    "oreoOS/opening.py",
     "oreoOS/hostui.py",
     "oreoOS/usbhost.py",
     "oreoOS/mascot.png",

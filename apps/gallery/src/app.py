@@ -594,13 +594,18 @@ class App(oreoOS.App):
         return self._is_video() and self._video_playing
 
     def _close_video(self):
-        if self._video is not None:
+        had = self._video is not None
+        if had:
             self._video.close()
         self._video = None
         self._video_name = ""
         self._video_elapsed = 0.0
         self._video_needs_clear = True
-        _gc.collect()
+        if had:
+            # Only a closed clip frees enough to be worth a full collect
+            # (tens of ms on the PSRAM heap); stepping between photos
+            # calls this too.
+            _gc.collect()
 
     def _is_video(self):
         return (not self._is_add_tile() and self._idx < len(self._names) and
