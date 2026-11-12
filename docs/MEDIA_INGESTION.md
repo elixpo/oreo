@@ -17,6 +17,10 @@ the badge-hosted web page and `tools/media_ingest.py` use the same sequence:
 | Markdown | `.mdz` / ODZ v1 | UTF-8 + zlib |
 | text | `.txtz` / ODZ v1 | UTF-8 + zlib |
 
+Videos stay on RV565 v6. RV565 format version 7 (the RV565 2.0 library: more
+pixel formats, delta and repeat frames) is not read by the Gallery or the
+firmware's `_oreo_rv565` module until the firmware moves to the 2.0 C library.
+
 Independent video frames provide bounded decode time and make the same file
 streamable from memory-mapped internal flash or an SD card. SD support changes
 the byte-source backend, not the codec or renderer.

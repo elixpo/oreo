@@ -263,7 +263,38 @@ CASES = {
 }
 
 
-class BadgeRenderTest(unittest.TestCase):
+def avatar_bin(login, w=56, h=56, color=0x07E0):
+    """An /avatar.bin as `oreo setup` writes it (cli/oreo_cli/avatar.py):
+    a solid disc of `color` with magenta corners."""
+    px = bytearray()
+    r2 = (w / 2.0 - 0.5) ** 2
+    for y in range(h):
+        for x in range(w):
+            inside = (x - w / 2.0 + 0.5) ** 2 + (y - h / 2.0 + 0.5) ** 2 <= r2
+            v = color if inside else 0xF81F
+            px += bytes((v >> 8, v & 0xFF))
+    name = login.encode()
+    return b"OAV1" + bytes((w, h, len(name))) + name + bytes(px)
+
+
+class _AvatarFiles:
+    """Temporary /avatar.bin files for a test case."""
+
+    def avatar_file(self, login, data=None):
+        import shutil
+        import tempfile
+        d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, d, True)
+        path = os.path.join(d, "avatar.bin")
+        if data is None and login:
+            data = avatar_bin(login)
+        if data is not None:
+            with open(path, "wb") as f:
+                f.write(data)
+        return path
+
+
+class BadgeRenderTest(_AvatarFiles, unittest.TestCase):
     PREVIEW = os.environ.get("BADGE_PREVIEW_DIR")
 
     def render(self, case, real_fonts, busy=False):
@@ -282,8 +313,8 @@ class BadgeRenderTest(unittest.TestCase):
                 release.wait(2)
                 return None
             gh.fetch_profile = fetch
-            if not avatar:
-                m._try_avatar = lambda: None
+            pkg.profile.AVATAR_PATH = self.avatar_file(
+                files.get("GITHUB_USER") if avatar else None)
             app = m.App()
             if not busy:
                 pkg.netsvc.quiet = True       # no automatic fetch
@@ -357,6 +388,70 @@ class BadgeRenderTest(unittest.TestCase):
         self.assertIn("Building tiny computers", shown)
         # No avatar blit, initials drawn instead (pixel font: no d.text).
         self.assertFalse([op for op in d.ops if op[0] == "blit"])
+
+    def test_owner_avatar_is_drawn_in_the_disc(self):
+        m, app, d = self.render("full", False)
+        blits = [op for op in d.ops if op[0] == "blit"]
+        self.assertEqual(len(blits), 1)
+        _k, x, y, w, h, _c = blits[0]
+        self.assertEqual((w, h), (56, 56))
+        self.assertEqual((x + w // 2, y + h // 2), (m.AV_CX, m.AV_CY))
+
+    def render_with_avatar_of(self, owner_login, file_login, data=None):
+        m, pkg, modules = build_env(False)
+        with _Installed(modules):
+            pkg.state.files = {"/profile.json": {"GITHUB_USER": owner_login,
+                                                 "DISPLAY_NAME": "Mona Lisa"}}
+            pkg.profile.reload()
+            pkg.profile.AVATAR_PATH = self.avatar_file(file_login, data)
+            pkg.github.online = lambda: False
+            pkg.github.cached_profile = lambda login: (None, None)
+            pkg.netsvc.quiet = True
+            app = m.App()
+            app.on_enter(None)
+            d = FakeDisplay()
+            app.draw(d)
+        return m, app, d
+
+    def test_someone_elses_avatar_is_never_shown(self):
+        m, app, d = self.render_with_avatar_of("octocat", "Circuit-Overtime")
+        self.assertIsNone(app._avatar)
+        self.assertFalse([op for op in d.ops if op[0] == "blit"])
+        self.assertIn("ML", [t[0] for t in d.texts])     # initials disc
+
+    def test_avatar_login_matches_case_insensitively(self):
+        m, app, d = self.render_with_avatar_of("OctoCat", "octocat")
+        self.assertIsNotNone(app._avatar)
+
+    def test_bad_avatar_files_fall_back_to_initials(self):
+        good = avatar_bin("octocat")
+        for data in (good[:-1],                          # cut short
+                     b"XXXX" + good[4:],                 # not an avatar
+                     avatar_bin("octocat", 80, 80),      # bigger than the disc
+                     b"OAV1",                            # header only
+                     b""):
+            with self.subTest(size=len(data)):
+                m, app, d = self.render_with_avatar_of("octocat", None, data)
+                self.assertIsNone(app._avatar)
+                self.assertFalse([op for op in d.ops if op[0] == "blit"])
+
+    def test_avatar_released_on_exit(self):
+        m, app, d = self.render_with_avatar_of("octocat", "octocat")
+        self.assertIsInstance(app._avatar[0], bytearray)
+        app.on_exit()
+        self.assertIsNone(app._avatar)
+
+    def test_shipped_avatar_module_is_removed(self):
+        import tempfile
+        d = tempfile.mkdtemp()
+        old = os.path.join(d, "avatar.py")
+        with open(old, "w") as f:
+            f.write("W = H = 56\n")
+        m, pkg, modules = build_env(False)
+        m.OLD_AVATAR = old
+        m._drop_shipped_avatar()
+        self.assertFalse(os.path.exists(old))
+        m._drop_shipped_avatar()                         # missing: no error
 
     def test_initials(self):
         m, _pkg, _mods = build_env(False)
@@ -471,7 +566,14 @@ class DeployRetiredAppsTest(unittest.TestCase):
         self.assertIn("apps/identity", paths)
         self.assertIn("assets/icons/optimized/identity_icon.py", paths)
         self.assertFalse(any(p.startswith("apps/") and p != "apps/identity"
-                             for p in paths))
+                             and p not in self.deploy.NEVER_SHIP for p in paths))
+
+    def test_shipped_avatar_is_retired_and_never_deployed(self):
+        # #133: one person's avatar went to every badge.
+        old = "apps/badge/assets/optimized/avatar.py"
+        self.assertIn(old, self.deploy.NEVER_SHIP)
+        self.assertIn(old, self.deploy.retired_paths({"badge"}, set()))
+        self.assertNotIn(old, [remote for _local, remote in self.deploy.DEPLOY])
 
     def test_name_back_in_repo_or_store_is_kept(self):
         for repo, store in (({"identity"}, set()), (set(), {"identity"})):

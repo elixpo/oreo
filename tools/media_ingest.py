@@ -87,6 +87,10 @@ def encode_document(source, output):
 
 
 def encode_video(source, output, seconds, fps, width, height):
+    # Writes RV565 v6, which is what the Gallery and the firmware's
+    # _oreo_rv565 module read. RV565 format version 7 is not readable on the
+    # badge until the firmware moves to the RV565 2.0 C library, so neither
+    # this tool nor validate() below accepts it.
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from encode_video_benchmark import encode
     encode(source, output, seconds, fps, width, height, compressed=True)

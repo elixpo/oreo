@@ -146,7 +146,7 @@ These are installed with the CLI:
 - `rich`
 - `pyserial`
 - `mpremote` 1.28.x, which must match the badge's MicroPython 1.28
-- `Pillow`
+- `Pillow`, for photos and for your GitHub avatar (`oreo setup`)
 - `textual` 8.x, for the [full-screen view](#interactive-ui)
 
 Converting **videos** also needs [ffmpeg](https://ffmpeg.org/) on your PATH
@@ -576,6 +576,8 @@ oreo setup --owm-key-stdin < owm-key.txt       # the OpenWeatherMap key, kept ou
 oreo setup --designation ""                    # remove a value
 oreo setup --from-file .env.local              # the profile keys from an .env-style file
 oreo setup --set DISPLAY_NAME="Mona Lisa" --set TIMEZONE_OFFSET=5.5   # one key at a time
+oreo setup --avatar                            # fetch your GitHub avatar again
+oreo setup --github-user octocat --no-avatar   # leave the avatar alone
 ```
 
 Keys use the `.env.local` names: `GITHUB_USER`, `DISPLAY_NAME`,
@@ -617,6 +619,26 @@ No checkout or `.env.local` is needed.
 - OreoOS restarts afterwards so the apps read the new profile (`--reset none`
   leaves it at the MicroPython prompt). A new timezone applies at the next
   time sync, which happens as OreoOS starts.
+
+**Your avatar.** After the profile, `oreo setup` puts the GitHub avatar of
+`GITHUB_USER` on the badge for the Badge app. This computer downloads it
+(`https://github.com/<user>.png`, not the rate-limited API), crops it to a
+56x56 circle in RGB565 with Pillow, and copies it over USB to
+`/avatar.bin`, together with the user it was made for. The badge itself
+downloads and decodes nothing.
+
+- It is fetched only when `/avatar.bin` is missing or was made for another
+  user. `--avatar` fetches it again (after you change your GitHub picture);
+  given alone, it does only that. `--no-avatar` leaves the file alone.
+- The Badge app shows it only while its user is the profile's
+  `GITHUB_USER`; otherwise it draws your initials. Without a GitHub user,
+  setup removes `/avatar.bin`.
+- If the download fails (offline, unknown user), the profile is still saved
+  and setup says so; an avatar made for someone else is removed, never left
+  behind. Run `oreo setup --avatar` later.
+- `/avatar.bin` sits next to `/profile.json`, outside every app folder, so
+  OreoOS updates and deploys keep it (`tools/deploy.py --clean` wipes both).
+- `--show` names whose avatar is on the badge.
 
 ### `oreo new`: start an app
 
@@ -1088,7 +1110,12 @@ the output when you report a problem.
     - **s** opens the REPL and Ctrl-] comes back to the view;
     - **q**, Ctrl-C, and pulling the cable: the terminal is restored, and
       OreoOS starts again (or the view waits for the badge to come back).
-12. With an OreoOS that has `oreoOS/hostui.py`: the badge's screen shows the
+12. `oreo setup --github-user <you>`: "saved /avatar.bin"; open **Badge**
+    and your avatar is in the ring. `oreo setup --github-user octocat`
+    replaces it; offline, `oreo setup --github-user <someone>` keeps the
+    profile, warns, and Badge shows initials (never the previous face).
+    `oreo setup --avatar` fetches it again; `--show` names its user.
+13. With an OreoOS that has `oreoOS/hostui.py`: the badge's screen shows the
     progress of `oreo push`/`pull` of a large file, `oreo add`,
     `oreo app install`, `oreo apps install` and `oreo update`, and is cleared
     when each finishes; with an older OreoOS, the same commands work as

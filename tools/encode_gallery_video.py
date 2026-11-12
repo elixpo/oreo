@@ -5,6 +5,10 @@ indices. The badge reads about 30 KB per frame and its Gallery-local C module
 expands 200x150 to the 320x240 framebuffer in about 8 ms. There is no inflate
 stall and only one compact frame is kept in RAM.
 
+This is the legacy palette path. Current Gallery videos are RV565 v6, written
+by tools/media_ingest.py and `oreo add` (tools/encode_video_benchmark.py). The
+generic RV565 format version 7 is not read on the badge yet.
+
 Usage:
     python3 tools/encode_gallery_video.py spiderman.mp4 \
         apps/gallery/assets/optimized/spiderman.rv565 --seconds 10 --fps 24

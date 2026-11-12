@@ -33,6 +33,26 @@ note listing every key that is still blank.
 | `WEATHER_NAME` | Weather (optional label) | `Bengaluru` |
 | `OWM_API_KEY` | Weather ([OpenWeatherMap](https://openweathermap.org/api) key) | |
 
+## Your avatar
+
+The Badge app draws your GitHub avatar in its ring. It is not a profile
+key and the badge never downloads it: `oreo setup` fetches the avatar of
+`GITHUB_USER` on your computer, converts it to a 56x56 circle and copies it
+over USB to **`/avatar.bin`**, next to `/profile.json` and outside every
+app folder, so OreoOS updates and deploys never replace it. The file
+records the GitHub user it was made for, and Badge shows it only while
+that user is your `GITHUB_USER` (case does not matter); otherwise, or
+without the file, it draws your initials. No avatar ships with OreoOS.
+
+```bash
+oreo setup --avatar          # fetch it again, e.g. after changing your GitHub picture
+```
+
+Changing `GITHUB_USER` with `oreo setup` replaces the avatar, and removing
+it removes the file. Details: [CLI.md](CLI.md#oreo-setup-owner-profile).
+Without the CLI, `python3 tools/fetch_avatar.py --user <you>` makes the
+same file from a checkout; copy it with `oreo push avatar.bin /avatar.bin`.
+
 ## Weather's location
 
 With no `WEATHER_LAT` / `WEATHER_LON`, Weather asks where the badge is from
@@ -112,6 +132,7 @@ not overwritten by a redeploy.
 from oreoOS import profile
 profile.get("GITHUB_USER", "octocat")
 profile.is_set_up()        # True once GITHUB_USER is set
+profile.avatar(profile.get("GITHUB_USER"))   # (pixels, w, h) for d.blit, or None
 ```
 
 Read the profile through this module, not `from secrets import ...`, so

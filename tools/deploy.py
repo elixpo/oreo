@@ -201,6 +201,13 @@ if _fonts_dir.exists():
     for _f in sorted(_fonts_dir.glob("pixelify_*.py")):
         DEPLOY.append((str(_f), "assets/fonts/optimized/" + _f.name))
 
+# Personal files a checkout may still hold that never go to a badge: the
+# avatar module older tools/fetch_avatar.py wrote (one person's face on
+# every badge, #133). The owner's avatar is /avatar.bin, from `oreo setup`.
+NEVER_SHIP = (
+    "apps/badge/assets/optimized/avatar.py",
+)
+
 APPS_DIR     = Path("apps")
 _app_roots   = [APPS_DIR]
 for _root in _app_roots:
@@ -274,6 +281,8 @@ for _root in _app_roots:
 
             for py in sorted(opt.glob("*.py")):
                 if py.name == "__init__.py":
+                    continue
+                if "%s/%s" % (r_base, py.name) in NEVER_SHIP:
                     continue
                 if raw_stems is not None and py.stem not in raw_stems:
                     # The matching raw image was removed — don't push the
@@ -540,7 +549,7 @@ RETIRED_APPS = (
 )
 RETIRED_FILES = (
     "assets/icons/optimized/identity_icon.py",
-)
+) + NEVER_SHIP          # removed from badges that got them before #133
 
 
 def retired_paths(repo_apps, store_apps):

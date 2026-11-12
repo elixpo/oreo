@@ -437,6 +437,25 @@ class ShippedFilesTest(unittest.TestCase):
         for rel in self._modules():
             self.assertIn(rel, shipped, rel)
 
+    def test_release_never_ships_an_avatar(self):
+        """#133: a checkout that still has the old avatar module (one
+        person's face) must not put it in a release."""
+        import shutil
+        import tempfile
+        release = load("tools/build_release.py", "oreo_release_never_ship")
+        tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, tmp, True)
+        for rel in ("apps/badge/assets/optimized/avatar.py",
+                    "apps/badge/assets/optimized/__init__.py",
+                    "oreoOS/profile.py"):
+            (tmp / rel).parent.mkdir(parents=True, exist_ok=True)
+            (tmp / rel).write_text("")
+        release.REPO_ROOT = tmp
+        shipped = {rel for _, rel in release._collect_paths()}
+        self.assertIn("oreoOS/profile.py", shipped)
+        self.assertIn("apps/badge/assets/optimized/__init__.py", shipped)
+        self.assertNotIn("apps/badge/assets/optimized/avatar.py", shipped)
+
 
 if __name__ == "__main__":
     unittest.main()
