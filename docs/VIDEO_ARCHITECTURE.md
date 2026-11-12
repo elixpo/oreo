@@ -256,6 +256,55 @@ dimensions, FPS, frame count, and exact payload size before allocating or
 playing anything. Runtime failures are logged and shown on-screen instead of
 being collapsed into an unexplained “broken video” state.
 
+## The native boot splash
+
+The boot splash ("hello" rolling through languages over the dark photo) used
+to animate on a Python thread. That thread shares MicroPython's interpreter
+lock with boot's imports and radio start-up, so the roll stuttered. Firmware
+with the native splash player plays it from C instead, as an RV565 clip.
+
+**The clip.** `tools/build_splash_clip.py` runs `oreoOS/splash.py`'s own band
+renderer for every frame, so `oreoOS/splash.rv565` is exactly what the Python
+splash draws: the 320 x 64 greeting band at y = 78, 13 frames per greeting at
+39 FPS (one word every 333 ms, as `CYCLE_MS`, and about the panel's ~39 Hz
+refresh), one loop of the 16 greetings, 208 frames. It is RV565 version 7,
+rgb565be, zlib level 9, lossless: frame 0 is the only keyframe, the word at
+rest is a repeat (nothing to decode or send), and the roll is partial deltas
+in bands of 4 rows, so only the rows the words touch are sent (5,484 rows per
+loop out of 13,312). It is 394 KB. Rebuild it after changing `splash.bin` or
+the splash timing; `--check` says whether the committed clip is stale.
+
+**The player** (`firmware/usermods/oreo_rv565/oreo_splash.c`, in the
+`_oreo_rv565` module, on the vendored RV565 2.0.0 core) is a FreeRTOS task on
+core 0; MicroPython runs on core 1. It never takes the interpreter lock and
+never touches the Python heap: `splash.py` copies the clip into the player's
+own memory in 8 KB chunks (`splash_load`). Each frame is decoded in place,
+only its changed rows go to the panel through two DMA bounce buffers, and an
+`esp_timer` paces it at the clip's rate. It also draws the loader bar, with
+the same formula as `splash.loader_frac()`, from the targets `progress()` and
+`finish()` pass on.
+
+**The panel hand-off.** `oreoWare.display` drives the ST7789 through
+`machine.SPI(1)` (ESP-IDF `SPI2_HOST`) with CS and DC as plain GPIOs. The
+player adds its own device on that bus, which stays initialised and
+configured as Python left it, drives the same CS and DC pins, and wraps each
+frame in `spi_device_acquire_bus()`. It never resets or re-initialises the
+panel: it sets row windows (and the loader's column window), writes, and
+restores the full-screen window after every frame. Between `intro()` and
+`finish()` nothing in Python draws. `finish()` asks the player to stop after
+a frame with the word at rest; `splash_stop()` copies the band on the panel
+into the framebuffer and returns the loader width it drew, which `splash.py`
+redraws, so the framebuffer matches the screen when the swipe into the OS
+starts from it. `Display()` and `oreoOS.hostui` stop a player that is still
+running (after a crash or a soft reset during boot), and the player stops
+itself 12 s into the splash.
+
+**Fallback.** OTA updates OS files, never the firmware, so a new OS meets old
+firmware: `splash.py` uses the player only when `_oreo_rv565` has
+`splash_start` (and the clip loads and the player starts); otherwise it runs
+the Python thread exactly as before. `inflate_frame`, which Gallery uses, is
+unchanged.
+
 ## What this architecture optimizes for
 
 This is not a general-purpose H.264 decoder. It is a format designed around one

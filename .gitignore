@@ -9,6 +9,8 @@ __pycache__/
 *.rv565
 # RV565 conformance vectors for the browser converter's tests.
 !oreo.elixpo/scripts/fixtures/**/*.rv565
+# The boot splash clip the native player plays (tools/build_splash_clip.py).
+!oreoOS/splash.rv565
 *.pyo
 *.pyd
 .venv/

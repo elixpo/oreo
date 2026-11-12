@@ -10,11 +10,31 @@ greeting. Each frame restores the greeting band from the static frame and
 draws two masks with framebuf's palette blit, then flushes only the band
 (and the loader when it moves).
 
-The animation runs on its own thread, so it keeps moving while boot imports
-modules and starts the radios; boot code never has to call into it.
+Native player. On firmware whose _oreo_rv565 module has splash_start
+(firmware/usermods/oreo_rv565/oreo_splash.c), intro() draws the first frame
+here, copies oreoOS/splash.rv565 (tools/build_splash_clip.py: the greeting
+band, every frame exactly as this module draws it, as an RV565 version 7
+clip at CLIP_FPS) into the player and hands it the band and the loader. The
+player is a FreeRTOS task on core 0, away from MicroPython (core 1) and its
+interpreter lock, so the roll stays smooth whatever boot does. It shares
+machine.SPI(1)'s bus as a second SPI device, drives the same CS/DC pins, and
+never resets the panel; between intro() and finish() nothing in Python
+draws. progress() and finish() pass the loader's target and finish time
+on; finish() stops the player on a word at rest, and splash_stop() copies
+the frame on the panel into the framebuffer's band (and the loader width
+it drew is redrawn here), so the swipe starts from exactly what is shown.
+oreoWare.display.Display() and oreoOS.hostui stop a player left running
+(a crash or a soft reset during boot), and it stops itself after
+MAX_TOTAL_MS + LIFE_MARGIN_MS.
+
+Fallback. OTA replaces OS files, never the firmware, so on older firmware
+(or without the clip, or if the player fails to start) the animation runs
+on a Python thread as before. It keeps moving while boot imports modules
+and starts the radios, but shares the interpreter lock with them, so it can
+stutter. Boot code never has to call into either.
 
     sp = Splash(os_obj)
-    sp.intro()          # first frame, starts the animation thread
+    sp.intro()          # first frame, starts the native player or the thread
     sp.progress(0.5)    # optional: the loader's target as boot advances
     sp.finish()         # minimum show time, fills the loader, word boundary
     sp.finish(settled)  # also wait (up to MAX_TOTAL_MS) for settled() -> True
@@ -54,6 +74,71 @@ SWIPE_T      = 30           # chevron thickness, px
 SWIPE_GAP    = 12           # gap between chevrons (shows the OS)
 SWIPE_SLOPE  = 70           # 1/100 px of depth per row from the centre
 SWIPE_COLS   = ((250, 186, 194), (166, 226, 208), (253, 212, 140))
+
+# The native player's clip (tools/build_splash_clip.py): the greeting band
+# at CLIP_FPS, CLIP_WORD_FRAMES frames per greeting (13 at 39 FPS is one
+# CYCLE_MS, three words a second, at about the panel's ~39 Hz refresh).
+CLIP_PATH        = "oreoOS/splash.rv565"
+CLIP_FPS         = 39
+CLIP_WORD_FRAMES = 13
+
+
+NATIVE           = True      # use the firmware's player when it has one
+LIFE_MARGIN_MS   = 6000      # it stops itself this long after MAX_TOTAL_MS
+STOP_TIMEOUT_MS  = 1000      # finish() waits this long for a word at rest
+CLIP_CHUNK       = 8192      # bytes per splash_load() while copying the clip
+
+
+def clip_time(i):
+    """The splash time (ms) clip frame i shows."""
+    j = i % CLIP_WORD_FRAMES
+    return (i // CLIP_WORD_FRAMES) * CYCLE_MS + j * CYCLE_MS // CLIP_WORD_FRAMES
+
+
+def native_player():
+    """The firmware's splash player (_oreo_rv565 with splash_start), or
+    None. OTA updates the OS but never the firmware, so an OS with this file
+    still meets firmware without the player, and then animates in Python."""
+    if not NATIVE:
+        return None
+    try:
+        import _oreo_rv565 as m
+    except Exception:
+        return None
+    for name in ("splash_load", "splash_start", "splash_progress", "splash_stop"):
+        if not hasattr(m, name):
+            return None
+    return m
+
+
+def load_clip(m, path):
+    """Copy the clip into the player's own memory, a chunk at a time (no
+    clip-sized buffer on the Python heap). Returns its size."""
+    f = open(path, "rb")
+    try:
+        f.seek(0, 2)
+        total = f.tell()
+        f.seek(0)
+        buf = bytearray(min(CLIP_CHUNK, total) or 1)
+        mv = memoryview(buf)
+        off = 0
+        while off < total:
+            n = f.readinto(buf)
+            if not n:
+                raise ValueError("short splash clip")
+            m.splash_load(mv[:n], off, total)
+            off += n
+    finally:
+        f.close()
+    return total
+
+
+def clip_rest_frames(count, band_h):
+    """How many leading frames of each greeting show the word at rest."""
+    j = 0
+    while j < CLIP_WORD_FRAMES and roll_state(clip_time(j), count, band_h)[2] == 0:
+        j += 1
+    return j
 
 
 def _rgb565(c):
@@ -335,6 +420,7 @@ class Splash:
         self._target = 0.15
         self._done_ms = None
         self._bar_px = -1
+        self._native = None
         try:
             a = _Art(BIN_PATH)
             self._art = a
@@ -360,13 +446,20 @@ class Splash:
                 self._static()
                 return
             self._first_frame()
-            self._start_thread()
+            if not self._start_native():
+                self._start_thread()
         except Exception as e:
             print("[splash] intro:", e)
 
     def progress(self, frac):
         if frac > self._target:
             self._target = frac
+        m = self._native
+        if m is not None:
+            try:
+                m.splash_progress(frac)
+            except Exception:
+                pass
 
     def pump(self):
         """Draw one frame when no animation thread is running. Returns False
@@ -385,20 +478,23 @@ class Splash:
         try:
             self.wait_settled(settled, cap_ms)
             if self._art is not None:
-                self._target = 1.0
+                self.progress(1.0)
                 while _diff(_ms(), self._start) < MIN_TOTAL_MS - FILL_MS:
                     self._tick_wait()
                 self._done_ms = _diff(_ms(), self._start)
-                limit = self._done_ms + FILL_MS + CYCLE_MS
-                while True:
-                    t = _diff(_ms(), self._start)
-                    full = t >= self._done_ms + FILL_MS
-                    rest = roll_state(t, self._art.count, self._art.band_h)[2] == 0
-                    if (full and rest) or t >= limit:
-                        break
-                    self._tick_wait()
-                if not self._threaded:
-                    self._frame()
+                if self._native is not None:
+                    self._finish_native()
+                else:
+                    limit = self._done_ms + FILL_MS + CYCLE_MS
+                    while True:
+                        t = _diff(_ms(), self._start)
+                        full = t >= self._done_ms + FILL_MS
+                        rest = roll_state(t, self._art.count, self._art.band_h)[2] == 0
+                        if (full and rest) or t >= limit:
+                            break
+                        self._tick_wait()
+                    if not self._threaded:
+                        self._frame()
             self._stop = True
             waited = 0
             while self._alive and waited < 500:
@@ -440,6 +536,8 @@ class Splash:
 
     def release(self):
         self._stop = True
+        if self._native is not None:
+            self._stop_native(False)
         if self._art is not None:
             self._art.close()
         self._art = None
@@ -517,8 +615,10 @@ class Splash:
             blit_gs4(band, SW, bh, self._masks[1], wn, bh, xn, bh - off, a.pal, a.key)
 
     def _draw_bar(self, frac):
+        return self._draw_bar_px(int(self._art.bar_w * frac))
+
+    def _draw_bar_px(self, px):
         a = self._art
-        px = int(a.bar_w * frac)
         if px == self._bar_px:
             return False
         self._bar_px = px
@@ -555,6 +655,74 @@ class Splash:
         except Exception as e:
             print("[splash] thread:", e)
         self._alive = False
+
+    # -- the native player (firmware _oreo_rv565, see the module docstring) -
+
+    def _start_native(self):
+        """Hand the band and the loader to the firmware's splash player.
+        False (and nothing changed) when the firmware or the clip lacks it."""
+        m = native_player()
+        if m is None:
+            return False
+        a = self._art
+        t0 = _ms()
+        try:
+            total = load_clip(m, CLIP_PATH)
+            kw = {}
+            try:
+                from oreoWare import pins
+                kw = {"cs": pins.DISPLAY_CS, "dc": pins.DISPLAY_DC,
+                      "baud": pins.DISPLAY_BAUD}
+            except Exception:
+                pass            # the firmware's defaults are the badge's pins
+            m.splash_start(a.band_y, period=CLIP_WORD_FRAMES,
+                           hold=clip_rest_frames(a.count, a.band_h),
+                           bar=(a.bar_x, a.bar_y, a.bar_w, a.bar_h),
+                           track=a.bar_track, fill=a.bar_fill,
+                           bar_px=max(0, self._bar_px),
+                           t0=_diff(_ms(), self._start),
+                           min_total=MIN_TOTAL_MS, fill_ms=FILL_MS,
+                           life=MAX_TOTAL_MS + LIFE_MARGIN_MS, spi=1, **kw)
+            m.splash_progress(self._target)
+        except Exception as e:
+            print("[splash] native player unavailable:", e)
+            try:
+                m.splash_stop()         # frees a partly loaded clip
+            except Exception:
+                pass
+            return False
+        self._native = m
+        self._threaded = True           # no Python animation, no pump()
+        print("[splash] native player: %d KB clip in %d ms"
+              % (total // 1024, _diff(_ms(), t0)))
+        return True
+
+    def _finish_native(self):
+        """The player runs the loader to full over FILL_MS, then stops on a
+        word at rest; its last frame lands in the framebuffer."""
+        try:
+            self._native.splash_progress(1.0, self._done_ms)
+        except Exception:
+            pass
+        while _diff(_ms(), self._start) < self._done_ms + FILL_MS:
+            self._tick_wait()
+        self._stop_native(True)
+
+    def _stop_native(self, at_rest):
+        """Stop the player and take the panel back: its last frame goes
+        into the framebuffer's band and the loader is redrawn where the
+        player left it, so the framebuffer matches the screen."""
+        m = self._native
+        self._native = None
+        try:
+            band = memoryview(self._os.display._buf)[self._band0:self._band1]
+            r = m.splash_stop(band, at_rest, STOP_TIMEOUT_MS)
+            if r:
+                self._draw_bar_px(r[0])
+                print("[splash] native: %d frames, %d late, worst %d us, err %d"
+                      % (r[1], r[2], r[3], r[4]))
+        except Exception as e:
+            print("[splash] native stop:", e)
 
     def _start_thread(self):
         try:
