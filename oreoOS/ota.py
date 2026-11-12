@@ -516,7 +516,28 @@ def peek(release, on_progress=None):
     }
 
 
-def download(peeked, on_progress=None, on_bytes=None):
+_dl_active = False
+
+
+def download_busy():
+    """True while download() runs (e.g. on a worker the Updates app left)."""
+    return _dl_active
+
+
+def download(peeked, on_progress=None, on_bytes=None, cancel=None):
+    """See _download(): the same, with download_busy() True meanwhile."""
+    global _dl_active
+    if _dl_active:
+        _fail("download", "another download is still running")
+        return False
+    _dl_active = True
+    try:
+        return _download(peeked, on_progress, on_bytes, cancel)
+    finally:
+        _dl_active = False
+
+
+def _download(peeked, on_progress=None, on_bytes=None, cancel=None):
     """Stage 3 — download only the changed files into /_ota.
 
     `peeked` is the dict returned by peek(). Pre-passing it means the
@@ -529,6 +550,8 @@ def download(peeked, on_progress=None, on_bytes=None):
     the update gives up. Free space is checked first. On failure
     last_error() / error_text() say which file, host and reason. Returns
     True when the update is staged and sealed (manifest written last).
+    cancel() is asked between files; True stops the download (nothing is
+    sealed, so nothing is installed).
     """
     if not peeked:
         return False
@@ -554,6 +577,9 @@ def download(peeked, on_progress=None, on_bytes=None):
     try:
         for i, entry in enumerate(changed):
             path = entry.get("path", "")
+            if cancel is not None and cancel():
+                _fail("download", "stopped", path)
+                return False
             if not (path and entry.get("url", "")):
                 _fail("download", "release lists a file without a URL", path)
                 return False
