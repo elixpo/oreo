@@ -92,10 +92,25 @@ except Exception:
     pass
 
 
+def _stop_native_splash():
+    """A native boot splash still playing (a crash or a soft reset during
+    boot, see oreoOS/splash.py) shares this SPI bus and drives the panel's
+    CS/DC pins: stop it before touching them. Firmware without the player
+    has no splash_stop."""
+    try:
+        import _oreo_rv565
+        stop = getattr(_oreo_rv565, "splash_stop", None)
+        if stop is not None:
+            stop()
+    except Exception:
+        pass
+
+
 class Display(api.Display):
     _mono_pal = None        # 2×1 RGB565 palette for blit_mono, built lazily
 
     def __init__(self):
+        _stop_native_splash()
         spi = SPI(
             1,
             baudrate=pins.DISPLAY_BAUD,

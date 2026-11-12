@@ -76,6 +76,11 @@ def _panel():
     p = _st.get("panel")
     if p is not None:
         return p
+    try:                        # a native boot splash still playing
+        import _oreo_rv565      # (oreoOS/splash.py) owns the panel
+        _oreo_rv565.splash_stop()
+    except Exception:
+        pass
     from machine import Pin, SPI
     from oreoWare import pins
     from oreoWare._st7789 import ST7789
