@@ -22,6 +22,10 @@ from its `## [<version>]` section below, so every release needs one.
   someone else is removed rather than left behind. `--show` names whose
   avatar is on the badge.
 
+### Changed
+
+- `oreo setup` makes the avatar 72x72 (was 56x56), so it fills the Badge app's disc. OreoOS v2.0.10 and later read up to 72 px, so the larger file works on the current release.
+
 ## [1.0.0] - 2026-11-11
 
 First stable release. Commands, options, output and exit codes are now
