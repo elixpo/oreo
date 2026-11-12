@@ -220,6 +220,9 @@ mentoring organisation; it has not been accepted._
 
 ## Licensing of contributions
 
+The licensing, engineering and process rules in
+[`PREAMBLE.md`](PREAMBLE.md) apply to every contribution.
+
 By submitting a contribution you agree that it is licensed inbound under
 the Elixpo standard (**MIT** for code, **CC-BY-4.0** for assets) and that
 you have the right to submit it. The
