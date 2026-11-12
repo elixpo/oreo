@@ -299,6 +299,13 @@ Notes:
 
 - `./deploy --board` raises OreoOS's patch version (`oreoOS/config.py`) on
   every run. Add `--no-bump` when you are only testing.
+- `./deploy --board` uploads the OS modules (`oreoOS/`, `oreoWare/`, the
+  built-in apps' `src/`) precompiled to `.mpy` when it finds MicroPython
+  1.28.0's `mpy-cross` (`$MPY_CROSS`, `PATH`, or the firmware checkout in
+  `~/esp`), and removes their `.py` from the badge, since MicroPython imports
+  `x.py` before `x.mpy`. Add `--py` to upload plain `.py` while developing
+  (it removes the `.mpy` again). `oreo dev` runs your app from the computer
+  as `.py` either way.
 - Pass `--port <device>` if the badge is not `/dev/ttyACM0`.
 - `--full` and `./build-firmware --flash` erase everything on the badge,
   including photos, documents and Store apps.

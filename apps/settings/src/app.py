@@ -48,6 +48,28 @@ class _Row:
 # result) and repaints when one changed.
 LIVE_MS = 500
 
+# The Sleep After slider changes the timer at once (power.SETTINGS is what
+# the power manager reads) but writes flash only once the slider has been
+# still this long, or when Settings closes: holding RIGHT used to write
+# the settings file on every step.
+SAVE_MS = 1500
+
+
+def _ticks():
+    import time      # looked up per call, so host tests can stand one in
+    try:
+        return time.ticks_ms()
+    except AttributeError:               # CPython
+        return int(time.monotonic() * 1000)
+
+
+def _diff(a, b):
+    import time
+    try:
+        return time.ticks_diff(a, b)
+    except AttributeError:
+        return a - b
+
 
 def sync_summary(net, wifi=None):
     """Value column of the "Sync Time" row, from netsvc.time_status().
@@ -114,6 +136,7 @@ class App(oreoOS.App):
     author       = "Circuit-Overtime"
     SHOW_LOADING = True     # pulls the pink slide-down panel while on_enter
                             # wires up WiFi / BT / power manager imports.
+    _save_at     = None     # ticks_ms of an unsaved slider change
 
     def on_enter(self, os):
         self._os         = os
@@ -137,6 +160,7 @@ class App(oreoOS.App):
         self._live_ms   = 0
         self._live_vals = None
         self._sync_note = ""          # "no wifi" after a refused request
+        self._save_at   = None        # ticks_ms of an unsaved slider change
 
         # Same value the notification panel's slider uses (100% after boot).
         self._brightness = getattr(os, "_last_brightness", 100)
@@ -251,7 +275,22 @@ class App(oreoOS.App):
         # 10 = top cap so the slider doesn't run off into hours.
         v = max(0, min(10, int(v)))
         self._pm.SETTINGS["idle_seconds"] = v * 60
-        self._pm.save_settings(self._os)
+        # Saved by update() once the slider rests (SAVE_MS), or on exit.
+        self._save_at = _ticks()
+
+    def _flush_power(self):
+        """Write the power settings if a slider change is unsaved."""
+        if self._save_at is None:
+            return
+        self._save_at = None
+        if self._pm:
+            try:
+                self._pm.save_settings(self._os)
+            except Exception:
+                pass
+
+    def on_exit(self):
+        self._flush_power()
 
     # ── apps drawer view ────────────────────────────────────────────────
     # The launcher reads os.settings_get("app_view", "grid"). We toggle it
@@ -416,17 +455,16 @@ class App(oreoOS.App):
             row.setter(None)
 
     def update(self, dt):
+        if self._save_at is not None and \
+                _diff(_ticks(), self._save_at) >= SAVE_MS:
+            self._flush_power()
         # The WiFi and Sync rows show live state (a join, a retry
         # countdown, a sync landing on the worker). Re-read them twice a
         # second and repaint only when one changed.
-        try:
-            import time
-            now = time.ticks_ms()
-            if time.ticks_diff(now, self._live_ms) < LIVE_MS:
-                return
-            self._live_ms = now
-        except Exception:
-            pass
+        now = _ticks()
+        if _diff(now, self._live_ms) < LIVE_MS:
+            return
+        self._live_ms = now
         if self._sync_note:
             try:
                 if self._wifi is not None and self._wifi.is_connected():

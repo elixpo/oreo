@@ -31,6 +31,7 @@ firmware/*.bin
 *.swp
 .env.local
 .deploy_hashes.json
+.deploy_mpy/
 dist/
 legal/
 

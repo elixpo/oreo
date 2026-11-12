@@ -830,7 +830,8 @@ class Badge:
             " _rel=O.check(%(ch)s)\n"
             " _v=_rel.get('version') if _rel else None\n"
             "if not _v or not _rel:\n"
-            " _e({'error':'no answer from GitHub','current':_cur})\n"
+            " _et=getattr(O,'error_text',None)\n"
+            " _e({'error':(_et() if _et else '') or 'no answer from GitHub','current':_cur})\n"
             "else:\n"
             " _cmp=getattr(O,'compare_version',None)\n"
             " _n=(_cmp(_v,_cur)>0) if _cmp else O._newer(_v,_cur)\n"
@@ -844,17 +845,22 @@ class Badge:
         r = self.result(
             "_pk=O.peek(_rel)\n"
             "if not _pk:\n"
-            " _e({'error':'could not read the release manifest'})\n"
+            " _et=getattr(O,'error_text',None)\n"
+            " _e({'error':(_et() if _et else '') or 'could not read the release manifest'})\n"
             "else:\n"
             " _e({'files':len(_pk['changed']),'bytes':_pk['bytes'],'unchanged':_pk['unchanged'],"
             "'major':bool(_pk['major']),'version':_pk['manifest'].get('version')})\n",
             timeout=300)
         return r
 
-    def ota_download(self, progress=None, screen=None):
+    def ota_download(self, progress=None, screen=None, size=0, files=0):
         """Download the changed files into /_ota. progress(i, total, path).
-        Returns True when the update is staged and sealed. screen=title:
-        the badge shows each file on its screen."""
+        Returns True when the update is staged and sealed; on failure
+        self.ota_error says why (file, host, reason) when the OS can tell.
+        screen=title: the badge shows each file on its screen. size and
+        files (from ota_peek) scale the time allowed: the badge streams
+        a few tens of KB/s over TLS."""
+        self.ota_error = ""
         def on_event(ev):
             if progress and "i" in ev:
                 progress(ev["i"], ev.get("t") or 0, ev.get("p") or "")
@@ -868,12 +874,18 @@ class Badge:
             "def _cb(i,t,p):\n"
             " _e({'i':i,'t':t,'p':p})\n" + step +
             "_ok=O.download(_pk,_cb)\n"
+            "_er=''\n"
             "if not _ok:\n"
+            " _et=getattr(O,'error_text',None)\n"
+            " _er=_et() if _et else ''\n"
             " try:\n"
             "  O.discard_pending()\n"
             " except Exception:\n"
             "  pass\n"
-            "_e({'ok':bool(_ok)})\n", timeout=120, on_event=on_event)
+            "_e({'ok':bool(_ok),'err':_er})\n",
+            timeout=max(120, 60 + int(size) // 4096 + 3 * int(files)),
+            on_event=on_event)
+        self.ota_error = r.get("err") or ""
         return bool(r.get("ok"))
 
     def ota_apply(self, progress=None, screen=None):

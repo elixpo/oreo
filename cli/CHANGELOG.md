@@ -25,6 +25,7 @@ from its `## [<version>]` section below, so every release needs one.
 ### Changed
 
 - `oreo setup` makes the avatar 72x72 (was 56x56), so it fills the Badge app's disc. OreoOS v2.0.10 and later read up to 72 px, so the larger file works on the current release.
+- `oreo update` says why a download failed: the file, host and reason the badge reports (for example `Downloading oreoOS/splash.rv565: release-assets.githubusercontent.com: timed out`), and the same for a failed check or manifest read. The time allowed for the download now grows with its size and file count (was a flat 120 s). OreoOS releases without the error report keep the old messages.
 
 ## [1.0.0] - 2026-11-11
 

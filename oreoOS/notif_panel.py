@@ -34,9 +34,23 @@ HOME (or C) restores the previous brightness and returns to the app.
 
 Quick settings are wired directly into oreoWare modules — `bt.set_active`,
 `wifi.connect_from_config`/`wifi.disconnect`, `display.set_brightness`.
-The Settings and Update tiles close the panel and launch their app. The
-panel never blocks for I/O except the WiFi association wait on an old
-wifi.py without auto_begin(), which can be cancelled with any key. The
+The Settings and Update tiles close the panel and launch their app.
+
+Radio tiles (WiFi, BT): turning a radio on or off is a C call
+(`wlan.active()` / `ble.active()`) that holds MicroPython's interpreter
+lock for its whole duration (up to a second), so no animator thread can
+draw while it runs. The panel therefore answers the press first: the
+tile switches to its pending look (a spinner frame, "starting" or
+"stopping") and that frame is presented, and only then does the call
+run. Afterwards the tile shows the real state; when the radio did not
+change, the tile says "failed" and the hint band says so in words for
+NOTE_MS. A press of A on a radio tile in the first frame after the call
+is dropped (it was made during the call), so a second tap never queues
+a second toggle.
+
+The panel never blocks for I/O except those radio calls and the WiFi
+association wait on an old wifi.py without auto_begin(), which can be
+cancelled with any key. The
 manual time sync runs on netsvc's worker (netsvc.request_sync()); the
 row shows "syncing…" until netsvc.sync_result() reports the outcome. The
 WiFi tile's sub-label comes from netsvc.status() (joining, retry N s,
@@ -58,6 +72,7 @@ SH = api.SCREEN_H
 _ANIM_DUR = 0.18      # slide-in duration (seconds)
 _REFRESH_MS = 500     # live status (clock, BT pulse) repaint cadence
 SYNC_WAIT_MS = 15000  # give up on a manual sync that never reports back
+NOTE_MS = 3000        # a radio tile's failure note stays this long
 
 # Quick tiles: three on the first row, two wider ones on the second.
 _PILL_PAD = 12
@@ -184,6 +199,16 @@ def _draw_torch(d, x, y, color):
     d.rect(x + 2, y + 2,  1, 8, color, fill=True)     # lens rim
     d.rect(x + 3, y + 3,  4, 6, color, fill=True)     # head
     d.rect(x + 7, y + 4,  5, 4, color, fill=True)     # handle
+
+
+def _draw_wait(d, x, y, color):
+    """A frozen spinner frame in the 12x12 glyph box: eight 2x2 dots on a
+    ring, three of them lit (head and tail), the rest dim."""
+    dots = ((5, 0), (8, 1), (10, 5), (8, 9), (5, 10), (1, 9), (0, 5), (1, 1))
+    for i in range(8):
+        dx, dy = dots[i]
+        c = color if i < 3 else theme.MUTED2
+        d.rect(x + dx, y + dy, 2, 2, c, fill=True)
 
 
 def _draw_update(d, x, y, color):
@@ -318,6 +343,14 @@ class NotifPanel:
         # netsvc.sync_result()[0] when the manual sync was asked for;
         # None when no manual sync is outstanding.
         self._sync_wait  = None
+        # Radio tiles: (tile, turning_on) while a radio call runs, so the
+        # pending frame can be drawn; tile -> (start_ms, text) failure
+        # notes; and the frame count when the last radio call ended
+        # (presses latched during the call arrive in the next frame).
+        self._radio      = None
+        self._radio_note = {}
+        self._frames     = 0
+        self._radio_end  = None
 
     # ── visibility ──────────────────────────────────────────────────────
     def is_active(self):
@@ -395,6 +428,7 @@ class NotifPanel:
 
     # ── per-frame ───────────────────────────────────────────────────────
     def tick(self, dt):
+        self._frames += 1
         if self._scroll.step(dt):
             self._dirty = True
         if self._poll_sync():
@@ -447,6 +481,8 @@ class NotifPanel:
     def _handle_quick(self, btn, items):
         if btn == api.BTN_A:
             sel = self._quick_sel
+            if sel in (Q_WIFI, Q_BT) and self._radio_echo():
+                return True             # pressed while the last call ran
             if sel == Q_WIFI:
                 self._toggle_wifi()
             elif sel == Q_BT:
@@ -538,52 +574,64 @@ class NotifPanel:
     def _toggle_wifi(self):
         """Drive the WiFi RADIO state, not the association state.
 
-        The old behaviour was: "if connected → disconnect; else →
-        connect_from_config". That made the chip look like a no-op
-        any time auto-association failed: tap → radio up → can't
-        associate → is_connected() stays False → chip still reads
-        "OFF" → next tap thinks it's currently off and tries the same
-        thing again. Now the chip tracks radio_on(): one tap powers
-        the MAC up (and *tries* to associate), another tap powers it
-        fully down. Association status surfaces as the sub-label.
+        The chip tracks radio_on(): one tap powers the MAC up (and
+        *tries* to associate), another tap powers it fully down.
+        Association status surfaces as the sub-label. (Tracking
+        is_connected() instead made the chip look like a no-op whenever
+        auto-association failed.)
         """
         try:
             from oreoWare import wifi
-            on_now = False
+        except Exception:
+            return
+        try:
+            on_now = bool(wifi.is_radio_on())
+        except Exception:
+            # Old build without is_radio_on: fall back to the
+            # association check (no worse than before).
             try:
-                on_now = bool(wifi.is_radio_on())
-            except Exception:
-                # Old build without is_radio_on — fall back to the
-                # association check (no worse than before).
                 on_now = bool(wifi.is_connected())
-            if on_now:
-                wifi.radio_off() if hasattr(wifi, "radio_off") else wifi.disconnect()
-            else:
-                if hasattr(wifi, "radio_on"):
-                    wifi.radio_on()
-                # Commit the visible ON state before association blocks in
-                # connect_from_config(). This makes the single button press
-                # acknowledge immediately even when no saved AP is reachable.
-                try:
-                    self._dirty = True
-                    self.draw(self._os.display)
-                    self._os.display.present()
-                except Exception:
-                    pass
-                # Non-blocking: the run loop ticks wifi.auto_tick() and
-                # starts the file-transfer server once the link is up.
-                # Older wifi.py without auto_begin falls back to the
-                # blocking connect, pumping input so a press cancels it.
+            except Exception:
+                on_now = False
+
+        def radio_now():
+            try:
+                return bool(wifi.is_radio_on())
+            except Exception:
+                return not on_now       # can't tell: assume it worked
+
+        if on_now:
+            def off():
+                if hasattr(wifi, "radio_off"):
+                    r = wifi.radio_off()
+                else:
+                    r = wifi.disconnect()
+                return r is not False and not radio_now()
+            self._radio_call(Q_WIFI, False, off)
+            return
+
+        def on():
+            if hasattr(wifi, "radio_on"):
+                if wifi.radio_on() is False or not radio_now():
+                    return False
+            # The radio is up. Start the join under the same pending frame
+            # (a join that fails shows on the sub-label, not as "failed").
+            # Non-blocking: the run loop ticks wifi.auto_tick(). An older
+            # wifi.py without auto_begin falls back to the blocking
+            # connect, pumping input so a press cancels it.
+            try:
                 if hasattr(wifi, "auto_begin"):
                     wifi.auto_begin()
                 else:
                     try:
-                        wifi.connect_from_config(pump_cb=self._wifi_cancel_pump)
+                        wifi.connect_from_config(
+                            pump_cb=self._wifi_cancel_pump)
                     except TypeError:
                         wifi.connect_from_config()
-        except Exception:
-            pass
-        self._dirty = True
+            except Exception:
+                pass
+            return True
+        self._radio_call(Q_WIFI, True, on)
 
     def _wifi_cancel_pump(self):
         """Called from inside wifi.connect_from_config's wait loop.
@@ -602,9 +650,67 @@ class NotifPanel:
     def _toggle_bt(self):
         try:
             from oreoWare import bt
-            bt.set_active(not bt.is_active())
+            on = not bt.is_active()
+        except Exception:
+            return
+
+        def call():
+            if bt.set_active(on) is False:
+                return False
+            try:
+                return bool(bt.is_active()) == on
+            except Exception:
+                return True
+        self._radio_call(Q_BT, on, call)
+
+    # ── radio calls: answer the press before the blocking call ──────────
+    def _radio_call(self, tile, turning_on, fn):
+        """Present the tile's pending frame, then run fn() (the blocking
+        radio call; True when the radio reached the new state). A failure
+        leaves a note on the tile instead of a silent snap-back."""
+        self._radio = (tile, turning_on)
+        self._radio_note.pop(tile, None)
+        self._present_now()
+        try:
+            ok = fn()
+        except Exception:
+            ok = False
+        self._radio = None
+        self._radio_end = self._frames
+        self._dirty = True
+        if not ok:
+            self._radio_note[tile] = (time.ticks_ms(),
+                                      "on" if turning_on else "off")
+
+    def _radio_echo(self):
+        """True for a press in the first frame after a radio call: it was
+        latched while the call held the badge, so it is not a new tap."""
+        return (self._radio_end is not None and
+                self._frames - self._radio_end <= 1)
+
+    def _present_now(self):
+        """Paint the panel and push it to the screen right away (the run
+        loop's own present comes only after the blocking call)."""
+        d = getattr(self._os, "display", None)
+        if d is None:
+            return
+        try:
+            self._dirty = True
+            self.draw(d)
+            d.present()
         except Exception:
             pass
+
+    def _note(self, tile):
+        """The live failure note of a radio tile ("on"/"off"), or None."""
+        n = self._radio_note.get(tile)
+        if n is None:
+            return None
+        if time.ticks_diff(time.ticks_ms(), n[0]) > NOTE_MS:
+            self._radio_note.pop(tile, None)
+            self._dirty = True
+            return None
+        return n[1]
 
     def _adjust_brightness(self, delta):
         cur = getattr(self._os, "_last_brightness", 100)
@@ -749,7 +855,7 @@ class NotifPanel:
 
         self._draw_hint(d, panel_y, full_h)
 
-    def _pill(self, d, x, y, w, on, sel, label, sub, glyph):
+    def _pill(self, d, x, y, w, on, sel, label, sub, glyph, sub_ink=None):
         fill = theme.PRIMARY if on else theme.CARD
         d.rect(x, y, w, _PILL_H, fill, fill=True)
         if sel:
@@ -768,7 +874,24 @@ class NotifPanel:
         d.text(lbl, tx0 + (tw - len(lbl) * 8) // 2, y + 5, ink, scale=1)
         if sub:
             sub = sub[:max(1, tw // 8)]
-            d.text(sub, tx0 + (tw - len(sub) * 8) // 2, y + 17, ink, scale=1)
+            d.text(sub, tx0 + (tw - len(sub) * 8) // 2, y + 17,
+                   ink if sub_ink is None else sub_ink, scale=1)
+
+    def _radio_pill(self, d, x, y, sel, tile, label, state):
+        """WiFi / BT tile: its live state, the pending look while its
+        radio call runs, or "failed" after a call that did not take."""
+        pend = self._radio
+        if pend is not None and pend[0] == tile:
+            # One spinner frame: the call holds the interpreter lock, so
+            # nothing can animate it; the frame says "working on it".
+            self._pill(d, x, y, _PILL_W, False, sel, label,
+                       "starting" if pend[1] else "stopping", _draw_wait)
+            return
+        if self._note(tile) is not None:
+            self._pill(d, x, y, _PILL_W, state[0], sel, label, "failed",
+                       None, theme.BG if state[0] else theme.PRIMARY)
+            return
+        self._pill(d, x, y, _PILL_W, state[0], sel, label, state[1], None)
 
     def _draw_quick_rows(self, d, panel_y):
         states = self._quick_states()
@@ -777,11 +900,10 @@ class NotifPanel:
         y1 = panel_y + _PILL_Y
         y2 = panel_y + _PILL_Y2
         x  = _PILL_PAD
-        self._pill(d, x, y1, _PILL_W, states[0][0], q and s == Q_WIFI,
-                   "WiFi", states[0][1], None)
+        self._radio_pill(d, x, y1, q and s == Q_WIFI, Q_WIFI, "WiFi",
+                         states[0])
         x += _PILL_W + _PILL_PAD
-        self._pill(d, x, y1, _PILL_W, states[1][0], q and s == Q_BT,
-                   "BT", states[1][1], None)
+        self._radio_pill(d, x, y1, q and s == Q_BT, Q_BT, "BT", states[1])
         x += _PILL_W + _PILL_PAD
         self._pill(d, x, y1, _PILL_W, False, q and s == Q_TORCH,
                    "Torch", "A = on", _draw_torch)
@@ -937,6 +1059,24 @@ class NotifPanel:
                    theme.PRIMARY if sel else theme.MUTED, scale=1)
 
     def _draw_hint(self, d, panel_y, full_h):
+        note = None
+        for tile, name in ((Q_WIFI, "WiFi"), (Q_BT, "Bluetooth")):
+            n = self._note(tile)
+            if n is not None:
+                note = "%s didn't turn %s. A = retry" % (name, n)
+        pend = self._radio
+        if pend is not None:
+            note = "Turning %s %s..." % (
+                "WiFi" if pend[0] == Q_WIFI else "Bluetooth",
+                "on" if pend[1] else "off")
+        if note is not None:
+            hy = panel_y + full_h - _HINT_H
+            d.rect(0, hy, SW, _HINT_H, theme.DOCK_BG, fill=True)
+            d.rect(0, hy, SW, 1, theme.PRIMARY, fill=True)
+            d.text(note[:SW // 8], (SW - len(note[:SW // 8]) * 8) // 2,
+                   hy + 5, theme.TEXT_BRIGHT if pend else theme.PRIMARY,
+                   scale=1)
+            return
         if self._focus == "quick":
             hint = "D-pad=move  A=select  C=close"
         elif self._focus == "bright":

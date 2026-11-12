@@ -357,6 +357,11 @@ def main(argv=None):
                         upload_dir / "manifest.json")
         shutil.copyfile(REPO_ROOT / "dist" / args.version / "bundle.tar",
                         upload_dir / "bundle.tar")
+        # The precompiled variant, when build_release.py found MicroPython
+        # 1.28.0's mpy-cross (badges fall back to manifest.json without it).
+        mpy_manifest = REPO_ROOT / "dist" / args.version / "manifest-mpy.json"
+        if mpy_manifest.exists():
+            shutil.copyfile(mpy_manifest, upload_dir / "manifest-mpy.json")
 
     # 5. Create the GitHub Release.
     prerelease_flag = ["--prerelease"] if args.channel != "stable" else []

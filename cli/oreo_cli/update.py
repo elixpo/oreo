@@ -184,9 +184,12 @@ def _run_update(ctx, b, channel, check_only):
 
     with ui.progress("downloading %s" % esc(latest), total=pk["files"], unit="files") as update:
         ok = b.ota_download(progress=lambda i, t, p: update(i, t or None),
-                            screen="Downloading OreoOS %s" % latest)
+                            screen="Downloading OreoOS %s" % latest,
+                            size=pk["bytes"], files=pk["files"])
     if not ok:
-        raise OreoError("the download failed; nothing was changed on the badge",
+        why = getattr(b, "ota_error", "")
+        raise OreoError("the download failed%s; nothing was changed on the badge"
+                        % ((" (%s)" % why) if why else ""),
                         hint="check the Wi-Fi signal and run `oreo update` again")
     ui.ok("downloaded and checked (SHA-256) on the badge")
     return _apply_and_reboot(ctx, b, latest)

@@ -170,6 +170,33 @@ the ESP-IDF heap (a copy of the DER plus parsed fields, roughly 15 KB) until
 the socket is closed and
 collected.
 
+## Connecting: address fallback
+
+GitHub serves release assets, raw files and its asset CDN from four anycast
+addresses (185.199.108.133 to 185.199.111.133), and some networks black-hole
+one of them: a TCP connection to it never opens. The badge's resolver (lwIP)
+returns one address and caches it for the DNS TTL, so a badge that drew the
+dead one used to time out on every OTA file and App Store download. Every
+connection (`_http._connect`) now tries each address it knows with a 6 s
+connect timeout, remembers the ones that failed for 10 minutes and tries
+them last, and, when all of them fail, asks the network's DNS server
+directly for every A record and tries the rest. Request failures are kept in
+plain words (`_http.last_error()`, `error_since(mark)`), for example
+`release-assets.githubusercontent.com: timed out`.
+
+To see what a badge gets, and to dry-run an update without installing it:
+
+```bash
+oreo run tools/ota_probe.py
+```
+
+It lists, per GitHub host, the resolver's address, every address DNS lists
+and whether a TCP connection to each opens; then it checks for the latest
+release and downloads and verifies every file of it into `/_ota_probe`
+(deleted at the end), printing host, redirects, size, time and hash result
+per file, and the first error in full. It never touches the installed OS or
+an update staged in `/_ota`.
+
 ## Not covered here
 
 TLS protects the connection, not the update itself. Signing OTA bundles,

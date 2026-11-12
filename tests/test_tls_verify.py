@@ -442,6 +442,12 @@ class ScreensTest(unittest.TestCase):
                     "apps/commits/src/app.py",
                     "apps_market/weather/src/app.py"):
             text = (ROOT / rel).read_text()
+            if "updates/src" in rel:
+                # Updates shows oreoOS.ota.error_text(), which carries the
+                # TLS reason ("TLS: untrusted certificate") from _http.
+                self.assertIn("error_text", text, rel)
+                self.assertIn("TLS: ", (ROOT / "oreoOS" / "_http.py").read_text())
+                continue
             self.assertIn("tls_error_since", text if "store/src" not in rel
                           else (ROOT / "oreoOS" / "store.py").read_text(), rel)
 

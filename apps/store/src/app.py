@@ -27,6 +27,13 @@ repainted. Selection moves repaint only the two rows involved.
 While either job runs the Store asks the launcher to keep its modules
 loaded (keep_loaded()), so a later visit re-attaches to the job.
 
+Nothing slow runs on a press or in draw(): the installed-apps list
+(a manifest read per app) is loaded in an idle frame after the
+catalogue is on screen and then kept until an install or uninstall
+changes it, and the size of an installed app (a stat of every file in
+it) is measured by update(), one app per frame, while its row shows
+"..." until the number lands.
+
 Install, update and uninstall run on the UI thread (one TLS session and
 the flash writes at a time) under an oreoOS.busy card: a spinner that
 keeps turning while the download blocks, the file being fetched, and a
@@ -92,6 +99,7 @@ class App(oreoOS.App):
         self._queue = []             # entries whose icon to download
         self._queued = set()
         self._sizes = {}             # installed id → bytes on flash
+        self._size_want = []         # ids whose size update() measures
         self._status = ""
         self._frames = 0
         self._paint = "full"         # full | rows | None
@@ -104,6 +112,7 @@ class App(oreoOS.App):
         self._busy = False
         self._prog_ms = 0
         self._installed = []
+        self._inst_stale = True      # _installed must be (re)loaded
         self._dirty = False          # set by the OS after an overlay closes
         self._job = None             # catalogue refresh in flight
         self._auto = False           # automatic refresh waiting on quiet
@@ -151,7 +160,15 @@ class App(oreoOS.App):
         self._featured = [e for e in self._featured if e]
         if self._feat_i >= len(self._featured):
             self._feat_i = 0
+        if self._page == INSTALLED:
+            self._load_installed()
+        else:
+            self._inst_stale = True      # update() loads it when idle
+        self._clamp()
+
+    def _load_installed(self):
         self._installed = store.list_installed()
+        self._inst_stale = False
         self._clamp()
 
     def _rows(self, page=None):
@@ -218,9 +235,31 @@ class App(oreoOS.App):
         return self._big[k]
 
     def _size(self, app_id):
-        if app_id not in self._sizes:
+        """Bytes on flash, or None until update() has measured it:
+        stat-ing every file of an app is too slow for draw()."""
+        v = self._sizes.get(app_id)
+        if v is None and app_id not in self._size_want:
+            self._size_want.append(app_id)
+        return v
+
+    def _measure_one(self):
+        """update(): measure one queued app size and repaint where it
+        shows."""
+        if not self._size_want:
+            return
+        app_id = self._size_want.pop(0)
+        try:
             self._sizes[app_id] = store.installed_size(app_id)
-        return self._sizes[app_id]
+        except Exception:
+            self._sizes[app_id] = 0
+        if self._view == "list":
+            if self._page == INSTALLED:
+                rows = [i for i, _y, _h in self._layout()
+                        if self._row_id(i) == app_id]
+                if rows:
+                    self._mark_rows(*rows)
+        elif self._entry is not None and self._entry["id"] == app_id:
+            self._paint = "full"
 
     # ── background work ────────────────────────────────────────────────
 
@@ -229,6 +268,14 @@ class App(oreoOS.App):
             self._frames += 1        # let the cached list reach the screen
             return
         global _inflight
+        if not self._busy:
+            # Slow local reads, off the press and out of draw(): one app
+            # size per frame, and the installed list once after entry.
+            self._measure_one()
+            if self._inst_stale and self._view == "list":
+                self._load_installed()
+                if self._page == INSTALLED:
+                    self._paint = "full"
         job = self._job
         if job is not None:
             if job.poll():
@@ -396,9 +443,8 @@ class App(oreoOS.App):
         p = self._page
         if btn == api.BTN_B:
             self._page = 1 - p
-            if self._page == INSTALLED:
-                self._installed = store.list_installed()
-                self._clamp()
+            if self._page == INSTALLED and self._inst_stale:
+                self._load_installed()
             self._paint = "full"
             return
         n = self._rows()
@@ -505,8 +551,9 @@ class App(oreoOS.App):
         self._view = "list"
         self._entry = None
         self._big.clear()
-        self._installed = store.list_installed()
-        self._sizes.clear()
+        if self._inst_stale:             # an install or uninstall ran
+            self._load_installed()
+            self._sizes.clear()
         self._clamp()
         self._paint = "full"
 
@@ -554,6 +601,8 @@ class App(oreoOS.App):
                 finally:
                     if b is not None:
                         b.stop(restore=False)   # a full paint follows
+                self._inst_stale = True
+                self._sizes.pop(self._entry["id"], None)
                 self._note = ("Uninstalled. Reinstall it from Discover."
                               if ok else "Uninstall failed: " + msg)
                 self._set_actions()
@@ -588,6 +637,7 @@ class App(oreoOS.App):
                 self._card = None
         self._busy = False
         self._sizes.clear()
+        self._inst_stale = True
         self._icons.pop(e["id"], None)
         self._note = "Installed." if ok else "Install failed: " + msg
         self._set_actions()
@@ -668,7 +718,8 @@ class App(oreoOS.App):
         else:
             parts.append("v" + (e.get("version") or "0"))
         if e.get("local"):
-            parts.append(R.fmt_size(self._size(e["id"])))
+            size = self._size(e["id"])
+            parts.append("..." if size is None else R.fmt_size(size))
         elif store.total_size(e):
             parts.append(R.fmt_size(store.total_size(e)))
         return "  ".join(parts)
@@ -725,8 +776,9 @@ class App(oreoOS.App):
         if store.is_default(app_id):
             meta, label = "Built-in", "BUILT-IN"
         else:
+            size = self._size(app_id)
             meta = "%s  %s" % (e.get("category") or "Sideloaded",
-                               R.fmt_size(self._size(app_id)))
+                               "..." if size is None else R.fmt_size(size))
             label = "UPDATE" if (not e.get("local") and
                                  store.app_state(e) == store.UPDATE) \
                 else "OPEN"
