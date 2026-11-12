@@ -15,7 +15,7 @@ const COLUMNS: FooterColumn[] = [
       { label: "oreo CLI",    href: "/docs/cli/" },
       { label: "Hacks",       href: "/hacks/" },
       { label: "Contribute",  href: "/contribute/" },
-      { label: "Upload",      href: "/upload/" },
+      { label: "Transfer",    href: "/docs/transfer/" },
     ],
   },
   {

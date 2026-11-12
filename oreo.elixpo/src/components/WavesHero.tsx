@@ -349,8 +349,8 @@ export default function WavesHero() {
                        text-text-dim md:text-xl"
           >
             OreoOS runs 20+ apps on a breadboard ESP32-S3 — a launcher,
-            an on-device app store, OTA updates over WiFi, AirDrop-style
-            file transfer, IR-quest peer-pairing, and a Tamagotchi panda
+            an on-device app store, OTA updates over WiFi, file transfer
+            over USB, IR-quest peer-pairing, and a Tamagotchi panda
             that judges you for skipping meals.
           </motion.p>
 
@@ -366,11 +366,11 @@ export default function WavesHero() {
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
             </Link>
             <Link
-              href="/upload/"
+              href="/docs/transfer/"
               className="btn-ghost rounded-pill px-7 py-3 text-base uppercase tracking-[0.18em]
                          backdrop-blur"
             >
-              Try file transfer
+              Send files over USB
             </Link>
             <a
               href="https://github.com/elixpo/oreo"
