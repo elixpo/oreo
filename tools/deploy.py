@@ -175,6 +175,7 @@ DEPLOY = [
     ("oreoOS/crashlog.py",      "oreoOS/crashlog.py"),  # /crash.log
     ("oreoOS/geo.py",           "oreoOS/geo.py"),       # Weather's auto location
     ("oreoOS/busy.py",          "oreoOS/busy.py"),      # loading animation
+    ("oreoOS/opening.py",       "oreoOS/opening.py"),   # feedback while an app opens
     ("oreoOS/hostui.py",        "oreoOS/hostui.py"),    # screen while the CLI drives
     ("oreoOS/usbhost.py",       "oreoOS/usbhost.py"),   # is a computer on USB?
 

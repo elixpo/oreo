@@ -266,6 +266,53 @@ _APPS_CACHE       = None
 _CATEGORIES_CACHE = None  # (apps_tuple, mode) → [(name, icon, idxs)…]
 
 
+DRAWER_HIDDEN = ("launcher", "bt", "wifi", "gestures", "updates")
+
+
+def _build_icons(apps):
+    """Fill the icon and label caches for `apps` unless they already hold
+    this roster. Returns True when it had to build them."""
+    global _ICON_CACHE_KEY
+    cache_key = (tuple(a["dir"] for a in apps), ICON_SZ)
+    if _ICON_CACHE_KEY == cache_key:
+        return False
+    _ICON_CACHE.clear()
+    _SMALL_ICON_CACHE.clear()
+    _LABEL_CACHE.clear()
+    _ICON_CACHE_KEY = cache_key
+
+    from oreoOS import icons as _icons
+    for a in apps:
+        res = _icons.load(a["dir"], a.get("icon"))
+        if not res:
+            continue
+        data, iw, ih = res
+        _SMALL_ICON_CACHE[a["dir"]] = (bytearray(data), iw, ih)
+        if iw == ICON_SZ and ih == ICON_SZ:
+            _ICON_CACHE[a["dir"]] = (bytearray(data), iw, ih)
+        else:
+            sx = max(1, ICON_SZ // iw)
+            sy = max(1, ICON_SZ // ih)
+            up, uw, uh = _upscale_xy(bytearray(data), iw, ih, sx, sy)
+            _ICON_CACHE[a["dir"]] = (up, uw, uh)
+
+    for a in apps:
+        _LABEL_CACHE[a["dir"]] = _wrap_label(a["name"])
+    return True
+
+
+def warm(apps):
+    """Called by the OS behind the boot splash with the app list it has
+    just read: seed the apps cache and build the icons, so the first A on
+    Home opens the drawer without reading manifests or decoding icons."""
+    global _APPS_CACHE
+    if _APPS_CACHE is None and apps is not None:
+        _APPS_CACHE = list(apps)
+    if _APPS_CACHE is not None:
+        _build_icons([a for a in _APPS_CACHE
+                      if a["dir"] not in DRAWER_HIDDEN])
+
+
 def invalidate_apps_cache():
     """Hook for the Store + Updates apps to drop the cached app list
     after an install / uninstall lands. Without this the launcher would
@@ -325,7 +372,6 @@ class App(oreoOS.App):
             def _lap(label):
                 pass
         self._os = os
-        DRAWER_HIDDEN = ("launcher", "bt", "wifi", "gestures", "updates")
 
         # Apps-list cache. list_apps() opens every manifest.json from
         # flash — ~50-100 ms per file on a busy FS, so 20+ apps was
@@ -344,32 +390,8 @@ class App(oreoOS.App):
         # invalidate on (apps_tuple, ICON_SZ) change — adding or removing
         # an app rebuilds, but re-entering the launcher with the same
         # roster is instant.
-        global _ICON_CACHE_KEY
-        cache_key  = (tuple(a["dir"] for a in self._apps), ICON_SZ)
-        icon_cache_hit = (_ICON_CACHE_KEY == cache_key)
+        icon_cache_hit = not _build_icons(self._apps)
         if not icon_cache_hit:
-            _ICON_CACHE.clear()
-            _SMALL_ICON_CACHE.clear()
-            _LABEL_CACHE.clear()
-            _ICON_CACHE_KEY = cache_key
-
-            from oreoOS import icons as _icons
-            for a in self._apps:
-                res = _icons.load(a["dir"], a.get("icon"))
-                if not res:
-                    continue
-                data, iw, ih = res
-                _SMALL_ICON_CACHE[a["dir"]] = (bytearray(data), iw, ih)
-                if iw == ICON_SZ and ih == ICON_SZ:
-                    _ICON_CACHE[a["dir"]] = (bytearray(data), iw, ih)
-                else:
-                    sx = max(1, ICON_SZ // iw)
-                    sy = max(1, ICON_SZ // ih)
-                    up, uw, uh = _upscale_xy(bytearray(data), iw, ih, sx, sy)
-                    _ICON_CACHE[a["dir"]] = (up, uw, uh)
-
-            for a in self._apps:
-                _LABEL_CACHE[a["dir"]] = _wrap_label(a["name"])
             _lap("icons (cold)")
         else:
             _lap("icons (warm)")

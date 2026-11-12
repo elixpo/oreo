@@ -299,6 +299,11 @@ class LoadingSpinnerTest(unittest.TestCase):
         self.fb_saved.restore()
 
     def test_spinner_runs_during_on_enter_only(self):
+        # The fallback for an OS without oreoOS.opening (the LOADING panel
+        # of the open itself is tested in test_app_open).
+        saved = _Saved(("oreoOS.opening",))
+        sys.modules["oreoOS.opening"] = None
+        self.addCleanup(saved.restore)
         launcher, busy = self.h.launcher, self.busy
         launcher.LOADING_SPIN_DELAY_MS = 0
         launcher._show_loading = lambda os_obj, label, author=None: False

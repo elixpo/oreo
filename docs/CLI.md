@@ -623,7 +623,7 @@ No checkout or `.env.local` is needed.
 **Your avatar.** After the profile, `oreo setup` puts the GitHub avatar of
 `GITHUB_USER` on the badge for the Badge app. This computer downloads it
 (`https://github.com/<user>.png`, not the rate-limited API), crops it to a
-56x56 circle in RGB565 with Pillow, and copies it over USB to
+72x72 circle in RGB565 with Pillow, and copies it over USB to
 `/avatar.bin`, together with the user it was made for. The badge itself
 downloads and decodes nothing.
 
