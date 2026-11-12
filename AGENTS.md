@@ -1,7 +1,8 @@
 # AGENTS.md
 
 Guide for coding agents, and for people, working in this repository. Read it
-before changing anything.
+before changing anything. The binding rules every contribution follows,
+licensing included, are in [PREAMBLE.md](PREAMBLE.md).
 
 ## What Oreo is
 

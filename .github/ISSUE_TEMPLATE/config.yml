@@ -8,4 +8,4 @@ contact_links:
     about: The oreo CLI, connecting over USB, Transfer, writing apps, and the hacks at oreo.elixpo.com/hacks.
   - name: Security issue
     url: https://github.com/elixpo/oreo/security/advisories/new
-    about: Report a vulnerability privately with a security advisory, not a public issue (see SECURITY.md).
+    about: Report a vulnerability privately with a security advisory, not a public issue (see docs/SECURITY.md).

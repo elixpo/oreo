@@ -55,11 +55,11 @@ maintainers:
   lead: false
 governance:
   model: maintainer-led
-  document: GOVERNANCE.md
+  document: docs/GOVERNANCE.md
 support:
   document: SUPPORT.md
 security:
-  document: SECURITY.md
+  document: docs/SECURITY.md
 conformance:
   standard: '1.0'
   status: conformant
