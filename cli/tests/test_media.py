@@ -71,6 +71,19 @@ class FormatTest(unittest.TestCase):
         raw = zlib.decompress(blob[12:])
         self.assertEqual(raw[:2], b"\xf8\x00")      # pure red in RGB565 big-endian
 
+    @unittest.skipUnless(HAVE_PIL, "Pillow not installed")
+    def test_image_follows_exif_orientation(self):
+        # Phones store a portrait photo as landscape pixels plus an EXIF
+        # Orientation tag; 6 means "rotate 90 degrees clockwise to show".
+        from PIL import Image
+        f = self.dir / "portrait.jpg"
+        exif = Image.Exif()
+        exif[0x0112] = 6
+        Image.new("RGB", (40, 20), (255, 0, 0)).save(f, exif=exif)
+        blob = media.encode_image(f, 240)
+        w, h, _ = struct.unpack("<HHI", blob[4:12])
+        self.assertEqual((w, h), (20, 40))
+
     def test_video_validation(self):
         good = fake_video()
         self.assertEqual(media.validate(good, "video"), len(good))
