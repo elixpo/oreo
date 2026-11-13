@@ -100,6 +100,37 @@ class GeoTest(_Env):
         self.assertIsNone(self.geo.lookup())
         self.assertIsNone(self.geo.location())
 
+    def test_a_failed_lookup_is_retried_after_the_backoff(self):
+        now = [1000]
+        self.geo._ticks = lambda: now[0]
+        self.http.replies[IPWHO] = OSError("captive portal")
+        self.http.replies[IPAPI] = None
+        self.assertIsNone(self.geo.lookup())
+        self.assertEqual(len(self.http.calls), 2)
+        # The network comes back; once the backoff has passed, the next
+        # lookup asks again and keeps the answer.
+        self.http.replies[IPWHO] = b'{"success":true,"latitude":22.57,"longitude":88.36,"city":"Kolkata"}'
+        now[0] += self.geo.RETRY_MS
+        self.assertEqual(self.geo.lookup()["name"], "Kolkata")
+        self.assertEqual(self.geo.location()["name"], "Kolkata")
+        n = len(self.http.calls)
+        self.geo.lookup()
+        self.assertEqual(len(self.http.calls), n)
+
+    def test_a_failed_lookup_is_not_repeated_within_the_backoff(self):
+        now = [1000]
+        self.geo._ticks = lambda: now[0]
+        self.http.replies[IPWHO] = None
+        self.http.replies[IPAPI] = None
+        self.assertIsNone(self.geo.lookup())
+        n = len(self.http.calls)
+        self.http.replies[IPWHO] = b'{"success":true,"latitude":22.57,"longitude":88.36,"city":"Kolkata"}'
+        now[0] += self.geo.RETRY_MS - 1
+        self.assertIsNone(self.geo.lookup())
+        self.assertEqual(len(self.http.calls), n)
+        # force=True skips the backoff.
+        self.assertEqual(self.geo.lookup(force=True)["name"], "Kolkata")
+
 
 class WeatherAutoLocationTest(_Env):
     def setUp(self):
