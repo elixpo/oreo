@@ -71,7 +71,19 @@ class FakeWLAN:
         return list(self.scan_result)
 
 
-def load_wifi(tmp):
+def load_wifi(tmp, case):
+    # The stubs below go into sys.modules for the test only: a leftover
+    # `_thread = None` breaks later tests that start threads.
+    saved = {k: sys.modules.get(k) for k in ("network", "_thread")}
+
+    def restore():
+        for k, v in saved.items():
+            if v is None:
+                sys.modules.pop(k, None)
+            else:
+                sys.modules[k] = v
+
+    case.addCleanup(restore)
     net = types.ModuleType("network")
     net.STA_IF = 0
     wlan = FakeWLAN()
@@ -100,7 +112,7 @@ def ap(ssid, rssi, auth=3, ch=6):
 class ParseScanTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
-        self.w, _, _ = load_wifi(self.tmp.name)
+        self.w, _, _ = load_wifi(self.tmp.name, self)
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -146,7 +158,7 @@ class ParseScanTest(unittest.TestCase):
 class ConnectStateTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
-        self.w, self.wlan, self.clock = load_wifi(self.tmp.name)
+        self.w, self.wlan, self.clock = load_wifi(self.tmp.name, self)
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -214,7 +226,7 @@ class ConnectStateTest(unittest.TestCase):
 class AutoConnectTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
-        self.w, self.wlan, self.clock = load_wifi(self.tmp.name)
+        self.w, self.wlan, self.clock = load_wifi(self.tmp.name, self)
 
     def tearDown(self):
         self.tmp.cleanup()

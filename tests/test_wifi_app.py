@@ -100,7 +100,7 @@ def load_app(wifi_mod, clock):
 class WifiAppTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
-        self.w, self.d, self.clock = drv.load_wifi(self.tmp.name)
+        self.w, self.d, self.clock = drv.load_wifi(self.tmp.name, self)
         self.mod, self.api, self._saved = load_app(self.w, self.clock)
         self.os = FakeOS()
         self.app = self.mod.App()

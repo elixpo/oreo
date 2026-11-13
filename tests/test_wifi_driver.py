@@ -187,7 +187,19 @@ class CapturedThreads:
             fn(*args)
 
 
-def load_wifi(tmp, threads=None):
+def load_wifi(tmp, case, threads=None):
+    # The stubs below go into sys.modules for the test only: a leftover
+    # `_thread = None` breaks later tests that start threads.
+    saved = {k: sys.modules.get(k) for k in ("network", "_thread")}
+
+    def restore():
+        for k, v in saved.items():
+            if v is None:
+                sys.modules.pop(k, None)
+            else:
+                sys.modules[k] = v
+
+    case.addCleanup(restore)
     clock = FakeClock()
     wlan = DriverWLAN(clock)
     net = types.ModuleType("network")
@@ -217,7 +229,8 @@ class Base(unittest.TestCase):
 
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
-        self.w, self.wlan, self.clock = load_wifi(self.tmp.name, self.threads)
+        self.w, self.wlan, self.clock = load_wifi(
+            self.tmp.name, self, self.threads)
 
     def tearDown(self):
         self.tmp.cleanup()
