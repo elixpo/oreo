@@ -10,6 +10,15 @@ from its `## [<version>]` section below, so every release needs one.
 
 ## [Unreleased]
 
+### Fixed
+
+- `oreo push -r ..` could write outside the destination: from `myapp/src`,
+  `oreo push -r .. /apps` wrote `myapp/main.py` over the badge's own
+  `/main.py`. A folder given as `.` or `..` now stands for its contents
+  (like `cp -r . dest`), so its files land inside the destination.
+- `oreo push -r . <new path>` failed with "unexpected error: IndexError"
+  and copied nothing; the folder's contents now land in the new path.
+
 ## [1.1.0] - 2026-11-12
 
 ### Added

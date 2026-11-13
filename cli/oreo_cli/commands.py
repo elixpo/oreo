@@ -336,6 +336,12 @@ def cmd_ls(ctx):
     ctx.ui.note("%d item(s), %s in files" % (len(entries), human(total)))
 
 
+def _unnamed(src):
+    """True for `.`, `./`, `..` and the like: a folder given without a name
+    of its own stands for its contents, as with `cp -r`."""
+    return Path(src).expanduser().name in ("", "..")
+
+
 def _local_files(sources, recursive):
     """[(local Path, relative posix path)] for the given sources."""
     out = []
@@ -344,9 +350,10 @@ def _local_files(sources, recursive):
         if p.is_dir():
             if not recursive:
                 raise OreoError("%s is a folder" % p, hint="use `oreo push -r`")
+            name = "" if _unnamed(src) else p.name
             for f in sorted(p.rglob("*")):
                 if f.is_file() and "__pycache__" not in f.parts:
-                    out.append((f, posixpath.join(p.name, f.relative_to(p).as_posix())))
+                    out.append((f, posixpath.join(name, f.relative_to(p).as_posix())))
         elif p.is_file():
             out.append((p, p.name))
         else:
@@ -360,7 +367,8 @@ def _local_files(sources, recursive):
 def push_targets(files, sources, dest, dest_stat):
     """Badge path for each (local, rel) file, with `cp -r` semantics:
     an existing folder (or a trailing /) receives the sources by name;
-    a new path names the copy of a single file or folder."""
+    a new path names the copy of a single file or folder. A folder given
+    as `.` or `..` stands for its contents."""
     dest = norm(dest)
     if dest_stat is not None and not dest_stat["dir"]:
         if len(files) != 1 or Path(sources[0]).is_dir():
@@ -370,6 +378,8 @@ def push_targets(files, sources, dest, dest_stat):
     if into:
         return [posixpath.join(dest, rel) for _, rel in files]
     if Path(sources[0]).is_dir():
+        if _unnamed(sources[0]):
+            return [posixpath.join(dest, rel) for _, rel in files]
         return [posixpath.join(dest, rel.split("/", 1)[1]) for _, rel in files]
     return [dest]
 
