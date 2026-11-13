@@ -83,7 +83,7 @@ def have_ffmpeg():
 
 def encode_image(source, max_dim=240):
     try:
-        from PIL import Image
+        from PIL import Image, ImageOps
     except ImportError:
         raise OreoError("Pillow is required for photos", hint="pip install Pillow")
     try:
@@ -91,7 +91,9 @@ def encode_image(source, max_dim=240):
     except Exception as e:
         raise OreoError("cannot read %s as an image: %s" % (Path(source).name, e))
     with image:
-        image = image.convert("RGB")
+        # Phone photos keep their pixels sideways and say how to turn them
+        # in the EXIF Orientation tag: apply it, or portraits arrive rotated.
+        image = ImageOps.exif_transpose(image).convert("RGB")
         scale = min(1.0, max_dim / float(max(image.size)))
         size = (max(1, round(image.width * scale)), max(1, round(image.height * scale)))
         if size != image.size:
