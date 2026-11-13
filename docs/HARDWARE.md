@@ -5,9 +5,20 @@
 <img src="images/breadboard.png" alt="Breadboard prototype" width="640">
 </div>
 
-The reference design is built around an **ESP32-S3-DevKitC-1-N16R8**
-(16 MB flash + 8 MB PSRAM). All electronics live on a 90×54 mm
-single-layer PCB that fits a standard lanyard slot.
+There are two designs:
+
+- **The breadboard badge** (this page): an **ESP32-S3-DevKitC-1-N16R8**
+  (16 MB flash + 8 MB PSRAM) with breakout boards. OreoOS runs on it
+  today, and its pins are the ones in
+  [`oreoWare/pins.py`](../oreoWare/pins.py).
+- **The PCB badge** ([`circuit/elixpo/`](../circuit/elixpo/), KiCad 10): a
+  bare ESP32-S3R8 board with a BQ24074 power-path charger and a TPS63031
+  buck-boost 3.3 V rail, about 90×54 mm to fit a lanyard slot. The
+  schematic exists and the board is not laid out yet. Help is welcome:
+  see [Work on the hardware](../CONTRIBUTING.md#work-on-the-hardware).
+
+Where the two differ, the parts lists and power section below describe the
+breadboard.
 
 ---
 

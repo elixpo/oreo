@@ -63,10 +63,12 @@ flowchart TD
     start --> bug["Fix a bug"]
     start --> hack["Write a hack"]
     start --> osx["Improve the OS"]
+    start --> hw["Work on the hardware"]
     app --> form["Open the matching issue form"]
     bug --> form
     hack --> form
     osx --> form
+    hw --> form
     form --> badge{"Have a badge?"}
     badge -->|"no"| host["Host tests, validate_app.py,<br/>CLI tests with the fake badge"]
     badge -->|"yes"| device["./deploy --board,<br/>then try it with oreo"]
@@ -79,7 +81,7 @@ flowchart TD
     review -->|"approved"| merge(["Squash merge"])
 ```
 
-Pick one of four paths and open its issue form. The form asks for what a
+Pick one of five paths and open its issue form. The form asks for what a
 reviewer needs, so we can agree on the approach before you spend time on
 it:
 
@@ -89,8 +91,9 @@ it:
 | Fix a bug | [Bug report](https://github.com/elixpo/oreo/issues/new?template=bug_report.yml) | `oreo info`, `oreo doctor`, [good first issues](https://github.com/elixpo/oreo/issues?q=is%3Aopen+label%3A%22good+first+issue%22) |
 | Write a hack | [Hack proposal](https://github.com/elixpo/oreo/issues/new?template=hack_proposal.yml) | [docs/hacks/](docs/hacks/README.md) |
 | Improve the OS | [OS improvement](https://github.com/elixpo/oreo/issues/new?template=os_improvement.yml) | [AGENTS.md](AGENTS.md), [docs/OS_ROADMAP.md](docs/OS_ROADMAP.md) |
+| Work on the hardware | [Hardware](https://github.com/elixpo/oreo/issues/new?template=hardware.yml) | [Work on the hardware](#work-on-the-hardware), [`circuit/elixpo/`](circuit/elixpo/) |
 
-Anything else (hardware, the website, tooling) goes in the
+Anything else (the website, tooling) goes in the
 [other idea form](https://github.com/elixpo/oreo/issues/new?template=feature_request.yml).
 A typo or a one-line fix can go straight to a pull request.
 
@@ -138,6 +141,52 @@ Building the firmware from source (`./build-firmware`) needs ESP-IDF; see
 
 [docs/USB.md](docs/USB.md) explains the USB ports and the REPL;
 [docs/CLI.md](docs/CLI.md) every `oreo` command.
+
+## Work on the hardware
+
+The badge is certified open source hardware
+([OSHWA IN000107](https://certification.oshwa.org/in000107.html)). Its
+KiCad 10 design is in [`circuit/elixpo/`](circuit/elixpo/): a schematic
+for a bare ESP32-S3R8 board, a sourcing BOM, and a PCB that is not laid
+out yet. Open work is labelled
+[hardware](https://github.com/elixpo/oreo/issues?q=is%3Aopen+label%3Ahardware);
+the ones marked help wanted are ready to pick up. You don't need a badge to
+review a schematic or lay out a board, and you need only a breakout board
+to write a driver.
+
+How the design is kept:
+
+- **The schematic is generated.** The four sheets and
+  `BOM_PRELIMINARY.csv` are written by
+  [`generate_badge_schematic.py`](circuit/elixpo/generate_badge_schematic.py).
+  Change the script, run `circuit/elixpo/build.sh` (KiCad 10's `kicad-cli`
+  on your PATH), and commit what it writes. Edits made in the schematic
+  editor are overwritten by the next run, so port them back to the script.
+- **The PCB is drawn by hand** in `elixpo.kicad_pcb`, from the generated
+  schematic.
+- **CI checks both** (`.github/workflows/hardware.yml`): the committed
+  schematic must match the generator, ERC must report nothing, and once the
+  board has footprints, DRC must pass with schematic parity. The job
+  uploads the schematic PDF, the BOM and the reports, so reviewers can read
+  a change without KiCad.
+- **Pins are shared with the OS.** [`oreoWare/pins.py`](oreoWare/pins.py)
+  is the single source of truth for the GPIOs the OS uses. A pull request
+  that moves a pin changes the schematic, `pins.py`, the drivers that use
+  it and [docs/HARDWARE.md](docs/HARDWARE.md) together, like the OS and CLI
+  contracts in [AGENTS.md](AGENTS.md).
+- **New hardware needs a driver first.** A part that replaces one the OS
+  already drives (the MPU-6050, the buttons) is merged together with, or
+  after, a driver in `oreoWare/` with host tests. Drivers sit behind the
+  interfaces in `oreoOS/api.py`, so apps don't change.
+
+In a hardware pull request, say what you changed and why: part numbers,
+datasheet links, the calculation behind each value, and which pins it uses
+or frees. Say what was checked (ERC, DRC, a calculation, a breadboard or
+breakout test) and what can only be checked on an assembled board.
+
+Hardware design files are licensed under CERN-OHL-P-2.0; see
+[`circuit/elixpo/README.md`](circuit/elixpo/README.md) for the design
+decisions and what has to be settled before layout.
 
 ## Workflow
 
@@ -224,7 +273,8 @@ The licensing, engineering and process rules in
 [`PREAMBLE.md`](PREAMBLE.md) apply to every contribution.
 
 By submitting a contribution you agree that it is licensed inbound under
-the Elixpo standard (**MIT** for code, **CC-BY-4.0** for assets) and that
+the Elixpo standard (**MIT** for code, **CERN-OHL-P-2.0** for the
+hardware design files under `circuit/`, **CC-BY-4.0** for assets) and that
 you have the right to submit it. The
 [Developer Certificate of Origin](https://developercertificate.org) applies
 to every commit; sign off with `git commit -s`. We don't require a CLA. See
