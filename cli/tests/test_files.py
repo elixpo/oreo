@@ -188,6 +188,51 @@ class FileCommandsTest(unittest.TestCase):
         r = run_cli(["push", "-r", str(app), "/apps"], fake=self.fake)
         self.assertEqual(self.fake.get("/apps/myapp/main.py"), b"print(1)")
 
+    def _push_from(self, cwd, *args):
+        old = os.getcwd()
+        os.chdir(cwd)
+        try:
+            return run_cli(["push", "-r"] + list(args), fake=self.fake)
+        finally:
+            os.chdir(old)
+
+    def _make_app(self):
+        app = self.dir / "myapp"
+        (app / "src").mkdir(parents=True)
+        (app / "main.py").write_text("print(1)")
+        (app / "src" / "app.py").write_text("x = 1")
+        return app
+
+    def test_push_current_folder_to_a_new_path(self):
+        app = self._make_app()
+        for src, dest in ((".", "/apps/a"), ("./", "/apps/b")):
+            r = self._push_from(app, src, dest)
+            self.assertEqual(r.rc, 0, r.out)
+            self.assertEqual(self.fake.get(dest + "/main.py"), b"print(1)")
+            self.assertEqual(self.fake.get(dest + "/src/app.py"), b"x = 1")
+
+    def test_push_current_folder_into_an_existing_folder_updates_it(self):
+        app = self._make_app()
+        r = self._push_from(app, ".", "/apps/settings")
+        self.assertEqual(r.rc, 0, r.out)
+        self.assertEqual(self.fake.get("/apps/settings/main.py"), b"print(1)")
+        self.assertEqual(self.fake.get("/apps/settings/src/app.py"), b"x = 1")
+        self.assertFalse(self.fake.exists("/apps/settings/myapp"))
+
+    def test_push_parent_folder_stays_inside_the_destination(self):
+        app = self._make_app()
+        sub = app / "src"
+        r = self._push_from(sub, "..", "/apps/settings")
+        self.assertEqual(r.rc, 0, r.out)
+        self.assertEqual(self.fake.get("/apps/settings/main.py"), b"print(1)")
+        self.assertEqual(self.fake.get("/apps/settings/src/app.py"), b"x = 1")
+        # Nothing lands above the destination (it used to: /apps/main.py).
+        self.assertFalse(self.fake.exists("/apps/main.py"))
+        self.assertEqual(self.fake.get("/main.py"), b"from oreoOS import entry\n")
+        r = self._push_from(sub, "..", "/apps/copy")
+        self.assertEqual(r.rc, 0, r.out)
+        self.assertEqual(self.fake.get("/apps/copy/main.py"), b"print(1)")
+
     def test_pull(self):
         self.fake.put("/documents/a.txt", b"AAA")
         self.fake.put("/documents/sub/b.txt", b"BBB")
