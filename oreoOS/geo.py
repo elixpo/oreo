@@ -18,12 +18,14 @@ try:
     import ujson as json
 except ImportError:
     import json
+import time
 
 from oreoOS import state as _state
 
 
 STATE_APP = "geo"
 TIMEOUT_S = 6
+RETRY_MS = 60000    # wait this long after a failed try before asking again
 
 # Keyless HTTPS services, tried in order. Each entry: (url, parser).
 def _parse_ipwho(j):
@@ -44,7 +46,22 @@ PROVIDERS = (
 )
 
 _mem = None          # {"lat", "lon", "name"} once known this boot
-_looked_up = False   # a network lookup ran (or was tried) this boot
+_looked_up = False   # a service answered this boot
+_tried_at = None     # ticks of the last network try, to space out retries
+
+
+def _ticks():
+    try:
+        return time.ticks_ms()
+    except AttributeError:
+        return int(time.monotonic() * 1000)
+
+
+def _diff(a, b):
+    try:
+        return time.ticks_diff(a, b)
+    except AttributeError:
+        return a - b
 
 
 def _valid(lat, lon):
@@ -93,13 +110,16 @@ def location():
 
 
 def lookup(force=False):
-    """Ask the services once per boot (or again with force=True) and
-    return the location, falling back to the last known one. Network I/O:
-    call it off the UI thread."""
-    global _mem, _looked_up
-    if _looked_up and not force:
-        return location()
-    _looked_up = True
+    """Ask the services once per boot (or again with force=True); a failed
+    try is retried, at most every RETRY_MS. Returns the location, falling
+    back to the last known one. Network I/O: call it off the UI thread."""
+    global _mem, _looked_up, _tried_at
+    if not force:
+        if _looked_up:
+            return location()
+        if _tried_at is not None and 0 <= _diff(_ticks(), _tried_at) < RETRY_MS:
+            return location()
+    _tried_at = _ticks()
     try:
         from oreoOS import _http
     except Exception:
@@ -115,6 +135,7 @@ def lookup(force=False):
         got = parse(body, parser)
         if got is not None:
             _mem = got
+            _looked_up = True
             try:
                 _state.save(STATE_APP, got)
             except Exception:
@@ -125,9 +146,10 @@ def lookup(force=False):
 
 def forget():
     """Drop the remembered location (memory and /state/geo.json)."""
-    global _mem, _looked_up
+    global _mem, _looked_up, _tried_at
     _mem = None
     _looked_up = False
+    _tried_at = None
     try:
         _state.delete(STATE_APP)
     except Exception:
