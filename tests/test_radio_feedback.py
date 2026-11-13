@@ -247,7 +247,7 @@ class RecWifiDisplay(wa.FakeDisplay):
 class WifiAppRadioTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
-        self.w, self.drv, self.clock = drv.load_wifi(self.tmp.name)
+        self.w, self.drv, self.clock = drv.load_wifi(self.tmp.name, self)
         self.mod, self.api, self._saved = wa.load_app(self.w, self.clock)
         self.os = wa.FakeOS()
         self.os.display = RecWifiDisplay()
