@@ -33,17 +33,16 @@ NETLIST = HERE / "build" / "elixpo.net"
 BOARD_FILE = HERE / "elixpo.kicad_pcb"
 PROJECT_FILE = HERE / "elixpo.kicad_pro"
 
-W, H, CORNER = 96.0, 154.0, 4.0           # board outline, mm
+W, H, CORNER = 88.0, 153.5, 4.0           # board outline, mm
 ORIGIN = (40.0, 30.0)                     # where the board sits on the page
 
 # Front-face features.
-PANEL = (13.4, 81.0, 69.2, 50.0)           # DT028BTFT outline, landscape: x, y, w, h
-CARD = (4.0, 19.0, 88.0, 60.0)            # name-card window, silkscreen only
-BATTERY = (22.0, 95.0, 50.0, 34.0)        # 603450 cell on the back, low for a low centre of gravity
+PANEL = (9.4, 80.0, 69.2, 50.0)           # top at 80 mm: the name card covers 0-80 mm           # DT028BTFT outline, landscape: x, y, w, h
+BATTERY = (18.0, 94.0, 50.0, 34.0)        # 603450 cell on the back, low for a low centre of gravity
 SPEAKER = (3.5, 7.0, 15.0, 11.0)          # 1511 speaker on the back
-SLOTS = ((11.0, 4.0), (85.0, 4.0))        # lanyard-clip slot centres
+SLOTS = ((10.0, 4.0), (78.0, 4.0))        # lanyard-clip slot centres
 SLOT_LEN, SLOT_W = 10.0, 3.2
-FPC_SLOT = (83.4, 92.0, 1.6, 28.0)        # x, y, w, h: the panel's FPC folds to the back here
+FPC_SLOT = (79.4, 91.0, 1.6, 28.0)        # x, y, w, h: the panel's FPC folds to the back here
 
 
 def mm(v):
@@ -100,125 +99,124 @@ def read_netlist():
 # ref: (x, y, rotation in degrees, side). Rotation is as seen from the front.
 
 F, B = "F", "B"
-DPAD = (17.0, 142.5)                       # centre of the D-pad, bottom-left
+DPAD = (13.0, 141.5)                       # centre of the D-pad, bottom-left
 PLACE = {
     # ---- Front: D-pad bottom-left, then HOME A B C side by side ----
     "SW11": (DPAD[0], DPAD[1] - 7.0, 0, F),    # UP
     "SW12": (DPAD[0], DPAD[1] + 7.0, 0, F),    # DOWN
     "SW13": (DPAD[0] - 7.0, DPAD[1], 90, F),   # LEFT
     "SW14": (DPAD[0] + 7.0, DPAD[1], 90, F),   # RIGHT
-    "SW18": (46.0, DPAD[1], 0, F),             # HOME
-    "SW15": (59.0, DPAD[1], 0, F),             # A
-    "SW16": (72.0, DPAD[1], 0, F),             # B
-    "SW17": (85.0, DPAD[1], 0, F),             # C
-    "D20": (35.0, DPAD[1] - 2.0, 0, F), "D21": (35.0, DPAD[1] + 2.0, 0, F),
-    # Corner LEDs around the panel, status LED on the right, IR at the top.
-    "D1": (10.0, 82.5, 90, F), "D2": (86.0, 82.5, 90, F),
-    "D3": (10.0, 129.5, 90, F), "D4": (86.0, 129.5, 90, F),
-    "U9": (88.0, 106.0, 90, F),
-    "D10": (84.0, 12.0, 0, F),
-    "U8": (88.0, 15.0, 0, F),
-
+    "SW18": (38.0, DPAD[1], 0, F),             # HOME
+    "SW15": (52.0, DPAD[1], 0, F),             # A
+    "SW16": (66.0, DPAD[1], 0, F),             # B
+    "SW17": (80.0, DPAD[1], 0, F),             # C
+    "D20": (29.0, DPAD[1] - 2.0, 0, F), "D21": (29.0, DPAD[1] + 2.0, 0, F),
+    # Corner LEDs around the panel, status LED right of the FPC slot.
+    "D1": (6.0, 81.5, 90, F), "D2": (82.0, 81.5, 90, F),
+    "D3": (6.0, 128.5, 90, F), "D4": (82.0, 128.5, 90, F),
+    "U9": (83.5, 105.0, 90, F),
     # ---- Back: module and RTC at the top, display/expander/IMU behind the top of the
     # screen, battery low, microSD and USB-C at the bottom ----
-    "U1": (48, 12.8, 0, B),
-    "R1": (60.5, 18, 90, B),
-    "C3": (62.5, 18, 90, B),
-    "R2": (62.5, 23, 90, B),
-    "SW1": (38, 30, 0, B),
-    "SW2": (58, 30, 0, B),
-    "TP1": (64, 34, 0, B),
-    "TP2": (68, 34, 0, B),
-    "TP3": (72, 34, 0, B),
-    "TP4": (76, 34, 0, B),
-    "R17": (35.5, 10, 0, B),
-    "R18": (35.5, 12.5, 0, B),
-    "C22": (35.5, 15, 0, B),
-    "U13": (48, 33, 0, B),
-    "C65": (51.5, 33, 90, B),
-    "C66": (44.5, 33, 90, B),
-    "R61": (48, 37.5, 0, B),
-    "J7": (14, 21.5, 0, B),
-    "U12": (14, 30, 0, B),
-    "C60": (14, 35, 0, B),
-    "C61": (18.5, 30, 90, B),
-    "R60": (9.5, 30, 90, B),
-    "Q1": (82, 24, 0, B),
-    "R71": (86, 24, 90, B),
-    "R72": (78, 24, 90, B),
-    "R73": (82, 29, 0, B),
-    "R70": (93.5, 20.5, 90, B),
-    "C70": (90, 20.5, 0, B),
-    "J3": (78, 106, 270, B),
-    "C30": (78, 122.5, 0, B),
-    "C31": (78, 124.5, 0, B),
-    "R74": (92.5, 110.5, 90, B),
-    "C71": (92.5, 102, 90, B),
-    "R30": (70, 83, 90, B),
-    "R31": (66, 83, 0, B),
-    "R32": (66, 85, 0, B),
-    "R33": (66, 87, 0, B),
-    "R34": (66, 89, 0, B),
-    "Q2": (61, 86, 0, B),
-    "R35": (61, 91, 0, B),
-    "R36": (57, 86, 90, B),
-    "U11": (38, 87, 0, B),
-    "C40": (42.5, 87, 90, B),
-    "R40": (44, 82, 90, B),
-    "R41": (46, 82, 90, B),
-    "R42": (26, 90.5, 90, B),
-    "R43": (28.2, 90.5, 90, B),
-    "R44": (30.4, 90.5, 90, B),
-    "TP6": (44, 93, 0, B),
-    "U7": (52, 87, 0, B),
-    "C62": (56.5, 90.5, 0, B),
-    "C63": (52, 91.5, 0, B),
-    "C64": (48, 82, 90, B),
-    "U10": (13, 87, 0, B),
-    "C29": (13, 83.5, 0, B),
-    "TP5": (7.5, 91, 0, B),
-    "J2": (13, 102, 90, B),
-    "J4": (11, 142.5, 270, B),
-    "C67": (4, 131.5, 90, B),
-    "C68": (6.2, 131.5, 90, B),
-    "R62": (8.4, 131.5, 90, B),
-    "R63": (10.6, 131.5, 90, B),
-    "R64": (12.8, 131.5, 90, B),
-    "R65": (15, 131.5, 90, B),
-    "R66": (17.2, 131.5, 90, B),
-    "R67": (19.4, 131.5, 90, B),
-    "J1": (48, 150.4, 0, B),
-    "U3": (48, 142, 0, B),
-    "R10": (41.5, 146, 90, B),
-    "R11": (54.5, 146, 90, B),
-    "R12": (46.5, 138.5, 90, B),
-    "R13": (49.5, 138.5, 90, B),
-    "R19": (40, 150.5, 90, B),
-    "C23": (56, 150.5, 90, B),
-    "R23": (42.5, 137, 0, B),
-    "R24": (53.5, 137, 0, B),
-    "U4": (32, 145, 0, B),
-    "R14": (28, 150, 90, B),
-    "R15": (30, 150, 90, B),
-    "R22": (34, 150, 90, B),
-    "R25": (36, 150, 90, B),
-    "R16": (32, 140, 0, B),
-    "C24": (27.5, 145, 90, B),
-    "C25": (36.5, 145, 90, B),
-    "C26": (36, 140, 90, B),
-    "U5": (64, 145, 0, B),
-    "L1": (69.5, 145, 0, B),
-    "R26": (60, 141, 0, B),
-    "C27": (60, 143, 0, B),
-    "C20": (64, 140.5, 0, B),
-    "C21": (64, 149.5, 0, B),
-    "C28": (69.5, 149.5, 0, B),
-    "SW3": (92, 144, 270, B),
-    "J5": (91.6, 132, 270, B),
+    "U1": (44, 12.8, 0, B),
+    "R1": (56.5, 18, 90, B),
+    "C3": (58.5, 18, 90, B),
+    "R2": (58.5, 23, 90, B),
+    "SW1": (34, 30, 0, B),
+    "SW2": (54, 30, 0, B),
+    "TP1": (60, 34, 0, B),
+    "TP2": (64, 34, 0, B),
+    "TP3": (68, 34, 0, B),
+    "TP4": (72, 34, 0, B),
+    "R17": (31.5, 10, 0, B),
+    "R18": (31.5, 12.5, 0, B),
+    "C22": (31.5, 15, 0, B),
+    "U13": (44, 33, 0, B),
+    "C65": (47.5, 33, 90, B),
+    "C66": (40.5, 33, 90, B),
+    "R61": (44, 37.5, 0, B),
+    "J7": (10, 21.5, 0, B),
+    "U12": (10, 30, 0, B),
+    "C60": (10, 35, 0, B),
+    "C61": (14.5, 30, 90, B),
+    "R60": (5.5, 30, 90, B),
+    "Q1": (78, 25, 0, B),
+    "R71": (82, 25, 90, B),
+    "R72": (74, 25, 90, B),
+    "R73": (78, 30, 0, B),
+    "R70": (80.5, 18.5, 0, B),
+    "C70": (76.5, 18.5, 0, B),
+    "J3": (74, 105, 270, B),
+    "C30": (74, 121.5, 0, B),
+    "C31": (74, 123.5, 0, B),
+    "R74": (84.5, 109.5, 90, B),
+    "C71": (84.5, 101, 90, B),
+    "R30": (66, 82, 90, B),
+    "R31": (62, 82, 0, B),
+    "R32": (62, 84, 0, B),
+    "R33": (62, 86, 0, B),
+    "R34": (62, 88, 0, B),
+    "Q2": (57, 85, 0, B),
+    "R35": (57, 90, 0, B),
+    "R36": (53, 85, 90, B),
+    "U11": (34, 86, 0, B),
+    "C40": (38.5, 86, 90, B),
+    "R40": (40, 81, 90, B),
+    "R41": (42, 81, 90, B),
+    "R42": (22, 89.5, 90, B),
+    "R43": (24.2, 89.5, 90, B),
+    "R44": (26.4, 89.5, 90, B),
+    "TP6": (40, 92, 0, B),
+    "U7": (48, 86, 0, B),
+    "C62": (52.5, 89.5, 0, B),
+    "C63": (48, 90.5, 0, B),
+    "C64": (44, 81, 90, B),
+    "U10": (13, 86, 0, B),
+    "C29": (13, 82.5, 0, B),
+    "TP5": (7.5, 90, 0, B),
+    "J2": (13, 101, 90, B),
+    "J4": (11, 142, 270, B),
+    "C67": (4, 131, 90, B),
+    "C68": (6.2, 131, 90, B),
+    "R62": (8.4, 131, 90, B),
+    "R63": (10.6, 131, 90, B),
+    "R64": (12.8, 131, 90, B),
+    "R65": (15, 131, 90, B),
+    "R66": (17.2, 131, 90, B),
+    "R67": (19.4, 131, 90, B),
+    "J1": (44, 149.9, 0, B),
+    "U3": (44, 141.5, 0, B),
+    "R10": (37.5, 145.5, 90, B),
+    "R11": (50.5, 145.5, 90, B),
+    "R12": (42.5, 138, 90, B),
+    "R13": (45.5, 138, 90, B),
+    "R19": (36, 150, 90, B),
+    "C23": (52, 150, 90, B),
+    "R23": (38.5, 136.5, 0, B),
+    "R24": (49.5, 136.5, 0, B),
+    "U4": (28, 144.5, 0, B),
+    "R14": (24, 149.5, 90, B),
+    "R15": (26, 149.5, 90, B),
+    "R22": (30, 149.5, 90, B),
+    "R25": (32, 149.5, 90, B),
+    "R16": (28, 139.5, 0, B),
+    "C24": (23.5, 144.5, 90, B),
+    "C25": (32.5, 144.5, 90, B),
+    "C26": (32, 139.5, 90, B),
+    "U5": (60, 144.5, 0, B),
+    "L1": (65.5, 144.5, 0, B),
+    "R26": (56, 140.5, 0, B),
+    "C27": (56, 142.5, 0, B),
+    "C20": (60, 140, 0, B),
+    "C21": (60, 149, 0, B),
+    "C28": (65.5, 149, 0, B),
+    "SW3": (84, 131, 270, B),
+    "J5": (83.6, 143.5, 270, B),
+    "U8": (80, 13, 0, B),
+    "D10": (84.5, 20.5, 90, B),
 }
 # Button pull-ups: two rows beside the expander.
 for i in range(8):
-    PLACE[f"R{50 + i}"] = (26.0 + (i % 4) * 2.2, 82.0 + (i // 4) * 2.4, 90, B)
+    PLACE[f"R{50 + i}"] = (22.0 + (i % 4) * 2.2, 81.0 + (i // 4) * 2.4, 90, B)
 
 # Passives that belong right at a module pad: ref -> (host, pad, distance
 # out from the pad centre, offset along the module edge). They are pushed
@@ -345,10 +343,6 @@ def outline(board):
 
 def silkscreen(board):
     fs, bs = pcbnew.F_SilkS, pcbnew.B_SilkS
-    x, y, w, h = CARD
-    add_rounded_rect(board, fs, x, y, w, h, 2.5, 0.2)
-    add_text(board, fs, "OREO", x + 7, y + 3.2, 1.6, 0.3, bold=True)
-    add_text(board, fs, "your name card goes here", x + w / 2, y + h / 2, 1.2, 0.15)
     # Panel corner marks (the panel itself is placed by hand).
     px, py, pw, ph = PANEL
     for (cx, cy, dx, dy) in ((px, py, 1, 1), (px + pw, py, -1, 1), (px, py + ph, 1, -1), (px + pw, py + ph, -1, -1)):
@@ -356,13 +350,7 @@ def silkscreen(board):
         add_line(board, pcbnew.F_Fab, (cx, cy), (cx, cy + 3 * dy), 0.1)
     add_rect(board, pcbnew.F_Fab, px, py, pw, ph, 0.1)
     add_text(board, pcbnew.F_Fab, "DT028BTFT 2.8in panel", px + pw / 2, py + ph / 2, 1.5)
-    labels = (("UP", "SW11", 5.6, 0), ("DOWN", "SW12", 6.4, 0), ("LEFT", "SW13", -5.9, 0),
-              ("RIGHT", "SW14", 6.4, 0), ("HOME", "SW18", 0, -4.3), ("A", "SW15", 0, -4.3),
-              ("B", "SW16", 0, -4.3), ("C", "SW17", 0, -4.3))
-    for label, ref, dx, dy in labels:
-        bx, by = PLACE[ref][0] + dx, PLACE[ref][1] + dy
-        add_text(board, fs, label, bx, by, 0.9, 0.15)
-    add_text(board, fs, "CHG", 35.0, 137.6, 0.8, 0.12)
+    # The front silkscreen (logo, artwork) is drawn by hand; buttons are not labelled.
     sx, sy, sw, sh = SPEAKER
     # Back.
     bx, by, bw, bh = BATTERY
@@ -372,14 +360,14 @@ def silkscreen(board):
     add_text(board, bs, "JST-PH: check polarity", bx + bw / 2, by + bh / 2 + 1, 1.0, 0.15, mirror=True)
     add_rect(board, pcbnew.B_Fab, sx, sy, sw, sh, 0.1)
     add_rect(board, pcbnew.B_CrtYd, sx, sy, sw, sh, 0.05)
-    add_text(board, bs, "OREO BADGE rev 1.0", 48.0, 52.0, 1.5, 0.25, mirror=True, bold=True)
-    add_text(board, bs, "oreo.elixpo.com", 48.0, 55.0, 1.0, 0.15, mirror=True)
-    add_text(board, bs, "CERN-OHL-P-2.0  OSHWA IN000107", 48.0, 57.5, 0.9, 0.15, mirror=True)
-    add_text(board, bs, "RST", 38.0, 26.8, 0.8, 0.12, mirror=True)
-    add_text(board, bs, "BOOT", 58.0, 26.8, 0.8, 0.12, mirror=True)
-    add_text(board, bs, "ON", 92.0, 137.5, 0.8, 0.12, mirror=True)
-    add_text(board, bs, "microSD", 11.0, 152.6, 0.8, 0.12, mirror=True)
-    add_text(board, bs, "Qwiic", 91.6, 126.5, 0.8, 0.12, mirror=True)
+    add_text(board, bs, "OREO BADGE rev 1.0", 44.0, 52.0, 1.5, 0.25, mirror=True, bold=True)
+    add_text(board, bs, "oreo.elixpo.com", 44.0, 55.0, 1.0, 0.15, mirror=True)
+    add_text(board, bs, "CERN-OHL-P-2.0  OSHWA IN000107", 44.0, 57.5, 0.9, 0.15, mirror=True)
+    add_text(board, bs, "RST", 34.0, 26.8, 0.8, 0.12, mirror=True)
+    add_text(board, bs, "BOOT", 54.0, 26.8, 0.8, 0.12, mirror=True)
+    add_text(board, bs, "ON", 84.0, 124.0, 0.8, 0.12, mirror=True)
+    add_text(board, bs, "microSD", 11.0, 151.8, 0.8, 0.12, mirror=True)
+    add_text(board, bs, "Qwiic", 83.6, 137.5, 0.8, 0.12, mirror=True)
     for ref, label in (("TP1", "TX"), ("TP2", "RX"), ("TP3", "GND"), ("TP4", "3V3"), ("TP5", "VBAT"), ("TP6", "P17")):
         tx, ty = PLACE[ref][:2]
         add_text(board, bs, label, tx, ty + 2.2, 0.8, 0.12, mirror=True)
