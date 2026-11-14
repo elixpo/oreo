@@ -33,17 +33,17 @@ NETLIST = HERE / "build" / "elixpo.net"
 BOARD_FILE = HERE / "elixpo.kicad_pcb"
 PROJECT_FILE = HERE / "elixpo.kicad_pro"
 
-W, H, CORNER = 88.0, 128.0, 4.0           # board outline, mm
+W, H, CORNER = 88.0, 135.0, 4.0           # board outline, mm
 ORIGIN = (40.0, 30.0)                     # where the board sits on the page
 
 # Front-face features.
-PANEL = (3.0, 61.0, 69.2, 50.0)           # DT028BTFT outline, landscape: x, y, w, h
-CARD = (4.0, 19.0, 80.0, 39.0)            # name-card window, silkscreen only
-BATTERY = (19.0, 27.0, 50.0, 34.0)        # 603450 cell on the back
+PANEL = (3.0, 58.0, 69.2, 50.0)           # DT028BTFT outline, landscape: x, y, w, h
+CARD = (4.0, 19.0, 80.0, 36.0)            # name-card window, silkscreen only
+BATTERY = (22.0, 84.0, 50.0, 34.0)        # 603450 cell on the back, low for a low centre of gravity
 SPEAKER = (3.5, 7.0, 15.0, 11.0)          # 1511 speaker on the back
 SLOTS = ((10.0, 4.0), (78.0, 4.0))        # lanyard-clip slot centres
 SLOT_LEN, SLOT_W = 10.0, 3.2
-FPC_SLOT = (74.0, 72.0, 1.6, 28.0)        # x, y, w, h: the panel's FPC folds to the back here
+FPC_SLOT = (74.0, 69.0, 1.6, 28.0)        # x, y, w, h: the panel's FPC folds to the back here
 
 
 def mm(v):
@@ -100,88 +100,89 @@ def read_netlist():
 # ref: (x, y, rotation in degrees, side). Rotation is as seen from the front.
 
 F, B = "F", "B"
+DPAD = (44.0, 121.0)                       # centre of the "+" under the screen
 PLACE = {
-    # Module on the back, antenna on the top edge (body 18 x 25.6 mm).
-    "U1": (44.0, 12.8, 0, B),
-    # Front: buttons. Right column like the Universe badge, row along the bottom.
-    "SW11": (80.5, 68.0, 0, F),   # UP
-    "SW17": (80.5, 86.0, 0, F),   # C
-    "SW12": (80.5, 104.0, 0, F),  # DOWN
-    "SW13": (8.5, 121.0, 0, F),   # LEFT
-    "SW14": (19.5, 121.0, 0, F),  # RIGHT
-    "SW18": (31.0, 121.0, 0, F),  # HOME
-    "SW16": (58.0, 121.0, 0, F),  # B
-    "SW15": (70.0, 121.0, 0, F),  # A
-    # Front: corner LEDs around the panel, status LED, charge LEDs, IR.
-    "D1": (4.5, 59.6, 0, F), "D2": (70.7, 59.6, 0, F),
-    "D3": (4.5, 112.6, 0, F), "D4": (70.7, 112.6, 0, F),
-    "U9": (80.5, 60.5, 0, F),
-    "D20": (41.0, 116.5, 0, F), "D21": (47.0, 116.5, 0, F),
+    # ---- Front ----
+    # D-pad as a "+" under the screen.
+    "SW11": (DPAD[0], DPAD[1] - 8.0, 0, F),   # UP
+    "SW12": (DPAD[0], DPAD[1] + 8.0, 0, F),   # DOWN
+    "SW13": (DPAD[0] - 9.0, DPAD[1], 0, F),   # LEFT
+    "SW14": (DPAD[0] + 9.0, DPAD[1], 0, F),   # RIGHT
+    # HOME, A, B, C down the right side of the screen.
+    "SW18": (80.5, 64.0, 0, F),   # HOME
+    "SW15": (80.5, 77.0, 0, F),   # A
+    "SW16": (80.5, 90.0, 0, F),   # B
+    "SW17": (80.5, 103.0, 0, F),  # C
+    # Corner LEDs around the panel, status LED, charge LEDs by the USB port, IR.
+    "D1": (4.5, 56.6, 0, F), "D2": (70.7, 56.6, 0, F),
+    "D3": (4.5, 109.6, 0, F), "D4": (70.7, 109.6, 0, F),
+    "U9": (80.5, 57.0, 0, F),
+    "D20": (8.0, 113.5, 0, F), "D21": (14.0, 113.5, 0, F),
     "D10": (76.0, 12.0, 0, F),
     "U8": (80.0, 15.0, 0, F),
-    # Back, top-left: speaker connector and amplifier beside the speaker.
+
+    # ---- Back, top: the ESP32 module and everything that belongs to it ----
+    "U1": (44.0, 12.8, 0, B),
+    "R1": (56.5, 18.0, 90, B), "C3": (58.5, 18.0, 90, B), "R2": (58.5, 23.0, 90, B),
+    "SW1": (34.0, 30.0, 0, B), "SW2": (54.0, 30.0, 0, B),
+    "TP1": (60.0, 34.0, 0, B), "TP2": (64.0, 34.0, 0, B),
+    "TP3": (68.0, 34.0, 0, B), "TP4": (72.0, 34.0, 0, B),
+    "R17": (31.5, 10.0, 0, B), "R18": (31.5, 12.5, 0, B), "C22": (31.5, 15.0, 0, B),
+    # RTC right under the module.
+    "U13": (44.0, 33.0, 0, B), "C65": (47.5, 33.0, 90, B), "C66": (40.5, 33.0, 90, B),
+    "R61": (44.0, 37.5, 0, B),
+    # Speaker connector and amplifier beside the speaker (top-left).
     "J7": (10.0, 21.5, 0, B),
     "U12": (10.0, 30.0, 0, B), "C60": (10.0, 35.0, 0, B), "C61": (14.5, 30.0, 90, B),
     "R60": (5.5, 30.0, 90, B),
-    # Back, left of the battery: battery connector, fuel gauge.
-    "J2": (10.0, 46.0, 90, B),
-    "U10": (10.0, 55.5, 0, B), "C29": (14.5, 55.5, 90, B),
-    # Back, right of the battery: IR driver and receiver filter.
+    # IR driver and receiver filter (top-right).
     "Q1": (78.0, 24.0, 0, B), "R71": (82.0, 24.0, 90, B), "R72": (74.0, 24.0, 90, B),
     "R73": (78.0, 29.0, 0, B), "R70": (84.5, 18.5, 90, B), "C70": (84.5, 13.0, 90, B),
-    "R74": (80.5, 56.0, 0, B), "C71": (84.5, 60.5, 90, B),
-    "R17": (74.0, 36.0, 90, B), "R18": (76.0, 36.0, 90, B), "C22": (78.0, 36.0, 90, B),
-    # Back, behind the panel: display connector by the FPC slot, backlight.
-    "J3": (81.6, 86.0, 90, B),
-    "C30": (73.5, 104.0, 0, B), "C31": (73.5, 106.0, 0, B),
-    "R30": (69.0, 66.0, 90, B),
-    "R31": (66.0, 70.0, 0, B), "R32": (66.0, 72.0, 0, B),
-    "R33": (66.0, 74.0, 0, B), "R34": (66.0, 76.0, 0, B),
-    "Q2": (61.0, 73.0, 0, B), "R35": (61.0, 78.0, 0, B), "R36": (57.0, 73.0, 90, B),
-    # Expander, its pull-ups and the I2C bus, centre of the back.
-    "U11": (30.0, 82.0, 0, B), "C40": (34.5, 82.0, 90, B),
-    "R40": (36.0, 72.0, 90, B), "R41": (38.0, 72.0, 90, B),
-    "R42": (24.0, 88.0, 0, B), "R43": (24.0, 90.0, 0, B), "R44": (24.0, 92.0, 0, B),
-    # IMU and RTC.
-    "U7": (48.0, 84.0, 0, B), "C62": (52.5, 84.0, 90, B), "C63": (48.0, 88.5, 0, B),
-    "C64": (43.5, 84.0, 90, B),
-    "U13": (12.0, 70.0, 0, B), "C65": (15.5, 70.0, 90, B), "C66": (8.5, 70.0, 90, B),
-    "R61": (12.0, 74.5, 0, B),
-    # Clock terminations right at the module's pins (moved next to their pads below).
-    "R3": (44.0, 29.0, 0, B), "R4": (44.0, 31.0, 0, B), "R5": (44.0, 33.0, 0, B),
-    # Module support.
-    "C1": (56.5, 9.0, 90, B), "C2": (56.5, 13.0, 90, B),
-    "R1": (56.5, 18.0, 90, B), "C3": (58.5, 18.0, 90, B),
-    "R2": (58.5, 23.0, 90, B),
-    "SW1": (64.0, 118.0, 0, B), "SW2": (64.0, 124.0, 0, B),
-    # microSD at the bottom-left, card entering from the left edge.
+    # Status LED parts behind it.
+    "R74": (80.5, 52.5, 0, B), "C71": (84.5, 57.0, 90, B),
+
+    # ---- Back, behind the top of the screen: display, expander, IMU ----
+    "J3": (81.6, 83.0, 90, B),
+    "C30": (76.0, 100.0, 0, B), "C31": (76.0, 102.0, 0, B),
+    "R30": (69.0, 62.0, 90, B),
+    "R31": (66.0, 64.0, 0, B), "R32": (66.0, 66.0, 0, B),
+    "R33": (66.0, 68.0, 0, B), "R34": (66.0, 70.0, 0, B),
+    "Q2": (61.0, 66.0, 0, B), "R35": (61.0, 71.0, 0, B), "R36": (57.0, 66.0, 90, B),
+    "U11": (34.0, 70.0, 0, B), "C40": (38.5, 70.0, 90, B),
+    "R40": (40.0, 63.0, 90, B), "R41": (42.0, 63.0, 90, B),
+    "R42": (28.5, 75.0, 0, B), "R43": (28.5, 77.0, 0, B), "R44": (28.5, 79.0, 0, B),
+    "TP6": (40.0, 78.0, 0, B),
+    "U7": (50.0, 72.0, 0, B), "C62": (54.5, 72.0, 90, B), "C63": (50.0, 76.5, 0, B),
+    "C64": (45.5, 72.0, 90, B),
+    # Battery connector and fuel gauge at the battery's top-left corner.
+    "J2": (12.0, 80.0, 90, B),
+    "U10": (17.0, 70.0, 0, B), "C29": (17.0, 66.0, 0, B),
+    "TP5": (7.0, 68.0, 0, B),
+
+    # ---- Back, under the screen: microSD and USB-C on the left, power below the battery ----
     "J4": (11.0, 104.0, 270, B),
-    "C67": (22.0, 98.0, 0, B), "C68": (22.0, 100.5, 0, B), "R62": (22.0, 102.5, 0, B),
-    "R63": (22.0, 104.5, 0, B), "R64": (22.0, 106.5, 0, B), "R65": (22.0, 108.5, 0, B),
-    "R66": (22.0, 110.5, 0, B), "R67": (22.0, 112.5, 0, B),
-    # Power: USB-C at the bottom centre, charger and regulator beside it.
-    "J1": (44.0, 124.4, 0, B),
-    "U3": (44.0, 116.0, 0, B),
-    "R10": (37.5, 120.0, 90, B), "R11": (50.5, 120.0, 90, B),
-    "R12": (42.5, 112.5, 90, B), "R13": (45.5, 112.5, 90, B),
-    "R19": (36.0, 124.5, 90, B), "C23": (52.0, 124.5, 90, B),
-    "R23": (40.0, 108.5, 0, B), "R24": (48.0, 108.5, 0, B),
-    "U4": (32.0, 106.0, 0, B),
-    "R14": (28.0, 111.0, 90, B), "R15": (30.0, 111.0, 90, B), "R22": (34.0, 111.0, 90, B),
-    "R25": (36.0, 111.0, 90, B), "R16": (27.0, 101.5, 0, B),
-    "C24": (36.5, 102.0, 90, B), "C25": (37.0, 106.0, 90, B), "C26": (27.5, 106.0, 90, B),
-    "U5": (55.0, 106.0, 0, B), "L1": (60.5, 106.0, 0, B),
-    "R26": (51.0, 102.0, 0, B), "C27": (51.0, 104.0, 0, B),
-    "C20": (55.0, 101.5, 0, B), "C21": (55.0, 110.5, 0, B), "C28": (60.5, 110.5, 0, B),
-    "SW3": (4.2, 88.0, 90, B),
-    "J5": (83.6, 112.0, 270, B),
-    # Test points along the bottom of the back.
-    "TP1": (70.0, 98.0, 0, B), "TP2": (70.0, 94.0, 0, B), "TP3": (66.0, 98.0, 0, B),
-    "TP4": (66.0, 94.0, 0, B), "TP5": (16.0, 42.0, 0, B), "TP6": (62.0, 94.0, 0, B),
+    "C67": (4.0, 116.0, 90, B), "C68": (6.2, 116.0, 90, B), "R62": (8.4, 116.0, 90, B),
+    "R63": (10.6, 116.0, 90, B), "R64": (12.8, 116.0, 90, B), "R65": (15.0, 116.0, 90, B),
+    "R66": (17.2, 116.0, 90, B), "R67": (19.4, 116.0, 90, B),
+    "J1": (14.0, 131.4, 0, B),
+    "U3": (14.0, 123.0, 0, B),
+    "R10": (7.5, 127.0, 90, B), "R11": (20.5, 127.0, 90, B),
+    "R12": (12.5, 119.5, 90, B), "R13": (15.5, 119.5, 90, B),
+    "R19": (6.0, 131.5, 90, B), "C23": (22.0, 131.5, 90, B),
+    "R23": (24.0, 122.0, 0, B), "R24": (24.0, 124.0, 0, B),
+    "U4": (32.0, 126.0, 0, B),
+    "R14": (28.0, 131.0, 90, B), "R15": (30.0, 131.0, 90, B), "R22": (34.0, 131.0, 90, B),
+    "R25": (36.0, 131.0, 90, B), "R16": (32.0, 121.0, 0, B),
+    "C24": (27.5, 126.0, 90, B), "C25": (36.5, 126.0, 90, B), "C26": (36.0, 122.0, 0, B),
+    "U5": (52.0, 126.0, 0, B), "L1": (57.5, 126.0, 0, B),
+    "R26": (48.0, 122.0, 0, B), "C27": (48.0, 124.0, 0, B),
+    "C20": (52.0, 121.5, 0, B), "C21": (52.0, 130.5, 0, B), "C28": (57.5, 130.5, 0, B),
+    "SW3": (84.0, 122.0, 270, B),
+    "J5": (83.6, 110.0, 270, B),
 }
 # Button pull-ups: two rows beside the expander.
 for i in range(8):
-    PLACE[f"R{50 + i}"] = (20.0 + (i % 4) * 2.2, 74.0 + (i // 4) * 2.4, 90, B)
+    PLACE[f"R{50 + i}"] = (22.0 + (i % 4) * 2.2, 62.5 + (i // 4) * 2.4, 90, B)
 
 # Passives that belong right at a module pad: ref -> (host, pad, distance
 # out from the pad centre, offset along the module edge). They are pushed
@@ -193,6 +194,8 @@ AT_PAD = {
     "R4": ("U1", "31", 2.0, 0.0),     # SD clock termination
     "R5": ("U1", "12", 2.0, 0.0),     # I2S bit clock termination
 }
+for _ref, (_host, *_rest) in AT_PAD.items():
+    PLACE.setdefault(_ref, (0.0, 0.0, 0, B))   # final position comes from the pad
 
 
 # -------------------------------------------------------------- board parts
@@ -317,11 +320,13 @@ def silkscreen(board):
         add_line(board, pcbnew.F_Fab, (cx, cy), (cx, cy + 3 * dy), 0.1)
     add_rect(board, pcbnew.F_Fab, px, py, pw, ph, 0.1)
     add_text(board, pcbnew.F_Fab, "DT028BTFT 2.8in panel", px + pw / 2, py + ph / 2, 1.5)
-    for label, (bx, by) in (("UP", (80.5, 72.2)), ("C", (80.5, 90.2)), ("DOWN", (80.5, 108.2)),
-                            ("LEFT", (8.5, 116.8)), ("RIGHT", (19.5, 116.8)), ("HOME", (31.0, 116.8)),
-                            ("B", (58.0, 116.8)), ("A", (70.0, 116.8))):
+    labels = (("UP", "SW11", 0, -4.2), ("DOWN", "SW12", 0, 4.4), ("LEFT", "SW13", -6.2, 0),
+              ("RIGHT", "SW14", 6.6, 0), ("HOME", "SW18", 0, 4.2), ("A", "SW15", 0, 4.2),
+              ("B", "SW16", 0, 4.2), ("C", "SW17", 0, 4.2))
+    for label, ref, dx, dy in labels:
+        bx, by = PLACE[ref][0] + dx, PLACE[ref][1] + dy
         add_text(board, fs, label, bx, by, 0.9, 0.15)
-    add_text(board, fs, "CHG", 44.0, 114.2, 0.8, 0.12)
+    add_text(board, fs, "CHG", 11.0, 111.6, 0.8, 0.12)
     sx, sy, sw, sh = SPEAKER
     # Back.
     bx, by, bw, bh = BATTERY
@@ -331,14 +336,14 @@ def silkscreen(board):
     add_text(board, bs, "JST-PH: check polarity", bx + bw / 2, by + bh / 2 + 1, 1.0, 0.15, mirror=True)
     add_rect(board, pcbnew.B_Fab, sx, sy, sw, sh, 0.1)
     add_rect(board, pcbnew.B_CrtYd, sx, sy, sw, sh, 0.05)
-    add_text(board, bs, "OREO BADGE rev 1.0", 44.0, 92.0, 1.5, 0.25, mirror=True, bold=True)
-    add_text(board, bs, "oreo.elixpo.com", 44.0, 95.0, 1.0, 0.15, mirror=True)
-    add_text(board, bs, "CERN-OHL-P-2.0  OSHWA IN000107", 44.0, 97.5, 0.9, 0.15, mirror=True)
-    add_text(board, bs, "RST", 64.0, 115.2, 0.8, 0.12, mirror=True)
-    add_text(board, bs, "BOOT", 64.0, 127.0, 0.8, 0.12, mirror=True)
-    add_text(board, bs, "ON", 4.2, 81.5, 0.8, 0.12, mirror=True)
-    add_text(board, bs, "microSD", 11.0, 94.0, 0.8, 0.12, mirror=True)
-    add_text(board, bs, "Qwiic", 83.6, 106.0, 0.8, 0.12, mirror=True)
+    add_text(board, bs, "OREO BADGE rev 1.0", 44.0, 44.0, 1.5, 0.25, mirror=True, bold=True)
+    add_text(board, bs, "oreo.elixpo.com", 44.0, 47.0, 1.0, 0.15, mirror=True)
+    add_text(board, bs, "CERN-OHL-P-2.0  OSHWA IN000107", 44.0, 49.5, 0.9, 0.15, mirror=True)
+    add_text(board, bs, "RST", 34.0, 26.8, 0.8, 0.12, mirror=True)
+    add_text(board, bs, "BOOT", 54.0, 26.8, 0.8, 0.12, mirror=True)
+    add_text(board, bs, "ON", 84.0, 115.5, 0.8, 0.12, mirror=True)
+    add_text(board, bs, "microSD", 11.0, 93.5, 0.8, 0.12, mirror=True)
+    add_text(board, bs, "Qwiic", 83.6, 104.5, 0.8, 0.12, mirror=True)
     for ref, label in (("TP1", "TX"), ("TP2", "RX"), ("TP3", "GND"), ("TP4", "3V3"), ("TP5", "VBAT"), ("TP6", "P17")):
         tx, ty = PLACE[ref][:2]
         add_text(board, bs, label, tx, ty + 2.2, 0.8, 0.12, mirror=True)
