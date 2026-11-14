@@ -33,16 +33,16 @@ NETLIST = HERE / "build" / "elixpo.net"
 BOARD_FILE = HERE / "elixpo.kicad_pcb"
 PROJECT_FILE = HERE / "elixpo.kicad_pro"
 
-W, H, CORNER = 88.0, 153.5, 4.0           # board outline, mm
+W, H, CORNER = 88.0, 123.5, 4.0           # board outline, mm
 ORIGIN = (40.0, 30.0)                     # where the board sits on the page
 
 # Front-face features.
-PANEL = (9.4, 80.0, 69.2, 50.0)           # top at 80 mm: the name card covers 0-80 mm           # DT028BTFT outline, landscape: x, y, w, h
-BATTERY = (18.0, 94.0, 50.0, 34.0)        # 603450 cell on the back, low for a low centre of gravity
+PANEL = (9.4, 50.0, 69.2, 50.0)           # top at 50 mm: the name card covers 0-50 mm           # DT028BTFT outline, landscape: x, y, w, h
+BATTERY = (18.0, 64.0, 50.0, 34.0)        # 603450 cell on the back, low for a low centre of gravity
 SPEAKER = (3.5, 7.0, 15.0, 11.0)          # 1511 speaker on the back
 SLOTS = ((10.0, 4.0), (78.0, 4.0))        # lanyard-clip slot centres
 SLOT_LEN, SLOT_W = 10.0, 3.2
-FPC_SLOT = (79.4, 91.0, 1.6, 28.0)        # x, y, w, h: the panel's FPC folds to the back here
+FPC_SLOT = (79.4, 61.0, 1.6, 28.0)        # x, y, w, h: the panel's FPC folds to the back here
 
 
 def mm(v):
@@ -99,7 +99,7 @@ def read_netlist():
 # ref: (x, y, rotation in degrees, side). Rotation is as seen from the front.
 
 F, B = "F", "B"
-DPAD = (13.0, 141.5)                       # centre of the D-pad, bottom-left
+DPAD = (13.0, 111.5)                       # centre of the D-pad, bottom-left
 PLACE = {
     # ---- Front: D-pad bottom-left, then HOME A B C side by side ----
     "SW11": (DPAD[0], DPAD[1] - 7.0, 0, F),    # UP
@@ -112,9 +112,9 @@ PLACE = {
     "SW17": (80.0, DPAD[1], 0, F),             # C
     "D20": (29.0, DPAD[1] - 2.0, 0, F), "D21": (29.0, DPAD[1] + 2.0, 0, F),
     # Corner LEDs around the panel, status LED right of the FPC slot.
-    "D1": (6.0, 81.5, 90, F), "D2": (82.0, 81.5, 90, F),
-    "D3": (6.0, 128.5, 90, F), "D4": (82.0, 128.5, 90, F),
-    "U9": (83.5, 105.0, 90, F),
+    "D1": (6.0, 51.5, 90, F), "D2": (82.0, 51.5, 90, F),
+    "D3": (6.0, 98.5, 90, F), "D4": (82.0, 98.5, 90, F),
+    "U9": (83.5, 75, 90, F),
     # ---- Back: module and RTC at the top, display/expander/IMU behind the top of the
     # screen, battery low, microSD and USB-C at the bottom ----
     "U1": (44, 12.8, 0, B),
@@ -145,78 +145,78 @@ PLACE = {
     "R73": (78, 30, 0, B),
     "R70": (80.5, 18.5, 0, B),
     "C70": (76.5, 18.5, 0, B),
-    "J3": (74, 105, 270, B),
-    "C30": (74, 121.5, 0, B),
-    "C31": (74, 123.5, 0, B),
-    "R74": (84.5, 109.5, 90, B),
-    "C71": (84.5, 101, 90, B),
-    "R30": (66, 82, 90, B),
-    "R31": (62, 82, 0, B),
-    "R32": (62, 84, 0, B),
-    "R33": (62, 86, 0, B),
-    "R34": (62, 88, 0, B),
-    "Q2": (57, 85, 0, B),
-    "R35": (57, 90, 0, B),
-    "R36": (53, 85, 90, B),
-    "U11": (34, 86, 0, B),
-    "C40": (38.5, 86, 90, B),
-    "R40": (40, 81, 90, B),
-    "R41": (42, 81, 90, B),
-    "R42": (22, 89.5, 90, B),
-    "R43": (24.2, 89.5, 90, B),
-    "R44": (26.4, 89.5, 90, B),
-    "TP6": (40, 92, 0, B),
-    "U7": (48, 86, 0, B),
-    "C62": (52.5, 89.5, 0, B),
-    "C63": (48, 90.5, 0, B),
-    "C64": (44, 81, 90, B),
-    "U10": (13, 86, 0, B),
-    "C29": (13, 82.5, 0, B),
-    "TP5": (7.5, 90, 0, B),
-    "J2": (13, 101, 90, B),
-    "J4": (11, 142, 270, B),
-    "C67": (4, 131, 90, B),
-    "C68": (6.2, 131, 90, B),
-    "R62": (8.4, 131, 90, B),
-    "R63": (10.6, 131, 90, B),
-    "R64": (12.8, 131, 90, B),
-    "R65": (15, 131, 90, B),
-    "R66": (17.2, 131, 90, B),
-    "R67": (19.4, 131, 90, B),
-    "J1": (44, 149.9, 0, B),
-    "U3": (44, 141.5, 0, B),
-    "R10": (37.5, 145.5, 90, B),
-    "R11": (50.5, 145.5, 90, B),
-    "R12": (42.5, 138, 90, B),
-    "R13": (45.5, 138, 90, B),
-    "R19": (36, 150, 90, B),
-    "C23": (52, 150, 90, B),
-    "R23": (38.5, 136.5, 0, B),
-    "R24": (49.5, 136.5, 0, B),
-    "U4": (28, 144.5, 0, B),
-    "R14": (24, 149.5, 90, B),
-    "R15": (26, 149.5, 90, B),
-    "R22": (30, 149.5, 90, B),
-    "R25": (32, 149.5, 90, B),
-    "R16": (28, 139.5, 0, B),
-    "C24": (23.5, 144.5, 90, B),
-    "C25": (32.5, 144.5, 90, B),
-    "C26": (32, 139.5, 90, B),
-    "U5": (60, 144.5, 0, B),
-    "L1": (65.5, 144.5, 0, B),
-    "R26": (56, 140.5, 0, B),
-    "C27": (56, 142.5, 0, B),
-    "C20": (60, 140, 0, B),
-    "C21": (60, 149, 0, B),
-    "C28": (65.5, 149, 0, B),
-    "SW3": (84, 131, 270, B),
-    "J5": (83.6, 143.5, 270, B),
+    "J3": (74, 75, 270, B),
+    "C30": (74, 91.5, 0, B),
+    "C31": (74, 93.5, 0, B),
+    "R74": (84.5, 79.5, 90, B),
+    "C71": (84.5, 71, 90, B),
+    "R30": (66, 52, 90, B),
+    "R31": (62, 52, 0, B),
+    "R32": (62, 54, 0, B),
+    "R33": (62, 56, 0, B),
+    "R34": (62, 58, 0, B),
+    "Q2": (57, 55, 0, B),
+    "R35": (57, 60, 0, B),
+    "R36": (53, 55, 90, B),
+    "U11": (34, 56, 0, B),
+    "C40": (38.5, 56, 90, B),
+    "R40": (40, 51, 90, B),
+    "R41": (42, 51, 90, B),
+    "R42": (22, 59.5, 90, B),
+    "R43": (24.2, 59.5, 90, B),
+    "R44": (26.4, 59.5, 90, B),
+    "TP6": (40, 62, 0, B),
+    "U7": (48, 56, 0, B),
+    "C62": (52.5, 59.5, 0, B),
+    "C63": (48, 60.5, 0, B),
+    "C64": (44, 51, 90, B),
+    "U10": (13, 56, 0, B),
+    "C29": (13, 52.5, 0, B),
+    "TP5": (7.5, 60, 0, B),
+    "J2": (13, 71, 90, B),
+    "J4": (11, 112, 270, B),
+    "C67": (4, 101, 90, B),
+    "C68": (6.2, 101, 90, B),
+    "R62": (8.4, 101, 90, B),
+    "R63": (10.6, 101, 90, B),
+    "R64": (12.8, 101, 90, B),
+    "R65": (15, 101, 90, B),
+    "R66": (17.2, 101, 90, B),
+    "R67": (19.4, 101, 90, B),
+    "J1": (44, 119.9, 0, B),
+    "U3": (44, 111.5, 0, B),
+    "R10": (37.5, 115.5, 90, B),
+    "R11": (50.5, 115.5, 90, B),
+    "R12": (42.5, 108, 90, B),
+    "R13": (45.5, 108, 90, B),
+    "R19": (36, 120, 90, B),
+    "C23": (52, 120, 90, B),
+    "R23": (38.5, 106.5, 0, B),
+    "R24": (49.5, 106.5, 0, B),
+    "U4": (28, 114.5, 0, B),
+    "R14": (24, 119.5, 90, B),
+    "R15": (26, 119.5, 90, B),
+    "R22": (30, 119.5, 90, B),
+    "R25": (32, 119.5, 90, B),
+    "R16": (28, 109.5, 0, B),
+    "C24": (23.5, 114.5, 90, B),
+    "C25": (32.5, 114.5, 90, B),
+    "C26": (32, 109.5, 90, B),
+    "U5": (60, 114.5, 0, B),
+    "L1": (65.5, 114.5, 0, B),
+    "R26": (56, 110.5, 0, B),
+    "C27": (56, 112.5, 0, B),
+    "C20": (60, 110, 0, B),
+    "C21": (60, 119, 0, B),
+    "C28": (65.5, 119, 0, B),
+    "SW3": (84, 101, 270, B),
+    "J5": (83.6, 113.5, 270, B),
     "U8": (80, 13, 0, B),
     "D10": (84.5, 20.5, 90, B),
 }
 # Button pull-ups: two rows beside the expander.
 for i in range(8):
-    PLACE[f"R{50 + i}"] = (22.0 + (i % 4) * 2.2, 81.0 + (i // 4) * 2.4, 90, B)
+    PLACE[f"R{50 + i}"] = (22.0 + (i % 4) * 2.2, 51.0 + (i // 4) * 2.4, 90, B)
 
 # Passives that belong right at a module pad: ref -> (host, pad, distance
 # out from the pad centre, offset along the module edge). They are pushed
@@ -360,14 +360,14 @@ def silkscreen(board):
     add_text(board, bs, "JST-PH: check polarity", bx + bw / 2, by + bh / 2 + 1, 1.0, 0.15, mirror=True)
     add_rect(board, pcbnew.B_Fab, sx, sy, sw, sh, 0.1)
     add_rect(board, pcbnew.B_CrtYd, sx, sy, sw, sh, 0.05)
-    add_text(board, bs, "OREO BADGE rev 1.0", 44.0, 52.0, 1.5, 0.25, mirror=True, bold=True)
-    add_text(board, bs, "oreo.elixpo.com", 44.0, 55.0, 1.0, 0.15, mirror=True)
-    add_text(board, bs, "CERN-OHL-P-2.0  OSHWA IN000107", 44.0, 57.5, 0.9, 0.15, mirror=True)
+    add_text(board, bs, "OREO BADGE rev 1.0", 44.0, 41.5, 1.5, 0.25, mirror=True, bold=True)
+    add_text(board, bs, "oreo.elixpo.com", 44.0, 44.3, 1.0, 0.15, mirror=True)
+    add_text(board, bs, "CERN-OHL-P-2.0  OSHWA IN000107", 44.0, 46.6, 0.9, 0.15, mirror=True)
     add_text(board, bs, "RST", 34.0, 26.8, 0.8, 0.12, mirror=True)
     add_text(board, bs, "BOOT", 54.0, 26.8, 0.8, 0.12, mirror=True)
-    add_text(board, bs, "ON", 84.0, 124.0, 0.8, 0.12, mirror=True)
-    add_text(board, bs, "microSD", 11.0, 151.8, 0.8, 0.12, mirror=True)
-    add_text(board, bs, "Qwiic", 83.6, 137.5, 0.8, 0.12, mirror=True)
+    add_text(board, bs, "ON", 84.0, 94.0, 0.8, 0.12, mirror=True)
+    add_text(board, bs, "microSD", 11.0, 121.8, 0.8, 0.12, mirror=True)
+    add_text(board, bs, "Qwiic", 83.6, 107.5, 0.8, 0.12, mirror=True)
     for ref, label in (("TP1", "TX"), ("TP2", "RX"), ("TP3", "GND"), ("TP4", "3V3"), ("TP5", "VBAT"), ("TP6", "P17")):
         tx, ty = PLACE[ref][:2]
         add_text(board, bs, label, tx, ty + 2.2, 0.8, 0.12, mirror=True)
@@ -414,23 +414,25 @@ def keepout(board, polygon, layers, name):
 
 
 def planes(board):
+    # 6 layers: F signal / In1 GND / In2 signal / In3 signal / In4 GND / B signal.
+    # Every signal layer is next to a solid ground plane; 3.3 V is routed
+    # with the Power net class.
     gnd = board.FindNet("GND")
-    v33 = board.FindNet("+3V3")
     full = [(0.3, 0.3), (W - 0.3, 0.3), (W - 0.3, H - 0.3), (0.3, H - 0.3)]
-    zone(board, gnd, pcbnew.In1_Cu, full)                 # solid return plane under everything
-    zone(board, v33, pcbnew.In2_Cu, full)                 # 3.3 V plane
+    zone(board, gnd, pcbnew.In1_Cu, full)                 # return plane for F and In2
+    zone(board, gnd, pcbnew.In4_Cu, full)                 # return plane for In3 and B
     zone(board, gnd, pcbnew.F_Cu, full, clearance=0.3)    # ground fill, stitched to In1
     zone(board, gnd, pcbnew.B_Cu, full, clearance=0.3)
     # Antenna: no copper on any layer beside or under the antenna, per the
     # ESP32-S3-WROOM-1 datasheet; the module's antenna end is on the top edge.
     mx = PLACE["U1"][0]
-    copper = [pcbnew.F_Cu, pcbnew.In1_Cu, pcbnew.In2_Cu, pcbnew.B_Cu]
+    copper = [pcbnew.F_Cu, pcbnew.In1_Cu, pcbnew.In2_Cu, pcbnew.In3_Cu, pcbnew.In4_Cu, pcbnew.B_Cu]
     keepout(board, [(mx - 15.0, 0.0), (mx + 15.0, 0.0), (mx + 15.0, 7.0), (mx - 15.0, 7.0)],
             copper, "antenna keep-out")
 
 
 def stackup(board):
-    board.SetCopperLayerCount(4)
+    board.SetCopperLayerCount(6)
     ds = board.GetDesignSettings()
     ds.SetBoardThickness(mm(1.6))
     ds.m_TrackMinWidth = mm(0.15)
@@ -533,7 +535,7 @@ def main():
     board.Save(str(BOARD_FILE))
     write_netclasses()
     write_rules()
-    print(f"Placed {len(footprints)} footprints on a {W:g} x {H:g} mm 4-layer board: {BOARD_FILE}")
+    print(f"Placed {len(footprints)} footprints on a {W:g} x {H:g} mm 6-layer board: {BOARD_FILE}")
 
 
 if __name__ == "__main__":
