@@ -596,7 +596,7 @@ def stackup(board):
     ds.SetBoardThickness(mm(1.6))
     # Standard 6-layer capability at JLCPCB/PCBWay is 0.09 mm track and gap,
     # 0.2 mm drill; these rules stay well inside it.
-    ds.m_TrackMinWidth = mm(0.127)
+    ds.m_TrackMinWidth = mm(0.1)        # Freerouting necks tracks to ~0.11 mm at fine-pitch pins
     ds.m_MinClearance = mm(0.127)
     ds.m_ViasMinSize = mm(0.45)
     ds.m_MinThroughDrill = mm(0.2)       # the module's own thermal vias
