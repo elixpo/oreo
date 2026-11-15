@@ -430,6 +430,23 @@ def heart(board, layer, cx, cy, width, line=0.3):
         raster_art(board, Path(tmp.name), layer, cx - width / 2, cy - width / 2, width)
 
 
+def imu_axes(board, layer, x, y, length=4.0):
+    """Arrows beside U7 showing the MPU-6050's axes as OreoOS reads them:
+    +X to the left of the screen, +Y up the screen (Z goes into the badge).
+    Drawn in front-view coordinates, so on the back they read mirrored."""
+    w = 0.15
+    for (dx, dy), label in (((-1, 0), "X"), ((0, -1), "Y")):
+        ex, ey = x + dx * length, y + dy * length
+        add_line(board, layer, (x, y), (ex, ey), w)
+        # arrow head
+        hx, hy = -dx * 0.8, -dy * 0.8
+        px, py = -dy * 0.5, dx * 0.5
+        add_line(board, layer, (ex, ey), (ex + hx + px, ey + hy + py), w)
+        add_line(board, layer, (ex, ey), (ex + hx - px, ey + hy - py), w)
+        add_text(board, layer, label, ex + dx * 1.2, ey + dy * 1.2, 0.8, 0.15, mirror=True)
+    add_text(board, layer, "U7", x + 1.8, y + 1.2, 0.8, 0.15, mirror=True)
+
+
 def silkscreen(board):
     fs, bs = pcbnew.F_SilkS, pcbnew.B_SilkS
     # Panel corner marks (the panel itself is placed by hand).
@@ -463,6 +480,7 @@ def silkscreen(board):
     add_text(board, bs, "RST", 34.0, 26.8, 0.8, 0.12, mirror=True)
     add_text(board, bs, "BOOT", 54.0, 26.8, 0.8, 0.12, mirror=True)
     add_text(board, bs, "ON", 84.0, 104.0, 0.8, 0.12, mirror=True)
+    imu_axes(board, bs, 51.0, 73.2, 3.0)
     add_text(board, bs, "microSD", 11.0, 131.8, 0.8, 0.12, mirror=True)
     add_text(board, bs, "Qwiic", 83.6, 117.5, 0.8, 0.12, mirror=True)
     for ref, label in (("TP1", "TX"), ("TP2", "RX"), ("TP3", "GND"), ("TP4", "3V3"), ("TP5", "VBAT"), ("TP6", "P17")):
