@@ -45,7 +45,10 @@ SLOT_LEN, SLOT_W = 13.5, 3.2               # the standard badge-clip slot
 ART = HERE / "art"
 PANDA = (-10.0, 6.0, 54.0)                # front, under the name card: x, y, height (runs off the left edge)
 HEART = (79.0, 35.5, 11.0)                # front, far right, where the panda is looking: centre x, y, width
-OSHW_MARK = (6.0, 40.0, 13.0)             # back: x, y, height (OSHWA certification mark)        # x, y, w, h: the panel's FPC folds to the back here
+# Back, one symmetric row: OSHW mark | "Elixpo" | the badge's details.
+BACK_ROW_Y = 47.5                          # centre line of the row
+BACK_SIDE = 26.0                           # each side block's centre, from the middle
+OSHW_H = 13.0                              # height of the OSHWA certification mark
 
 
 def mm(v):
@@ -499,17 +502,25 @@ def silkscreen(board):
     add_text(board, bs, "JST-PH: check polarity", bx + bw / 2, by + bh / 2 + 1, 1.0, 0.15, mirror=True)
     add_rect(board, pcbnew.B_Fab, sx, sy, sw, sh, 0.1)
     add_rect(board, pcbnew.B_CrtYd, sx, sy, sw, sh, 0.05)
-    add_text(board, bs, "OREO BADGE", 44.0, 45.0, 1.5, 0.25, mirror=True, bold=True)
-    add_text(board, bs, "oreo.elixpo.com", 44.0, 47.8, 1.0, 0.15, mirror=True)
-    add_text(board, bs, "CERN-OHL-P-2.0", 44.0, 50.1, 0.9, 0.15, mirror=True)
-    add_text(board, bs, "S/N-2509-0023", 44.0, 52.5, 0.9, 0.15, mirror=True)
+    # One row, symmetric about the board's centre line: seen from the back,
+    # the OSHW mark on the left, "Elixpo" in the middle, the badge's details
+    # on the right (front-view x is mirrored on the back).
+    mid, y0 = W / 2, BACK_ROW_Y
+    add_text(board, bs, "Elixpo", mid, y0, 4.2, 0.6, mirror=True, bold=True)
+    tx = mid - BACK_SIDE
+    for text, dy, size, thick, bold in (("OREO BADGE", -4.0, 1.5, 0.25, True),
+                                        ("oreo.elixpo.com", -1.2, 1.0, 0.15, False),
+                                        ("CERN-OHL-P-2.0", 1.2, 0.9, 0.15, False),
+                                        ("S/N-2509-0023", 3.6, 0.9, 0.15, False)):
+        add_text(board, bs, text, tx, y0 + dy, size, thick, mirror=True, bold=bold)
     # Art: the Oreo panda in profile on the front, under the name card, and
     # OSHWA's certification mark on the back.
     px_, py_, ph_ = PANDA
     raster_art(board, ART / "oreo-lineart.png", fs, px_, py_, ph_)
     heart(board, fs, *HEART)
-    ox, oy, oh = OSHW_MARK
-    raster_art(board, ART / "oshw-certification-mark-IN000107.png", bs, ox, oy, oh, mirror=True)
+    ow = OSHW_H * 2196 / 1768              # the rendered mark's aspect ratio
+    raster_art(board, ART / "oshw-certification-mark-IN000107.png", bs,
+               mid + BACK_SIDE - ow / 2, y0 - OSHW_H / 2, OSHW_H, mirror=True)
     add_text(board, bs, "RST", 34.0, 26.8, 0.8, 0.12, mirror=True)
     add_text(board, bs, "BOOT", 54.0, 26.8, 0.8, 0.12, mirror=True)
     add_text(board, bs, "ON", 84.0, 104.0, 0.8, 0.12, mirror=True)
@@ -529,7 +540,7 @@ def zone(board, net, layer, polygon, priority=0, clearance=0.25, min_width=0.2):
     z.SetAssignedPriority(priority)
     z.SetLocalClearance(mm(clearance))
     z.SetMinThickness(mm(min_width))
-    z.SetPadConnection(pcbnew.ZONE_CONNECTION_THERMAL)
+    z.SetPadConnection(pcbnew.ZONE_CONNECTION_FULL)    # solid: no starved thermals on fine-pitch pads
     z.SetIslandRemovalMode(pcbnew.ISLAND_REMOVAL_MODE_ALWAYS)
     z.SetThermalReliefGap(mm(0.3))
     z.SetThermalReliefSpokeWidth(mm(0.35))
@@ -601,8 +612,11 @@ def write_netclasses():
                 schematic_color="rgba(0, 0, 0, 0.000)", wire_width=6, priority=2147483647)
     ns["classes"] = [
         dict(base, name="Default", clearance=0.15, track_width=0.2, via_diameter=0.6, via_drill=0.3),
-        dict(base, name="Power", clearance=0.2, track_width=0.5, via_diameter=0.8, via_drill=0.4, priority=1),
-        dict(base, name="Battery", clearance=0.2, track_width=0.8, via_diameter=0.8, via_drill=0.4, priority=0),
+        # 0.3 mm reaches the 0.5 mm-pitch QFN/WSON pads of the charger and the
+        # regulator within clearance, and carries about 1 A on outer copper:
+        # enough for the 0.5-0.8 A these short runs see.
+        dict(base, name="Power", clearance=0.2, track_width=0.3, via_diameter=0.8, via_drill=0.4, priority=1),
+        dict(base, name="Battery", clearance=0.2, track_width=0.3, via_diameter=0.8, via_drill=0.4, priority=0),
         dict(base, name="Fast", clearance=0.2, track_width=0.2, via_diameter=0.6, via_drill=0.3, priority=2),
         dict(base, name="USB", clearance=0.2, track_width=0.3, via_diameter=0.6, via_drill=0.3,
              diff_pair_width=0.3, diff_pair_gap=0.15, priority=3),

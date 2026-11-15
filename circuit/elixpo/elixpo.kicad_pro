@@ -301,7 +301,7 @@
         "priority": 1,
         "name": "Power",
         "clearance": 0.2,
-        "track_width": 0.5,
+        "track_width": 0.3,
         "via_diameter": 0.8,
         "via_drill": 0.4
       },
@@ -319,7 +319,7 @@
         "priority": 0,
         "name": "Battery",
         "clearance": 0.2,
-        "track_width": 0.8,
+        "track_width": 0.3,
         "via_diameter": 0.8,
         "via_drill": 0.4
       },
