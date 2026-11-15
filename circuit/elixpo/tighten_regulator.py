@@ -12,14 +12,18 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 BOARD = HERE / "elixpo.kicad_pcb"
 O = (40.0, 30.0)                         # board origin on the page
-BOX = (53.5, 117.0, 69.0, 133.0)         # x0, y0, x1, y1 in board mm
+# U5 sits below the A and B button pins, turned so its switch pins (1-5)
+# face the inductor on the left and VINA (pin 8) faces its filter on the right.
+BOX = (19.5, 123.4, 33.2, 133.4)         # x0, y0, x1, y1 in board mm
+U5_ORIENTATION = 0                       # stored orientation of the flipped part
 MOVES = {                                # ref: (x, y, orientation as seen on the board)
-    "L1": (64.0, 124.5, None),           # pads to face pins 2 (L2) and 4 (L1)
-    "C21": (61.0, 121.6, None),          # VOUT, at pin 1
-    "C28": (61.0, 119.4, None),          # second VOUT cap just above it
-    "C20": (61.0, 127.4, None),          # VIN, at pin 5
-    "C27": (56.7, 124.5, None),          # VINA filter at pin 8
-    "R26": (56.7, 127.0, None),
+    "U5": (28.0, 127.5, None),
+    "L1": (24.0, 127.5, None),           # pads to face pins 2 (L2) and 4 (L1)
+    "C20": (28.5, 124.6, None),          # VIN, across pins 5 and 6
+    "C21": (27.0, 130.6, None),          # VOUT, at pins 1 and 10
+    "C28": (23.3, 131.3, None),          # second VOUT cap beside it
+    "C27": (31.3, 127.6, None),          # VINA filter at pin 8
+    "R26": (31.3, 126.3, None),
 }
 
 def strip_box(text):
@@ -63,6 +67,7 @@ board = pcbnew.LoadBoard(str(BOARD))
 for ref, (x, y, _rot) in MOVES.items():
     fp = board.FindFootprintByReference(ref)
     fp.SetPosition(pcbnew.VECTOR2I(pcbnew.FromMM(O[0] + x), pcbnew.FromMM(O[1] + y)))
+board.FindFootprintByReference("U5").SetOrientationDegrees(U5_ORIENTATION)
 # L1: turn it so its pads run along the pin column, pad 1 (BUCK_L1) towards pin 4
 l1 = board.FindFootprintByReference("L1")
 u5 = board.FindFootprintByReference("U5")
@@ -77,19 +82,21 @@ for ang in (0, 90, 180, 270):
         best = (d, ang)
 l1.SetOrientationDegrees(best[1])
 # capacitors: pad 1 (the supply side) towards its pin
-for ref, target in (("C21", "1"), ("C28", "1"), ("C20", "5"), ("C27", "8"), ("R26", "8")):
+for ref, own, target in (("C21", "1", "1"), ("C28", "1", "1"), ("C20", "1", "6"),
+                         ("C27", "1", "8"), ("R26", "2", "8")):
     fp = board.FindFootprintByReference(ref)
     best = None
-    turns = (0, 180) if ref in ("C21", "C28", "C20") else (0, 90, 180, 270)   # keep the caps flat
-    for ang in turns:
+    for ang in (0, 180):                 # every part stays flat, along the row
         fp.SetOrientationDegrees(ang)
-        d = (pads(fp)["1"] - pin[target]).EuclideanNorm()
+        d = (pads(fp)[own] - pin[target]).EuclideanNorm()
         if best is None or d < best[0]:
             best = (d, ang)
     fp.SetOrientationDegrees(best[1])
 board.Save(str(BOARD))
 BOARD.with_suffix(".kicad_pro").write_bytes(project)
 for ref in MOVES:
+    if ref == "U5":
+        continue
     fp = board.FindFootprintByReference(ref)
     near = min((pd.GetPosition() - pin[k]).EuclideanNorm() for pd in fp.Pads() for k in pin if k)
     print(f"{ref}: nearest pad to a U5 pin {pcbnew.ToMM(near):.2f} mm")

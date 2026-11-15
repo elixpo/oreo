@@ -227,13 +227,13 @@ PLACE = {
     "C24": (60.5, 127.6, 0, B),
     "C25": (55.5, 124.5, 90, B),
     "C26": (56, 119.5, 90, B),
-    "U5": (28, 127.5, 0, B),
-    "L1": (22.5, 127.5, 0, B),
-    "R26": (34.4, 127.0, 90, B),
-    "C27": (34.4, 130.2, 90, B),
-    "C20": (31.8, 127.5, 90, B),
-    "C21": (28, 131.5, 0, B),
-    "C28": (22.5, 131.5, 0, B),
+    "U5": (28, 127.5, 180, B),
+    "L1": (24, 127.5, 270, B),
+    "R26": (31.3, 126.3, 0, B),
+    "C27": (31.3, 127.6, 180, B),
+    "C20": (28.5, 124.6, 0, B),
+    "C21": (27, 130.6, 180, B),
+    "C28": (23.3, 131.3, 0, B),
     "SW3": (84, 44, 270, B),
     "J5": (13, 129.5, 0, B),
     "U8": (86, 21.5, 270, F),
@@ -782,7 +782,7 @@ def main():
             if name and not name.startswith("unconnected-"):
                 pad.SetNet(nets[name])
         # Dense passives carry their reference on the fab layer, not silk.
-        if not re.match(r"(U\d|J\d|Q\d|SW3$)", ref) or ref in ("U9", "J7", "U8", "J5"):
+        if not re.match(r"(U\d|J\d|Q\d|SW3$)", ref) or ref in ("U9", "J7", "U8", "J5", "U5"):
             fp.Reference().SetLayer(pcbnew.F_Fab)   # the flip below moves it to B.Fab
         x, y, rot, side = PLACE[ref]
         place(fp, x, y, rot, side)

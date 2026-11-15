@@ -80,6 +80,10 @@ hand-soldered: the eight 6 mm buttons, J3, and the IR receiver. The
 corner LEDs D1-D4 on the front stay SMD; each has two more on the back's
 corner curve (D30-D37), in parallel on the same AW9523B channel.
 
+`python3 export_jlcpcb.py` writes the order files into `build/jlcpcb/`:
+the Gerber zip, and the assembly BOM and placement list with the
+hand-soldered parts left out. Fill in the LCSC part numbers before ordering.
+
 The battery sits on the back in a 3D-printed L-shaped holder: it runs the
 cell's 50 mm edge, is as tall as the cell (6 mm) and has a 10-12 mm lip over
 it. Its foot is drawn on the back silkscreen under the cell and fixes with
