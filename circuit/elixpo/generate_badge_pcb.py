@@ -180,9 +180,9 @@ PLACE = {
     "C30": (81.5, HEADER_PIN1[1], 90, B),
     "R74": (76.0, 47.2, 0, B),
     # 5 V boost for the display, on the back beside J3's power pin
-    "U6": (77.0, 96.0, 0, B), "L2": (77.0, 92.0, 0, B),
+    "U6": (77.0, 96.0, 180, B), "L2": (77.0, 92.0, 180, B),   # VIN and L2 input on the left, SW straight up to L2 on the right
     "C31": (73.6, 96.0, 90, B), "C32": (80.4, 96.0, 90, B),
-    "R20": (75.6, 99.6, 0, B), "R21": (78.4, 99.6, 0, B),
+    "R20": (75.6, 99.6, 180, B), "R21": (78.4, 99.6, 180, B),   # FB ends inboard, under U6 pin 1
     "Q4": (72.3, 44.5, 0, B),              # switches +3V3_AUX (IR receiver, status LED)
     "R46": (72.3, 41.4, 0, B),
     "J6": (82.4, 68.6, 0, B),             # expansion header: a column on the back's left edge (seen from the
