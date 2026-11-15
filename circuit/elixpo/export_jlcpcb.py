@@ -100,7 +100,8 @@ PARTS = {
     "BQ24074RGT": (B, "TI BQ24074RGTR, charger, VQFN-16", "C54313", 2.1188, "Exposed pad: hot air or hot plate"),
     "TPS63031DSK": (B, "TI TPS63031DSKR, 3.3 V buck-boost, WSON-10", "C15516", 1.1568, "Exposed pad: hot air or hot plate"),
     "MPU-6050": (B, "TDK InvenSense MPU-6050, QFN-24", "C24112", 21.0013,
-                 "Costly and scarce as a bare chip: buy from an authorised distributor"),
+                 "Costly as a genuine bare chip. Cheaper: Robu SKU 162123, generic, Rs 426 incl. GST "
+                 "(Rs 369 at 10+): confirm it ships in the 4 x 4 mm QFN-24 (a 3 x 3 mm chip will not fit)"),
     "WS2812B-2020": (B, "Worldsemi WS2812B-2020, status LED", "C965555", 0.1165,
                      "Out of stock at LCSC on the price date; pads underneath: hot air"),
     "MAX17048G+": (B, "ADI MAX17048G+T10, fuel gauge, TDFN-8", "C2682616", 1.9438, "Exposed pad: hot air or hot plate"),

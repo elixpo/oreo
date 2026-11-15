@@ -39,7 +39,7 @@ A JLCPCB assembles (basic),R74,1,"UNI-ROYAL 0402WGF3300TCE, 330 R 1% 0402",R_040
 "B Buy, hand-solder SMD",U3,1,"ST USBLC6-2SC6, USB ESD",SOT-23-6,C7519,0.157,0.157,
 "B Buy, hand-solder SMD",U4,1,"TI BQ24074RGTR, charger, VQFN-16",VQFN-16-1EP_3x3mm_P0.5mm_EP1.6x1.6mm,C54313,2.1188,2.1188,Exposed pad: hot air or hot plate
 "B Buy, hand-solder SMD",U5,1,"TI TPS63031DSKR, 3.3 V buck-boost, WSON-10",WSON-10-1EP_2.5x2.5mm_P0.5mm_EP1.2x2mm,C15516,1.1568,1.1568,Exposed pad: hot air or hot plate
-"B Buy, hand-solder SMD",U7,1,"TDK InvenSense MPU-6050, QFN-24",InvenSense_QFN-24_4x4mm_P0.5mm,C24112,21.0013,21.0013,Costly and scarce as a bare chip: buy from an authorised distributor
+"B Buy, hand-solder SMD",U7,1,"TDK InvenSense MPU-6050, QFN-24",InvenSense_QFN-24_4x4mm_P0.5mm,C24112,21.0013,21.0013,"Costly as a genuine bare chip. Cheaper: Robu SKU 162123, generic, Rs 426 incl. GST (Rs 369 at 10+): confirm it ships in the 4 x 4 mm QFN-24 (a 3 x 3 mm chip will not fit)"
 "B Buy, hand-solder SMD",U9,1,"Worldsemi WS2812B-2020, status LED",LED_WS2812B-2020_PLCC4_2.0x2.0mm,C965555,0.1165,0.1165,Out of stock at LCSC on the price date; pads underneath: hot air
 "B Buy, hand-solder SMD",U10,1,"ADI MAX17048G+T10, fuel gauge, TDFN-8",TDFN-8-1EP_2x2mm_P0.5mm_EP0.8x1.2mm,C2682616,1.9438,1.9438,Exposed pad: hot air or hot plate
 "B Buy, hand-solder SMD",U11,1,"Awinic AW9523BTQR, I2C expander, QFN-24",QFN-24-1EP_4x4mm_P0.5mm_EP2.7x2.7mm,C148077,0.3266,0.3266,Exposed pad: hot air or hot plate
