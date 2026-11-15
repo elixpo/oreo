@@ -189,7 +189,7 @@ PLACE = {
                                           # back), beside J3's pins, under the display module; pin 1 (3V3) at the top
     "C71": (76.0, 40.8, 0, B),
     "U11": (34, 66, 0, B),
-    "C40": (33.75, 62.2, 0, B),           # above U11 at its VCC pin (21), clear of pins 1-6
+    "C40": (38.5, 66, 90, B),
     "R40": (40, 61, 90, B),
     "R41": (42, 61, 90, B),
     "R42": (22, 69.5, 90, B),
