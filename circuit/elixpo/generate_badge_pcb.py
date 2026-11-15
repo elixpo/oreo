@@ -52,10 +52,11 @@ SLOT_LEN, SLOT_W = 13.5, 3.2               # the standard badge-clip slot
 ART = HERE / "art"
 PANDA = (-10.0, 6.0, 54.0)                # front, under the name card: x, y, height (runs off the left edge)
 HEART = (79.0, 35.5, 11.0)                # front, far right, where the panda is looking: centre x, y, width
-# Back, one symmetric row: OSHW mark | "Elixpo" | the badge's details.
-BACK_ROW_Y = 47.5                          # centre line of the row
-BACK_SIDE = 26.0                           # each side block's centre, from the middle
-OSHW_H = 13.0                              # height of the OSHWA certification mark
+# Back: "Elixpo" alone in the middle; the OSHW mark and the badge's details
+# in the free column beside the ESP32-S3 module, under the clip slot.
+BACK_ROW_Y = 47.5                          # centre line of "Elixpo"
+BACK_COLUMN = (15.0, 9.0)                  # front-view centre x and top of the column
+OSHW_H = 12.0                              # height of the OSHWA certification mark
 
 
 def mm(v):
@@ -551,17 +552,17 @@ def silkscreen(board):
     add_text(board, bs, "JST-PH: check polarity", bx + bw / 2, by + bh / 2 - 3, 1.0, 0.15, mirror=True)
     add_rect(board, pcbnew.B_Fab, sx, sy, sw, sh, 0.1)
     add_rect(board, pcbnew.B_CrtYd, sx, sy, sw, sh, 0.05)
-    # One row, symmetric about the board's centre line: seen from the back,
-    # the OSHW mark on the left, "Elixpo" in the middle, the badge's details
-    # on the right (front-view x is mirrored on the back).
+    # "Elixpo" alone on the board's centre line; the OSHW mark and the
+    # badge's details stacked in the column beside the module (seen from the
+    # back it is right of the module: front-view x is mirrored there).
     mid, y0 = W / 2, BACK_ROW_Y
     add_text(board, bs, "Elixpo", mid, y0, 4.2, 0.6, mirror=True, bold=True)
-    tx = mid - BACK_SIDE
-    for text, dy, size, thick, bold in (("OREO BADGE", -4.0, 1.5, 0.25, True),
-                                        ("oreo.elixpo.com", -1.2, 1.0, 0.15, False),
-                                        ("CERN-OHL-P-2.0", 1.2, 0.9, 0.15, False),
-                                        ("A/A-2509-0023", 3.6, 0.9, 0.15, False)):
-        add_text(board, bs, text, tx, y0 + dy, size, thick, mirror=True, bold=bold)
+    tx, ty = BACK_COLUMN
+    for text, dy, size, thick, bold in (("OREO BADGE", OSHW_H + 3.0, 1.5, 0.25, True),
+                                        ("oreo.elixpo.com", OSHW_H + 5.8, 1.0, 0.15, False),
+                                        ("CERN-OHL-P-2.0", OSHW_H + 8.2, 0.9, 0.15, False),
+                                        ("A/A-2509-0023", OSHW_H + 10.6, 0.9, 0.15, False)):
+        add_text(board, bs, text, tx, ty + dy, size, thick, mirror=True, bold=bold)
     # Art: the Oreo panda in profile on the front, under the name card, and
     # OSHWA's certification mark on the back.
     px_, py_, ph_ = PANDA
@@ -569,7 +570,7 @@ def silkscreen(board):
     heart(board, fs, *HEART)
     ow = OSHW_H * 2196 / 1768              # the rendered mark's aspect ratio
     raster_art(board, ART / "oshw-certification-mark-IN000107.png", bs,
-               mid + BACK_SIDE - ow / 2, y0 - OSHW_H / 2, OSHW_H, mirror=True)
+               tx - ow / 2, ty, OSHW_H, mirror=True)
     add_text(board, bs, "RST", 34.0, 26.8, 0.8, 0.12, mirror=True)
     add_text(board, bs, "BOOT", 54.0, 26.8, 0.8, 0.12, mirror=True)
     add_text(board, bs, "ON", 84.0, 37.9, 0.8, 0.12, mirror=True)
