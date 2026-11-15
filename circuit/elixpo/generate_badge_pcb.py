@@ -39,13 +39,13 @@ ORIGIN = (40.0, 30.0)                     # where the board sits on the page
 # Front-face features.
 PANEL = (9.4, 60.0, 69.2, 50.0)           # top at 60 mm: the name card covers 0-60 mm           # DT028BTFT outline, landscape: x, y, w, h
 BATTERY = (18.0, 74.0, 50.0, 34.0)        # 603450 cell on the back, low for a low centre of gravity
-SPEAKER = (3.5, 7.0, 15.0, 11.0)          # 1511 speaker on the back
+SPEAKER = (57.5, 6.0, 15.0, 11.0)         # 1511 speaker on the back, top right
 SLOTS = ((10.0, 4.0), (78.0, 4.0))        # lanyard-clip slot centres
 SLOT_LEN, SLOT_W = 10.0, 3.2
 FPC_SLOT = (79.4, 71.0, 1.6, 28.0)
 ART = HERE / "art"
-PANDA = (4.0, 20.0, 38.0)                 # front, under the name card: x, y, height
-HEART = (60.0, 38.5, 10.0)                # front, where the panda is looking: centre x, y, width
+PANDA = (-10.0, 6.0, 54.0)                # front, under the name card: x, y, height (runs off the left edge)
+HEART = (79.0, 35.5, 11.0)                # front, far right, where the panda is looking: centre x, y, width
 OSHW_MARK = (6.0, 40.0, 13.0)             # back: x, y, height (OSHWA certification mark)        # x, y, w, h: the panel's FPC folds to the back here
 
 
@@ -122,15 +122,15 @@ PLACE = {
     # ---- Back: module and RTC at the top, display/expander/IMU behind the top of the
     # screen, battery low, microSD and USB-C at the bottom ----
     "U1": (44, 12.8, 0, B),
-    "R1": (56.5, 18, 90, B),
-    "C3": (58.5, 18, 90, B),
-    "R2": (58.5, 23, 90, B),
+    "R1": (56.5, 20, 90, B),
+    "C3": (58.5, 20, 90, B),
+    "R2": (58.5, 24, 90, B),
     "SW1": (34, 30, 0, B),
     "SW2": (54, 30, 0, B),
-    "TP1": (60, 34, 0, B),
-    "TP2": (64, 34, 0, B),
-    "TP3": (68, 34, 0, B),
-    "TP4": (72, 34, 0, B),
+    "TP1": (60, 37, 0, B),
+    "TP2": (64, 37, 0, B),
+    "TP3": (68, 37, 0, B),
+    "TP4": (72, 37, 0, B),
     "R17": (31.5, 10, 0, B),
     "R18": (31.5, 12.5, 0, B),
     "C22": (31.5, 15, 0, B),
@@ -138,11 +138,11 @@ PLACE = {
     "C65": (47.5, 33, 90, B),
     "C66": (40.5, 33, 90, B),
     "R61": (44, 37.5, 0, B),
-    "J7": (10, 21.5, 0, B),
-    "U12": (10, 30, 0, B),
-    "C60": (10, 35, 0, B),
-    "C61": (14.5, 30, 90, B),
-    "R60": (5.5, 30, 90, B),
+    "J7": (65, 21, 0, B),
+    "U12": (66, 28, 0, B),
+    "C60": (66, 32.5, 0, B),
+    "C61": (70.5, 28, 90, B),
+    "R60": (61.5, 28, 90, B),
     "Q1": (78, 25, 0, B),
     "R71": (82, 25, 90, B),
     "R72": (74, 25, 90, B),
@@ -455,7 +455,7 @@ def silkscreen(board):
     add_text(board, bs, "OREO BADGE", 44.0, 45.0, 1.5, 0.25, mirror=True, bold=True)
     add_text(board, bs, "oreo.elixpo.com", 44.0, 47.8, 1.0, 0.15, mirror=True)
     add_text(board, bs, "CERN-OHL-P-2.0", 44.0, 50.1, 0.9, 0.15, mirror=True)
-    add_text(board, bs, "S/N 2509-0001", 44.0, 52.5, 0.9, 0.15, mirror=True)
+    add_text(board, bs, "S/N-2509-0023", 44.0, 52.5, 0.9, 0.15, mirror=True)
     # Art: the Oreo panda in profile on the front, under the name card, and
     # OSHWA's certification mark on the back.
     px_, py_, ph_ = PANDA
