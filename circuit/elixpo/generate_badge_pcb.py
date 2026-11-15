@@ -44,7 +44,8 @@ SLOTS = ((10.0, 4.0), (78.0, 4.0))        # lanyard-clip slot centres
 SLOT_LEN, SLOT_W = 10.0, 3.2
 FPC_SLOT = (79.4, 71.0, 1.6, 28.0)
 ART = HERE / "art"
-PANDA = (4.0, 19.5, 39.0)                 # front, under the name card: x, y, height
+PANDA = (4.0, 20.0, 38.0)                 # front, under the name card: x, y, height
+HEART = (60.0, 38.5, 10.0)                # front, where the panda is looking: centre x, y, width
 OSHW_MARK = (6.0, 40.0, 13.0)             # back: x, y, height (OSHWA certification mark)        # x, y, w, h: the panel's FPC folds to the back here
 
 
@@ -411,6 +412,27 @@ def raster_art(board, png, layer, x, y, height, mirror=False, threshold=128):
         board.Add(shape)
 
 
+def heart(board, layer, cx, cy, width, line=0.3):
+    """An outline heart in the line art's weight, drawn as a raster so it
+    goes through the same path as the other artwork."""
+    from PIL import Image, ImageDraw
+    import tempfile
+    size = 400
+    img = Image.new("L", (size, size), 255)
+    draw = ImageDraw.Draw(img)
+    pts = []
+    for i in range(361):
+        t = math.radians(i)
+        x = 16 * math.sin(t) ** 3
+        y = 13 * math.cos(t) - 5 * math.cos(2 * t) - 2 * math.cos(3 * t) - math.cos(4 * t)
+        pts.append((size / 2 + x * size / 36, size / 2 - y * size / 36 - 10))
+    stroke = max(2, round(line / width * size * 36 / 34))
+    draw.line(pts, fill=0, width=stroke, joint="curve")
+    with tempfile.NamedTemporaryFile(suffix=".png") as tmp:
+        img.save(tmp.name)
+        raster_art(board, Path(tmp.name), layer, cx - width / 2, cy - width / 2, width)
+
+
 def silkscreen(board):
     fs, bs = pcbnew.F_SilkS, pcbnew.B_SilkS
     # Panel corner marks (the panel itself is placed by hand).
@@ -433,10 +455,12 @@ def silkscreen(board):
     add_text(board, bs, "OREO BADGE", 44.0, 45.0, 1.5, 0.25, mirror=True, bold=True)
     add_text(board, bs, "oreo.elixpo.com", 44.0, 47.8, 1.0, 0.15, mirror=True)
     add_text(board, bs, "CERN-OHL-P-2.0", 44.0, 50.1, 0.9, 0.15, mirror=True)
+    add_text(board, bs, "S/N 2509-0001", 44.0, 52.5, 0.9, 0.15, mirror=True)
     # Art: the Oreo panda in profile on the front, under the name card, and
     # OSHWA's certification mark on the back.
     px_, py_, ph_ = PANDA
-    raster_art(board, ART / "oreo-panda-profile.png", fs, px_, py_, ph_)
+    raster_art(board, ART / "oreo-lineart.png", fs, px_, py_, ph_)
+    heart(board, fs, *HEART)
     ox, oy, oh = OSHW_MARK
     raster_art(board, ART / "oshw-certification-mark-IN000107.png", bs, ox, oy, oh, mirror=True)
     add_text(board, bs, "RST", 34.0, 26.8, 0.8, 0.12, mirror=True)
