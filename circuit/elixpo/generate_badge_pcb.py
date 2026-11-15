@@ -7,8 +7,8 @@ Run with the Python that ships KiCad's pcbnew module (on Ubuntu,
     kicad-cli sch export netlist --format kicadsexpr -o build/elixpo.net elixpo.kicad_sch
     /usr/bin/python3 circuit/elixpo/generate_badge_pcb.py
 
-It places every footprint, draws the outline, the lanyard slots, the
-display's FPC slot and the speaker grille, pours the ground and power
+It places every footprint, draws the outline, the lanyard slots and the
+speaker grille, pours the ground and power
 planes, and writes the net classes. Routing is done afterwards (see
 README.md); this script never touches tracks, so a routed board is kept by
 running it only when placement changes.
@@ -42,7 +42,6 @@ BATTERY = (18.0, 74.0, 50.0, 34.0)        # 603450 cell on the back, low for a l
 SPEAKER = (70.5, 7.0, 15.0, 11.0)         # 1511 speaker on the back, under the right clip slot
 SLOTS = ((10.0, 4.0), (78.0, 4.0))        # lanyard-clip slot centres
 SLOT_LEN, SLOT_W = 10.0, 3.2
-FPC_SLOT = (79.4, 71.0, 1.6, 28.0)
 ART = HERE / "art"
 PANDA = (-10.0, 6.0, 54.0)                # front, under the name card: x, y, height (runs off the left edge)
 HEART = (79.0, 35.5, 11.0)                # front, far right, where the panda is looking: centre x, y, width
@@ -115,7 +114,7 @@ PLACE = {
     "SW16": (66.0, DPAD[1], 0, F),             # B
     "SW17": (80.0, DPAD[1], 0, F),             # C
     "D20": (29.0, DPAD[1] - 2.0, 0, F), "D21": (29.0, DPAD[1] + 2.0, 0, F),
-    # Corner LEDs around the panel, status LED right of the FPC slot.
+    # Corner LEDs around the panel, status LED right of it.
     "D1": (6.0, 61.5, 90, F), "D2": (82.0, 61.5, 90, F),
     "D3": (6.0, 108.5, 90, F), "D4": (82.0, 108.5, 90, F),
     "U9": (83.5, 85, 90, F),
@@ -149,9 +148,9 @@ PLACE = {
     "R73": (78, 33, 0, B),
     "R70": (79, 21.5, 90, B),
     "C70": (76.5, 21.5, 90, B),
-    "J3": (74, 85, 270, B),
-    "C30": (74, 101.5, 0, B),
-    "C31": (74, 103.5, 0, B),
+    "J3": (62, 85, 90, F),
+    "C30": (57, 76.5, 90, F),
+    "C31": (55.5, 76.5, 90, F),
     "R74": (84.5, 89.5, 90, B),
     "C71": (84.5, 81, 90, B),
     "R30": (66, 62, 90, B),
@@ -178,7 +177,7 @@ PLACE = {
     "C29": (13, 62.5, 0, B),
     "TP5": (7.5, 70, 0, B),
     "J2": (13, 81, 90, B),
-    "J4": (11, 122, 270, B),
+    "J4": (9, 122, 90, B),
     "C67": (4, 111, 90, B),
     "C68": (6.2, 111, 90, B),
     "R62": (8.4, 111, 90, B),
@@ -332,8 +331,6 @@ def outline(board):
         add_line(board, e, (cx + half, cy + r), (cx - half, cy + r), 0.1)
         add_arc(board, e, (cx + half, cy), (cx + half, cy - r), 180, 0.1)
         add_arc(board, e, (cx - half, cy), (cx - half, cy + r), 180, 0.1)
-    x, y, w, h = FPC_SLOT
-    add_rounded_rect(board, e, x, y, w, h, w / 2 - 0.01)
 
 
 GRILLE_ROWS = (0x41, 0x4E, 0x57, 0x45, 0x53, 0x48, 0x41)   # one row per byte, MSB on the left

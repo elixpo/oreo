@@ -58,6 +58,32 @@ flat engineering export that is regenerated directly from the schematic model.
 - Treat this as an engineering prototype, not a production-certified charger
   or RF design, until layout review, bring-up and compliance testing complete.
 
+## Display mounting
+
+The panel is a Displaytech DT028BTFT (2.8 inch, 240x320, ILI9341, 4-line
+SPI with IM3..IM0 = 1110), sold by DigiKey (1756-1052-ND) and Mouser
+(758-DT028BTFT); the Raystar RFJ280J-AYW-DNN is a second source. Its 45-pin
+0.5 mm FPC leaves one 50 mm edge and is about 38.6 mm long. As the
+datasheet's "bending for reference" drawing shows, the FPC folds 180 degrees
+behind the panel. J3 therefore sits on the front, under the panel, with its
+opening facing the panel's right edge, and the panel stands on about
+2.5 mm of foam tape to clear the 2 mm connector.
+
+Check with a real panel before ordering boards:
+
+- Fold the FPC as mounted and note which face its contacts are on. FPC
+  contacts facing the PCB need a bottom-contact connector
+  (FH12-45S-0.5SH(55)); facing up, a top-contact one (FH12A-45S-0.5SH(55)).
+  The land pattern is the same.
+- With it folded, pin 1 (LED-A) must land on J3 pin 1. If it lands on pin
+  45, reverse J3's pin order in generate_badge_schematic.py.
+
+## Motion sensor orientation
+
+U7 (MPU-6050) is on the back, unrotated, so seen from the front its +X
+points to the left of the screen, +Y up the screen and +Z into the badge,
+the frame oreoWare/imu.py and oreoWare/pins.py assume.
+
 ## Contributing
 
 Open work is labelled
