@@ -165,10 +165,6 @@ PLACE = {
     "R17": (31.5, 10, 0, B),
     "R18": (31.5, 12.5, 0, B),
     "C22": (31.5, 15, 0, B),
-    "U13": (44, 33, 0, B),
-    "C65": (47.5, 33, 90, B),
-    "C66": (40.5, 33, 90, B),
-    "R61": (44, 37.5, 0, B),
     "J7": (65, 21, 270, B),
     "U12": (66, 28, 0, B),
     "C60": (66, 32.5, 0, B),
@@ -183,6 +179,7 @@ PLACE = {
     "J3": (HEADER_PIN1[0], HEADER_PIN1[1], 180, F),   # module header socket; pin 1 at the bottom
     "C30": (81.5, HEADER_PIN1[1], 90, B),
     "R74": (76.0, 47.2, 0, B),
+    "J6": (71.7, 55.0, 90, B),            # expansion header, pin 1 (3V3) on the left seen from the back
     "C71": (76.0, 40.8, 0, B),
     "U11": (34, 66, 0, B),
     "C40": (38.5, 66, 90, B),
@@ -218,10 +215,10 @@ PLACE = {
     "C23": (36, 130, 90, B),
     "R23": (49.5, 116.5, 0, B),
     "R24": (38.5, 116.5, 0, B),
-    "U4": (60, 124.5, 0, B),
-    "R14": (64, 129.5, 90, B),
+    "U4": (60, 124.5, 180, B),            # turned so ISET/TMR/ITERM/VBUS face their parts below
+    "R14": (58, 129.5, 90, B),            # ISET, left of C24 under pin 16
     "R15": (62, 129.5, 90, B),
-    "R22": (58, 129.5, 90, B),
+    "R22": (64, 129.5, 90, B),            # TMR, right of C24
     "R25": (56, 129.5, 90, B),
     "R16": (60, 119.5, 0, B),
     "C24": (60.5, 127.6, 0, B),
@@ -598,6 +595,11 @@ def silkscreen(board):
     imu_axes(board, bs, 51.0, 73.2, 3.0)
     add_text(board, bs, "microSD", 9.0, 86.1, 0.8, 0.12, mirror=True)
     add_text(board, bs, "Qwiic", 13.0, 125.6, 0.8, 0.12, mirror=True)
+    # Expansion header: pin names under the pins, a title above.
+    jx, jy = PLACE["J6"][:2]
+    for i, label in enumerate(("3V3", "GND", "5", "41", "42", "47")):
+        add_text(board, bs, label, jx - i * 2.54, jy + 2.1, 0.8, 0.12, mirror=True)
+    add_text(board, bs, "EXPANSION I2C / SPI / GPIO", jx - 2.5 * 2.54, jy - 2.1, 0.8, 0.12, mirror=True)
     for ref, label in (("TP1", "TX"), ("TP2", "RX"), ("TP3", "GND"), ("TP4", "3V3"), ("TP5", "VBAT"), ("TP6", "P17")):
         tx, ty = PLACE[ref][:2]
         add_text(board, bs, label, tx, ty + 2.2, 0.8, 0.12, mirror=True)
@@ -814,7 +816,7 @@ def main():
             if name and not name.startswith("unconnected-"):
                 pad.SetNet(nets[name])
         # Dense passives carry their reference on the fab layer, not silk.
-        if not re.match(r"(U\d|J\d|Q\d|SW3$)", ref) or ref in ("U9", "J7", "U8", "J5", "U5"):
+        if not re.match(r"(U\d|J\d|Q\d|SW3$)", ref) or ref in ("U9", "J7", "U8", "J5", "U5", "J6", "U4"):
             fp.Reference().SetLayer(pcbnew.F_Fab)   # the flip below moves it to B.Fab
         x, y, rot, side = PLACE[ref]
         place(fp, x, y, rot, side)

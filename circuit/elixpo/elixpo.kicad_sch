@@ -73,7 +73,7 @@
     (stroke (width 0.4) (type solid))
     (fill (color 245 230 220 1))
     (uuid "f1a55271-7b42-5efb-9c99-f876ba69095f")
-    (property "Sheetname" "Oreo badge — speaker, motion, RTC, microSD, infrared and accessories" (at 150 159 0) (effects (font (size 1.15 1.15) (bold yes)) (justify left bottom)))
+    (property "Sheetname" "Oreo badge — speaker, motion, microSD, infrared and expansion" (at 150 159 0) (effects (font (size 1.15 1.15) (bold yes)) (justify left bottom)))
     (property "Sheetfile" "peripherals_expansion.kicad_sch" (at 150 221 0) (effects (font (size 1.0 1.0)) (justify left top)))
     (instances
       (project "elixpo"

@@ -776,7 +776,7 @@
   (global_label "LED_BR_K" (shape bidirectional) (at 394.96999999999997 134.62 180) (effects (font (size 0.9 0.9)) (justify right)) (uuid "37a0048b-adb0-5a6f-97f4-0f40fd56491c"))
   (global_label "+3V3" (shape bidirectional) (at 415.29 134.62 0) (effects (font (size 0.9 0.9)) (justify left)) (uuid "569067c7-bc50-5c14-ab00-7c1f49101eeb"))
   (text "I2C EXPANDER + CORNER AND EDGE LEDS" (exclude_from_sim no) (at 18 18 0) (effects (font (size 2.0 2.0) (bold yes)) (justify left bottom)) (uuid "9c104031-4d4b-54a6-9ae3-37ae8909a312"))
-  (text "I2C addresses: RV-3028 0x52, AW9523B 0x58, MPU-6050 0x69 (AD0 high)." (exclude_from_sim no) (at 18 25 0) (effects (font (size 1.1 1.1)) (justify left bottom)) (uuid "e5e73697-8cc9-5c2b-a718-843d450193ed"))
+  (text "I2C addresses: AW9523B 0x58, MPU-6050 0x69 (AD0 high)." (exclude_from_sim no) (at 18 25 0) (effects (font (size 1.1 1.1)) (justify left bottom)) (uuid "e5e73697-8cc9-5c2b-a718-843d450193ed"))
   (text "The expander interrupt (GPIO3) is an RTC GPIO, so a button press can wake the badge." (exclude_from_sim no) (at 18 285 0) (effects (font (size 1.05 1.05)) (justify left bottom)) (uuid "ac8aeca6-c6c5-5c07-82b4-cd09b751aa4e"))
   (symbol
     (lib_id "oreo_badge:U11")
