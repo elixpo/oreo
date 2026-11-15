@@ -7844,7 +7844,7 @@
 				(justify mirror)
 			)
 		)
-		(property "Value" "46.4k 1%"
+		(property "Value" "47k 1%"
 			(at 0 -1.17 90)
 			(layer "B.Fab")
 			(uuid "546c79d7-1d85-4633-a626-c05b43f5cbe0")
@@ -7868,7 +7868,7 @@
 				(justify mirror)
 			)
 		)
-		(property "Description" "Safety timer"
+		(property "Description" "Safety timer 10 x 48 s/k x R = 6.3 h"
 			(at 0 0 90)
 			(layer "B.Fab")
 			(hide yes)
@@ -7997,7 +7997,7 @@
 				(justify mirror)
 			)
 		)
-		(property "Value" "3.0k 1%"
+		(property "Value" "3.3k 1%"
 			(at 0 -1.17 90)
 			(layer "B.Fab")
 			(uuid "8ba3b1df-37ed-4f78-8024-5ce23c46e4c6")
@@ -8021,7 +8021,7 @@
 				(justify mirror)
 			)
 		)
-		(property "Description" "Termination current"
+		(property "Description" "Termination current 0.030 x R / R14 = 50 mA"
 			(at 0 0 90)
 			(layer "B.Fab")
 			(hide yes)
@@ -25435,7 +25435,7 @@
 				(justify mirror)
 			)
 		)
-		(property "Value" "1.78k 1% (500 mA)"
+		(property "Value" "2.0k 1% (445 mA)"
 			(at 0 -1.17 90)
 			(layer "B.Fab")
 			(uuid "cf25f01d-74ec-4356-986b-9e94f7897a96")
@@ -25459,7 +25459,7 @@
 				(justify mirror)
 			)
 		)
-		(property "Description" "Charge current 890/R = 0.5 A = 0.5C for 1000 mAh"
+		(property "Description" "Charge current 890/R = 0.45 A = 0.45C for 1000 mAh"
 			(at 0 0 90)
 			(layer "B.Fab")
 			(hide yes)

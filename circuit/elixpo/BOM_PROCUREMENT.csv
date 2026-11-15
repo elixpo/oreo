@@ -25,10 +25,10 @@ R13,1,22R,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rati
 R19,1,1M,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rating,Shield bleed; Use 1% resistors; X7R capacitors with voltage derating
 C23,1,1nF 50V,Qualified commodity,,Capacitor_SMD:C_0402_1005Metric,YES,Select by rating,Shield HF return; Use 1% resistors; X7R capacitors with voltage derating
 U4,1,BQ24074RGT,Texas Instruments,BQ24074RGTR,Package_DFN_QFN:VQFN-16-1EP_3x3mm_P0.5mm_EP1.6x1.6mm,YES,Active,1-cell Li-ion charger with power path; EN2=1 EN1=0: input limit set by ILIM; Power-path single-cell Li-ion charger
-R14,1,1.78k 1% (500 mA),Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rating,Charge current 890/R = 0.5 A = 0.5C for 1000 mAh; Use 1% resistors; X7R capacitors with voltage derating
+R14,1,2.0k 1% (445 mA),Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rating,Charge current 890/R = 0.45 A = 0.45C for 1000 mAh; Use 1% resistors; X7R capacitors with voltage derating
 R15,1,2.0k 1% (800 mA),Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rating,Input current limit 1610/R; Use 1% resistors; X7R capacitors with voltage derating
-R22,1,46.4k 1%,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rating,Safety timer; Use 1% resistors; X7R capacitors with voltage derating
-R25,1,3.0k 1%,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rating,Termination current; Use 1% resistors; X7R capacitors with voltage derating
+R22,1,47k 1%,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rating,Safety timer 10 x 48 s/k x R = 6.3 h; Use 1% resistors; X7R capacitors with voltage derating
+R25,1,3.3k 1%,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rating,Termination current 0.030 x R / R14 = 50 mA; Use 1% resistors; X7R capacitors with voltage derating
 R16,1,10k 1%,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rating,TS fixed at 10k: 2-wire cell with its own protection board; Use 1% resistors; X7R capacitors with voltage derating
 C24,1,1uF 25V,Qualified commodity,,Capacitor_SMD:C_0603_1608Metric,YES,Select by rating,Use 1% resistors; X7R capacitors with voltage derating
 C25,1,4.7uF 10V,Qualified commodity,,Capacitor_SMD:C_0603_1608Metric,YES,Select by rating,Use 1% resistors; X7R capacitors with voltage derating

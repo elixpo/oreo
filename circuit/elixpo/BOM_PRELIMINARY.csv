@@ -25,10 +25,10 @@ R13,22R,Resistor_SMD:R_0402_1005Metric,power_usb,
 R19,1M,Resistor_SMD:R_0402_1005Metric,power_usb,Shield bleed
 C23,1nF 50V,Capacitor_SMD:C_0402_1005Metric,power_usb,Shield HF return
 U4,BQ24074RGT,Package_DFN_QFN:VQFN-16-1EP_3x3mm_P0.5mm_EP1.6x1.6mm,power_usb,1-cell Li-ion charger with power path; EN2=1 EN1=0: input limit set by ILIM
-R14,1.78k 1% (500 mA),Resistor_SMD:R_0402_1005Metric,power_usb,Charge current 890/R = 0.5 A = 0.5C for 1000 mAh
+R14,2.0k 1% (445 mA),Resistor_SMD:R_0402_1005Metric,power_usb,Charge current 890/R = 0.45 A = 0.45C for 1000 mAh
 R15,2.0k 1% (800 mA),Resistor_SMD:R_0402_1005Metric,power_usb,Input current limit 1610/R
-R22,46.4k 1%,Resistor_SMD:R_0402_1005Metric,power_usb,Safety timer
-R25,3.0k 1%,Resistor_SMD:R_0402_1005Metric,power_usb,Termination current
+R22,47k 1%,Resistor_SMD:R_0402_1005Metric,power_usb,Safety timer 10 x 48 s/k x R = 6.3 h
+R25,3.3k 1%,Resistor_SMD:R_0402_1005Metric,power_usb,Termination current 0.030 x R / R14 = 50 mA
 R16,10k 1%,Resistor_SMD:R_0402_1005Metric,power_usb,TS fixed at 10k: 2-wire cell with its own protection board
 C24,1uF 25V,Capacitor_SMD:C_0603_1608Metric,power_usb,
 C25,4.7uF 10V,Capacitor_SMD:C_0603_1608Metric,power_usb,

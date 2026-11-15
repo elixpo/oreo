@@ -27,8 +27,8 @@ flat engineering export that is regenerated directly from the schematic model.
 - Native USB uses GPIO19/GPIO20, 22 ohm series resistors, Type-C 5.1 kohm Rd
   resistors and a dedicated low-capacitance ESD array.
 - BQ24074 keeps the system powered while charging. The current design targets
-  about 500 mA charge current, about 775 mA input limit, about 50 mA termination
-  current, and a 6.25-hour safety timer. These values must be checked against
+  about 445 mA charge current, about 800 mA input limit, about 50 mA termination
+  current, and a 6.3-hour safety timer (all JLCPCB basic resistor values). These values must be checked against
   the selected cell before production.
 - The main 3.3 V rail is buck-boost regulated so the badge remains stable over
   the full Li-ion discharge curve. The display module runs from 3.3 V and
@@ -75,14 +75,19 @@ clones differ.
 
 ## Assembly
 
-JLCPCB assembles the SMD parts on both sides. The through-hole parts are
-hand-soldered: the eight 6 mm buttons, J3, and the IR receiver. The
+JLCPCB assembles the basic-library parts (all on the back); everything
+else is bought and hand-soldered, as `BOM_ORDER.csv` sets out, including
+the through-hole parts: the eight 6 mm buttons, J3, and the IR receiver. The
 corner LEDs D1-D4 on the front stay SMD; each has two more on the back's
 corner curve (D30-D37), in parallel on the same AW9523B channel.
 
-`python3 export_jlcpcb.py` writes the order files into `build/jlcpcb/`:
-the Gerber zip, and the assembly BOM and placement list with the
-hand-soldered parts left out. Fill in the LCSC part numbers before ordering.
+`python3 export_jlcpcb.py` writes the order files: the Gerber zip, and a
+JLCPCB assembly BOM and placement list in `build/jlcpcb/` that hold only
+parts from JLCPCB's basic library (no extended-part fees; all on the back,
+so assembly is single-sided). `BOM_ORDER.csv` lists everything a badge
+needs: what JLCPCB fits, the SMD and through-hole parts to buy and solder
+by hand (the exposed-pad chips need a stencil and hot air or a hot plate),
+and the off-board parts, with LCSC numbers and prices.
 
 The battery sits on the back in a 3D-printed L-shaped holder: it runs the
 cell's 50 mm edge, is as tall as the cell (6 mm) and has a 10-12 mm lip over
