@@ -295,7 +295,7 @@ POWER = [
 # on many of these modules it does not release MISO when CS is high, which
 # would corrupt touch reads, and nothing reads the display back.
 LCD_PINS = [
-    ("VCC", 1, "+3V3"), ("GND", 2, "GND"), ("CS", 3, "LCD_CS"), ("RESET", 4, "LCD_RST"),
+    ("VCC", 1, "LCD_5V"), ("GND", 2, "GND"), ("CS", 3, "LCD_CS"), ("RESET", 4, "LCD_RST"),
     ("DC", 5, "LCD_DC"), ("SDI (MOSI)", 6, "LCD_MOSI"), ("SCK", 7, "LCD_SCK"),
     ("LED", 8, "LCD_BL"), ("SDO (MISO)", 9, "LCD_SDO_NC"), ("T_CLK", 10, "LCD_SCK"),
     ("T_CS", 11, "EXP_P17"), ("T_DIN", 12, "LCD_MOSI"), ("T_DO", 13, "LCD_MISO"),
@@ -305,7 +305,20 @@ LCD_PINS = [
 DISPLAY = [
     component("J3", "2.8in ILI9341 SPI module (MSP2807)", "Connector_PinSocket_2.54mm:PinSocket_1x14_P2.54mm_Vertical",
               LCD_PINS, 120, 150, "1x14 2.54 mm socket for the module's header; hand-soldered"),
-    p2("C30", "10uF 10V", C0805, "+3V3", "GND", 230, 75, "Bulk for the module's backlight, at J3 pin 1"),
+    p2("C30", "10uF 10V", C0805, "LCD_5V", "GND", 230, 75, "Bulk for the module's backlight, at J3 pin 1"),
+    # 5 V for the display module, so its backlight stays equally bright from a
+    # full cell (4.2 V) down to the cut-off. TPS61023DRLR pins per TI SLVSF14B:
+    # 1 FB, 2 EN, 3 VIN, 4 GND, 5 SW, 6 VOUT. VOUT = 0.595 V x (1 + R20/R21).
+    component("U6", "TPS61023 5V boost", "Package_TO_SOT_SMD:SOT-563",
+              [("FB", 1, "LCD_FB"), ("EN", 2, "VSYS_SW"), ("VIN", 3, "VSYS_SW"), ("GND", 4, "GND"),
+               ("SW", 5, "LCD_BOOST_SW"), ("VOUT", 6, "LCD_5V")], 320, 100,
+              "5 V boost for the display module; output disconnected from the input when off"),
+    p2("L2", "1.5uH 2A shielded", "Inductor_SMD:L_Taiyo-Yuden_NR-30xx", "VSYS_SW", "LCD_BOOST_SW", 320, 45,
+       "Same part as L1; the TPS61023 takes 0.37-2.9 uH"),
+    p2("C31", "10uF 10V", C0805, "VSYS_SW", "GND", 380, 45, "Boost input"),
+    p2("C32", "22uF 10V", C0805, "LCD_5V", "GND", 380, 100, "Boost output (10 uF effective minimum)"),
+    p2("R20", "150k 1%", R0402, "LCD_5V", "LCD_FB", 270, 150, "Sets 5.06 V with R21"),
+    p2("R21", "20k 1%", R0402, "LCD_FB", "GND", 320, 150),
 ]
 button_nets = (("UP", "BTN_UP"), ("DOWN", "BTN_DOWN"), ("LEFT", "BTN_LEFT"),
                ("RIGHT", "BTN_RIGHT"), ("A", "BTN_A"), ("B", "BTN_B"),
@@ -322,7 +335,7 @@ EXPANDER = [
                ("P0_2", 7, "BTN_LEFT"), ("P0_3", 8, "BTN_RIGHT"), ("GND", 9, "GND"),
                ("P0_4", 10, "BTN_A"), ("P0_5", 11, "BTN_B"), ("P0_6", 12, "BTN_C"),
                ("P0_7", 13, "BTN_HOME"), ("P1_4", 14, "AMP_EN"), ("P1_5", 15, "SD_DET"),
-               ("P1_6", 16, "EXP_P16_NC"), ("P1_7", 17, "EXP_P17"), ("AD0", 18, "GND"),
+               ("P1_6", 16, "AUX_ON_N"), ("P1_7", 17, "EXP_P17"), ("AD0", 18, "GND"),
                ("SCL", 19, "I2C_SCL"), ("SDA", 20, "I2C_SDA"), ("VCC", 21, "+3V3"),
                ("~INT", 22, "EXP_INT"), ("~RST", 23, "EXP_RST"), ("AD1", 24, "GND"),
                ("GND/EP", 25, "GND")], 150, 140,
@@ -333,6 +346,10 @@ EXPANDER = [
     p2("R42", "10k", R0402, "EXP_INT", "+3V3", 45, 105),
     p2("R43", "10k", R0402, "EXP_RST", "+3V3", 95, 105),
     p2("R45", "10k", R0402, "EXP_P17", "+3V3", 95, 135, "Keeps the touch controller deselected (T_CS high) until the OS drives it"),
+    component("Q4", "AO3401A", "Package_TO_SOT_SMD:SOT-23",
+              [("G", 1, "AUX_ON_N"), ("S", 2, "+3V3"), ("D", 3, "+3V3_AUX")], 45, 180,
+              "Switches 3.3 V to the IR receiver and the status LED: P1_6 low = on"),
+    p2("R46", "100k", R0402, "AUX_ON_N", "+3V3", 95, 180, "Keeps +3V3_AUX off until the OS turns it on"),
 ]
 for i, (_label, net) in enumerate(button_nets):
     EXPANDER.append(p2(f"R{50 + i}", "10k", R0402, net, "+3V3", 255 + (i % 2) * 50, 45 + (i // 2) * 30,
@@ -394,7 +411,7 @@ for i, net in enumerate(("SD_CMD", "SD_D0", "SD_D1", "SD_D2", "SD_D3")):
 PERIPHERALS += [
     component("U8", "TSOP38238", "OptoDevice:Vishay_MINICAST-3Pin",
               [("OUT", 1, "IR_RX"), ("GND", 2, "GND"), ("Vs", 3, "IR_RX_VCC")], 200, 150, "38 kHz IR receiver"),
-    p2("R70", "100R", R0402, "+3V3", "IR_RX_VCC", 260, 140),
+    p2("R70", "100R", R0402, "+3V3_AUX", "IR_RX_VCC", 260, 140),
     p2("C70", "4.7uF", C0603, "IR_RX_VCC", "GND", 260, 170),
     component("Q1", "MMBT2222A", "Package_TO_SOT_SMD:SOT-23",
               [("B", 1, "IR_BASE"), ("E", 2, "GND"), ("C", 3, "IR_LED_K")], 340, 150, "IR LED pulse driver"),
@@ -405,9 +422,9 @@ PERIPHERALS += [
     p2("R73", "47R 0.25W", "Resistor_SMD:R_0805_2012Metric", "VSYS_SW", "IR_LED_A", 390, 210, "IR pulse current limit"),
     component("U9", "WS2812B-2020", "LED_SMD:LED_WS2812B-2020_PLCC4_2.0x2.0mm",
               [("DOUT", 1, "STATUS_DOUT_NC"), ("VSS", 2, "GND"), ("DIN", 3, "STATUS_DIN"),
-               ("VDD", 4, "+3V3")], 200, 240, "Status LED"),
+               ("VDD", 4, "+3V3_AUX")], 200, 240, "Status LED, on the switched +3V3_AUX"),
     p2("R74", "330R", R0402, "STATUS_LED", "STATUS_DIN", 260, 230),
-    p2("C71", "100nF", C0402, "+3V3", "GND", 260, 260),
+    p2("C71", "100nF", C0402, "+3V3_AUX", "GND", 260, 260),
     component("J5", "Qwiic / STEMMA QT", "Connector_JST:JST_SH_SM04B-SRSS-TB_1x04-1MP_P1.00mm_Horizontal",
               [("GND", 1, "GND"), ("3V3", 2, "+3V3"), ("SDA", 3, "I2C_SDA"), ("SCL", 4, "I2C_SCL"),
                ("MP", "MP", "GND")], 340, 260, "I2C accessory port, Qwiic pin order"),
@@ -425,7 +442,7 @@ PAGES = [
       ("Charge current 0.45 A suits a 1000 mAh cell (0.45C); recheck R14 for any other cell.", 18, 285, 1.05, False)]),
     ("display_controls", "Oreo badge — 2.8 inch ILI9341 SPI module and buttons", DISPLAY,
      [("DISPLAY + BUTTONS", 18, 18, 2.0, True),
-      ("4-line SPI module on a 14-pin header; touch shares the bus, T_CS on EXP_P17, T_IRQ on GPIO21.", 18, 25, 1.1, False),
+      ("4-line SPI module on a 14-pin header, powered from its own 5 V boost; touch shares the bus, T_CS on EXP_P17, T_IRQ on GPIO21.", 18, 25, 1.1, False),
       ("Buttons are read through the AW9523B expander (sheet expander_leds).", 18, 285, 1.05, False)]),
     ("expander_leds", "Oreo badge — AW9523B expander, I2C bus and corner LEDs", EXPANDER,
      [("I2C EXPANDER + CORNER AND EDGE LEDS", 18, 18, 2.0, True),
@@ -447,6 +464,7 @@ SOURCING = {
     "L1": ("Taiyo Yuden", "NR3015T1R5N", "Verify current", "1.5 uH shielded, >=1.5 A saturation"),
     "SW3": ("C&K", "JS102011SAQN", "Active", "Main system disconnect"),
     "J2": ("JST", "S2B-PH-SM4-TB(LF)(SN)", "Active", "Battery connector; pack polarity varies by vendor"),
+    "U6": ("Texas Instruments", "TPS61023DRLR", "Active", "Synchronous 5 V boost for the display module"),
     "J3": ("Generic", "1x14 female header, 2.54 mm, 8.5 mm", "Active", "Through-hole, hand-soldered; the module plugs in"),
     "Q3": ("Alpha & Omega", "AO3401A", "Active", "Reverse-battery protection, -30 V P-FET, about 50 mOhm at -4.5 V"),
     "U11": ("Awinic", "AW9523BTQR", "Active", "16-bit I2C expander with LED current drive"),

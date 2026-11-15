@@ -62,6 +62,7 @@ PARTS = {
     "100k": (A, "UNI-ROYAL 0402WGF1003TCE, 100 k 1% 0402", "C25741", 0.0009, ""),
     "100k 1%": (A, "UNI-ROYAL 0402WGF1003TCE, 100 k 1% 0402", "C25741", 0.0009, ""),
     "1M": (A, "UNI-ROYAL 0402WGF1004TCE, 1 M 1% 0402", "C26083", 0.0012, ""),
+    "20k 1%": (A, "UNI-ROYAL 0402WGF2002TCE, 20 k 1% 0402", "C25765", 0.001, "Sets the 5 V with R20"),
     "47k 1%": (A, "UNI-ROYAL 0402WGF4702TCE, 47 k 1% 0402", "C25792", 0.0019, "Charger safety timer"),
     "1k": (A, "UNI-ROYAL 0402WGF1001TCE, 1 k 1% 0402", "C11702", 0.0013, ""),
     "3.3k 1%": (A, "UNI-ROYAL 0402WGF3301TCE, 3.3 k 1% 0402", "C25890", 0.0036, "Charge termination current"),
@@ -106,6 +107,9 @@ PARTS = {
                  "(Rs 369 at 10+): confirm it ships in the 4 x 4 mm QFN-24 (a 3 x 3 mm chip will not fit)"),
     "WS2812B-2020": (B, "Worldsemi WS2812B-2020, status LED", "C965555", 0.1165,
                      "Out of stock at LCSC on the price date; pads underneath: hot air"),
+    "TPS61023 5V boost": (B, "TI TPS61023DRLR, 5 V boost for the display, SOT-563", "C919459", 0.233,
+                          "Small 0.5 mm pitch: stencil and hot air"),
+    "150k 1%": (B, "UNI-ROYAL 0402WGF1503TCE, 150 k 1% 0402", "C25755", 0.002, "No basic 150 k; sets the 5 V"),
     "AW9523B": (B, "Awinic AW9523BTQR, I2C expander, QFN-24", "C148077", 0.3266, "Exposed pad: hot air or hot plate"),
     "MAX98357A": (B, "ADI MAX98357AETE+T, I2S amplifier, TQFN-16", "C910544", 1.3089, "Exposed pad: hot air or hot plate"),
 
@@ -127,8 +131,9 @@ SKIP = {"Fiducial_1mm_Mask2mm"}
 OFF_BOARD = [
     ("LCD1", 1, "2.8in 240x320 ILI9341 SPI module with touch, 14-pin header (LCDwiki MSP2807 type)",
      "Check its header reads VCC, GND, CS ... T_IRQ from pin 1"),
-    ("BT1", 1, "LiPo 1000 mAh, 603450 (6 x 34 x 50 mm), protection PCB, JST-PH 2.0 lead",
-     "Check the lead polarity against J2 before plugging in"),
+    ("BT1", 1, "LiPo 3.7 V with protection PCB and a JST-PH 2.0 lead, up to 6 x 34 x 50 mm "
+     "(603450 about 1000 mAh; KP-603048 fits too)",
+     "Check the plug is JST-PH 2.0 and the red wire goes to J2's + pin before plugging in"),
     ("LS1", 1, "Speaker 8 ohm 0.7 W, 15 x 11 mm (1511), leads with a JST-SH 1.0 2-pin plug",
      "Foam tape around the rim, over the grille"),
     ("HW1-HW4", 4, "M3 standoff, female-female, about 11 mm", "Match the socket + header stack"),

@@ -179,10 +179,17 @@ PLACE = {
     "J3": (HEADER_PIN1[0], HEADER_PIN1[1], 180, F),   # module header socket; pin 1 at the bottom
     "C30": (81.5, HEADER_PIN1[1], 90, B),
     "R74": (76.0, 47.2, 0, B),
-    "J6": (71.7, 55.0, 90, B),            # expansion header, pin 1 (3V3) on the left seen from the back
+    # 5 V boost for the display, on the back beside J3's power pin
+    "U6": (77.0, 96.0, 0, B), "L2": (77.0, 92.0, 0, B),
+    "C31": (73.6, 96.0, 90, B), "C32": (80.4, 96.0, 90, B),
+    "R20": (75.6, 99.6, 0, B), "R21": (78.4, 99.6, 0, B),
+    "Q4": (72.3, 44.5, 0, B),              # switches +3V3_AUX (IR receiver, status LED)
+    "R46": (72.3, 41.4, 0, B),
+    "J6": (82.4, 68.6, 0, B),             # expansion header: a column on the back's left edge (seen from the
+                                          # back), beside J3's pins, under the display module; pin 1 (3V3) at the top
     "C71": (76.0, 40.8, 0, B),
     "U11": (34, 66, 0, B),
-    "C40": (38.5, 66, 90, B),
+    "C40": (33.75, 62.2, 0, B),           # above U11 at its VCC pin (21), clear of pins 1-6
     "R40": (40, 61, 90, B),
     "R41": (42, 61, 90, B),
     "R42": (22, 69.5, 90, B),
@@ -562,7 +569,7 @@ def silkscreen(board):
     # JLCPCB prints its order number over this text ("Specify a location" when
     # ordering); here the battery covers it.
     add_text(board, bs, JLC_MARK, bx + bw / 2, ly + 5.5, 1.0, 0.15, mirror=True)
-    add_text(board, bs, "LiPo 1000 mAh 603450", bx + bw / 2, by + bh / 2 - 6, 1.2, 0.15, mirror=True)
+    add_text(board, bs, "LiPo 3.7 V, up to 6 x 34 x 50 mm", bx + bw / 2, by + bh / 2 - 6, 1.2, 0.15, mirror=True)
     add_text(board, bs, "JST-PH: check polarity", bx + bw / 2, by + bh / 2 - 3, 1.0, 0.15, mirror=True)
     add_rect(board, pcbnew.B_Fab, sx, sy, sw, sh, 0.1)
     add_rect(board, pcbnew.B_CrtYd, sx, sy, sw, sh, 0.05)
@@ -595,11 +602,13 @@ def silkscreen(board):
     imu_axes(board, bs, 51.0, 73.2, 3.0)
     add_text(board, bs, "microSD", 9.0, 86.1, 0.8, 0.12, mirror=True)
     add_text(board, bs, "Qwiic", 13.0, 125.6, 0.8, 0.12, mirror=True)
-    # Expansion header: pin names under the pins, a title above.
+    # Expansion header: each pin named beside it (inboard, so it reads on the
+    # right of the pin seen from the back), the title below the column.
     jx, jy = PLACE["J6"][:2]
-    for i, label in enumerate(("3V3", "GND", "5", "41", "42", "47")):
-        add_text(board, bs, label, jx - i * 2.54, jy + 2.1, 0.8, 0.12, mirror=True)
-    add_text(board, bs, "EXPANSION I2C / SPI / GPIO", jx - 2.5 * 2.54, jy - 2.1, 0.8, 0.12, mirror=True)
+    for i, label in enumerate(("3V3", "GND", "IO5", "IO41", "IO42", "IO47")):
+        add_text(board, bs, label, jx - 3.0, jy + i * 2.54, 0.8, 0.12, mirror=True)
+    add_text(board, bs, "EXPANSION", jx - 5.5, jy + 5 * 2.54 + 2.3, 0.8, 0.12, mirror=True)
+    add_text(board, bs, "I2C / SPI / GPIO", jx - 5.5, jy + 5 * 2.54 + 3.6, 0.8, 0.12, mirror=True)
     for ref, label in (("TP1", "TX"), ("TP2", "RX"), ("TP3", "GND"), ("TP4", "3V3"), ("TP5", "VBAT"), ("TP6", "P17")):
         tx, ty = PLACE[ref][:2]
         add_text(board, bs, label, tx, ty + 2.2, 0.8, 0.12, mirror=True)
@@ -703,7 +712,7 @@ def write_netclasses():
     ]
     ns["netclass_patterns"] = (
         [dict(netclass="Battery", pattern=p) for p in ("VBUS_5V", "VSYS", "VSYS_SW", "VBAT", "BAT_IN", "BUCK_L1", "BUCK_L2")] +
-        [dict(netclass="Power", pattern=p) for p in ("+3V3", "GND", "LCD_LEDA", "LCD_BL_SINK", "SPK_P", "SPK_N", "IR_LED_*", "CHASSIS")] +
+        [dict(netclass="Power", pattern=p) for p in ("+3V3", "+3V3_AUX", "LCD_5V", "LCD_BOOST_SW", "GND", "LCD_LEDA", "LCD_BL_SINK", "SPK_P", "SPK_N", "IR_LED_*", "CHASSIS")] +
         [dict(netclass="Fast", pattern=p) for p in ("LCD_SCK*", "LCD_MOSI", "LCD_MISO", "SD_CLK*", "SD_CMD", "SD_D*", "I2S_BCLK*")] +
         [dict(netclass="USB", pattern=p) for p in ("USB_D*", "USB_CONN_D*")]
     )
@@ -816,7 +825,7 @@ def main():
             if name and not name.startswith("unconnected-"):
                 pad.SetNet(nets[name])
         # Dense passives carry their reference on the fab layer, not silk.
-        if not re.match(r"(U\d|J\d|Q\d|SW3$)", ref) or ref in ("U9", "J7", "U8", "J5", "U5", "J6", "U4"):
+        if not re.match(r"(U\d|J\d|Q\d|SW3$)", ref) or ref in ("U9", "J7", "U8", "J5", "U5", "J6", "U4", "Q4", "U6", "U11"):
             fp.Reference().SetLayer(pcbnew.F_Fab)   # the flip below moves it to B.Fab
         x, y, rot, side = PLACE[ref]
         place(fp, x, y, rot, side)

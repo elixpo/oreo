@@ -53,6 +53,12 @@ R18,100k 1%,Resistor_SMD:R_0402_1005Metric,power_usb,
 C22,100nF,Capacitor_SMD:C_0402_1005Metric,power_usb,
 J3,2.8in ILI9341 SPI module (MSP2807),Connector_PinSocket_2.54mm:PinSocket_1x14_P2.54mm_Vertical,display_controls,1x14 2.54 mm socket for the module's header; hand-soldered
 C30,10uF 10V,Capacitor_SMD:C_0805_2012Metric,display_controls,"Bulk for the module's backlight, at J3 pin 1"
+U6,TPS61023 5V boost,Package_TO_SOT_SMD:SOT-563,display_controls,5 V boost for the display module; output disconnected from the input when off
+L2,1.5uH 2A shielded,Inductor_SMD:L_Taiyo-Yuden_NR-30xx,display_controls,Same part as L1; the TPS61023 takes 0.37-2.9 uH
+C31,10uF 10V,Capacitor_SMD:C_0805_2012Metric,display_controls,Boost input
+C32,22uF 10V,Capacitor_SMD:C_0805_2012Metric,display_controls,Boost output (10 uF effective minimum)
+R20,150k 1%,Resistor_SMD:R_0402_1005Metric,display_controls,Sets 5.06 V with R21
+R21,20k 1%,Resistor_SMD:R_0402_1005Metric,display_controls,
 SW11,UP,Button_Switch_THT:SW_PUSH_6mm,display_controls,
 SW12,DOWN,Button_Switch_THT:SW_PUSH_6mm,display_controls,
 SW13,LEFT,Button_Switch_THT:SW_PUSH_6mm,display_controls,
@@ -68,6 +74,8 @@ R41,2.2k,Resistor_SMD:R_0402_1005Metric,expander_leds,"I2C pull-up, 400 kHz"
 R42,10k,Resistor_SMD:R_0402_1005Metric,expander_leds,
 R43,10k,Resistor_SMD:R_0402_1005Metric,expander_leds,
 R45,10k,Resistor_SMD:R_0402_1005Metric,expander_leds,Keeps the touch controller deselected (T_CS high) until the OS drives it
+Q4,AO3401A,Package_TO_SOT_SMD:SOT-23,expander_leds,Switches 3.3 V to the IR receiver and the status LED: P1_6 low = on
+R46,100k,Resistor_SMD:R_0402_1005Metric,expander_leds,Keeps +3V3_AUX off until the OS turns it on
 R50,10k,Resistor_SMD:R_0402_1005Metric,expander_leds,Button pull-up: the AW9523B has none
 R51,10k,Resistor_SMD:R_0402_1005Metric,expander_leds,Button pull-up: the AW9523B has none
 R52,10k,Resistor_SMD:R_0402_1005Metric,expander_leds,Button pull-up: the AW9523B has none
@@ -115,7 +123,7 @@ R71,1k,Resistor_SMD:R_0402_1005Metric,peripherals_expansion,
 R72,100k,Resistor_SMD:R_0402_1005Metric,peripherals_expansion,
 D10,940nm IR LED,LED_SMD:LED_1206_3216Metric,peripherals_expansion,
 R73,47R 0.25W,Resistor_SMD:R_0805_2012Metric,peripherals_expansion,IR pulse current limit
-U9,WS2812B-2020,LED_SMD:LED_WS2812B-2020_PLCC4_2.0x2.0mm,peripherals_expansion,Status LED
+U9,WS2812B-2020,LED_SMD:LED_WS2812B-2020_PLCC4_2.0x2.0mm,peripherals_expansion,"Status LED, on the switched +3V3_AUX"
 R74,330R,Resistor_SMD:R_0402_1005Metric,peripherals_expansion,
 C71,100nF,Capacitor_SMD:C_0402_1005Metric,peripherals_expansion,
 J5,Qwiic / STEMMA QT,Connector_JST:JST_SH_SM04B-SRSS-TB_1x04-1MP_P1.00mm_Horizontal,peripherals_expansion,"I2C accessory port, Qwiic pin order"
