@@ -185,8 +185,8 @@ PLACE = {
     "R20": (75.6, 99.6, 180, B), "R21": (78.4, 99.6, 180, B),   # FB ends inboard, under U6 pin 1
     "Q4": (72.3, 44.5, 0, B),              # switches +3V3_AUX (IR receiver, status LED)
     "R46": (72.3, 41.4, 0, B),
-    "J6": (82.4, 68.6, 0, B),             # expansion header: a column on the back's left edge (seen from the
-                                          # back), beside J3's pins, under the display module; pin 1 (3V3) at the top
+    "J6": (7.0, 40.0, 0, B),              # expansion header: a column on the back's right edge (seen from the
+                                          # back), under the badge details, above H2; pin 1 (3V3) at the top
     "C71": (76.0, 40.8, 0, B),
     "U11": (34, 66, 0, B),
     "C40": (38.5, 66, 90, B),
@@ -602,13 +602,13 @@ def silkscreen(board):
     imu_axes(board, bs, 51.0, 73.2, 3.0)
     add_text(board, bs, "microSD", 9.0, 86.1, 0.8, 0.12, mirror=True)
     add_text(board, bs, "Qwiic", 13.0, 125.6, 0.8, 0.12, mirror=True)
-    # Expansion header: each pin named beside it (inboard, so it reads on the
-    # right of the pin seen from the back), the title below the column.
+    # Expansion header: each pin named beside it on the inner side (it reads on
+    # the left of the pin seen from the back), the title below, clear of FID6.
     jx, jy = PLACE["J6"][:2]
     for i, label in enumerate(("3V3", "GND", "IO5", "IO41", "IO42", "IO47")):
-        add_text(board, bs, label, jx - 3.0, jy + i * 2.54, 0.8, 0.12, mirror=True)
-    add_text(board, bs, "EXPANSION", jx - 5.5, jy + 5 * 2.54 + 2.3, 0.8, 0.12, mirror=True)
-    add_text(board, bs, "I2C / SPI / GPIO", jx - 5.5, jy + 5 * 2.54 + 3.6, 0.8, 0.12, mirror=True)
+        add_text(board, bs, label, jx + 3.2, jy + i * 2.54, 0.8, 0.12, mirror=True)
+    add_text(board, bs, "EXPANSION", jx + 3.0, jy + 5 * 2.54 + 2.3, 0.8, 0.12, mirror=True)
+    add_text(board, bs, "I2C / SPI / GPIO", jx + 3.0, jy + 5 * 2.54 + 3.6, 0.8, 0.12, mirror=True)
     for ref, label in (("TP1", "TX"), ("TP2", "RX"), ("TP3", "GND"), ("TP4", "3V3"), ("TP5", "VBAT"), ("TP6", "P17")):
         tx, ty = PLACE[ref][:2]
         add_text(board, bs, label, tx, ty + 2.2, 0.8, 0.12, mirror=True)
