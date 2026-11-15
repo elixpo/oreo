@@ -33,16 +33,19 @@ NETLIST = HERE / "build" / "elixpo.net"
 BOARD_FILE = HERE / "elixpo.kicad_pcb"
 PROJECT_FILE = HERE / "elixpo.kicad_pro"
 
-W, H, CORNER = 88.0, 123.5, 4.0           # board outline, mm
+W, H, CORNER = 88.0, 133.5, 4.0           # board outline, mm
 ORIGIN = (40.0, 30.0)                     # where the board sits on the page
 
 # Front-face features.
-PANEL = (9.4, 50.0, 69.2, 50.0)           # top at 50 mm: the name card covers 0-50 mm           # DT028BTFT outline, landscape: x, y, w, h
-BATTERY = (18.0, 64.0, 50.0, 34.0)        # 603450 cell on the back, low for a low centre of gravity
+PANEL = (9.4, 60.0, 69.2, 50.0)           # top at 60 mm: the name card covers 0-60 mm           # DT028BTFT outline, landscape: x, y, w, h
+BATTERY = (18.0, 74.0, 50.0, 34.0)        # 603450 cell on the back, low for a low centre of gravity
 SPEAKER = (3.5, 7.0, 15.0, 11.0)          # 1511 speaker on the back
 SLOTS = ((10.0, 4.0), (78.0, 4.0))        # lanyard-clip slot centres
 SLOT_LEN, SLOT_W = 10.0, 3.2
-FPC_SLOT = (79.4, 61.0, 1.6, 28.0)        # x, y, w, h: the panel's FPC folds to the back here
+FPC_SLOT = (79.4, 71.0, 1.6, 28.0)
+ART = HERE / "art"
+PANDA = (4.0, 19.5, 39.0)                 # front, under the name card: x, y, height
+OSHW_MARK = (6.0, 40.0, 13.0)             # back: x, y, height (OSHWA certification mark)        # x, y, w, h: the panel's FPC folds to the back here
 
 
 def mm(v):
@@ -99,7 +102,7 @@ def read_netlist():
 # ref: (x, y, rotation in degrees, side). Rotation is as seen from the front.
 
 F, B = "F", "B"
-DPAD = (13.0, 111.5)                       # centre of the D-pad, bottom-left
+DPAD = (13.0, 121.5)                       # centre of the D-pad, bottom-left
 PLACE = {
     # ---- Front: D-pad bottom-left, then HOME A B C side by side ----
     "SW11": (DPAD[0], DPAD[1] - 7.0, 0, F),    # UP
@@ -112,9 +115,9 @@ PLACE = {
     "SW17": (80.0, DPAD[1], 0, F),             # C
     "D20": (29.0, DPAD[1] - 2.0, 0, F), "D21": (29.0, DPAD[1] + 2.0, 0, F),
     # Corner LEDs around the panel, status LED right of the FPC slot.
-    "D1": (6.0, 51.5, 90, F), "D2": (82.0, 51.5, 90, F),
-    "D3": (6.0, 98.5, 90, F), "D4": (82.0, 98.5, 90, F),
-    "U9": (83.5, 75, 90, F),
+    "D1": (6.0, 61.5, 90, F), "D2": (82.0, 61.5, 90, F),
+    "D3": (6.0, 108.5, 90, F), "D4": (82.0, 108.5, 90, F),
+    "U9": (83.5, 85, 90, F),
     # ---- Back: module and RTC at the top, display/expander/IMU behind the top of the
     # screen, battery low, microSD and USB-C at the bottom ----
     "U1": (44, 12.8, 0, B),
@@ -145,78 +148,78 @@ PLACE = {
     "R73": (78, 30, 0, B),
     "R70": (80.5, 18.5, 0, B),
     "C70": (76.5, 18.5, 0, B),
-    "J3": (74, 75, 270, B),
-    "C30": (74, 91.5, 0, B),
-    "C31": (74, 93.5, 0, B),
-    "R74": (84.5, 79.5, 90, B),
-    "C71": (84.5, 71, 90, B),
-    "R30": (66, 52, 90, B),
-    "R31": (62, 52, 0, B),
-    "R32": (62, 54, 0, B),
-    "R33": (62, 56, 0, B),
-    "R34": (62, 58, 0, B),
-    "Q2": (57, 55, 0, B),
-    "R35": (57, 60, 0, B),
-    "R36": (53, 55, 90, B),
-    "U11": (34, 56, 0, B),
-    "C40": (38.5, 56, 90, B),
-    "R40": (40, 51, 90, B),
-    "R41": (42, 51, 90, B),
-    "R42": (22, 59.5, 90, B),
-    "R43": (24.2, 59.5, 90, B),
-    "R44": (26.4, 59.5, 90, B),
-    "TP6": (40, 62, 0, B),
-    "U7": (48, 56, 0, B),
-    "C62": (52.5, 59.5, 0, B),
-    "C63": (48, 60.5, 0, B),
-    "C64": (44, 51, 90, B),
-    "U10": (13, 56, 0, B),
-    "C29": (13, 52.5, 0, B),
-    "TP5": (7.5, 60, 0, B),
-    "J2": (13, 71, 90, B),
-    "J4": (11, 112, 270, B),
-    "C67": (4, 101, 90, B),
-    "C68": (6.2, 101, 90, B),
-    "R62": (8.4, 101, 90, B),
-    "R63": (10.6, 101, 90, B),
-    "R64": (12.8, 101, 90, B),
-    "R65": (15, 101, 90, B),
-    "R66": (17.2, 101, 90, B),
-    "R67": (19.4, 101, 90, B),
-    "J1": (44, 119.9, 0, B),
-    "U3": (44, 111.5, 0, B),
-    "R10": (37.5, 115.5, 90, B),
-    "R11": (50.5, 115.5, 90, B),
-    "R12": (42.5, 108, 90, B),
-    "R13": (45.5, 108, 90, B),
-    "R19": (36, 120, 90, B),
-    "C23": (52, 120, 90, B),
-    "R23": (38.5, 106.5, 0, B),
-    "R24": (49.5, 106.5, 0, B),
-    "U4": (28, 114.5, 0, B),
-    "R14": (24, 119.5, 90, B),
-    "R15": (26, 119.5, 90, B),
-    "R22": (30, 119.5, 90, B),
-    "R25": (32, 119.5, 90, B),
-    "R16": (28, 109.5, 0, B),
-    "C24": (23.5, 114.5, 90, B),
-    "C25": (32.5, 114.5, 90, B),
-    "C26": (32, 109.5, 90, B),
-    "U5": (60, 114.5, 0, B),
-    "L1": (65.5, 114.5, 0, B),
-    "R26": (56, 110.5, 0, B),
-    "C27": (56, 112.5, 0, B),
-    "C20": (60, 110, 0, B),
-    "C21": (60, 119, 0, B),
-    "C28": (65.5, 119, 0, B),
-    "SW3": (84, 101, 270, B),
-    "J5": (83.6, 113.5, 270, B),
+    "J3": (74, 85, 270, B),
+    "C30": (74, 101.5, 0, B),
+    "C31": (74, 103.5, 0, B),
+    "R74": (84.5, 89.5, 90, B),
+    "C71": (84.5, 81, 90, B),
+    "R30": (66, 62, 90, B),
+    "R31": (62, 62, 0, B),
+    "R32": (62, 64, 0, B),
+    "R33": (62, 66, 0, B),
+    "R34": (62, 68, 0, B),
+    "Q2": (57, 65, 0, B),
+    "R35": (57, 70, 0, B),
+    "R36": (53, 65, 90, B),
+    "U11": (34, 66, 0, B),
+    "C40": (38.5, 66, 90, B),
+    "R40": (40, 61, 90, B),
+    "R41": (42, 61, 90, B),
+    "R42": (22, 69.5, 90, B),
+    "R43": (24.2, 69.5, 90, B),
+    "R44": (26.4, 69.5, 90, B),
+    "TP6": (40, 72, 0, B),
+    "U7": (48, 66, 0, B),
+    "C62": (52.5, 69.5, 0, B),
+    "C63": (48, 70.5, 0, B),
+    "C64": (44, 61, 90, B),
+    "U10": (13, 66, 0, B),
+    "C29": (13, 62.5, 0, B),
+    "TP5": (7.5, 70, 0, B),
+    "J2": (13, 81, 90, B),
+    "J4": (11, 122, 270, B),
+    "C67": (4, 111, 90, B),
+    "C68": (6.2, 111, 90, B),
+    "R62": (8.4, 111, 90, B),
+    "R63": (10.6, 111, 90, B),
+    "R64": (12.8, 111, 90, B),
+    "R65": (15, 111, 90, B),
+    "R66": (17.2, 111, 90, B),
+    "R67": (19.4, 111, 90, B),
+    "J1": (44, 129.9, 0, B),
+    "U3": (44, 121.5, 0, B),
+    "R10": (37.5, 125.5, 90, B),
+    "R11": (50.5, 125.5, 90, B),
+    "R12": (42.5, 118, 90, B),
+    "R13": (45.5, 118, 90, B),
+    "R19": (36, 130, 90, B),
+    "C23": (52, 130, 90, B),
+    "R23": (38.5, 116.5, 0, B),
+    "R24": (49.5, 116.5, 0, B),
+    "U4": (28, 124.5, 0, B),
+    "R14": (24, 129.5, 90, B),
+    "R15": (26, 129.5, 90, B),
+    "R22": (30, 129.5, 90, B),
+    "R25": (32, 129.5, 90, B),
+    "R16": (28, 119.5, 0, B),
+    "C24": (23.5, 124.5, 90, B),
+    "C25": (32.5, 124.5, 90, B),
+    "C26": (32, 119.5, 90, B),
+    "U5": (60, 124.5, 0, B),
+    "L1": (65.5, 124.5, 0, B),
+    "R26": (56, 120.5, 0, B),
+    "C27": (56, 122.5, 0, B),
+    "C20": (60, 120, 0, B),
+    "C21": (60, 129, 0, B),
+    "C28": (65.5, 129, 0, B),
+    "SW3": (84, 111, 270, B),
+    "J5": (83.6, 123.5, 270, B),
     "U8": (80, 13, 0, B),
     "D10": (84.5, 20.5, 90, B),
 }
 # Button pull-ups: two rows beside the expander.
 for i in range(8):
-    PLACE[f"R{50 + i}"] = (22.0 + (i % 4) * 2.2, 51.0 + (i // 4) * 2.4, 90, B)
+    PLACE[f"R{50 + i}"] = (22.0 + (i % 4) * 2.2, 61.0 + (i // 4) * 2.4, 90, B)
 
 # Passives that belong right at a module pad: ref -> (host, pad, distance
 # out from the pad centre, offset along the module edge). They are pushed
@@ -330,15 +333,82 @@ def outline(board):
         add_arc(board, e, (cx - half, cy), (cx - half, cy + r), 180, 0.1)
     x, y, w, h = FPC_SLOT
     add_rounded_rect(board, e, x, y, w, h, w / 2 - 0.01)
-    # Speaker grille: 1.2 mm holes on a hex grid over the speaker.
+
+
+GRILLE_ROWS = (0x41, 0x4E, 0x57, 0x45, 0x53, 0x48, 0x41)   # one row per byte, MSB on the left
+GRILLE_PITCH = (1.8, 1.6)                                    # column, row (mm)
+GRILLE_HOLES = (0.6, 1.2)                                    # drill for a 0 bit, a 1 bit (mm)
+
+
+def speaker_grille(board):
+    """Drilled (non-plated) holes over the speaker, read from the front:
+    every hole passes sound, big holes are 1 bits and small holes 0 bits."""
+    fp = pcbnew.FOOTPRINT(board)
+    fp.SetReference("G1")
+    fp.SetValue("speaker grille")
+    fp.SetAttributes(pcbnew.FP_BOARD_ONLY | pcbnew.FP_EXCLUDE_FROM_BOM | pcbnew.FP_EXCLUDE_FROM_POS_FILES)
+    fp.Reference().SetVisible(False)
+    fp.Value().SetVisible(False)
     sx, sy, sw, sh = SPEAKER
     cx, cy = sx + sw / 2, sy + sh / 2
-    for row in range(-2, 3):
-        for col in range(-3, 4):
-            hx = cx + col * 2.0 + (1.0 if row % 2 else 0.0)
-            hy = cy + row * 1.75
-            if abs(hx - cx) <= 6.0 and abs(hy - cy) <= 4.0:
-                add_circle(board, e, (hx, hy), 0.6)
+    fp.SetPosition(pt(cx, cy))
+    board.Add(fp)
+    dx, dy = GRILLE_PITCH
+    for row, byte in enumerate(GRILLE_ROWS):
+        for col in range(8):
+            bit = (byte >> (7 - col)) & 1
+            d = GRILLE_HOLES[bit]
+            pad = pcbnew.PAD(fp)
+            pad.SetAttribute(pcbnew.PAD_ATTRIB_NPTH)
+            pad.SetShape(pcbnew.PAD_SHAPE_CIRCLE)
+            pad.SetSize(pcbnew.VECTOR2I(mm(d), mm(d)))
+            pad.SetDrillSize(pcbnew.VECTOR2I(mm(d), mm(d)))
+            pad.SetLayerSet(pcbnew.PAD.UnplatedHoleMask())
+            fp.Add(pad)
+            pad.SetPosition(pt(cx + (col - 3.5) * dx, cy + (row - (len(GRILLE_ROWS) - 1) / 2) * dy))
+
+
+def raster_art(board, png, layer, x, y, height, mirror=False, threshold=128):
+    """Silkscreen artwork from a black-on-white PNG: dark pixels become silk.
+    Pixel runs are merged into polygons by KiCad's own polygon engine."""
+    from PIL import Image
+    img = Image.open(png).convert("L")
+    rows = max(1, round(height / 0.05))                     # 0.05 mm per pixel
+    cols = max(1, round(img.width * rows / img.height))
+    img = img.resize((cols, rows), Image.LANCZOS)
+    if mirror:
+        img = img.transpose(Image.FLIP_LEFT_RIGHT)
+    px = height / rows
+    data = img.load()
+    polys = pcbnew.SHAPE_POLY_SET()
+    for r in range(rows):
+        c = 0
+        while c < cols:
+            if data[c, r] < threshold:
+                start = c
+                while c < cols and data[c, r] < threshold:
+                    c += 1
+                x0, x1 = x + start * px, x + c * px
+                y0, y1 = y + r * px, y + (r + 1) * px + 0.001
+                polys.NewOutline()
+                for vx, vy in ((x0, y0), (x1, y0), (x1, y1), (x0, y1)):
+                    polys.Append(mm(ORIGIN[0] + vx), mm(ORIGIN[1] + vy))
+            else:
+                c += 1
+    polys.Simplify()
+    # A polygon shape holds one outline (with its holes), so each merged
+    # outline becomes its own shape.
+    for i in range(polys.OutlineCount()):
+        piece = pcbnew.SHAPE_POLY_SET()
+        piece.AddOutline(polys.Outline(i))
+        for h in range(polys.HoleCount(i)):
+            piece.AddHole(polys.Hole(i, h))
+        shape = pcbnew.PCB_SHAPE(board, pcbnew.SHAPE_T_POLY)
+        shape.SetLayer(layer)
+        shape.SetPolyShape(piece)
+        shape.SetFilled(True)
+        shape.SetWidth(0)
+        board.Add(shape)
 
 
 def silkscreen(board):
@@ -360,14 +430,20 @@ def silkscreen(board):
     add_text(board, bs, "JST-PH: check polarity", bx + bw / 2, by + bh / 2 + 1, 1.0, 0.15, mirror=True)
     add_rect(board, pcbnew.B_Fab, sx, sy, sw, sh, 0.1)
     add_rect(board, pcbnew.B_CrtYd, sx, sy, sw, sh, 0.05)
-    add_text(board, bs, "OREO BADGE rev 1.0", 44.0, 41.5, 1.5, 0.25, mirror=True, bold=True)
-    add_text(board, bs, "oreo.elixpo.com", 44.0, 44.3, 1.0, 0.15, mirror=True)
-    add_text(board, bs, "CERN-OHL-P-2.0  OSHWA IN000107", 44.0, 46.6, 0.9, 0.15, mirror=True)
+    add_text(board, bs, "OREO BADGE", 44.0, 45.0, 1.5, 0.25, mirror=True, bold=True)
+    add_text(board, bs, "oreo.elixpo.com", 44.0, 47.8, 1.0, 0.15, mirror=True)
+    add_text(board, bs, "CERN-OHL-P-2.0", 44.0, 50.1, 0.9, 0.15, mirror=True)
+    # Art: the Oreo panda in profile on the front, under the name card, and
+    # OSHWA's certification mark on the back.
+    px_, py_, ph_ = PANDA
+    raster_art(board, ART / "oreo-panda-profile.png", fs, px_, py_, ph_)
+    ox, oy, oh = OSHW_MARK
+    raster_art(board, ART / "oshw-certification-mark-IN000107.png", bs, ox, oy, oh, mirror=True)
     add_text(board, bs, "RST", 34.0, 26.8, 0.8, 0.12, mirror=True)
     add_text(board, bs, "BOOT", 54.0, 26.8, 0.8, 0.12, mirror=True)
-    add_text(board, bs, "ON", 84.0, 94.0, 0.8, 0.12, mirror=True)
-    add_text(board, bs, "microSD", 11.0, 121.8, 0.8, 0.12, mirror=True)
-    add_text(board, bs, "Qwiic", 83.6, 107.5, 0.8, 0.12, mirror=True)
+    add_text(board, bs, "ON", 84.0, 104.0, 0.8, 0.12, mirror=True)
+    add_text(board, bs, "microSD", 11.0, 131.8, 0.8, 0.12, mirror=True)
+    add_text(board, bs, "Qwiic", 83.6, 117.5, 0.8, 0.12, mirror=True)
     for ref, label in (("TP1", "TX"), ("TP2", "RX"), ("TP3", "GND"), ("TP4", "3V3"), ("TP5", "VBAT"), ("TP6", "P17")):
         tx, ty = PLACE[ref][:2]
         add_text(board, bs, label, tx, ty + 2.2, 0.8, 0.12, mirror=True)
@@ -468,6 +544,39 @@ def write_netclasses():
     PROJECT_FILE.write_text(json.dumps(pro, indent=2) + "\n")
 
 
+STACKUP = """\t\t(stackup
+\t\t\t(layer "F.SilkS" (type "Top Silk Screen") (color "White"))
+\t\t\t(layer "F.Paste" (type "Top Solder Paste"))
+\t\t\t(layer "F.Mask" (type "Top Solder Mask") (color "Black") (thickness 0.01))
+\t\t\t(layer "F.Cu" (type "copper") (thickness 0.035))
+\t\t\t(layer "dielectric 1" (type "prepreg") (thickness 0.1) (material "FR4") (epsilon_r 4.5) (loss_tangent 0.02))
+\t\t\t(layer "In1.Cu" (type "copper") (thickness 0.035))
+\t\t\t(layer "dielectric 2" (type "core") (thickness 0.535) (material "FR4") (epsilon_r 4.5) (loss_tangent 0.02))
+\t\t\t(layer "In2.Cu" (type "copper") (thickness 0.035))
+\t\t\t(layer "dielectric 3" (type "prepreg") (thickness 0.1) (material "FR4") (epsilon_r 4.5) (loss_tangent 0.02))
+\t\t\t(layer "In3.Cu" (type "copper") (thickness 0.035))
+\t\t\t(layer "dielectric 4" (type "core") (thickness 0.535) (material "FR4") (epsilon_r 4.5) (loss_tangent 0.02))
+\t\t\t(layer "In4.Cu" (type "copper") (thickness 0.035))
+\t\t\t(layer "dielectric 5" (type "prepreg") (thickness 0.1) (material "FR4") (epsilon_r 4.5) (loss_tangent 0.02))
+\t\t\t(layer "B.Cu" (type "copper") (thickness 0.035))
+\t\t\t(layer "B.Mask" (type "Bottom Solder Mask") (color "Black") (thickness 0.01))
+\t\t\t(layer "B.Paste" (type "Bottom Solder Paste"))
+\t\t\t(layer "B.SilkS" (type "Bottom Silk Screen") (color "White"))
+\t\t\t(copper_finish "ENIG")
+\t\t\t(dielectric_constraints no)
+\t\t)
+"""
+
+
+def write_stackup():
+    """1.6 mm 6-layer build with black solder mask and white silkscreen.
+    The stackup is not exposed to Python, so it goes into the file."""
+    text = BOARD_FILE.read_text()
+    if "(stackup" not in text:
+        text = text.replace("\t(setup\n", "\t(setup\n" + STACKUP, 1)
+        BOARD_FILE.write_text(text)
+
+
 def write_rules():
     (HERE / "elixpo.kicad_dru").write_text(
         '(version 1)\n'
@@ -507,7 +616,7 @@ def main():
             if name and not name.startswith("unconnected-"):
                 pad.SetNet(nets[name])
         # Dense passives carry their reference on the fab layer, not silk.
-        if not re.match(r"(U\d|J\d|Q\d|SW3$)", ref) or ref == "U9":
+        if not re.match(r"(U\d|J\d|Q\d|SW3$)", ref) or ref in ("U9", "J7"):
             fp.Reference().SetLayer(pcbnew.F_Fab)   # the flip below moves it to B.Fab
         x, y, rot, side = PLACE[ref]
         place(fp, x, y, rot, side)
@@ -527,12 +636,14 @@ def main():
         fp.SetPosition(pt(x, y))
 
     outline(board)
+    speaker_grille(board)
     silkscreen(board)
     planes(board)
 
     filler = pcbnew.ZONE_FILLER(board)
     filler.Fill(board.Zones())
     board.Save(str(BOARD_FILE))
+    write_stackup()
     write_netclasses()
     write_rules()
     print(f"Placed {len(footprints)} footprints on a {W:g} x {H:g} mm 6-layer board: {BOARD_FILE}")

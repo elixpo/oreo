@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Oreo panda, side profile facing right. Black = silkscreen (white fur on a
+     black board); white = bare solder mask (the panda's black patches). -->
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1000" viewBox="0 0 1000 1000">
+  <rect width="1000" height="1000" fill="white"/>
+  <!-- far ear peeking over the head, then the near ear: black with a white rim -->
+  <circle cx="560" cy="175" r="92" fill="black"/>
+  <circle cx="560" cy="175" r="72" fill="white"/>
+  <circle cx="370" cy="200" r="118" fill="black"/>
+  <circle cx="370" cy="200" r="96" fill="white"/>
+  <!-- head: big and round, with a short soft snout -->
+  <path fill="black" d="
+    M 480 210
+    C 640 205 760 290 795 400
+    C 840 410 880 440 885 490
+    C 890 545 850 585 790 590
+    C 760 690 660 770 520 775
+    C 360 780 230 690 200 560
+    C 170 420 260 255 400 220
+    C 425 214 452 211 480 210 Z"/>
+  <!-- shoulder, cut off by the bottom of the art -->
+  <path fill="black" d="M 290 700 C 330 760 350 840 335 1000 L 760 1000 C 760 880 720 790 650 740 Z"/>
+  <!-- the panda's black arm and chest band -->
+  <path fill="white" d="M 330 860 C 450 820 600 830 730 890 L 760 1000 L 320 1000 Z"/>
+  <!-- eye patch: a big tear-drop, tilted down toward the snout -->
+  <path fill="white" d="
+    M 520 360
+    C 575 315 680 330 715 400
+    C 745 460 715 530 650 545
+    C 590 560 530 525 510 470
+    C 495 430 495 385 520 360 Z"/>
+  <!-- eye with two highlights -->
+  <circle cx="625" cy="440" r="46" fill="black"/>
+  <circle cx="630" cy="442" r="30" fill="white"/>
+  <circle cx="644" cy="428" r="11" fill="black"/>
+  <circle cx="620" cy="458" r="5" fill="black"/>
+  <!-- nose -->
+  <path fill="white" d="M 850 455 C 885 455 900 482 890 506 C 880 528 845 532 828 515 C 812 498 818 456 850 455 Z"/>
+  <!-- smile and a little open mouth -->
+  <path fill="none" stroke="white" stroke-width="15" stroke-linecap="round"
+        d="M 858 532 C 858 556 845 572 820 575"/>
+  <path fill="white" d="M 818 578 C 800 600 768 600 752 580 C 770 586 795 586 818 578 Z"/>
+  <!-- cheek -->
+  <path fill="none" stroke="white" stroke-width="12" stroke-linecap="round"
+        d="M 560 650 C 610 680 680 680 730 650"/>
+</svg>
