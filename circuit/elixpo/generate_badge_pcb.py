@@ -129,19 +129,19 @@ def read_netlist():
 # ref: (x, y, rotation in degrees, side). Rotation is as seen from the front.
 
 F, B = "F", "B"
-DPAD = (13.0, 121.5)                       # centre of the D-pad, bottom-left
+DPAD = (75.0, 121.5)                       # centre of the D-pad, bottom-right
 DPAD_STEP = 7.6                            # 6 mm THT switches: the closest their courtyards allow
 PLACE = {
-    # ---- Front: D-pad bottom-left, then HOME A B C side by side ----
+    # ---- Front: HOME A B C side by side from the left, D-pad bottom-right ----
     "SW11": (DPAD[0], DPAD[1] - DPAD_STEP, 0, F),    # UP
     "SW12": (DPAD[0], DPAD[1] + DPAD_STEP, 0, F),    # DOWN
     "SW13": (DPAD[0] - DPAD_STEP, DPAD[1], 0, F),    # LEFT
     "SW14": (DPAD[0] + DPAD_STEP, DPAD[1], 0, F),    # RIGHT
-    "SW18": (38.0, DPAD[1], 0, F),             # HOME (6 mm THT switches: centre of the four pins)
-    "SW15": (52.0, DPAD[1], 0, F),             # A
-    "SW16": (66.0, DPAD[1], 0, F),             # B
-    "SW17": (80.0, DPAD[1], 0, F),             # C
-    "D20": (29.0, DPAD[1] - 2.0, 0, F), "D21": (29.0, DPAD[1] + 2.0, 0, F),
+    "SW18": (8.0, DPAD[1], 0, F),             # HOME (6 mm THT switches: centre of the four pins)
+    "SW15": (22.0, DPAD[1], 0, F),             # A
+    "SW16": (36.0, DPAD[1], 0, F),             # B
+    "SW17": (50.0, DPAD[1], 0, F),             # C
+    "D20": (59.0, DPAD[1] - 2.0, 0, F), "D21": (59.0, DPAD[1] + 2.0, 0, F),
     # The four corner LEDs sit in the board's corners (the top two under the
     # clip slots); the back edge lights follow the corner curves (below).
     "D1": (3.6, 11.0, 90, F), "D2": (86.4, 9.0, 90, F),
@@ -208,33 +208,33 @@ PLACE = {
     "R66": (11.7, 106.5, 90, B),
     "R67": (13.9, 106.5, 90, B),
     "J1": (44, 129.9, 0, B),
-    "U3": (45, 121.5, 0, B),
-    "R10": (37.5, 125.5, 90, B),
-    "R11": (50.5, 125.5, 90, B),
-    "R12": (43.5, 116.5, 90, B),
-    "R13": (46.5, 116.5, 90, B),
-    "R19": (36, 130, 90, B),
-    "C23": (52, 130, 90, B),
-    "R23": (38.5, 116.5, 0, B),
-    "R24": (49.5, 116.5, 0, B),
-    "U4": (28, 124.5, 0, B),
-    "R14": (24, 129.5, 90, B),
-    "R15": (26, 129.5, 90, B),
-    "R22": (30, 129.5, 90, B),
-    "R25": (32, 129.5, 90, B),
-    "R16": (28, 119.5, 0, B),
-    "C24": (27.5, 127.6, 0, B),
-    "C25": (32.5, 124.5, 90, B),
-    "C26": (32, 119.5, 90, B),
-    "U5": (60, 127.5, 0, B),
-    "L1": (65.5, 127.5, 0, B),
-    "R26": (53.6, 127.0, 90, B),
-    "C27": (53.6, 130.2, 90, B),
-    "C20": (56.2, 127.5, 90, B),
-    "C21": (60, 131.5, 0, B),
-    "C28": (65.5, 131.5, 0, B),
+    "U3": (43, 121.5, 0, B),
+    "R10": (50.5, 125.5, 90, B),
+    "R11": (37.5, 125.5, 90, B),
+    "R12": (44.5, 116.5, 90, B),
+    "R13": (41.5, 116.5, 90, B),
+    "R19": (52, 130, 90, B),
+    "C23": (36, 130, 90, B),
+    "R23": (49.5, 116.5, 0, B),
+    "R24": (38.5, 116.5, 0, B),
+    "U4": (60, 124.5, 0, B),
+    "R14": (64, 129.5, 90, B),
+    "R15": (62, 129.5, 90, B),
+    "R22": (58, 129.5, 90, B),
+    "R25": (56, 129.5, 90, B),
+    "R16": (60, 119.5, 0, B),
+    "C24": (60.5, 127.6, 0, B),
+    "C25": (55.5, 124.5, 90, B),
+    "C26": (56, 119.5, 90, B),
+    "U5": (28, 127.5, 0, B),
+    "L1": (22.5, 127.5, 0, B),
+    "R26": (34.4, 127.0, 90, B),
+    "C27": (34.4, 130.2, 90, B),
+    "C20": (31.8, 127.5, 90, B),
+    "C21": (28, 131.5, 0, B),
+    "C28": (22.5, 131.5, 0, B),
     "SW3": (84, 44, 270, B),
-    "J5": (75, 129.5, 0, B),
+    "J5": (13, 129.5, 0, B),
     "U8": (86, 28, 90, B),
     "D10": (70.5, 22, 0, B),
 }
@@ -523,7 +523,20 @@ def silkscreen(board):
     add_rect(board, pcbnew.F_Fab, px, py, pw, ph, 0.1)
     add_rect(board, pcbnew.F_CrtYd, px, py, pw, ph, 0.05)
     add_text(board, pcbnew.F_Fab, "2.8in ILI9341 SPI module (MSP2807), 86 x 50 mm", px + pw / 2, py + ph / 2, 1.5)
-    # The front silkscreen (logo, artwork) is drawn by hand; buttons are not labelled.
+    # Button labels: U D L R inside the D-pad; a house for HOME and A B C above
+    # their buttons (below them sit the USB-C shell pegs).
+    dx_, dy_ = DPAD
+    for label, ox, oy in (("U", 0, -2.9), ("D", 0, 2.9), ("L", -1.9, 0), ("R", 1.9, 0)):
+        add_text(board, fs, label, dx_ + ox, dy_ + oy, 1.2, 0.2, bold=True)
+    for ref, label in (("SW15", "A"), ("SW16", "B"), ("SW17", "C")):
+        add_text(board, fs, label, PLACE[ref][0], dy_ - 5.6, 1.5, 0.25, bold=True)
+    hx, hy = PLACE["SW18"][0], dy_ - 5.7
+    for a, b in (((hx - 1.3, hy - 0.1), (hx, hy - 1.3)), ((hx, hy - 1.3), (hx + 1.3, hy - 0.1)),
+                 ((hx - 0.9, hy - 0.4), (hx - 0.9, hy + 1.0)), ((hx + 0.9, hy - 0.4), (hx + 0.9, hy + 1.0)),
+                 ((hx - 0.9, hy + 1.0), (hx + 0.9, hy + 1.0)),
+                 ((hx - 0.3, hy + 1.0), (hx - 0.3, hy + 0.2)), ((hx - 0.3, hy + 0.2), (hx + 0.3, hy + 0.2)),
+                 ((hx + 0.3, hy + 0.2), (hx + 0.3, hy + 1.0))):
+        add_line(board, fs, a, b, 0.22)
     sx, sy, sw, sh = SPEAKER
     # Back.
     bx, by, bw, bh = BATTERY
@@ -576,7 +589,7 @@ def silkscreen(board):
     add_text(board, bs, "ON", 84.0, 37.9, 0.8, 0.12, mirror=True)
     imu_axes(board, bs, 51.0, 73.2, 3.0)
     add_text(board, bs, "microSD", 9.0, 86.1, 0.8, 0.12, mirror=True)
-    add_text(board, bs, "Qwiic", 75.0, 125.6, 0.8, 0.12, mirror=True)
+    add_text(board, bs, "Qwiic", 13.0, 125.6, 0.8, 0.12, mirror=True)
     for ref, label in (("TP1", "TX"), ("TP2", "RX"), ("TP3", "GND"), ("TP4", "3V3"), ("TP5", "VBAT"), ("TP6", "P17")):
         tx, ty = PLACE[ref][:2]
         add_text(board, bs, label, tx, ty + 2.2, 0.8, 0.12, mirror=True)
