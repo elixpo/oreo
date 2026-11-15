@@ -520,7 +520,7 @@
   (global_label "LCD_SCK_MCU" (shape bidirectional) (at 124.46000000000001 185.42 180) (effects (font (size 0.9 0.9)) (justify right)) (uuid "35c5abbf-61e9-5c25-b679-013b90ac478c"))
   (global_label "LCD_MISO" (shape bidirectional) (at 124.46000000000001 190.5 180) (effects (font (size 0.9 0.9)) (justify right)) (uuid "f89c4016-7504-5804-aeed-9a3d17acbb46"))
   (global_label "LCD_CS" (shape bidirectional) (at 175.26000000000002 91.44 0) (effects (font (size 0.9 0.9)) (justify left)) (uuid "a9a3ab6c-4222-5e35-a9e1-49b1a182dfc5"))
-  (global_label "LCD_TE" (shape bidirectional) (at 175.26000000000002 96.51999999999998 0) (effects (font (size 0.9 0.9)) (justify left)) (uuid "52acab18-6a1c-517e-bb66-de7b1f343be5"))
+  (global_label "TOUCH_IRQ" (shape bidirectional) (at 175.26000000000002 96.51999999999998 0) (effects (font (size 0.9 0.9)) (justify left)) (uuid "e6f68e80-892e-5427-af44-3f2f10d45be7"))
   (global_label "SD_D3" (shape bidirectional) (at 175.26000000000002 101.6 0) (effects (font (size 0.9 0.9)) (justify left)) (uuid "8f56932b-552d-51f2-9452-e5fba7b1c1c1"))
   (global_label "STATUS_LED" (shape bidirectional) (at 175.26000000000002 106.67999999999999 0) (effects (font (size 0.9 0.9)) (justify left)) (uuid "4db75978-7d30-58d7-8169-84c1c2f9b682"))
   (no_connect (at 175.26000000000002 111.75999999999999) (uuid "23d37985-1144-5eab-80ce-44f2a3e6146a"))

@@ -33,12 +33,19 @@ NETLIST = HERE / "build" / "elixpo.net"
 BOARD_FILE = HERE / "elixpo.kicad_pcb"
 PROJECT_FILE = HERE / "elixpo.kicad_pro"
 
-W, H, CORNER = 88.0, 133.5, 4.0           # board outline, mm
+W, H, CORNER = 88.0, 133.5, 6.0           # board outline, mm
 ORIGIN = (40.0, 30.0)                     # where the board sits on the page
 
 # Front-face features.
-PANEL = (9.4, 60.0, 69.2, 50.0)           # top at 60 mm: the name card covers 0-60 mm           # DT028BTFT outline, landscape: x, y, w, h
-BATTERY = (18.0, 74.0, 50.0, 34.0)        # 603450 cell on the back, low for a low centre of gravity
+# The 2.8" ILI9341 SPI module (MSP2807 type, 86 x 50 mm), landscape on the
+# front with its 14-pin header on the right; top at 60 mm, under the name card.
+PANEL = (1.0, 60.0, 86.0, 50.0)           # x, y, w, h
+BATTERY = (20.0, 74.0, 50.0, 34.0)        # 603450 cell on the back, low for a low centre of gravity
+# 3D-printed L-shaped holder along the battery's lower 50 mm edge: its foot
+# is screwed to the board below the cell, its wall is as tall as the cell
+# (6 mm) and its lip reaches HOLDER_LIP over the cell.
+HOLDER_FOOT = 4.0                         # depth of the foot on the board, mm
+HOLDER_LIP = 11.0                         # how far the lip reaches over the cell (10-12 mm)
 SPEAKER = (70.5, 9.0, 15.0, 11.0)         # 1511 speaker on the back, under the right clip slot
 SLOTS = ((10.0, 5.5), (78.0, 5.5))        # ID-card clip slot centres
 SLOT_LEN, SLOT_W = 13.5, 3.2               # the standard badge-clip slot
@@ -57,6 +64,22 @@ def mm(v):
 
 def pt(x, y):
     return pcbnew.VECTOR2I(mm(ORIGIN[0] + x), mm(ORIGIN[1] + y))
+
+
+def module_xy(u, v):
+    """Board position of a point on the display module, given in the module
+    drawing's front view (portrait, header at the bottom): u across its
+    50 mm width from the left edge, v down its 86 mm length. Landscape on
+    the badge, the drawing's bottom (the header) is on the right."""
+    px, py, pw, ph = PANEL
+    return px + v, py + (ph - u)
+
+
+# The MSP2807 drawing: header pin 1 is 8.49 mm from the left edge and the
+# row is 2.00 mm in from the bottom edge; the M3 holes are 3.00 mm in from
+# the long edges, 44.00 mm apart across and 78.08 mm apart along.
+HEADER_PIN1 = module_xy(8.49, 86.0 - 2.0)
+MODULE_HOLES = tuple(module_xy(u, v) for v in (3.0, 3.0 + 78.08) for u in (3.0, 47.0))
 
 
 # ---------------------------------------------------------------- netlist
@@ -106,22 +129,23 @@ def read_netlist():
 
 F, B = "F", "B"
 DPAD = (13.0, 121.5)                       # centre of the D-pad, bottom-left
+DPAD_STEP = 7.6                            # 6 mm THT switches: the closest their courtyards allow
 PLACE = {
     # ---- Front: D-pad bottom-left, then HOME A B C side by side ----
-    "SW11": (DPAD[0], DPAD[1] - 7.0, 0, F),    # UP
-    "SW12": (DPAD[0], DPAD[1] + 7.0, 0, F),    # DOWN
-    "SW13": (DPAD[0] - 7.0, DPAD[1], 90, F),   # LEFT
-    "SW14": (DPAD[0] + 7.0, DPAD[1], 90, F),   # RIGHT
-    "SW18": (38.0, DPAD[1], 0, F),             # HOME
+    "SW11": (DPAD[0], DPAD[1] - DPAD_STEP, 0, F),    # UP
+    "SW12": (DPAD[0], DPAD[1] + DPAD_STEP, 0, F),    # DOWN
+    "SW13": (DPAD[0] - DPAD_STEP, DPAD[1], 0, F),    # LEFT
+    "SW14": (DPAD[0] + DPAD_STEP, DPAD[1], 0, F),    # RIGHT
+    "SW18": (38.0, DPAD[1], 0, F),             # HOME (6 mm THT switches: centre of the four pins)
     "SW15": (52.0, DPAD[1], 0, F),             # A
     "SW16": (66.0, DPAD[1], 0, F),             # B
     "SW17": (80.0, DPAD[1], 0, F),             # C
     "D20": (29.0, DPAD[1] - 2.0, 0, F), "D21": (29.0, DPAD[1] + 2.0, 0, F),
-    # Corner LEDs around the panel, status LED right of it.
-    # The four edge LEDs sit in the board's corners (the top two under the clip slots).
+    # The four corner LEDs sit in the board's corners (the top two under the
+    # clip slots); the back edge lights follow the corner curves (below).
     "D1": (3.6, 11.0, 90, F), "D2": (86.4, 9.0, 90, F),
     "D3": (3.6, 130.0, 0, F), "D4": (84.4, 130.0, 0, F),
-    "U9": (83.5, 85, 90, F),
+    "U9": (45.0, DPAD[1], 0, F),               # status LED between HOME and A
     # ---- Back: module and RTC at the top, display/expander/IMU behind the top of the
     # screen, battery low, microSD and USB-C at the bottom ----
     "U1": (44, 12.8, 0, B),
@@ -152,19 +176,10 @@ PLACE = {
     "R73": (78, 33, 0, B),
     "R70": (79, 21.5, 90, B),
     "C70": (76.5, 21.5, 90, B),
-    "J3": (63, 85, 90, F),
-    "C30": (58, 76.5, 90, F),
-    "C31": (56.5, 76.5, 90, F),
-    "R74": (84.5, 89.5, 90, B),
-    "C71": (84.5, 81, 90, B),
-    "R30": (66, 62, 90, B),
-    "R31": (62, 62, 0, B),
-    "R32": (62, 64, 0, B),
-    "R33": (62, 66, 0, B),
-    "R34": (62, 68, 0, B),
-    "Q2": (57, 65, 0, B),
-    "R35": (57, 70, 0, B),
-    "R36": (53, 65, 90, B),
+    "J3": (HEADER_PIN1[0], HEADER_PIN1[1], 180, F),   # module header socket; pin 1 at the bottom
+    "C30": (81.5, HEADER_PIN1[1], 90, B),
+    "R74": (80.5, 89.5, 90, B),
+    "C71": (80.5, 81, 90, B),
     "U11": (34, 66, 0, B),
     "C40": (38.5, 66, 90, B),
     "R40": (40, 61, 90, B),
@@ -182,21 +197,21 @@ PLACE = {
     "TP5": (7.5, 70, 0, B),
     "Q3": (13, 74, 0, B), "R27": (8.5, 74, 90, B),     # reverse-battery protection by J2
     "J2": (13, 81, 90, B),
-    "J4": (9, 122, 90, B),
-    "C67": (4, 111, 90, B),
-    "C68": (6.2, 111, 90, B),
-    "R62": (8.4, 111, 90, B),
-    "R63": (10.6, 111, 90, B),
-    "R64": (12.8, 111, 90, B),
-    "R65": (15, 111, 90, B),
-    "R66": (17.2, 111, 90, B),
-    "R67": (19.4, 111, 90, B),
+    "J4": (9, 94.5, 90, B),
+    "C67": (13, 108.8, 0, B),
+    "C68": (9.5, 104.0, 90, B),
+    "R62": (11.7, 104.0, 90, B),
+    "R63": (13.9, 104.0, 90, B),
+    "R64": (16.1, 104.0, 90, B),
+    "R65": (9.5, 106.5, 90, B),
+    "R66": (11.7, 106.5, 90, B),
+    "R67": (13.9, 106.5, 90, B),
     "J1": (44, 129.9, 0, B),
-    "U3": (44, 121.5, 0, B),
+    "U3": (45, 121.5, 0, B),
     "R10": (37.5, 125.5, 90, B),
     "R11": (50.5, 125.5, 90, B),
-    "R12": (42.5, 118, 90, B),
-    "R13": (45.5, 118, 90, B),
+    "R12": (43.5, 116.5, 90, B),
+    "R13": (46.5, 116.5, 90, B),
     "R19": (36, 130, 90, B),
     "C23": (52, 130, 90, B),
     "R23": (38.5, 116.5, 0, B),
@@ -207,21 +222,31 @@ PLACE = {
     "R22": (30, 129.5, 90, B),
     "R25": (32, 129.5, 90, B),
     "R16": (28, 119.5, 0, B),
-    "C24": (23.5, 124.5, 90, B),
+    "C24": (27.5, 127.6, 0, B),
     "C25": (32.5, 124.5, 90, B),
     "C26": (32, 119.5, 90, B),
-    "U5": (60, 124.5, 0, B),
-    "L1": (65.5, 124.5, 0, B),
-    "R26": (56, 120.5, 0, B),
-    "C27": (56, 122.5, 0, B),
-    "C20": (60, 120, 0, B),
-    "C21": (60, 129, 0, B),
-    "C28": (65.5, 129, 0, B),
-    "SW3": (84, 111, 270, B),
-    "J5": (83.6, 123.5, 270, B),
+    "U5": (60, 127.5, 0, B),
+    "L1": (65.5, 127.5, 0, B),
+    "R26": (53.6, 127.0, 90, B),
+    "C27": (53.6, 130.2, 90, B),
+    "C20": (56.2, 127.5, 90, B),
+    "C21": (60, 131.5, 0, B),
+    "C28": (65.5, 131.5, 0, B),
+    "SW3": (84, 44, 270, B),
+    "J5": (75, 129.5, 0, B),
     "U8": (86, 28, 90, B),
     "D10": (70.5, 22, 0, B),
 }
+# Back edge lights: two per corner on the corner's curve, long side along it.
+EDGE_LED_R = CORNER - 1.4                  # from the corner's centre: 1.4 mm in from the edge
+for _i, (_cx, _cy, _ox, _oy) in enumerate(((CORNER, CORNER, -1, -1), (W - CORNER, CORNER, 1, -1),
+                                           (CORNER, H - CORNER, -1, 1), (W - CORNER, H - CORNER, 1, 1))):
+    for _j, _a in enumerate((18.0, 72.0)):
+        _dx, _dy = _ox * math.cos(math.radians(_a)), _oy * math.sin(math.radians(_a))
+        _rot = round(math.degrees(math.atan2(-_dx, -_dy)))     # along the tangent (-dy, dx), seen from the front
+        _rot = (180 - _rot) % 180                               # place() mirrors the angle when it flips to the back
+        PLACE[f"D{30 + _i * 2 + _j}"] = (_cx + EDGE_LED_R * _dx, _cy + EDGE_LED_R * _dy, _rot, B)
+
 # Button pull-ups: two rows beside the expander.
 for i in range(8):
     PLACE[f"R{50 + i}"] = (22.0 + (i % 4) * 2.2, 61.0 + (i // 4) * 2.4, 90, B)
@@ -343,11 +368,13 @@ GRILLE_PITCH = (1.8, 1.6)                                    # column, row (mm)
 GRILLE_HOLES = (0.6, 1.2)                                    # drill for a 0 bit, a 1 bit (mm)
 
 
-# M2 holes beside the panel for standoffs and a bezel that clamps its edges
-# (the bare panel has no holes of its own), and fiducials for assembly.
-MOUNT_HOLES = ((4.7, 63.0), (83.3, 63.0), (4.7, 101.5), (83.3, 101.5))
-FIDUCIALS = {"F": ((2.6, 50.0), (85.4, 47.0), (2.6, 112.0)),
-             "B": ((2.6, 45.0), (85.4, 52.0), (85.4, 96.0))}
+# M3 holes under the display module's own holes for its standoffs, M2 holes
+# for the battery holder's foot, and fiducials for assembly.
+MOUNT_HOLES = MODULE_HOLES
+_bx, _by, _bw, _bh = BATTERY
+HOLDER_HOLES = ((_bx + 3.0, _by + _bh + 0.3 + HOLDER_FOOT / 2), (_bx + _bw - 3.0, _by + _bh + 0.3 + HOLDER_FOOT / 2))
+FIDUCIALS = {"F": ((2.6, 50.0), (85.4, 55.0), (2.6, 112.0)),
+             "B": ((2.6, 45.0), (85.4, 52.0), (2.6, 56.5))}
 
 
 def board_only(board, fpid, ref, x, y, side="F"):
@@ -366,6 +393,8 @@ def board_only(board, fpid, ref, x, y, side="F"):
 
 def mechanical(board):
     for i, (x, y) in enumerate(MOUNT_HOLES, 1):
+        board_only(board, "MountingHole:MountingHole_3.2mm_M3", f"H{i}", x, y)
+    for i, (x, y) in enumerate(HOLDER_HOLES, len(MOUNT_HOLES) + 1):
         board_only(board, "MountingHole:MountingHole_2.2mm_M2", f"H{i}", x, y)
     n = 1
     for side, spots in FIDUCIALS.items():
@@ -485,21 +514,41 @@ def imu_axes(board, layer, x, y, length=4.0):
 
 def silkscreen(board):
     fs, bs = pcbnew.F_SilkS, pcbnew.B_SilkS
-    # Panel corner marks (the panel itself is placed by hand).
+    # The display module's outline (it stands on J3 and H1-H4).
     px, py, pw, ph = PANEL
     for (cx, cy, dx, dy) in ((px, py, 1, 1), (px + pw, py, -1, 1), (px, py + ph, 1, -1), (px + pw, py + ph, -1, -1)):
         add_line(board, pcbnew.F_Fab, (cx, cy), (cx + 3 * dx, cy), 0.1)
         add_line(board, pcbnew.F_Fab, (cx, cy), (cx, cy + 3 * dy), 0.1)
     add_rect(board, pcbnew.F_Fab, px, py, pw, ph, 0.1)
-    add_text(board, pcbnew.F_Fab, "DT028BTFT 2.8in panel", px + pw / 2, py + ph / 2, 1.5)
+    add_rect(board, pcbnew.F_CrtYd, px, py, pw, ph, 0.05)
+    add_text(board, pcbnew.F_Fab, "2.8in ILI9341 SPI module (MSP2807), 86 x 50 mm", px + pw / 2, py + ph / 2, 1.5)
     # The front silkscreen (logo, artwork) is drawn by hand; buttons are not labelled.
     sx, sy, sw, sh = SPEAKER
     # Back.
     bx, by, bw, bh = BATTERY
     add_rect(board, pcbnew.B_Fab, bx, by, bw, bh, 0.1)
     add_rect(board, pcbnew.B_CrtYd, bx, by, bw, bh, 0.05)
-    add_text(board, bs, "LiPo 1000 mAh 603450", bx + bw / 2, by + bh / 2 - 2, 1.2, 0.15, mirror=True)
-    add_text(board, bs, "JST-PH: check polarity", bx + bw / 2, by + bh / 2 + 1, 1.0, 0.15, mirror=True)
+    # The cell's corners, and the battery holder: its foot (solid outline,
+    # screwed through H5-H6) and how far its lip reaches over the cell (dashed).
+    for (cx, cy, dx, dy) in ((bx, by, 1, 1), (bx + bw, by, -1, 1), (bx, by + bh, 1, -1), (bx + bw, by + bh, -1, -1)):
+        add_line(board, bs, (cx, cy), (cx + 3 * dx, cy), 0.15)
+        add_line(board, bs, (cx, cy), (cx, cy + 3 * dy), 0.15)
+    fy = by + bh + 0.3
+    add_rect(board, bs, bx, fy, bw, HOLDER_FOOT, 0.15)
+    ly = by + bh - HOLDER_LIP
+    x = bx
+    while x < bx + bw - 0.1:
+        add_line(board, bs, (x, ly), (min(x + 1.5, bx + bw), ly), 0.15)
+        x += 2.5
+    for xx in (bx, bx + bw):
+        y = ly
+        while y < by + bh - 0.1:
+            add_line(board, bs, (xx, y), (xx, min(y + 1.5, by + bh)), 0.15)
+            y += 2.5
+    add_text(board, bs, "BATTERY HOLDER", bx + bw / 2, fy + HOLDER_FOOT / 2, 1.0, 0.15, mirror=True)
+    add_text(board, bs, "holder lip", bx + bw / 2, ly + 1.4, 0.8, 0.12, mirror=True)
+    add_text(board, bs, "LiPo 1000 mAh 603450", bx + bw / 2, by + bh / 2 - 6, 1.2, 0.15, mirror=True)
+    add_text(board, bs, "JST-PH: check polarity", bx + bw / 2, by + bh / 2 - 3, 1.0, 0.15, mirror=True)
     add_rect(board, pcbnew.B_Fab, sx, sy, sw, sh, 0.1)
     add_rect(board, pcbnew.B_CrtYd, sx, sy, sw, sh, 0.05)
     # One row, symmetric about the board's centre line: seen from the back,
@@ -523,10 +572,10 @@ def silkscreen(board):
                mid + BACK_SIDE - ow / 2, y0 - OSHW_H / 2, OSHW_H, mirror=True)
     add_text(board, bs, "RST", 34.0, 26.8, 0.8, 0.12, mirror=True)
     add_text(board, bs, "BOOT", 54.0, 26.8, 0.8, 0.12, mirror=True)
-    add_text(board, bs, "ON", 84.0, 104.0, 0.8, 0.12, mirror=True)
+    add_text(board, bs, "ON", 84.0, 37.9, 0.8, 0.12, mirror=True)
     imu_axes(board, bs, 51.0, 73.2, 3.0)
-    add_text(board, bs, "microSD", 11.0, 131.8, 0.8, 0.12, mirror=True)
-    add_text(board, bs, "Qwiic", 83.6, 117.5, 0.8, 0.12, mirror=True)
+    add_text(board, bs, "microSD", 9.0, 86.1, 0.8, 0.12, mirror=True)
+    add_text(board, bs, "Qwiic", 75.0, 125.6, 0.8, 0.12, mirror=True)
     for ref, label in (("TP1", "TX"), ("TP2", "RX"), ("TP3", "GND"), ("TP4", "3V3"), ("TP5", "VBAT"), ("TP6", "P17")):
         tx, ty = PLACE[ref][:2]
         add_text(board, bs, label, tx, ty + 2.2, 0.8, 0.12, mirror=True)
@@ -715,10 +764,17 @@ def main():
             if name and not name.startswith("unconnected-"):
                 pad.SetNet(nets[name])
         # Dense passives carry their reference on the fab layer, not silk.
-        if not re.match(r"(U\d|J\d|Q\d|SW3$)", ref) or ref in ("U9", "J7", "U8"):
+        if not re.match(r"(U\d|J\d|Q\d|SW3$)", ref) or ref in ("U9", "J7", "U8", "J5"):
             fp.Reference().SetLayer(pcbnew.F_Fab)   # the flip below moves it to B.Fab
         x, y, rot, side = PLACE[ref]
         place(fp, x, y, rot, side)
+        if comp["footprint"].startswith("Button_Switch_THT:"):
+            # The library puts the origin on pin 1; PLACE gives the switch's centre.
+            xs = [pcbnew.ToMM(pad.GetPosition().x) - ORIGIN[0] for pad in fp.Pads()]
+            ys = [pcbnew.ToMM(pad.GetPosition().y) - ORIGIN[1] for pad in fp.Pads()]
+            dx = x - (min(xs) + max(xs)) / 2
+            dy = y - (min(ys) + max(ys)) / 2
+            fp.SetPosition(fp.GetPosition() + pcbnew.VECTOR2I(mm(dx), mm(dy)))
         footprints[ref] = fp
 
     for ref, (host, padnum, dist, along) in AT_PAD.items():

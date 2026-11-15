@@ -45,7 +45,7 @@
     (stroke (width 0.4) (type solid))
     (fill (color 245 230 220 1))
     (uuid "5d5c251b-5f21-5085-9b9d-0f14b3450606")
-    (property "Sheetname" "Oreo badge — 2.8 inch ILI9341 panel, backlight and buttons" (at 275 59 0) (effects (font (size 1.15 1.15) (bold yes)) (justify left bottom)))
+    (property "Sheetname" "Oreo badge — 2.8 inch ILI9341 SPI module and buttons" (at 275 59 0) (effects (font (size 1.15 1.15) (bold yes)) (justify left bottom)))
     (property "Sheetfile" "display_controls.kicad_sch" (at 275 121 0) (effects (font (size 1.0 1.0)) (justify left top)))
     (instances
       (project "elixpo"

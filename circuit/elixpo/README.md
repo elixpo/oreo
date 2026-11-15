@@ -9,7 +9,7 @@ breadboard. The root schematic, `elixpo.kicad_sch`, links four detailed sheets:
 
 1. ESP32-S3R8 core, 16 MB external flash, 40 MHz clock and 2.4 GHz RF network.
 2. USB-C data/power, BQ24074 Li-ion power-path charger and TPS63031 3.3 V rail.
-3. TPS61023 5 V LCD supply, ST7789 module connector, buttons and corner LEDs.
+3. 2.8 inch ILI9341 SPI display module header, buttons, corner and edge LEDs.
 4. MPU-6050, exact-capture IR path, WS2812 status LED, microSD and expansion.
 
 Run `./circuit/elixpo/build.sh` from any directory to regenerate the design and
@@ -31,8 +31,8 @@ flat engineering export that is regenerated directly from the schematic model.
   current, and a 6.25-hour safety timer. These values must be checked against
   the selected cell before production.
 - The main 3.3 V rail is buck-boost regulated so the badge remains stable over
-  the full Li-ion discharge curve. The tested display module gets its own 5 V
-  boost rail.
+  the full Li-ion discharge curve. The display module runs from 3.3 V and
+  switches its own backlight.
 - microSD shares the LCD clock/MOSI lines and uses GPIO43 as CS and GPIO44 as
   MISO. Firmware must arbitrate the two devices and keep both chip-select lines
   inactive while the other device owns the bus.
@@ -60,25 +60,30 @@ flat engineering export that is regenerated directly from the schematic model.
 
 ## Display mounting
 
-The panel is a Displaytech DT028BTFT (2.8 inch, 240x320, ILI9341, 4-line
-SPI with IM3..IM0 = 1110), sold by DigiKey (1756-1052-ND) and Mouser
-(758-DT028BTFT); the Raystar RFJ280J-AYW-DNN is a second source. Its 45-pin
-0.5 mm FPC leaves one 50 mm edge and is about 38.6 mm long. As the
-datasheet's "bending for reference" drawing shows, the FPC folds 180 degrees
-behind the panel. J3 therefore sits on the front, under the panel, with its
-opening facing the panel's right edge. The panel is raised to clear the
-2 mm connector by four 3 mm M2 standoffs in H1-H4, beside the panel, and a
-front bezel screwed to them clamps the panel by its edges over a thin foam
-gasket (the bare panel has no holes of its own).
+The display is a 2.8 inch 240x320 ILI9341 SPI module of the LCDwiki MSP2807
+type (86 x 50 mm, with XPT2046 resistive touch and its own regulator and
+backlight transistor). It sits landscape on the front, under the name card,
+with its 14-pin 2.54 mm header in J3 (a hand-soldered socket) on the right
+and its four M3 holes on 11 mm standoffs in H1-H4. LED (pin 8) is a logic
+input, so GPIO17 drives and dims the backlight directly. Touch shares the
+display's SPI bus, with T_CS on the expander's spare pin (EXP_P17) and
+T_IRQ on GPIO21.
 
-Check with a real panel before ordering boards:
+Before soldering J3, check that the module's header reads VCC, GND, CS,
+RESET, DC, SDI, SCK, LED, SDO, T_CLK, T_CS, T_DIN, T_DO, T_IRQ from pin 1:
+clones differ.
 
-- Fold the FPC as mounted and note which face its contacts are on. FPC
-  contacts facing the PCB need a bottom-contact connector
-  (FH12-45S-0.5SH(55)); facing up, a top-contact one (FH12A-45S-0.5SH(55)).
-  The land pattern is the same.
-- With it folded, pin 1 (LED-A) must land on J3 pin 1. If it lands on pin
-  45, reverse J3's pin order in generate_badge_schematic.py.
+## Assembly
+
+JLCPCB assembles the SMD parts on both sides. The through-hole parts are
+hand-soldered: the eight 6 mm buttons, J3, and the IR receiver. The
+corner LEDs D1-D4 on the front stay SMD; each has two more on the back's
+corner curve (D30-D37), in parallel on the same AW9523B channel.
+
+The battery sits on the back in a 3D-printed L-shaped holder: it runs the
+cell's 50 mm edge, is as tall as the cell (6 mm) and has a 10-12 mm lip over
+it. Its foot is drawn on the back silkscreen under the cell and fixes with
+two M2 screws in H5-H6; the dashed line shows how far the lip reaches.
 
 ## Motion sensor orientation
 

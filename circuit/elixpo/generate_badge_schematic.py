@@ -169,7 +169,7 @@ C0603 = "Capacitor_SMD:C_0603_1608Metric"
 
 C0805 = "Capacitor_SMD:C_0805_2012Metric"
 LED0603 = "LED_SMD:LED_0603_1608Metric"
-BUTTON = "Button_Switch_SMD:SW_Push_1P1T_XKB_TS-1187A"
+BUTTON = "Button_Switch_THT:SW_PUSH_6mm"          # 6x6 mm through-hole tact switch, hand-soldered
 SIDE_BUTTON = "Button_Switch_SMD:SW_SPST_EVQP2_ShortPushTravel_H2.5mm"
 TP = "TestPoint:TestPoint_Pad_D1.5mm"
 
@@ -193,7 +193,7 @@ MODULE_PINS = [
     ("USB_D-/IO19", 13, "USB_D-"), ("USB_D+/IO20", 14, "USB_D+"), ("IO3", 15, "EXP_INT"),
     ("IO46 strap", 16, "STRAP46_NC"), ("IO9", 17, "I2S_LRCLK"), ("IO10", 18, "I2S_DIN"),
     ("IO11", 19, "LCD_MOSI"), ("IO12", 20, "LCD_SCK_MCU"), ("IO13", 21, "LCD_MISO"),
-    ("IO14", 22, "LCD_CS"), ("IO21", 23, "LCD_TE"), ("IO47", 24, "SD_D3"),
+    ("IO14", 22, "LCD_CS"), ("IO21", 23, "TOUCH_IRQ"), ("IO47", 24, "SD_D3"),
     ("IO48", 25, "STATUS_LED"), ("IO45 strap", 26, "STRAP45_NC"), ("IO0", 27, "BOOT"),
     ("IO35 PSRAM", 28, "PSRAM35_NC"), ("IO36 PSRAM", 29, "PSRAM36_NC"),
     ("IO37 PSRAM", 30, "PSRAM37_NC"), ("IO38", 31, "SD_CLK_MCU"), ("IO39", 32, "SD_CMD"),
@@ -292,38 +292,24 @@ POWER = [
 ]
 
 
-# Displaytech DT028BTFT (second source: Raystar RFJ280J-AYW-DNN): 2.8" ILI9341,
-# 240x320, 45-pin 0.5 mm FPC. IM3..IM0 = 1110 selects the 4-line serial
-# interface II: WR is D/CX, RS is SCL, SDA is SDI and SDO is SDO.
+# 2.8" ILI9341 SPI module (LCDwiki MSP2807 type, 50 x 86 mm, 240x320) on its
+# 14-pin 2.54 mm header, with an XPT2046 resistive touch controller. The
+# module has its own regulator and backlight transistor: LED is a logic input
+# (high = on), so GPIO17 drives it directly and can PWM it. The touch
+# controller shares the display's SPI bus; T_CS comes from the expander's
+# spare pin and T_IRQ goes to GPIO21.
 LCD_PINS = [
-    ("LED-A", 1, "LCD_LEDA"), ("LED-K1", 2, "LCD_K1"), ("LED-K2", 3, "LCD_K2"),
-    ("LED-K3", 4, "LCD_K3"), ("LED-K4", 5, "LCD_K4"), ("IM0", 6, "GND"),
-    ("IM1", 7, "+3V3"), ("IM2", 8, "+3V3"), ("IM3", 9, "+3V3"), ("FMARK/TE", 10, "LCD_TE"),
-    ("VSYNC", 11, "GND"), ("HSYNC", 12, "GND"), ("DOTCLK", 13, "GND"), ("DE", 14, "GND"),
-] + [(f"DB{17 - i}", 15 + i, "GND") for i in range(18)] + [
-    ("CS", 33, "LCD_CS"), ("WR (D/CX)", 34, "LCD_DC"), ("RS (SCL)", 35, "LCD_SCK"),
-    ("RD", 36, "+3V3"), ("RESET", 37, "LCD_RST"), ("SDO", 38, "LCD_MISO"),
-    ("SDA (SDI)", 39, "LCD_MOSI"), ("VDD", 40, "+3V3"), ("GND", 41, "GND"),
-    ("YD", 42, "TOUCH_YD_NC"), ("XR", 43, "TOUCH_XR_NC"), ("YU", 44, "TOUCH_YU_NC"),
-    ("XL", 45, "TOUCH_XL_NC"), ("MP", "MP", "GND"),
+    ("VCC", 1, "+3V3"), ("GND", 2, "GND"), ("CS", 3, "LCD_CS"), ("RESET", 4, "LCD_RST"),
+    ("DC", 5, "LCD_DC"), ("SDI (MOSI)", 6, "LCD_MOSI"), ("SCK", 7, "LCD_SCK"),
+    ("LED", 8, "LCD_BL"), ("SDO (MISO)", 9, "LCD_MISO"), ("T_CLK", 10, "LCD_SCK"),
+    ("T_CS", 11, "EXP_P17"), ("T_DIN", 12, "LCD_MOSI"), ("T_DO", 13, "LCD_MISO"),
+    ("T_IRQ", 14, "TOUCH_IRQ"),
 ]
 
 DISPLAY = [
-    component("J3", "DT028BTFT 2.8in ILI9341 FPC", "Connector_FFC-FPC:Hirose_FH12-45S-0.5SH_1x45-1MP_P0.50mm_Horizontal",
-              LCD_PINS, 120, 150, "45-pin 0.5 mm ZIF for the panel's FPC; check contact side against the panel"),
-    p2("C30", "1uF", C0402, "+3V3", "GND", 230, 45, "Panel VDD, at J3 pin 40"),
-    p2("C31", "100nF", C0402, "+3V3", "GND", 230, 75, "Panel VDD, at J3 pin 40"),
-    p2("R30", "0R", R0402, "VSYS_SW", "LCD_LEDA", 230, 105, "Backlight anode feed"),
-]
-for i in range(1, 5):
-    DISPLAY.append(p2(f"R{30 + i}", "56R", R0402, f"LCD_K{i}", "LCD_BL_SINK", 280, 75 + (i - 1) * 30,
-                      "Limits each backlight LED to <=25 mA at VSYS 4.4 V (Vf 3.0 V); PWM sets brightness"))
-DISPLAY += [
-    component("Q2", "AO3400A", "Package_TO_SOT_SMD:SOT-23",
-              [("G", 1, "LCD_BL_G"), ("S", 2, "GND"), ("D", 3, "LCD_BL_SINK")], 330, 150,
-              "Backlight low-side switch, PWM from GPIO17"),
-    p2("R35", "100R", R0402, "LCD_BL", "LCD_BL_G", 280, 205),
-    p2("R36", "100k", R0402, "LCD_BL_G", "GND", 330, 205, "Backlight off until the OS drives it"),
+    component("J3", "2.8in ILI9341 SPI module (MSP2807)", "Connector_PinSocket_2.54mm:PinSocket_1x14_P2.54mm_Vertical",
+              LCD_PINS, 120, 150, "1x14 2.54 mm socket for the module's header; hand-soldered"),
+    p2("C30", "10uF 10V", C0805, "+3V3", "GND", 230, 75, "Bulk for the module's backlight, at J3 pin 1"),
 ]
 button_nets = (("UP", "BTN_UP"), ("DOWN", "BTN_DOWN"), ("LEFT", "BTN_LEFT"),
                ("RIGHT", "BTN_RIGHT"), ("A", "BTN_A"), ("B", "BTN_B"),
@@ -359,6 +345,12 @@ for i, corner in enumerate(("TL", "TR", "BL", "BR"), 1):
     EXPANDER.append(led(f"D{i}", "amber corner LED", "+3V3", f"LED_{corner}_K",
                         255 + ((i - 1) % 2) * 50, 180 + ((i - 1) // 2) * 30,
                         "Driven by the AW9523B constant-current sink; amber for headroom from 3.3 V"))
+for i, corner in enumerate(("TL", "TR", "BL", "BR")):
+    for j in range(2):
+        n = 30 + i * 2 + j
+        EXPANDER.append(led(f"D{n}", "amber edge LED", "+3V3", f"LED_{corner}_K",
+                            355 + j * 50, 45 + i * 30,
+                            "Back edge light on the corner's curve, in parallel with the front corner LED"))
 
 
 PERIPHERALS = [
@@ -439,12 +431,12 @@ PAGES = [
      [("USB-C + BATTERY MANAGEMENT", 18, 18, 2.0, True),
       ("BQ24074 runs the badge from USB while it charges; SW3 cuts the system, not charging, the RTC or the gauge.", 18, 25, 1.1, False),
       ("Charge current 0.5 A suits a 1000 mAh cell (0.5C); recheck R14 for any other cell.", 18, 285, 1.05, False)]),
-    ("display_controls", "Oreo badge — 2.8 inch ILI9341 panel, backlight and buttons", DISPLAY,
+    ("display_controls", "Oreo badge — 2.8 inch ILI9341 SPI module and buttons", DISPLAY,
      [("DISPLAY + BUTTONS", 18, 18, 2.0, True),
-      ("4-line SPI (IM3..IM0 = 1110); TE goes to GPIO21 so video can sync to the panel refresh.", 18, 25, 1.1, False),
+      ("4-line SPI module on a 14-pin header; touch shares the bus, T_CS on EXP_P17, T_IRQ on GPIO21.", 18, 25, 1.1, False),
       ("Buttons are read through the AW9523B expander (sheet expander_leds).", 18, 285, 1.05, False)]),
     ("expander_leds", "Oreo badge — AW9523B expander, I2C bus and corner LEDs", EXPANDER,
-     [("I2C EXPANDER + CORNER LEDS", 18, 18, 2.0, True),
+     [("I2C EXPANDER + CORNER AND EDGE LEDS", 18, 18, 2.0, True),
       ("I2C addresses: MAX17048 0x36, RV-3028 0x52, AW9523B 0x58, MPU-6050 0x68.", 18, 25, 1.1, False),
       ("The expander interrupt (GPIO3) is an RTC GPIO, so a button press can wake the badge.", 18, 285, 1.05, False)]),
     ("peripherals_expansion", "Oreo badge — speaker, motion, RTC, microSD, infrared and accessories", PERIPHERALS,
@@ -464,8 +456,7 @@ SOURCING = {
     "U10": ("Analog Devices / Maxim", "MAX17048G+T10", "Active", "ModelGauge fuel gauge"),
     "SW3": ("C&K", "JS102011SAQN", "Active", "Main system disconnect"),
     "J2": ("JST", "S2B-PH-SM4-TB(LF)(SN)", "Active", "Battery connector; pack polarity varies by vendor"),
-    "J3": ("Hirose", "FH12-45S-0.5SH(55)", "Mechanical check", "Confirm contact side against the DT028BTFT FPC"),
-    "Q2": ("Alpha & Omega", "AO3400A", "Active", "Backlight switch"),
+    "J3": ("Generic", "1x14 female header, 2.54 mm, 8.5 mm", "Active", "Through-hole, hand-soldered; the module plugs in"),
     "Q3": ("Alpha & Omega", "AO3401A", "Active", "Reverse-battery protection, -30 V P-FET, about 50 mOhm at -4.5 V"),
     "U11": ("Awinic", "AW9523BTQR", "Active", "16-bit I2C expander with LED current drive"),
     "U12": ("Analog Devices / Maxim", "MAX98357AETE+T", "Active", "I2S class-D amplifier"),
@@ -542,21 +533,22 @@ def write_bom():
                       "Qualified battery vendor", "TBD", "Off-board / JST-PH 2-wire",
                       "YES", "Safety-critical",
                       "Must include a protection PCB; check the lead polarity against J2"))
-        csv.writerow(("LCD1", 1, "2.8 inch 240x320 ILI9341 TFT, 45-pin 0.5 mm FPC",
-                      "Displaytech", "DT028BTFT", "Off-board / J3", "YES", "Mechanical check",
-                      "Second source Raystar RFJ280J-AYW-DNN; confirm the FPC pin table"))
+        csv.writerow(("LCD1", 1, "2.8 inch 240x320 ILI9341 SPI module with XPT2046 touch, 14-pin header",
+                      "LCDwiki", "MSP2807", "Off-board / J3", "YES", "Active",
+                      "50 x 86 mm module; check the header pin order matches J3 before soldering"))
         csv.writerow(("LS1", 1, "Speaker 8 ohm 0.7 W, 15x11 mm, with leads",
                       "Qualified vendor", "TBD", "Off-board / J7", "YES", "Select", "Mobile-phone type"))
-        csv.writerow(("HW1-HW4", 4, "M2 standoff, 3 mm, female-female", "Qualified vendor", "TBD",
+        csv.writerow(("HW1-HW4", 4, "M3 standoff, 11 mm, female-female", "Qualified vendor", "TBD",
                       "Mechanical / H1-H4", "YES", "Select",
-                      "Raises the panel to clear J3; holds the bezel"))
-        csv.writerow(("HW5-HW12", 8, "M2 x 4 mm screw", "Qualified vendor", "TBD",
-                      "Mechanical / H1-H4", "YES", "Select", "Four from the back, four through the bezel"))
-        csv.writerow(("BZ1", 1, "Front bezel with a window for the panel", "Laser-cut acrylic or 3D print",
-                      "TBD", "Mechanical", "YES", "Design",
-                      "Clamps the panel by its edges; the bare panel has no holes"))
-        csv.writerow(("FT1", 1, "Foam gasket, 0.5-1 mm, frame around the panel edge", "Qualified vendor",
-                      "TBD", "Mechanical", "YES", "Select", "Cushions the glass under the bezel"))
+                      "Holds the module at the height of its header in J3; check against the parts"))
+        csv.writerow(("HW5-HW12", 8, "M3 x 5 mm screw", "Qualified vendor", "TBD",
+                      "Mechanical / H1-H4", "YES", "Select", "Four from the back, four through the module"))
+        csv.writerow(("BH1", 1, "Battery holder, L-shaped, 3D printed", "3D print", "TBD",
+                      "Mechanical / H5-H6", "YES", "Design",
+                      "Runs the battery's 50 mm edge, as tall as the cell (6 mm), with a 10-12 mm lip over it; "
+                      "two M2 screws in H5-H6, outline on the back silkscreen"))
+        csv.writerow(("HW13-HW14", 2, "M2 x 6 mm screw", "Qualified vendor", "TBD",
+                      "Mechanical / H5-H6", "YES", "Select", "Fixes the battery holder"))
 
 
 def write_symbol_library():
