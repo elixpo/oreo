@@ -282,7 +282,7 @@
   (global_label "LCD_MOSI" (shape bidirectional) (at 93.97999999999999 160.02 180) (effects (font (size 0.9 0.9)) (justify right)) (uuid "78c3846d-2242-5fd5-b103-73589a41ca80"))
   (global_label "LCD_SCK" (shape bidirectional) (at 93.97999999999999 165.10000000000002 180) (effects (font (size 0.9 0.9)) (justify right)) (uuid "56953420-8834-5d8e-8c6c-ef5dc25d63de"))
   (global_label "LCD_BL" (shape bidirectional) (at 144.78 134.62 0) (effects (font (size 0.9 0.9)) (justify left)) (uuid "2658beea-c8bc-540c-8018-17ab09849994"))
-  (global_label "LCD_MISO" (shape bidirectional) (at 144.78 139.70000000000002 0) (effects (font (size 0.9 0.9)) (justify left)) (uuid "529cb8f5-8722-5715-ad34-e03463876d3d"))
+  (no_connect (at 144.78 139.70000000000002) (uuid "0b1b9577-f0e1-5408-ad2f-69dc5f5f9f41"))
   (global_label "LCD_SCK" (shape bidirectional) (at 144.78 144.78 0) (effects (font (size 0.9 0.9)) (justify left)) (uuid "a76a5199-57a1-5582-9a57-a97cddf9eb0f"))
   (global_label "EXP_P17" (shape bidirectional) (at 144.78 149.86 0) (effects (font (size 0.9 0.9)) (justify left)) (uuid "ac6dfdc1-ece8-5bd5-a2b6-34c5ee6836cd"))
   (global_label "LCD_MOSI" (shape bidirectional) (at 144.78 154.94000000000003 0) (effects (font (size 0.9 0.9)) (justify left)) (uuid "656e484a-9879-5d88-aaed-c7c7513d76a9"))

@@ -237,6 +237,29 @@
       )
       (embedded_fonts no)
     )
+    (symbol "oreo_badge:R45"
+      (pin_names (offset 1.016))
+      (exclude_from_sim no) (in_bom yes) (on_board yes)
+      (property "Reference" "U" (at 0 -15.8 0) (effects (font (size 1.27 1.27))))
+      (property "Value" "10k" (at 0 15.8 0) (effects (font (size 1.27 1.27))))
+      (property "Footprint" "Resistor_SMD:R_0402_1005Metric" (at 0 0 0) (effects (font (size 1.27 1.27)) (hide yes)))
+      (property "Datasheet" "" (at 0 0 0) (effects (font (size 1.27 1.27)) (hide yes)))
+      (property "Description" "Keeps the touch controller deselected (T_CS high) until the OS drives it" (at 0 0 0) (effects (font (size 1.27 1.27)) (hide yes)))
+      (symbol "R45_0_1"
+        (rectangle (start -7.62 -12.0) (end 7.62 12.0)
+          (stroke (width 0.254) (type solid)) (fill (type background)))
+        (text "10k" (at 0 0 0) (effects (font (size 1.05 1.05) (bold yes))))
+      )
+      (symbol "R45_1_1"
+        (pin bidirectional line (at -10.16 0.0 0) (length 2.54)
+          (name "1" (effects (font (size 0.9 0.9))))
+          (number "1" (effects (font (size 0.9 0.9)))))
+        (pin bidirectional line (at 10.16 0.0 180) (length 2.54)
+          (name "2" (effects (font (size 0.9 0.9))))
+          (number "2" (effects (font (size 0.9 0.9)))))
+      )
+      (embedded_fonts no)
+    )
     (symbol "oreo_badge:R50"
       (pin_names (offset 1.016))
       (exclude_from_sim no) (in_bom yes) (on_board yes)
@@ -735,6 +758,8 @@
   (global_label "+3V3" (shape bidirectional) (at 105.41 105.41 0) (effects (font (size 0.9 0.9)) (justify left)) (uuid "525b390e-55ec-5af5-b86c-39874c33e466"))
   (global_label "FG_ALRT" (shape bidirectional) (at 34.290000000000006 134.62 180) (effects (font (size 0.9 0.9)) (justify right)) (uuid "39982adf-2be5-5cf9-9eca-f552ccfe6672"))
   (global_label "+3V3" (shape bidirectional) (at 54.61 134.62 0) (effects (font (size 0.9 0.9)) (justify left)) (uuid "310a9ab2-31e0-5f4a-a35e-f8c1bc9de644"))
+  (global_label "EXP_P17" (shape bidirectional) (at 85.09 134.62 180) (effects (font (size 0.9 0.9)) (justify right)) (uuid "08c2c913-d677-56cf-86f6-31fa046f5eec"))
+  (global_label "+3V3" (shape bidirectional) (at 105.41 134.62 0) (effects (font (size 0.9 0.9)) (justify left)) (uuid "e49164e6-cbe9-59a1-aaaf-91fb72670f9d"))
   (global_label "BTN_UP" (shape bidirectional) (at 245.11 44.45 180) (effects (font (size 0.9 0.9)) (justify right)) (uuid "70561fd9-1b43-5ae1-a4a7-28068fe51527"))
   (global_label "+3V3" (shape bidirectional) (at 265.43 44.45 0) (effects (font (size 0.9 0.9)) (justify left)) (uuid "65267219-5436-5db3-8129-01080a8f9130"))
   (global_label "BTN_DOWN" (shape bidirectional) (at 294.64 44.45 180) (effects (font (size 0.9 0.9)) (justify right)) (uuid "d717a966-0752-5739-a677-6b938caa207d"))
@@ -918,6 +943,23 @@
     (instances
       (project "elixpo"
         (path "/fe0792e5-9f87-5b76-b754-53a589d4c014/242dab30-5892-598d-94ba-c33c92fc5087" (reference "R44") (unit 1)))
+    )
+  )
+  (symbol
+    (lib_id "oreo_badge:R45")
+    (at 95.25 134.62 0) (unit 1)
+    (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no)
+    (uuid "1499c1c6-38ff-566c-8603-df43e1321682")
+    (property "Reference" "R45" (at 95.25 118.82000000000001 0) (effects (font (size 1.1 1.1) (bold yes))))
+    (property "Value" "10k" (at 95.25 150.42000000000002 0) (effects (font (size 1.0 1.0))))
+    (property "Footprint" "Resistor_SMD:R_0402_1005Metric" (at 95.25 134.62 0) (effects (font (size 1.27 1.27)) (hide yes)))
+    (property "Datasheet" "" (at 95.25 134.62 0) (effects (font (size 1.27 1.27)) (hide yes)))
+    (property "Description" "Keeps the touch controller deselected (T_CS high) until the OS drives it" (at 95.25 134.62 0) (effects (font (size 1.27 1.27)) (hide yes)))
+    (pin "1" (uuid "6372badd-647e-59bb-9217-428949ddd2ab"))
+    (pin "2" (uuid "505234f7-e426-5a3f-9c11-7628e72b32e3"))
+    (instances
+      (project "elixpo"
+        (path "/fe0792e5-9f87-5b76-b754-53a589d4c014/1499c1c6-38ff-566c-8603-df43e1321682" (reference "R45") (unit 1)))
     )
   )
   (symbol

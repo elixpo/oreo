@@ -297,11 +297,13 @@ POWER = [
 # module has its own regulator and backlight transistor: LED is a logic input
 # (high = on), so GPIO17 drives it directly and can PWM it. The touch
 # controller shares the display's SPI bus; T_CS comes from the expander's
-# spare pin and T_IRQ goes to GPIO21.
+# spare pin and T_IRQ goes to GPIO21. The display's own SDO stays unconnected:
+# on many of these modules it does not release MISO when CS is high, which
+# would corrupt touch reads, and nothing reads the display back.
 LCD_PINS = [
     ("VCC", 1, "+3V3"), ("GND", 2, "GND"), ("CS", 3, "LCD_CS"), ("RESET", 4, "LCD_RST"),
     ("DC", 5, "LCD_DC"), ("SDI (MOSI)", 6, "LCD_MOSI"), ("SCK", 7, "LCD_SCK"),
-    ("LED", 8, "LCD_BL"), ("SDO (MISO)", 9, "LCD_MISO"), ("T_CLK", 10, "LCD_SCK"),
+    ("LED", 8, "LCD_BL"), ("SDO (MISO)", 9, "LCD_SDO_NC"), ("T_CLK", 10, "LCD_SCK"),
     ("T_CS", 11, "EXP_P17"), ("T_DIN", 12, "LCD_MOSI"), ("T_DO", 13, "LCD_MISO"),
     ("T_IRQ", 14, "TOUCH_IRQ"),
 ]
@@ -337,6 +339,7 @@ EXPANDER = [
     p2("R42", "10k", R0402, "EXP_INT", "+3V3", 45, 105),
     p2("R43", "10k", R0402, "EXP_RST", "+3V3", 95, 105),
     p2("R44", "10k", R0402, "FG_ALRT", "+3V3", 45, 135),
+    p2("R45", "10k", R0402, "EXP_P17", "+3V3", 95, 135, "Keeps the touch controller deselected (T_CS high) until the OS drives it"),
 ]
 for i, (_label, net) in enumerate(button_nets):
     EXPANDER.append(p2(f"R{50 + i}", "10k", R0402, net, "+3V3", 255 + (i % 2) * 50, 45 + (i // 2) * 30,

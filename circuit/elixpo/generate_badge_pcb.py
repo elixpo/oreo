@@ -166,7 +166,7 @@ PLACE = {
     "C65": (47.5, 33, 90, B),
     "C66": (40.5, 33, 90, B),
     "R61": (44, 37.5, 0, B),
-    "J7": (65, 21, 0, B),
+    "J7": (65, 21, 270, B),
     "U12": (66, 28, 0, B),
     "C60": (66, 32.5, 0, B),
     "C61": (70.5, 28, 90, B),
@@ -188,6 +188,7 @@ PLACE = {
     "R42": (22, 69.5, 90, B),
     "R43": (24.2, 69.5, 90, B),
     "R44": (26.4, 69.5, 90, B),
+    "R45": (28.6, 69.5, 90, B),
     "TP6": (40, 72, 0, B),
     "U7": (48, 66, 0, B),
     "C62": (52.5, 69.5, 0, B),
@@ -197,7 +198,7 @@ PLACE = {
     "C29": (13, 62.5, 0, B),
     "TP5": (7.5, 70, 0, B),
     "Q3": (13, 74, 0, B), "R27": (8.5, 74, 90, B),     # reverse-battery protection by J2
-    "J2": (13, 81, 90, B),
+    "J2": (13, 81, 270, B),
     "J4": (9, 94.5, 90, B),
     "C67": (13, 108.8, 0, B),
     "C68": (9.5, 104.0, 90, B),
@@ -235,8 +236,8 @@ PLACE = {
     "C28": (22.5, 131.5, 0, B),
     "SW3": (84, 44, 270, B),
     "J5": (13, 129.5, 0, B),
-    "U8": (86, 28, 90, B),
-    "D10": (70.5, 22, 0, B),
+    "U8": (86, 21.5, 270, F),
+    "D10": (77.5, 25.0, 0, F),
 }
 # Back edge lights: two per corner on the corner's curve, long side along it.
 EDGE_LED_R = CORNER - 1.4                  # from the corner's centre: 1.4 mm in from the edge
@@ -565,6 +566,9 @@ def silkscreen(board):
     add_text(board, bs, "JST-PH: check polarity", bx + bw / 2, by + bh / 2 - 3, 1.0, 0.15, mirror=True)
     add_rect(board, pcbnew.B_Fab, sx, sy, sw, sh, 0.1)
     add_rect(board, pcbnew.B_CrtYd, sx, sy, sw, sh, 0.05)
+    for (cx, cy, dx, dy) in ((sx, sy, 1, 1), (sx + sw, sy, -1, 1), (sx, sy + sh, 1, -1), (sx + sw, sy + sh, -1, -1)):
+        add_line(board, bs, (cx, cy), (cx + 2.5 * dx, cy), 0.15)
+        add_line(board, bs, (cx, cy), (cx, cy + 2.5 * dy), 0.15)
     # "Elixpo" alone on the board's centre line; the OSHW mark and the
     # badge's details stacked in the column beside the module (seen from the
     # back it is right of the module: front-view x is mirrored there).

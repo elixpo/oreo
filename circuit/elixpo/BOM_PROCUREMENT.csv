@@ -70,6 +70,7 @@ R41,1,2.2k,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rat
 R42,1,10k,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rating,Use 1% resistors; X7R capacitors with voltage derating
 R43,1,10k,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rating,Use 1% resistors; X7R capacitors with voltage derating
 R44,1,10k,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rating,Use 1% resistors; X7R capacitors with voltage derating
+R45,1,10k,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rating,Keeps the touch controller deselected (T_CS high) until the OS drives it; Use 1% resistors; X7R capacitors with voltage derating
 R50,1,10k,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rating,Button pull-up: the AW9523B has none; Use 1% resistors; X7R capacitors with voltage derating
 R51,1,10k,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rating,Button pull-up: the AW9523B has none; Use 1% resistors; X7R capacitors with voltage derating
 R52,1,10k,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rating,Button pull-up: the AW9523B has none; Use 1% resistors; X7R capacitors with voltage derating

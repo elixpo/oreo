@@ -70,6 +70,7 @@ R41,2.2k,Resistor_SMD:R_0402_1005Metric,expander_leds,"I2C pull-up, 400 kHz"
 R42,10k,Resistor_SMD:R_0402_1005Metric,expander_leds,
 R43,10k,Resistor_SMD:R_0402_1005Metric,expander_leds,
 R44,10k,Resistor_SMD:R_0402_1005Metric,expander_leds,
+R45,10k,Resistor_SMD:R_0402_1005Metric,expander_leds,Keeps the touch controller deselected (T_CS high) until the OS drives it
 R50,10k,Resistor_SMD:R_0402_1005Metric,expander_leds,Button pull-up: the AW9523B has none
 R51,10k,Resistor_SMD:R_0402_1005Metric,expander_leds,Button pull-up: the AW9523B has none
 R52,10k,Resistor_SMD:R_0402_1005Metric,expander_leds,Button pull-up: the AW9523B has none
