@@ -56,6 +56,8 @@ HEART = (79.0, 35.5, 11.0)                # front, far right, where the panda is
 # in the free column beside the ESP32-S3 module, under the clip slot.
 BACK_ROW_Y = 47.5                          # centre line of "Elixpo"
 BACK_COLUMN = (15.0, 9.0)                  # front-view centre x and top of the column
+REPO_URL = "github.com/elixpo/oreo"            # under "Elixpo"
+JLC_MARK = "JLCJLCJLCJLC"                     # where JLCPCB puts its order number
 OSHW_H = 12.0                              # height of the OSHWA certification mark
 
 
@@ -562,6 +564,9 @@ def silkscreen(board):
             y += 2.5
     add_text(board, bs, "BATTERY HOLDER", bx + bw / 2, fy + HOLDER_FOOT / 2, 1.0, 0.15, mirror=True)
     add_text(board, bs, "holder lip", bx + bw / 2, ly + 1.4, 0.8, 0.12, mirror=True)
+    # JLCPCB prints its order number over this text ("Specify a location" when
+    # ordering); here the battery covers it.
+    add_text(board, bs, JLC_MARK, bx + bw / 2, ly + 5.5, 1.0, 0.15, mirror=True)
     add_text(board, bs, "LiPo 1000 mAh 603450", bx + bw / 2, by + bh / 2 - 6, 1.2, 0.15, mirror=True)
     add_text(board, bs, "JST-PH: check polarity", bx + bw / 2, by + bh / 2 - 3, 1.0, 0.15, mirror=True)
     add_rect(board, pcbnew.B_Fab, sx, sy, sw, sh, 0.1)
@@ -574,6 +579,7 @@ def silkscreen(board):
     # back it is right of the module: front-view x is mirrored there).
     mid, y0 = W / 2, BACK_ROW_Y
     add_text(board, bs, "Elixpo", mid, y0, 4.2, 0.6, mirror=True, bold=True)
+    add_text(board, bs, REPO_URL, mid, y0 + 4.6, 1.0, 0.15, mirror=True)
     tx, ty = BACK_COLUMN
     for text, dy, size, thick, bold in (("OREO BADGE", OSHW_H + 3.0, 1.5, 0.25, True),
                                         ("oreo.elixpo.com", OSHW_H + 5.8, 1.0, 0.15, False),
