@@ -37,7 +37,9 @@ R23,1k,Resistor_SMD:R_0402_1005Metric,power_usb,
 D20,"green, power good",LED_SMD:LED_0603_1608Metric,power_usb,"Lit while USB power is good, even when the badge is off"
 R24,1k,Resistor_SMD:R_0402_1005Metric,power_usb,
 D21,"amber, charging",LED_SMD:LED_0603_1608Metric,power_usb,"Lit while charging, even when the badge is off"
-J2,LiPo JST-PH 2-pin,Connector_JST:JST_PH_S2B-PH-SM4-TB_1x02-1MP_P2.00mm_Horizontal,power_usb,"Protected 1S LiPo, 1000 mAh 603450; check the pack's polarity before plugging in"
+J2,LiPo JST-PH 2-pin,Connector_JST:JST_PH_S2B-PH-SM4-TB_1x02-1MP_P2.00mm_Horizontal,power_usb,"Protected 1S LiPo, 1000 mAh 603450; Q3 blocks a reversed pack"
+Q3,AO3401A,Package_TO_SOT_SMD:SOT-23,power_usb,"Reverse-battery protection: P-FET, gate to GND. A correct pack turns it on (conducts both ways, so charging works); a reversed pack leaves it off"
+R27,10k,Resistor_SMD:R_0402_1005Metric,power_usb,Q3 gate to GND
 SW3,MAIN POWER,Button_Switch_SMD:SW_SPDT_CK_JS102011SAQN,power_usb,"Disconnects the system; charging, the RTC and the fuel gauge stay powered"
 U5,TPS63031DSK,Package_SON:WSON-10-1EP_2.5x2.5mm_P0.5mm_EP1.2x2mm,power_usb,Fixed 3.3 V buck-boost; holds 3.3 V across the LiPo's 3.0-4.2 V
 L1,1.5uH 2A shielded,Inductor_SMD:L_Taiyo-Yuden_NR-30xx,power_usb,

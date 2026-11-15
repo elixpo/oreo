@@ -384,6 +384,10 @@
       },
       {
         "netclass": "Battery",
+        "pattern": "BAT_IN"
+      },
+      {
+        "netclass": "Battery",
         "pattern": "BUCK_L1"
       },
       {

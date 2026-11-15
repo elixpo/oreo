@@ -177,6 +177,7 @@ PLACE = {
     "U10": (13, 66, 0, B),
     "C29": (13, 62.5, 0, B),
     "TP5": (7.5, 70, 0, B),
+    "Q3": (13, 74, 0, B), "R27": (8.5, 74, 90, B),     # reverse-battery protection by J2
     "J2": (13, 81, 90, B),
     "J4": (9, 122, 90, B),
     "C67": (4, 111, 90, B),
@@ -607,7 +608,7 @@ def write_netclasses():
              diff_pair_width=0.3, diff_pair_gap=0.15, priority=3),
     ]
     ns["netclass_patterns"] = (
-        [dict(netclass="Battery", pattern=p) for p in ("VBUS_5V", "VSYS", "VSYS_SW", "VBAT", "BUCK_L1", "BUCK_L2")] +
+        [dict(netclass="Battery", pattern=p) for p in ("VBUS_5V", "VSYS", "VSYS_SW", "VBAT", "BAT_IN", "BUCK_L1", "BUCK_L2")] +
         [dict(netclass="Power", pattern=p) for p in ("+3V3", "GND", "LCD_LEDA", "LCD_BL_SINK", "SPK_P", "SPK_N", "IR_LED_*", "CHASSIS")] +
         [dict(netclass="Fast", pattern=p) for p in ("LCD_SCK*", "LCD_MOSI", "LCD_MISO", "SD_CLK*", "SD_CMD", "SD_D*", "I2S_BCLK*")] +
         [dict(netclass="USB", pattern=p) for p in ("USB_D*", "USB_CONN_D*")]

@@ -37,7 +37,9 @@ R23,1,1k,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by ratin
 D20,1,"green, power good",Qualified commodity,,LED_SMD:LED_0603_1608Metric,YES,Select by rating,"Lit while USB power is good, even when the badge is off; Confirm current, power and package"
 R24,1,1k,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rating,Use 1% resistors; X7R capacitors with voltage derating
 D21,1,"amber, charging",Qualified commodity,,LED_SMD:LED_0603_1608Metric,YES,Select by rating,"Lit while charging, even when the badge is off; Confirm current, power and package"
-J2,1,LiPo JST-PH 2-pin,JST,S2B-PH-SM4-TB(LF)(SN),Connector_JST:JST_PH_S2B-PH-SM4-TB_1x02-1MP_P2.00mm_Horizontal,YES,Active,"Protected 1S LiPo, 1000 mAh 603450; check the pack's polarity before plugging in; Battery connector; pack polarity varies by vendor"
+J2,1,LiPo JST-PH 2-pin,JST,S2B-PH-SM4-TB(LF)(SN),Connector_JST:JST_PH_S2B-PH-SM4-TB_1x02-1MP_P2.00mm_Horizontal,YES,Active,"Protected 1S LiPo, 1000 mAh 603450; Q3 blocks a reversed pack; Battery connector; pack polarity varies by vendor"
+Q3,1,AO3401A,Alpha & Omega,AO3401A,Package_TO_SOT_SMD:SOT-23,YES,Active,"Reverse-battery protection: P-FET, gate to GND. A correct pack turns it on (conducts both ways, so charging works); a reversed pack leaves it off; Reverse-battery protection, -30 V P-FET, about 50 mOhm at -4.5 V"
+R27,1,10k,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rating,Q3 gate to GND; Use 1% resistors; X7R capacitors with voltage derating
 SW3,1,MAIN POWER,C&K,JS102011SAQN,Button_Switch_SMD:SW_SPDT_CK_JS102011SAQN,YES,Active,"Disconnects the system; charging, the RTC and the fuel gauge stay powered; Main system disconnect"
 U5,1,TPS63031DSK,Texas Instruments,TPS63031DSKR,Package_SON:WSON-10-1EP_2.5x2.5mm_P0.5mm_EP1.2x2mm,YES,Active,Fixed 3.3 V buck-boost; holds 3.3 V across the LiPo's 3.0-4.2 V; Fixed 3.3 V buck-boost
 L1,1,1.5uH 2A shielded,Taiyo Yuden,NR3015T1R5N,Inductor_SMD:L_Taiyo-Yuden_NR-30xx,YES,Verify current,"1.5 uH shielded, >=1.5 A saturation"
