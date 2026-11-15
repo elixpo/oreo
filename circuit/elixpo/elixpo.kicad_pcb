@@ -7,6 +7,14 @@
 		(legacy_teardrops no)
 	)
 	(paper "A4")
+	(title_block
+		(title "Oreo Badge")
+		(date "2026-11-15")
+		(rev "1.0")
+		(company "Elixpo")
+		(comment 1 "Hardware: CERN-OHL-P-2.0, OSHWA IN000107")
+		(comment 2 "6 layers, 1.6 mm, ENIG, black mask")
+	)
 	(layers
 		(0 "F.Cu" signal)
 		(4 "In1.Cu" signal)

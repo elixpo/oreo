@@ -657,6 +657,16 @@ STACKUP = """\t\t(stackup
 """
 
 
+TITLE_BLOCK = '\t(title_block\n\t\t(title "Oreo Badge")\n\t\t(date "2026-11-15")\n\t\t(rev "1.0")\n\t\t(company "Elixpo")\n\t\t(comment 1 "Hardware: CERN-OHL-P-2.0, OSHWA IN000107")\n\t\t(comment 2 "6 layers, 1.6 mm, ENIG, black mask")\n\t)\n'
+
+
+def write_title():
+    text = BOARD_FILE.read_text()
+    if "(title_block" not in text:
+        text = text.replace('\t(paper "A4")\n', '\t(paper "A4")\n' + TITLE_BLOCK, 1)
+        BOARD_FILE.write_text(text)
+
+
 def write_stackup():
     """1.6 mm 6-layer build with black solder mask and white silkscreen.
     The stackup is not exposed to Python, so it goes into the file."""
@@ -734,6 +744,7 @@ def main():
     filler.Fill(board.Zones())
     board.Save(str(BOARD_FILE))
     write_stackup()
+    write_title()
     write_netclasses()
     write_rules()
     print(f"Placed {len(footprints)} footprints on a {W:g} x {H:g} mm 6-layer board: {BOARD_FILE}")
