@@ -47,12 +47,13 @@ def export_dsn():
     BUILD.mkdir(exist_ok=True)
     if not pcbnew.ExportSpecctraDSN(board, str(DSN)):
         raise SystemExit("DSN export failed")
-    # In1 and In4 are solid ground planes: mark them as power layers so
-    # Freerouting routes only on F.Cu, In2.Cu, In3.Cu and B.Cu and never cuts
+    # In1 (and In4 on six layers) are solid ground planes: mark them as power
+    # layers so Freerouting routes only on the signal layers and never cuts
     # a slot in a return plane.
     import re
     text = DSN.read_text()
-    for layer in ("In1.Cu", "In4.Cu"):
+    planes = ("In1.Cu", "In4.Cu") if "(layer In4.Cu" in text else ("In1.Cu",)
+    for layer in planes:
         text, n = re.subn(r"(\(layer %s\s*\(type )signal" % re.escape(layer), r"\1power", text)
         if n != 1:
             raise SystemExit("could not mark %s as a plane in the DSN" % layer)

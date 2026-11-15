@@ -40,7 +40,7 @@ D21,"amber, charging",LED_SMD:LED_0603_1608Metric,power_usb,"Lit while charging,
 J2,LiPo JST-PH 2-pin,Connector_JST:JST_PH_S2B-PH-SM4-TB_1x02-1MP_P2.00mm_Horizontal,power_usb,"Protected 1S LiPo, 1000 mAh 603450; Q3 blocks a reversed pack"
 Q3,AO3401A,Package_TO_SOT_SMD:SOT-23,power_usb,"Reverse-battery protection: P-FET, gate to GND. A correct pack turns it on (conducts both ways, so charging works); a reversed pack leaves it off"
 R27,10k,Resistor_SMD:R_0402_1005Metric,power_usb,Q3 gate to GND
-SW3,MAIN POWER,Button_Switch_SMD:SW_SPDT_CK_JS102011SAQN,power_usb,"Disconnects the system; charging, the RTC and the fuel gauge stay powered"
+SW3,MAIN POWER,Button_Switch_SMD:SW_SPDT_CK_JS102011SAQN,power_usb,Disconnects the system; charging and the RTC stay powered
 U5,TPS63031DSK,Package_SON:WSON-10-1EP_2.5x2.5mm_P0.5mm_EP1.2x2mm,power_usb,Fixed 3.3 V buck-boost; holds 3.3 V across the LiPo's 3.0-4.2 V
 L1,1.5uH 2A shielded,Inductor_SMD:L_Taiyo-Yuden_NR-30xx,power_usb,
 R26,10R,Resistor_SMD:R_0402_1005Metric,power_usb,VINA RC filter
@@ -51,8 +51,6 @@ C28,22uF 10V,Capacitor_SMD:C_0805_2012Metric,power_usb,
 R17,100k 1%,Resistor_SMD:R_0402_1005Metric,power_usb,Battery voltage divider for the ADC (OreoOS battery.py)
 R18,100k 1%,Resistor_SMD:R_0402_1005Metric,power_usb,
 C22,100nF,Capacitor_SMD:C_0402_1005Metric,power_usb,
-U10,MAX17048G+,Package_DFN_QFN:TDFN-8-1EP_2x2mm_P0.5mm_EP0.8x1.2mm,power_usb,Fuel gauge: state of charge over I2C at 0x36
-C29,1uF,Capacitor_SMD:C_0402_1005Metric,power_usb,
 J3,2.8in ILI9341 SPI module (MSP2807),Connector_PinSocket_2.54mm:PinSocket_1x14_P2.54mm_Vertical,display_controls,1x14 2.54 mm socket for the module's header; hand-soldered
 C30,10uF 10V,Capacitor_SMD:C_0805_2012Metric,display_controls,"Bulk for the module's backlight, at J3 pin 1"
 SW11,UP,Button_Switch_THT:SW_PUSH_6mm,display_controls,
@@ -69,7 +67,6 @@ R40,2.2k,Resistor_SMD:R_0402_1005Metric,expander_leds,"I2C pull-up, 400 kHz"
 R41,2.2k,Resistor_SMD:R_0402_1005Metric,expander_leds,"I2C pull-up, 400 kHz"
 R42,10k,Resistor_SMD:R_0402_1005Metric,expander_leds,
 R43,10k,Resistor_SMD:R_0402_1005Metric,expander_leds,
-R44,10k,Resistor_SMD:R_0402_1005Metric,expander_leds,
 R45,10k,Resistor_SMD:R_0402_1005Metric,expander_leds,Keeps the touch controller deselected (T_CS high) until the OS drives it
 R50,10k,Resistor_SMD:R_0402_1005Metric,expander_leds,Button pull-up: the AW9523B has none
 R51,10k,Resistor_SMD:R_0402_1005Metric,expander_leds,Button pull-up: the AW9523B has none

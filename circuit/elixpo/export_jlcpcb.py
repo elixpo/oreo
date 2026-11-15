@@ -4,7 +4,7 @@
     python3 circuit/elixpo/export_jlcpcb.py
 
 build/jlcpcb/:
-- oreo-badge-gerbers.zip: the six copper layers, paste, silkscreen, mask,
+- oreo-badge-gerbers.zip: the copper layers, paste, silkscreen, mask,
   outline and the plated and unplated drill files (no drill maps).
 - oreo-badge-BOM.csv and oreo-badge-CPL.csv: JLCPCB assembly of the parts
   in its *basic* library only (no extended-part fees), with LCSC numbers.
@@ -32,7 +32,9 @@ BOARD = HERE / "elixpo.kicad_pcb"
 OUT = HERE / "build" / "jlcpcb"
 GERBERS = OUT / "gerbers"
 ORDER = HERE / "BOM_ORDER.csv"
-LAYERS = ("F.Cu,In1.Cu,In2.Cu,In3.Cu,In4.Cu,B.Cu,F.Paste,B.Paste,"
+INNER = ("In1.Cu,In2.Cu,In3.Cu,In4.Cu" if '"In4.Cu"' in BOARD.read_text()
+         else "In1.Cu,In2.Cu")                      # 6 or 4 copper layers
+LAYERS = ("F.Cu," + INNER + ",B.Cu,F.Paste,B.Paste,"
           "F.Silkscreen,B.Silkscreen,F.Mask,B.Mask,Edge.Cuts")
 PRICE_DATE = "2026-11-15"
 
@@ -100,10 +102,10 @@ PARTS = {
     "BQ24074RGT": (B, "TI BQ24074RGTR, charger, VQFN-16", "C54313", 2.1188, "Exposed pad: hot air or hot plate"),
     "TPS63031DSK": (B, "TI TPS63031DSKR, 3.3 V buck-boost, WSON-10", "C15516", 1.1568, "Exposed pad: hot air or hot plate"),
     "MPU-6050": (B, "TDK InvenSense MPU-6050, QFN-24", "C24112", 21.0013,
-                 "Costly and scarce as a bare chip: buy from an authorised distributor"),
+                 "Costly as a genuine bare chip. Cheaper: Robu SKU 162123, generic, Rs 426 incl. GST "
+                 "(Rs 369 at 10+): confirm it ships in the 4 x 4 mm QFN-24 (a 3 x 3 mm chip will not fit)"),
     "WS2812B-2020": (B, "Worldsemi WS2812B-2020, status LED", "C965555", 0.1165,
                      "Out of stock at LCSC on the price date; pads underneath: hot air"),
-    "MAX17048G+": (B, "ADI MAX17048G+T10, fuel gauge, TDFN-8", "C2682616", 1.9438, "Exposed pad: hot air or hot plate"),
     "AW9523B": (B, "Awinic AW9523BTQR, I2C expander, QFN-24", "C148077", 0.3266, "Exposed pad: hot air or hot plate"),
     "MAX98357A": (B, "ADI MAX98357AETE+T, I2S amplifier, TQFN-16", "C910544", 1.3089, "Exposed pad: hot air or hot plate"),
     "RV-3028-C7": (B, "Micro Crystal RV-3028-C7 32.768kHz 1ppm-TA-QC, RTC", "C3019759", 2.4722,

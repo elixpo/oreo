@@ -31,7 +31,7 @@
     (stroke (width 0.4) (type solid))
     (fill (color 245 230 220 1))
     (uuid "b7a5c141-1bd0-5eca-9147-013546ab968e")
-    (property "Sheetname" "Oreo badge — USB-C, charger, battery, fuel gauge and 3.3 V rail" (at 150 59 0) (effects (font (size 1.15 1.15) (bold yes)) (justify left bottom)))
+    (property "Sheetname" "Oreo badge — USB-C, charger, battery sense and 3.3 V rail" (at 150 59 0) (effects (font (size 1.15 1.15) (bold yes)) (justify left bottom)))
     (property "Sheetfile" "power_usb.kicad_sch" (at 150 121 0) (effects (font (size 1.0 1.0)) (justify left top)))
     (instances
       (project "elixpo"

@@ -34,6 +34,7 @@ BOARD_FILE = HERE / "elixpo.kicad_pcb"
 PROJECT_FILE = HERE / "elixpo.kicad_pro"
 
 W, H, CORNER = 88.0, 133.5, 6.0           # board outline, mm
+COPPER_LAYERS = 4                         # F signal / In1 GND / In2 signal / B signal
 ORIGIN = (40.0, 30.0)                     # where the board sits on the page
 
 # Front-face features.
@@ -189,15 +190,12 @@ PLACE = {
     "R41": (42, 61, 90, B),
     "R42": (22, 69.5, 90, B),
     "R43": (24.2, 69.5, 90, B),
-    "R44": (26.4, 69.5, 90, B),
     "R45": (28.6, 69.5, 90, B),
     "TP6": (40, 72, 0, B),
     "U7": (48, 66, 0, B),
     "C62": (52.5, 69.5, 0, B),
     "C63": (48, 70.5, 0, B),
     "C64": (44, 61, 90, B),
-    "U10": (13, 66, 0, B),
-    "C29": (13, 62.5, 0, B),
     "TP5": (7.5, 70, 0, B),
     "Q3": (13, 74, 0, B), "R27": (8.5, 74, 90, B),     # reverse-battery protection by J2
     "J2": (13, 81, 270, B),
@@ -646,28 +644,32 @@ def keepout(board, polygon, layers, name):
 
 
 def planes(board):
-    # 6 layers: F signal / In1 GND / In2 signal / In3 signal / In4 GND / B signal.
-    # Every signal layer is next to a solid ground plane; 3.3 V is routed
-    # with the Power net class.
+    # 4 layers: F signal / In1 GND / In2 signal / B signal (6 layers add In3
+    # signal and an In4 GND plane). 3.3 V is routed with the Power net class.
     gnd = board.FindNet("GND")
     full = [(0.3, 0.3), (W - 0.3, 0.3), (W - 0.3, H - 0.3), (0.3, H - 0.3)]
     zone(board, gnd, pcbnew.In1_Cu, full)                 # return plane for F and In2
-    zone(board, gnd, pcbnew.In4_Cu, full)                 # return plane for In3 and B
+    if COPPER_LAYERS == 6:
+        zone(board, gnd, pcbnew.In4_Cu, full)             # return plane for In3 and B
+    else:
+        # 4 layers: the free area of In2 carries 3.3 V, a reference for the
+        # back's tracks and a low-impedance supply; it fills around In2's tracks.
+        zone(board, board.FindNet("+3V3"), pcbnew.In2_Cu, full, clearance=0.3)
     zone(board, gnd, pcbnew.F_Cu, full, clearance=0.3)    # ground fill, stitched to In1
     zone(board, gnd, pcbnew.B_Cu, full, clearance=0.3)
     # Antenna: no copper on any layer beside or under the antenna, per the
     # ESP32-S3-WROOM-1 datasheet; the module's antenna end is on the top edge.
     mx = PLACE["U1"][0]
-    copper = [pcbnew.F_Cu, pcbnew.In1_Cu, pcbnew.In2_Cu, pcbnew.In3_Cu, pcbnew.In4_Cu, pcbnew.B_Cu]
+    copper = list(board.GetEnabledLayers().CuStack())
     keepout(board, [(mx - 15.0, 0.0), (mx + 15.0, 0.0), (mx + 15.0, 7.0), (mx - 15.0, 7.0)],
             copper, "antenna keep-out")
 
 
 def stackup(board):
-    board.SetCopperLayerCount(6)
+    board.SetCopperLayerCount(COPPER_LAYERS)
     ds = board.GetDesignSettings()
     ds.SetBoardThickness(mm(1.6))
-    # Standard 6-layer capability at JLCPCB/PCBWay is 0.09 mm track and gap,
+    # Standard 4- and 6-layer capability at JLCPCB/PCBWay is 0.09 mm track and gap,
     # 0.2 mm drill; these rules stay well inside it.
     ds.m_TrackMinWidth = mm(0.1)        # Freerouting necks tracks to ~0.11 mm at fine-pitch pins
     ds.m_MinClearance = mm(0.127)
@@ -706,7 +708,7 @@ def write_netclasses():
     PROJECT_FILE.write_text(json.dumps(pro, indent=2) + "\n")
 
 
-STACKUP = """\t\t(stackup
+STACKUP_6 = """\t\t(stackup
 \t\t\t(layer "F.SilkS" (type "Top Silk Screen") (color "White"))
 \t\t\t(layer "F.Paste" (type "Top Solder Paste"))
 \t\t\t(layer "F.Mask" (type "Top Solder Mask") (color "Black") (thickness 0.01))
@@ -730,7 +732,31 @@ STACKUP = """\t\t(stackup
 """
 
 
-TITLE_BLOCK = '\t(title_block\n\t\t(title "Oreo Badge")\n\t\t(date "2026-11-15")\n\t\t(rev "1.0")\n\t\t(company "Elixpo")\n\t\t(comment 1 "Hardware: CERN-OHL-P-2.0, OSHWA IN000107")\n\t\t(comment 2 "6 layers, 1.6 mm, ENIG, black mask")\n\t)\n'
+STACKUP_4 = """\t\t(stackup
+\t\t\t(layer "F.SilkS" (type "Top Silk Screen") (color "White"))
+\t\t\t(layer "F.Paste" (type "Top Solder Paste"))
+\t\t\t(layer "F.Mask" (type "Top Solder Mask") (color "Black") (thickness 0.01))
+\t\t\t(layer "F.Cu" (type "copper") (thickness 0.035))
+\t\t\t(layer "dielectric 1" (type "prepreg") (thickness 0.2104) (material "FR4") (epsilon_r 4.4) (loss_tangent 0.02))
+\t\t\t(layer "In1.Cu" (type "copper") (thickness 0.0152))
+\t\t\t(layer "dielectric 2" (type "core") (thickness 1.065) (material "FR4") (epsilon_r 4.6) (loss_tangent 0.02))
+\t\t\t(layer "In2.Cu" (type "copper") (thickness 0.0152))
+\t\t\t(layer "dielectric 3" (type "prepreg") (thickness 0.2104) (material "FR4") (epsilon_r 4.4) (loss_tangent 0.02))
+\t\t\t(layer "B.Cu" (type "copper") (thickness 0.035))
+\t\t\t(layer "B.Mask" (type "Bottom Solder Mask") (color "Black") (thickness 0.01))
+\t\t\t(layer "B.Paste" (type "Bottom Solder Paste"))
+\t\t\t(layer "B.SilkS" (type "Bottom Silk Screen") (color "White"))
+\t\t\t(copper_finish "ENIG")
+\t\t\t(dielectric_constraints no)
+\t\t)
+"""
+STACKUP = STACKUP_4 if COPPER_LAYERS == 4 else STACKUP_6   # JLCPCB JLC04161H-7628 for 4 layers
+
+
+TITLE_BLOCK_FMT = '\t(title_block\n\t\t(title "Oreo Badge")\n\t\t(date "2026-11-15")\n\t\t(rev "1.0")\n\t\t(company "Elixpo")\n\t\t(comment 1 "Hardware: CERN-OHL-P-2.0, OSHWA IN000107")\n\t\t(comment 2 "%d layers, 1.6 mm, ENIG, black mask")\n\t)\n'
+
+
+TITLE_BLOCK = TITLE_BLOCK_FMT % COPPER_LAYERS
 
 
 def write_title():
@@ -741,7 +767,7 @@ def write_title():
 
 
 def write_stackup():
-    """1.6 mm 6-layer build with black solder mask and white silkscreen.
+    """1.6 mm 4- or 6-layer build with black solder mask and white silkscreen.
     The stackup is not exposed to Python, so it goes into the file."""
     text = BOARD_FILE.read_text()
     if "(stackup" not in text:
@@ -827,7 +853,7 @@ def main():
     write_title()
     write_netclasses()
     write_rules()
-    print(f"Placed {len(footprints)} footprints on a {W:g} x {H:g} mm 6-layer board: {BOARD_FILE}")
+    print(f"Placed {len(footprints)} footprints on a {W:g} x {H:g} mm {COPPER_LAYERS}-layer board: {BOARD_FILE}")
 
 
 if __name__ == "__main__":

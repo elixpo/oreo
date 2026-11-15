@@ -5,11 +5,11 @@ Association, UID [IN000107](https://certification.oshwa.org/in000107.html). The 
 CERN-OHL-P-2.0 (see `LICENSE` in this directory).
 
 This KiCad 10 project is the PCB successor to the ESP32-S3 DevKitC
-breadboard: a 6-layer, 88 x 133.5 mm board, fully routed. The root
+breadboard: a 4-layer, 88 x 133.5 mm board, fully routed. The root
 schematic, `elixpo.kicad_sch`, links five sheets:
 
 1. ESP32-S3-WROOM-1-N16R8 module, reset and boot, debug pads.
-2. USB-C, BQ24074 Li-ion power-path charger, fuel gauge and TPS63031 3.3 V rail.
+2. USB-C, BQ24074 Li-ion power-path charger, battery sense and TPS63031 3.3 V rail.
 3. 2.8 inch ILI9341 SPI display module header and the eight buttons.
 4. AW9523B I2C expander, the I2C bus, corner and edge LEDs.
 5. MAX98357A speaker amp, MPU-6050, RTC, microSD, infrared, status LED and Qwiic.
@@ -38,8 +38,9 @@ flat engineering export that is regenerated directly from the schematic model.
 
 On the AW9523B (0x58): P0_0-P0_7 are UP, DOWN, LEFT, RIGHT, A, B, C,
 HOME; P1_0-P1_3 sink the corner LEDs (TL, TR, BL, BR); P1_4 AMP_EN,
-P1_5 SD_DET, P1_6 FG_ALRT, P1_7 the touch controller's chip select. Other
-I2C devices: MAX17048 0x36, RV-3028 0x52, MPU-6050 0x68.
+P1_5 SD_DET, P1_6 spare, P1_7 the touch controller's chip select. Other
+I2C devices: RV-3028 0x52, MPU-6050 0x69 (AD0 tied to its VLOGIC pin;
+`oreoWare/imu.py` tries 0x68, then 0x69).
 
 This differs from the breadboard's `oreoWare/pins.py` (buttons on GPIOs,
 SD on 38-40, the amp on 41/21/46): the expander freed the button pins, so
@@ -49,6 +50,8 @@ this board.
 
 ## Electrical decisions
 
+- 4 layers, JLCPCB JLC04161H-7628 (1.6 mm): F signal / In1 solid GND /
+  In2 signal with a 3.3 V pour / B signal.
 - U1 is the ESP32-S3-WROOM-1-N16R8 module (16 MB flash, 8 MB octal PSRAM),
   its PCB antenna over a keep-out on every layer at the top edge.
 - Native USB uses GPIO19/GPIO20, 22 ohm series resistors, Type-C 5.1 kohm Rd
@@ -57,7 +60,7 @@ this board.
   about 445 mA charge current, about 800 mA input limit, about 50 mA
   termination current, and a 6.3-hour safety timer (all JLCPCB basic resistor
   values). These values must be checked against the selected cell before
-  production. A MAX17048 reports the state of charge over I2C.
+  production. The battery level comes from the R17/R18 divider on GPIO1 (ADC).
 - The main 3.3 V rail is buck-boost regulated so the badge remains stable over
   the full Li-ion discharge curve. The display module runs from 3.3 V and
   switches its own backlight. The speaker amp runs from VSYS.
