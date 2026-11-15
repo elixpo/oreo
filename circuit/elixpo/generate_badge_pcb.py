@@ -617,8 +617,8 @@ def write_netclasses():
         # 0.3 mm reaches the 0.5 mm-pitch QFN/WSON pads of the charger and the
         # regulator within clearance, and carries about 1 A on outer copper:
         # enough for the 0.5-0.8 A these short runs see.
-        dict(base, name="Power", clearance=0.15, track_width=0.3, via_diameter=0.6, via_drill=0.3, priority=1),
-        dict(base, name="Battery", clearance=0.15, track_width=0.3, via_diameter=0.6, via_drill=0.3, priority=0),
+        dict(base, name="Power", clearance=0.13, track_width=0.3, via_diameter=0.6, via_drill=0.3, priority=1),
+        dict(base, name="Battery", clearance=0.13, track_width=0.3, via_diameter=0.6, via_drill=0.3, priority=0),
         # about 50 ohm on an outer layer over the 0.1 mm prepreg to its ground plane
         dict(base, name="Fast", clearance=0.15, track_width=0.18, via_diameter=0.45, via_drill=0.2, priority=2),
         dict(base, name="USB", clearance=0.15, track_width=0.3, via_diameter=0.45, via_drill=0.2,

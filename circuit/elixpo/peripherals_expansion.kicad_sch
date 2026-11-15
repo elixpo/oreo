@@ -1017,7 +1017,7 @@
   (no_connect (at 224.79000000000002 77.47) (uuid "07b42e35-11e8-50f6-8097-64b7af93acf4"))
   (global_label "IMU_CPOUT" (shape bidirectional) (at 224.79000000000002 82.55000000000001 0) (effects (font (size 0.9 0.9)) (justify left)) (uuid "5b2a355d-1df8-5855-8488-b4af02e383e0"))
   (no_connect (at 224.79000000000002 87.63000000000001) (uuid "9cda8674-18dc-51fb-b37a-6f93a1bb0d6f"))
-  (global_label "GND" (shape bidirectional) (at 224.79000000000002 92.71000000000001 0) (effects (font (size 0.9 0.9)) (justify left)) (uuid "6b5d1db4-dcf7-57af-8dce-4336a71f24e0"))
+  (no_connect (at 224.79000000000002 92.71000000000001) (uuid "aee04cb7-cfeb-5ba2-b3d2-a2c040a36300"))
   (global_label "I2C_SCL" (shape bidirectional) (at 224.79000000000002 97.79 0) (effects (font (size 0.9 0.9)) (justify left)) (uuid "23b1b2a6-91c9-5e76-b231-40da361fa093"))
   (global_label "I2C_SDA" (shape bidirectional) (at 224.79000000000002 102.87 0) (effects (font (size 0.9 0.9)) (justify left)) (uuid "3d24c480-0185-5f25-bc45-9d28559a7027"))
   (global_label "IMU_REGOUT" (shape bidirectional) (at 250.19000000000003 44.45 180) (effects (font (size 0.9 0.9)) (justify right)) (uuid "c81da7a7-3020-509c-a4f3-1fc8949c79a2"))

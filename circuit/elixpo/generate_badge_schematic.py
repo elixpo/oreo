@@ -382,7 +382,7 @@ PERIPHERALS = [
                ("FSYNC", 11, "GND"), ("INT", 12, "IMU_INT"), ("VDD", 13, "+3V3"),
                ("NC", 14, "IMU14_NC"), ("NC", 15, "IMU15_NC"), ("NC", 16, "IMU16_NC"),
                ("NC", 17, "IMU17_NC"), ("GND", 18, "GND"), ("RESV", 19, "IMU19_NC"),
-               ("CPOUT", 20, "IMU_CPOUT"), ("RESV", 21, "IMU21_NC"), ("RESV", 22, "GND"),
+               ("CPOUT", 20, "IMU_CPOUT"), ("RESV", 21, "IMU21_NC"), ("RESV", 22, "IMU22_NC"),
                ("SCL", 23, "I2C_SCL"), ("SDA", 24, "I2C_SDA")], 200, 75, "IMU at 0x68"),
     p2("C62", "100nF", C0402, "IMU_REGOUT", "GND", 260, 45),
     p2("C63", "2.2nF 50V", C0402, "IMU_CPOUT", "GND", 260, 75),
