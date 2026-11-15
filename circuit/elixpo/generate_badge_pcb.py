@@ -146,7 +146,7 @@ PLACE = {
     # clip slots); the back edge lights follow the corner curves (below).
     "D1": (3.6, 11.0, 90, F), "D2": (86.4, 9.0, 90, F),
     "D3": (3.6, 130.0, 0, F), "D4": (84.4, 130.0, 0, F),
-    "U9": (45.0, DPAD[1], 0, F),               # status LED between HOME and A
+    "U9": (76.0, 44.0, 0, B),               # status LED on the back, beside the power switch
     # ---- Back: module and RTC at the top, display/expander/IMU behind the top of the
     # screen, battery low, microSD and USB-C at the bottom ----
     "U1": (44, 12.8, 0, B),
@@ -179,8 +179,8 @@ PLACE = {
     "C70": (76.5, 21.5, 90, B),
     "J3": (HEADER_PIN1[0], HEADER_PIN1[1], 180, F),   # module header socket; pin 1 at the bottom
     "C30": (81.5, HEADER_PIN1[1], 90, B),
-    "R74": (80.5, 89.5, 90, B),
-    "C71": (80.5, 81, 90, B),
+    "R74": (76.0, 47.2, 0, B),
+    "C71": (76.0, 40.8, 0, B),
     "U11": (34, 66, 0, B),
     "C40": (38.5, 66, 90, B),
     "R40": (40, 61, 90, B),
