@@ -88,6 +88,35 @@ def _find(node, key):
     return [c for c in node if isinstance(c, list) and c and c[0] == key]
 
 
+def _without_tracks(text):
+    """The board file with its top-level segment, arc and via blocks removed
+    (everything else, footprints and zones included, kept byte for byte)."""
+    out, depth, i, start, n = [], 0, 0, 0, len(text)
+    block_start = None
+    while i < n:
+        c = text[i]
+        if c == '"':
+            i = text.index('"', i + 1)          # strings never hold structure
+            while text[i - 1] == "\\":
+                i = text.index('"', i + 1)
+        elif c == "(":
+            depth += 1
+            if depth == 2:
+                block_start = i
+        elif c == ")":
+            if depth == 2 and block_start is not None:
+                head = text[block_start + 1:block_start + 8]
+                if head.startswith(("segment", "via", "arc")):
+                    line = text.rfind("\n", 0, block_start)
+                    out.append(text[start:line])
+                    start = i + 1
+                block_start = None
+            depth -= 1
+        i += 1
+    out.append(text[start:])
+    return "".join(out)
+
+
 def import_ses():
     """Read Freerouting's session file and add its wires and vias.
     (KiCad's own ImportSpecctraSES needs the editor window.) Session
@@ -108,9 +137,17 @@ def import_ses():
             if m:
                 pads[ps[1]] = (int(m.group(1)) * 1000, int(m.group(2)) * 1000)
 
-    board = pcbnew.LoadBoard(str(BOARD))
-    for track in list(board.Tracks()):
-        board.Remove(track)
+    # Drop the old tracks in the file itself: removing them through the API
+    # leaves dangling objects that crash the zone filler.
+    # The copy sits next to copies of the project and rules files, or KiCad
+    # would load it (and save it) with default net classes.
+    import shutil
+    stripped = BUILD / "route_input.kicad_pcb"
+    stripped.write_text(_without_tracks(BOARD.read_text()))
+    for ext in (".kicad_pro", ".kicad_dru"):
+        shutil.copyfile(BOARD.with_suffix(ext), stripped.with_suffix(ext))
+    project = BOARD.with_suffix(".kicad_pro").read_bytes()
+    board = pcbnew.LoadBoard(str(stripped))
     layers = {board.GetLayerName(l): l for l in board.GetEnabledLayers().CuStack()}
     n_tracks = n_vias = 0
     for net_node in _find(_find(routes, "network_out")[0], "net"):
@@ -144,15 +181,21 @@ def import_ses():
             n_vias += 1
     pcbnew.ZONE_FILLER(board).Fill(board.Zones())
     board.Save(str(BOARD))
+    BOARD.with_suffix(".kicad_pro").write_bytes(project)    # never let a save change the rules
     print(f"Imported {n_tracks} track segments and {n_vias} vias into {BOARD}")
 
 
 if __name__ == "__main__":
+    import os
     if IMPORT_ONLY:
         import_ses()
+        sys.stdout.flush()
+        os._exit(0)             # pcbnew can crash while Python tears down
     else:
         export_dsn()
         route()
         # A second LoadBoard in this process crashes pcbnew, so the import
         # runs in a fresh one.
         subprocess.run([sys.executable, __file__, "--import-only"], check=True)
+        sys.stdout.flush()
+        os._exit(0)
