@@ -54,11 +54,13 @@ def detect(path, forced=None):
 
 def encode_image(source, output, max_dim):
     try:
-        from PIL import Image
+        from PIL import Image, ImageOps
     except ImportError:
         raise SystemExit("Pillow is required for images: pip install Pillow")
     with Image.open(source) as image:
-        image = image.convert("RGB")
+        # Phone photos keep their pixels sideways and say how to turn them
+        # in the EXIF Orientation tag: apply it, or portraits arrive rotated.
+        image = ImageOps.exif_transpose(image).convert("RGB")
         scale = min(1.0, max_dim / max(image.size))
         size = (max(1, round(image.width * scale)),
                 max(1, round(image.height * scale)))

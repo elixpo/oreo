@@ -18,6 +18,9 @@ from its `## [<version>]` section below, so every release needs one.
   (like `cp -r . dest`), so its files land inside the destination.
 - `oreo push -r . <new path>` failed with "unexpected error: IndexError"
   and copied nothing; the folder's contents now land in the new path.
+- Photos sent with `oreo add` or `oreo transfer send` are turned upright
+  from their EXIF Orientation tag, so portrait phone photos no longer
+  arrive in the Gallery sideways.
 
 ## [1.1.0] - 2026-11-12
 
