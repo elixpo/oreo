@@ -67,6 +67,13 @@ class Copper:
                 if pad.HasHole():
                     d = max(pad.GetDrillSize().x, pad.GetDrillSize().y)
                     self.holes.append((pad.GetPosition(), d // 2))
+                if pad.GetAttribute() == pcbnew.PAD_ATTRIB_NPTH:
+                    # An unplated hole has no copper, so it is not in the grid
+                    # above: block it on every layer with the board's hole
+                    # clearance (the USB-C shell pegs, mounting holes, grille).
+                    hole = pad.GetEffectiveHoleShape()
+                    for l in self.layers:
+                        self._put(l, hole, -1, board.GetDesignSettings().m_HoleClearance)
         for t in board.Tracks():
             self.add(t)
         # board rule areas and the footprints' own (the module's antenna, the IMU, the card socket)

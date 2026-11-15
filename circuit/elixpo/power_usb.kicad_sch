@@ -674,7 +674,7 @@
       (property "Value" "MAIN POWER" (at 0 15.8 0) (effects (font (size 1.27 1.27))))
       (property "Footprint" "Button_Switch_SMD:SW_SPDT_CK_JS102011SAQN" (at 0 0 0) (effects (font (size 1.27 1.27)) (hide yes)))
       (property "Datasheet" "" (at 0 0 0) (effects (font (size 1.27 1.27)) (hide yes)))
-      (property "Description" "Disconnects the system; charging and the RTC stay powered" (at 0 0 0) (effects (font (size 1.27 1.27)) (hide yes)))
+      (property "Description" "Disconnects the system; charging stays powered" (at 0 0 0) (effects (font (size 1.27 1.27)) (hide yes)))
       (symbol "SW3_0_1"
         (rectangle (start -7.62 -12.0) (end 7.62 12.0)
           (stroke (width 0.254) (type solid)) (fill (type background)))
@@ -1068,7 +1068,7 @@
   (global_label "VBAT_SENSE" (shape bidirectional) (at 139.70000000000002 270.51 180) (effects (font (size 0.9 0.9)) (justify right)) (uuid "908b0a5c-e487-5e64-a777-2ab9c129e2f8"))
   (global_label "GND" (shape bidirectional) (at 160.02 270.51 0) (effects (font (size 0.9 0.9)) (justify left)) (uuid "d5770d5e-f02d-5f07-9bed-4dbc27f291af"))
   (text "USB-C + BATTERY MANAGEMENT" (exclude_from_sim no) (at 18 18 0) (effects (font (size 2.0 2.0) (bold yes)) (justify left bottom)) (uuid "3ef9abb5-d507-5f80-8e1b-5b9c49e76842"))
-  (text "BQ24074 runs the badge from USB while it charges; SW3 cuts the system, not charging or the RTC; R17/R18 read the battery on GPIO1." (exclude_from_sim no) (at 18 25 0) (effects (font (size 1.1 1.1)) (justify left bottom)) (uuid "9120df63-2352-54cc-8b49-042246a57ecf"))
+  (text "BQ24074 runs the badge from USB while it charges; SW3 cuts the system, not charging; R17/R18 read the battery on GPIO1." (exclude_from_sim no) (at 18 25 0) (effects (font (size 1.1 1.1)) (justify left bottom)) (uuid "9120df63-2352-54cc-8b49-042246a57ecf"))
   (text "Charge current 0.45 A suits a 1000 mAh cell (0.45C); recheck R14 for any other cell." (exclude_from_sim no) (at 18 285 0) (effects (font (size 1.05 1.05)) (justify left bottom)) (uuid "7b8a3a8e-581a-57f9-a39e-de524934660c"))
   (symbol
     (lib_id "oreo_badge:J1")
@@ -1523,7 +1523,7 @@
     (property "Value" "MAIN POWER" (at 204.47 126.28999999999999 0) (effects (font (size 1.0 1.0))))
     (property "Footprint" "Button_Switch_SMD:SW_SPDT_CK_JS102011SAQN" (at 204.47 110.49 0) (effects (font (size 1.27 1.27)) (hide yes)))
     (property "Datasheet" "" (at 204.47 110.49 0) (effects (font (size 1.27 1.27)) (hide yes)))
-    (property "Description" "Disconnects the system; charging and the RTC stay powered" (at 204.47 110.49 0) (effects (font (size 1.27 1.27)) (hide yes)))
+    (property "Description" "Disconnects the system; charging stays powered" (at 204.47 110.49 0) (effects (font (size 1.27 1.27)) (hide yes)))
     (pin "1" (uuid "982cf454-d7a1-5519-8ea9-f985db97ef3d"))
     (pin "2" (uuid "1439c1b6-787d-5f24-927d-b5feb2822a59"))
     (pin "3" (uuid "af7d32a4-5eb6-59df-840c-945419163acf"))

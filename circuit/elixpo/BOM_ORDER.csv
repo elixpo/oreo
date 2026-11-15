@@ -1,6 +1,6 @@
 Group,Designators,Qty per badge,Part,Footprint,LCSC #,LCSC unit USD (2026-11-15),Line USD,Notes
 A JLCPCB assembles (basic),C1 C21 C28,3,"Samsung CL21A226MAQNNNE, 22 uF 25 V X5R 0805",C_0805_2012Metric,C45783,0.1084,0.3252,
-A JLCPCB assembles (basic),C2 C22 C27 C40 C61 C62 C64 C65 C66 C68 C71,11,"Samsung CL05B104KO5NNNC, 100 nF 16 V X7R 0402",C_0402_1005Metric,C1525,0.0024,0.0264,
+A JLCPCB assembles (basic),C2 C22 C27 C40 C61 C62 C64 C68 C71,9,"Samsung CL05B104KO5NNNC, 100 nF 16 V X7R 0402",C_0402_1005Metric,C1525,0.0024,0.0216,
 A JLCPCB assembles (basic),C3,1,"Samsung CL05A105KA5NQNC, 1 uF 25 V X5R 0402",C_0402_1005Metric,C52923,0.0057,0.0057,
 A JLCPCB assembles (basic),C20 C30 C60 C67,4,"Samsung CL21A106KAYNNNE, 10 uF 25 V X5R 0805",C_0805_2012Metric,C15850,0.0311,0.1244,
 A JLCPCB assembles (basic),C23,1,"FH 0402B102K500NT, 1 nF 50 V X7R 0402",C_0402_1005Metric,C1523,0.0036,0.0036,
@@ -8,7 +8,7 @@ A JLCPCB assembles (basic),C24,1,"Samsung CL10A105KB8NNNC, 1 uF 50 V X5R 0603",C
 A JLCPCB assembles (basic),C25 C26 C70,3,"Samsung CL10A475KO8NNNC, 4.7 uF 16 V X5R 0603",C_0603_1608Metric,C19666,0.015,0.045,
 A JLCPCB assembles (basic),Q1,1,"CJ MMBT2222A, NPN SOT-23",SOT-23,C8512,0.0182,0.0182,
 A JLCPCB assembles (basic),Q3,1,"AOS AO3401A, P-MOSFET SOT-23",SOT-23,C15127,0.0814,0.0814,
-A JLCPCB assembles (basic),R1 R2 R16 R27 R42 R43 R45 R50 R51 R52 R53 R54 R55 R56 R57 R61 R62 R63 R64 R65 R66 R67,22,"UNI-ROYAL 0402WGF1002TCE, 10 k 1% 0402",R_0402_1005Metric,C25744,0.001,0.022,
+A JLCPCB assembles (basic),R1 R2 R16 R27 R42 R43 R45 R50 R51 R52 R53 R54 R55 R56 R57 R62 R63 R64 R65 R66 R67,21,"UNI-ROYAL 0402WGF1002TCE, 10 k 1% 0402",R_0402_1005Metric,C25744,0.001,0.021,
 A JLCPCB assembles (basic),R3 R4 R12 R13,4,"UNI-ROYAL 0402WGF220JTCE, 22 R 0402",R_0402_1005Metric,C25092,0.001,0.004,
 A JLCPCB assembles (basic),R5,1,"UNI-ROYAL 0402WGF330JTCE, 33 R 0402",R_0402_1005Metric,C25105,0.0011,0.0011,
 A JLCPCB assembles (basic),R10 R11,2,"UNI-ROYAL 0402WGF5101TCE, 5.1 k 1% 0402",R_0402_1005Metric,C25905,0.0014,0.0028,
@@ -43,8 +43,8 @@ A JLCPCB assembles (basic),R74,1,"UNI-ROYAL 0402WGF3300TCE, 330 R 1% 0402",R_040
 "B Buy, hand-solder SMD",U9,1,"Worldsemi WS2812B-2020, status LED",LED_WS2812B-2020_PLCC4_2.0x2.0mm,C965555,0.1165,0.1165,Out of stock at LCSC on the price date; pads underneath: hot air
 "B Buy, hand-solder SMD",U11,1,"Awinic AW9523BTQR, I2C expander, QFN-24",QFN-24-1EP_4x4mm_P0.5mm_EP2.7x2.7mm,C148077,0.3266,0.3266,Exposed pad: hot air or hot plate
 "B Buy, hand-solder SMD",U12,1,"ADI MAX98357AETE+T, I2S amplifier, TQFN-16",TQFN-16-1EP_3x3mm_P0.5mm_EP1.23x1.23mm,C910544,1.3089,1.3089,Exposed pad: hot air or hot plate
-"B Buy, hand-solder SMD",U13,1,"Micro Crystal RV-3028-C7 32.768kHz 1ppm-TA-QC, RTC",MicroCrystal_C7_SON-8_1.5x3.2mm_P0.9mm,C3019759,2.4722,2.4722,Out of stock at LCSC on the price date: Mouser / DigiKey
 "C Buy, hand-solder through-hole",J3,1,"1x14 female header, 2.54 mm, 8.5 mm tall",PinSocket_1x14_P2.54mm_Vertical,C41417326,0.2363,0.2363,The display module plugs into it
+"C Buy, hand-solder through-hole",J6,1,"1x6 male header, 2.54 mm (optional)",PinHeader_1x06_P2.54mm_Vertical,,,,Any generic header; or solder wires straight to the pads
 "C Buy, hand-solder through-hole",SW11 SW12 SW13 SW14 SW15 SW16 SW17 SW18,8,"6 x 6 mm tactile switch, 4-pin through-hole (5-7 mm tall)",SW_PUSH_6mm,,,,Any generic 6x6 THT tact
 "C Buy, hand-solder through-hole",U8,1,"Vishay TSOP38238, 38 kHz IR receiver",Vishay_MINICAST-3Pin,C141632,0.648,0.648,"Front, lying flat, lens facing out"
 D Off-board / mechanical,LCD1,1,"2.8in 240x320 ILI9341 SPI module with touch, 14-pin header (LCDwiki MSP2807 type)",,,,,"Check its header reads VCC, GND, CS ... T_IRQ from pin 1"

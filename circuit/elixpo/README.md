@@ -12,7 +12,8 @@ schematic, `elixpo.kicad_sch`, links five sheets:
 2. USB-C, BQ24074 Li-ion power-path charger, battery sense and TPS63031 3.3 V rail.
 3. 2.8 inch ILI9341 SPI display module header and the eight buttons.
 4. AW9523B I2C expander, the I2C bus, corner and edge LEDs.
-5. MAX98357A speaker amp, MPU-6050, RTC, microSD, infrared, status LED and Qwiic.
+5. MAX98357A speaker amp, MPU-6050, microSD, infrared, status LED, Qwiic and the
+   J6 expansion header.
 
 Run `./circuit/elixpo/build.sh` from any directory to regenerate the design and
 produce the ERC report, PDF and KiCad-native BOM under `circuit/elixpo/build/`.
@@ -28,9 +29,9 @@ flat engineering export that is regenerated directly from the schematic model.
 | 0 | BOOT button | 21 | TOUCH_IRQ (display touch) |
 | 1 | VBAT_SENSE (ADC) | 38 | SD_CLK |
 | 2 | IR_TX | 39 | SD_CMD |
-| 3 | EXP_INT (AW9523B, RTC GPIO: wakes the badge) | 40, 41, 42, 47 | SD_D0, D1, D2, D3 |
+| 3 | EXP_INT (AW9523B, RTC GPIO: wakes the badge) | 40 | SD_D0 |
 | 4 | IMU_INT | 43, 44 | UART TX, RX (debug pads) |
-| 5 | RTC_INT | 45, 46 | strapping pins, unused |
+| 5, 41, 42, 47 | J6 expansion header | 45, 46 | strapping pins, unused |
 | 6, 7 | I2C SDA, SCL | 48 | STATUS_LED (WS2812B) |
 | 8, 9, 10 | I2S BCLK, LRCLK, DIN | 11, 12, 13 | LCD MOSI, SCK, MISO (touch only) |
 | 14, 15, 16, 17 | LCD CS, DC, RESET, backlight | 18 | IR_RX |
@@ -39,7 +40,7 @@ flat engineering export that is regenerated directly from the schematic model.
 On the AW9523B (0x58): P0_0-P0_7 are UP, DOWN, LEFT, RIGHT, A, B, C,
 HOME; P1_0-P1_3 sink the corner LEDs (TL, TR, BL, BR); P1_4 AMP_EN,
 P1_5 SD_DET, P1_6 spare, P1_7 the touch controller's chip select. Other
-I2C devices: RV-3028 0x52, MPU-6050 0x69 (AD0 tied to its VLOGIC pin;
+I2C devices: MPU-6050 0x69 (AD0 tied to its VLOGIC pin;
 `oreoWare/imu.py` tries 0x68, then 0x69).
 
 This differs from the breadboard's `oreoWare/pins.py` (buttons on GPIOs,
@@ -64,8 +65,14 @@ this board.
 - The main 3.3 V rail is buck-boost regulated so the badge remains stable over
   the full Li-ion discharge curve. The display module runs from 3.3 V and
   switches its own backlight. The speaker amp runs from VSYS.
-- microSD is on its own 4-bit SDMMC bus, so the display keeps the whole SPI
-  bus for video.
+- microSD is on its own 1-bit SDMMC bus (CLK 38, CMD 39, D0 40), as on the
+  breadboard, so the display keeps the whole SPI bus for video. DAT1-DAT3
+  are pulled up at the socket.
+- J6 brings out GPIO5, 41, 42 and 47 with 3.3 V and GND on a 2.54 mm header
+  for add-ons: any of them can be I2C, SPI or plain GPIO through the
+  ESP32-S3's GPIO matrix. Qwiic (J5) carries the main I2C bus as well.
+- There is no RTC: the ESP32's own clock keeps time while the battery is in,
+  and the OS sets it over Wi-Fi (NTP) after a cold start.
 - GPIO45 and GPIO46 are deliberately unused because they are boot strapping
   pins. GPIO0 has a dedicated BOOT switch and EN has the recommended
   10 kohm/1 uF reset network.

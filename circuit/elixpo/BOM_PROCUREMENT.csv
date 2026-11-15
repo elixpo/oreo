@@ -40,7 +40,7 @@ D21,1,"amber, charging",Qualified commodity,,LED_SMD:LED_0603_1608Metric,YES,Sel
 J2,1,LiPo JST-PH 2-pin,JST,S2B-PH-SM4-TB(LF)(SN),Connector_JST:JST_PH_S2B-PH-SM4-TB_1x02-1MP_P2.00mm_Horizontal,YES,Active,"Protected 1S LiPo, 1000 mAh 603450; Q3 blocks a reversed pack; Battery connector; pack polarity varies by vendor"
 Q3,1,AO3401A,Alpha & Omega,AO3401A,Package_TO_SOT_SMD:SOT-23,YES,Active,"Reverse-battery protection: P-FET, gate to GND. A correct pack turns it on (conducts both ways, so charging works); a reversed pack leaves it off; Reverse-battery protection, -30 V P-FET, about 50 mOhm at -4.5 V"
 R27,1,10k,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rating,Q3 gate to GND; Use 1% resistors; X7R capacitors with voltage derating
-SW3,1,MAIN POWER,C&K,JS102011SAQN,Button_Switch_SMD:SW_SPDT_CK_JS102011SAQN,YES,Active,Disconnects the system; charging and the RTC stay powered; Main system disconnect
+SW3,1,MAIN POWER,C&K,JS102011SAQN,Button_Switch_SMD:SW_SPDT_CK_JS102011SAQN,YES,Active,Disconnects the system; charging stays powered; Main system disconnect
 U5,1,TPS63031DSK,Texas Instruments,TPS63031DSKR,Package_SON:WSON-10-1EP_2.5x2.5mm_P0.5mm_EP1.2x2mm,YES,Active,Fixed 3.3 V buck-boost; holds 3.3 V across the LiPo's 3.0-4.2 V; Fixed 3.3 V buck-boost
 L1,1,1.5uH 2A shielded,Taiyo Yuden,NR3015T1R5N,Inductor_SMD:L_Taiyo-Yuden_NR-30xx,YES,Verify current,"1.5 uH shielded, >=1.5 A saturation"
 R26,1,10R,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rating,VINA RC filter; Use 1% resistors; X7R capacitors with voltage derating
@@ -97,14 +97,11 @@ U7,1,MPU-6050,TDK InvenSense,MPU-6050,Sensor_Motion:InvenSense_QFN-24_4x4mm_P0.5
 C62,1,100nF,Qualified commodity,,Capacitor_SMD:C_0402_1005Metric,YES,Select by rating,Use 1% resistors; X7R capacitors with voltage derating
 C63,1,2.2nF 50V,Qualified commodity,,Capacitor_SMD:C_0402_1005Metric,YES,Select by rating,Use 1% resistors; X7R capacitors with voltage derating
 C64,1,100nF,Qualified commodity,,Capacitor_SMD:C_0402_1005Metric,YES,Select by rating,Use 1% resistors; X7R capacitors with voltage derating
-U13,1,RV-3028-C7,Micro Crystal,RV-3028-C7 32.768kHz 1ppm-TA-QC,Package_SON:MicroCrystal_C7_SON-8_1.5x3.2mm_P0.9mm,YES,Active,"RTC at 0x52, 45 nA; runs from the battery when the badge is off (set level-switching mode); Ultra-low-power RTC with backup switchover"
-C65,1,100nF,Qualified commodity,,Capacitor_SMD:C_0402_1005Metric,YES,Select by rating,Use 1% resistors; X7R capacitors with voltage derating
-C66,1,100nF,Qualified commodity,,Capacitor_SMD:C_0402_1005Metric,YES,Select by rating,Use 1% resistors; X7R capacitors with voltage derating
-R61,1,10k,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rating,Use 1% resistors; X7R capacitors with voltage derating
-J4,1,microSD push-push,Hirose,DM3AT-SF-PEJM5,Connector_Card:microSD_HC_Hirose_DM3AT-SF-PEJM5,YES,Active,"4-bit SDMMC on its own bus, off the display's SPI; Push-push microSD with card detect"
+J4,1,microSD push-push,Hirose,DM3AT-SF-PEJM5,Connector_Card:microSD_HC_Hirose_DM3AT-SF-PEJM5,YES,Active,"1-bit SDMMC (CLK, CMD, D0) on its own bus; DAT1-DAT3 pulled up keep the card in SD mode; Push-push microSD with card detect"
 C67,1,10uF 10V,Qualified commodity,,Capacitor_SMD:C_0805_2012Metric,YES,Select by rating,Use 1% resistors; X7R capacitors with voltage derating
 C68,1,100nF,Qualified commodity,,Capacitor_SMD:C_0402_1005Metric,YES,Select by rating,Use 1% resistors; X7R capacitors with voltage derating
 R62,1,10k,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rating,Use 1% resistors; X7R capacitors with voltage derating
+J6,1,Expansion: 3V3 GND IO5 IO41 IO42 IO47,TBD,,Connector_PinHeader_2.54mm:PinHeader_1x06_P2.54mm_Vertical,YES,Select,"Four free GPIOs for add-ons: I2C, SPI or plain GPIO through the GPIO matrix; Confirm availability and mechanical fit"
 R63,1,10k,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rating,SDMMC pull-up; Use 1% resistors; X7R capacitors with voltage derating
 R64,1,10k,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rating,SDMMC pull-up; Use 1% resistors; X7R capacitors with voltage derating
 R65,1,10k,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rating,SDMMC pull-up; Use 1% resistors; X7R capacitors with voltage derating

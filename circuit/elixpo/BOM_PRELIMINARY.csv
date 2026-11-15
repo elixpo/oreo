@@ -40,7 +40,7 @@ D21,"amber, charging",LED_SMD:LED_0603_1608Metric,power_usb,"Lit while charging,
 J2,LiPo JST-PH 2-pin,Connector_JST:JST_PH_S2B-PH-SM4-TB_1x02-1MP_P2.00mm_Horizontal,power_usb,"Protected 1S LiPo, 1000 mAh 603450; Q3 blocks a reversed pack"
 Q3,AO3401A,Package_TO_SOT_SMD:SOT-23,power_usb,"Reverse-battery protection: P-FET, gate to GND. A correct pack turns it on (conducts both ways, so charging works); a reversed pack leaves it off"
 R27,10k,Resistor_SMD:R_0402_1005Metric,power_usb,Q3 gate to GND
-SW3,MAIN POWER,Button_Switch_SMD:SW_SPDT_CK_JS102011SAQN,power_usb,Disconnects the system; charging and the RTC stay powered
+SW3,MAIN POWER,Button_Switch_SMD:SW_SPDT_CK_JS102011SAQN,power_usb,Disconnects the system; charging stays powered
 U5,TPS63031DSK,Package_SON:WSON-10-1EP_2.5x2.5mm_P0.5mm_EP1.2x2mm,power_usb,Fixed 3.3 V buck-boost; holds 3.3 V across the LiPo's 3.0-4.2 V
 L1,1.5uH 2A shielded,Inductor_SMD:L_Taiyo-Yuden_NR-30xx,power_usb,
 R26,10R,Resistor_SMD:R_0402_1005Metric,power_usb,VINA RC filter
@@ -97,14 +97,11 @@ U7,MPU-6050,Sensor_Motion:InvenSense_QFN-24_4x4mm_P0.5mm,peripherals_expansion,I
 C62,100nF,Capacitor_SMD:C_0402_1005Metric,peripherals_expansion,
 C63,2.2nF 50V,Capacitor_SMD:C_0402_1005Metric,peripherals_expansion,
 C64,100nF,Capacitor_SMD:C_0402_1005Metric,peripherals_expansion,
-U13,RV-3028-C7,Package_SON:MicroCrystal_C7_SON-8_1.5x3.2mm_P0.9mm,peripherals_expansion,"RTC at 0x52, 45 nA; runs from the battery when the badge is off (set level-switching mode)"
-C65,100nF,Capacitor_SMD:C_0402_1005Metric,peripherals_expansion,
-C66,100nF,Capacitor_SMD:C_0402_1005Metric,peripherals_expansion,
-R61,10k,Resistor_SMD:R_0402_1005Metric,peripherals_expansion,
-J4,microSD push-push,Connector_Card:microSD_HC_Hirose_DM3AT-SF-PEJM5,peripherals_expansion,"4-bit SDMMC on its own bus, off the display's SPI"
+J4,microSD push-push,Connector_Card:microSD_HC_Hirose_DM3AT-SF-PEJM5,peripherals_expansion,"1-bit SDMMC (CLK, CMD, D0) on its own bus; DAT1-DAT3 pulled up keep the card in SD mode"
 C67,10uF 10V,Capacitor_SMD:C_0805_2012Metric,peripherals_expansion,
 C68,100nF,Capacitor_SMD:C_0402_1005Metric,peripherals_expansion,
 R62,10k,Resistor_SMD:R_0402_1005Metric,peripherals_expansion,
+J6,Expansion: 3V3 GND IO5 IO41 IO42 IO47,Connector_PinHeader_2.54mm:PinHeader_1x06_P2.54mm_Vertical,peripherals_expansion,"Four free GPIOs for add-ons: I2C, SPI or plain GPIO through the GPIO matrix"
 R63,10k,Resistor_SMD:R_0402_1005Metric,peripherals_expansion,SDMMC pull-up
 R64,10k,Resistor_SMD:R_0402_1005Metric,peripherals_expansion,SDMMC pull-up
 R65,10k,Resistor_SMD:R_0402_1005Metric,peripherals_expansion,SDMMC pull-up

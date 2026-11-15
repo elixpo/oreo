@@ -108,8 +108,6 @@ PARTS = {
                      "Out of stock at LCSC on the price date; pads underneath: hot air"),
     "AW9523B": (B, "Awinic AW9523BTQR, I2C expander, QFN-24", "C148077", 0.3266, "Exposed pad: hot air or hot plate"),
     "MAX98357A": (B, "ADI MAX98357AETE+T, I2S amplifier, TQFN-16", "C910544", 1.3089, "Exposed pad: hot air or hot plate"),
-    "RV-3028-C7": (B, "Micro Crystal RV-3028-C7 32.768kHz 1ppm-TA-QC, RTC", "C3019759", 2.4722,
-                   "Out of stock at LCSC on the price date: Mouser / DigiKey"),
 
     "UP": (C, "6 x 6 mm tactile switch, 4-pin through-hole (5-7 mm tall)", "", None, "Any generic 6x6 THT tact"),
     "DOWN": (C, "6 x 6 mm tactile switch, 4-pin through-hole (5-7 mm tall)", "", None, ""),
@@ -121,6 +119,8 @@ PARTS = {
     "HOME": (C, "6 x 6 mm tactile switch, 4-pin through-hole (5-7 mm tall)", "", None, ""),
     "2.8in ILI9341 SPI module (MSP2807)": (C, "1x14 female header, 2.54 mm, 8.5 mm tall", "C41417326", 0.2363,
                                           "The display module plugs into it"),
+    "Expansion: 3V3 GND IO5 IO41 IO42 IO47": (C, "1x6 male header, 2.54 mm (optional)", "", None,
+                                              "Any generic header; or solder wires straight to the pads"),
     "TSOP38238": (C, "Vishay TSOP38238, 38 kHz IR receiver", "C141632", 0.648, "Front, lying flat, lens facing out"),
 }
 SKIP = {"Fiducial_1mm_Mask2mm"}
