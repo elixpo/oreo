@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 """Finish the routed board: ground stitching, the last few gaps, stubs.
 
-    /usr/bin/python3 circuit/elixpo/finish_badge_pcb.py [--ripup NET,NET] [--first NET,NET]
+    /usr/bin/python3 circuit/elixpo/finish_badge_pcb.py [--ripup NET,NET] [--first NET,NET] [--thin NET=0.12]
 
 --ripup removes those nets' tracks and vias first (rip-up and reroute);
 --first routes those nets before the rest.
@@ -52,6 +52,8 @@ class Copper:
     def __init__(self, board):
         self.board = board
         self.layers = list(board.GetEnabledLayers().CuStack())
+        self.net_clr = {code: net_clearance(n.GetNetname()) if n.GetNetname() else MM(0.13)
+                        for code, n in board.GetNetsByNetcode().items()}
         self.items = {l: {} for l in self.layers}      # layer -> cell -> [(shape, netcode)]
         self.holes = []                                  # (centre, radius)
         for fp in board.GetFootprints():
@@ -60,7 +62,7 @@ class Copper:
                 for l in self.layers:
                     if pad.IsOnLayer(l):
                         # fiducials and mechanical holes keep a 0.6 mm clearance of their own
-                        clr = MM(0.6) if board_only else CLEARANCE
+                        clr = MM(0.6) if board_only else self.net_clr.get(pad.GetNetCode(), CLEARANCE)
                         self._put(l, pad.GetEffectiveShape(l), pad.GetNetCode(), clr)
                 if pad.HasHole():
                     d = max(pad.GetDrillSize().x, pad.GetDrillSize().y)
@@ -96,7 +98,7 @@ class Copper:
         return [(x, y) for x in range(x0, x1 + 1) for y in range(y0, y1 + 1)]
 
     def _put(self, layer, shape, net, clr=None):
-        entry = (shape, net, clr or CLEARANCE)
+        entry = (shape, net, clr or self.net_clr.get(net, CLEARANCE))
         for cell in self._cells(shape.BBox(), 0):
             self.items[layer].setdefault(cell, []).append(entry)
 
@@ -116,7 +118,7 @@ class Copper:
                     continue
                 seen.add(id(entry))
                 other, onet, clr = entry
-                if onet != net and other.Collide(shape, clr):
+                if onet != net and other.Collide(shape, max(clr, self.net_clr.get(net, CLEARANCE))):
                     return False
         return True
 
@@ -242,6 +244,28 @@ def paths(a, b):
     ]
 
 
+def _netclasses():
+    import json
+    ns = json.loads(BOARD.with_suffix(".kicad_pro").read_text())["net_settings"]
+    return ns, {c["name"]: c for c in ns["classes"]}
+
+
+def _class_of(name):
+    import fnmatch
+    ns, classes = _netclasses()
+    for pat in ns.get("netclass_patterns", []):
+        if fnmatch.fnmatchcase(name, pat["pattern"]):
+            return classes[pat["netclass"]]
+    return classes["Default"]
+
+
+def net_clearance(name):
+    return MM(_class_of(name)["clearance"])
+
+
+THIN = {}                      # net name -> track width override (mm), from --thin
+
+
 def track_width(name):
     """The net class's track width, from the project file's patterns (the
     net-class object is not exposed to Python)."""
@@ -249,6 +273,8 @@ def track_width(name):
     import json
     ns = json.loads(BOARD.with_suffix(".kicad_pro").read_text())["net_settings"]
     widths = {c["name"]: c["track_width"] for c in ns["classes"]}
+    if name in THIN:
+        return MM(THIN[name])
     for pat in ns.get("netclass_patterns", []):
         if fnmatch.fnmatchcase(name, pat["pattern"]):
             return MM(widths[pat["netclass"]])
@@ -580,6 +606,9 @@ def main():
     args = sys.argv[1:]
     opt = lambda k: args[args.index(k) + 1].split(",") if k in args else []
     ripup, first, skip = opt("--ripup"), opt("--first"), opt("--skip")
+    for item in opt("--thin"):
+        name, width = item.split("=")
+        THIN[name] = float(width)
     project = BOARD.with_suffix(".kicad_pro").read_bytes()
     if ripup:
         BOARD.write_text(strip_nets(BOARD.read_text(), ripup))
