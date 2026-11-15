@@ -148,7 +148,11 @@ def import_ses():
 
 
 if __name__ == "__main__":
-    if not IMPORT_ONLY:
+    if IMPORT_ONLY:
+        import_ses()
+    else:
         export_dsn()
         route()
-    import_ses()
+        # A second LoadBoard in this process crashes pcbnew, so the import
+        # runs in a fresh one.
+        subprocess.run([sys.executable, __file__, "--import-only"], check=True)

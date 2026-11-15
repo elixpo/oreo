@@ -140,7 +140,7 @@
       },
       "rules": {
         "max_error": 0.005,
-        "min_clearance": 0.15,
+        "min_clearance": 0.127,
         "min_connection": 0.0,
         "min_copper_edge_clearance": 0.3,
         "min_groove_width": 0.0,
@@ -153,9 +153,9 @@
         "min_text_height": 0.8,
         "min_text_thickness": 0.08,
         "min_through_hole_diameter": 0.2,
-        "min_track_width": 0.15,
+        "min_track_width": 0.127,
         "min_via_annular_width": 0.1,
-        "min_via_diameter": 0.5,
+        "min_via_diameter": 0.45,
         "solder_mask_to_copper_clearance": 0.0,
         "use_height_for_length_calcs": true
       },
@@ -282,10 +282,10 @@
         "wire_width": 6,
         "priority": 2147483647,
         "name": "Default",
-        "clearance": 0.15,
-        "track_width": 0.2,
-        "via_diameter": 0.6,
-        "via_drill": 0.3
+        "clearance": 0.13,
+        "track_width": 0.15,
+        "via_diameter": 0.45,
+        "via_drill": 0.2
       },
       {
         "bus_width": 12,
@@ -300,10 +300,10 @@
         "wire_width": 6,
         "priority": 1,
         "name": "Power",
-        "clearance": 0.2,
+        "clearance": 0.15,
         "track_width": 0.3,
-        "via_diameter": 0.8,
-        "via_drill": 0.4
+        "via_diameter": 0.6,
+        "via_drill": 0.3
       },
       {
         "bus_width": 12,
@@ -318,10 +318,10 @@
         "wire_width": 6,
         "priority": 0,
         "name": "Battery",
-        "clearance": 0.2,
+        "clearance": 0.15,
         "track_width": 0.3,
-        "via_diameter": 0.8,
-        "via_drill": 0.4
+        "via_diameter": 0.6,
+        "via_drill": 0.3
       },
       {
         "bus_width": 12,
@@ -336,10 +336,10 @@
         "wire_width": 6,
         "priority": 2,
         "name": "Fast",
-        "clearance": 0.2,
-        "track_width": 0.2,
-        "via_diameter": 0.6,
-        "via_drill": 0.3
+        "clearance": 0.15,
+        "track_width": 0.18,
+        "via_diameter": 0.45,
+        "via_drill": 0.2
       },
       {
         "bus_width": 12,
@@ -354,10 +354,10 @@
         "wire_width": 6,
         "priority": 3,
         "name": "USB",
-        "clearance": 0.2,
+        "clearance": 0.15,
         "track_width": 0.3,
-        "via_diameter": 0.6,
-        "via_drill": 0.3
+        "via_diameter": 0.45,
+        "via_drill": 0.2
       }
     ],
     "meta": {

@@ -511,7 +511,7 @@ def silkscreen(board):
     for text, dy, size, thick, bold in (("OREO BADGE", -4.0, 1.5, 0.25, True),
                                         ("oreo.elixpo.com", -1.2, 1.0, 0.15, False),
                                         ("CERN-OHL-P-2.0", 1.2, 0.9, 0.15, False),
-                                        ("S/N-2509-0023", 3.6, 0.9, 0.15, False)):
+                                        ("A/A-2509-0023", 3.6, 0.9, 0.15, False)):
         add_text(board, bs, text, tx, y0 + dy, size, thick, mirror=True, bold=bold)
     # Art: the Oreo panda in profile on the front, under the name card, and
     # OSHWA's certification mark on the back.
@@ -594,9 +594,11 @@ def stackup(board):
     board.SetCopperLayerCount(6)
     ds = board.GetDesignSettings()
     ds.SetBoardThickness(mm(1.6))
-    ds.m_TrackMinWidth = mm(0.15)
-    ds.m_MinClearance = mm(0.15)
-    ds.m_ViasMinSize = mm(0.5)
+    # Standard 6-layer capability at JLCPCB/PCBWay is 0.09 mm track and gap,
+    # 0.2 mm drill; these rules stay well inside it.
+    ds.m_TrackMinWidth = mm(0.127)
+    ds.m_MinClearance = mm(0.127)
+    ds.m_ViasMinSize = mm(0.45)
     ds.m_MinThroughDrill = mm(0.2)       # the module's own thermal vias
     ds.m_CopperEdgeClearance = mm(0.3)
     ds.m_HoleClearance = mm(0.25)
@@ -611,14 +613,15 @@ def write_netclasses():
                 line_style=0, microvia_diameter=0.3, microvia_drill=0.1, pcb_color="rgba(0, 0, 0, 0.000)",
                 schematic_color="rgba(0, 0, 0, 0.000)", wire_width=6, priority=2147483647)
     ns["classes"] = [
-        dict(base, name="Default", clearance=0.15, track_width=0.2, via_diameter=0.6, via_drill=0.3),
+        dict(base, name="Default", clearance=0.13, track_width=0.15, via_diameter=0.45, via_drill=0.2),
         # 0.3 mm reaches the 0.5 mm-pitch QFN/WSON pads of the charger and the
         # regulator within clearance, and carries about 1 A on outer copper:
         # enough for the 0.5-0.8 A these short runs see.
-        dict(base, name="Power", clearance=0.2, track_width=0.3, via_diameter=0.8, via_drill=0.4, priority=1),
-        dict(base, name="Battery", clearance=0.2, track_width=0.3, via_diameter=0.8, via_drill=0.4, priority=0),
-        dict(base, name="Fast", clearance=0.2, track_width=0.2, via_diameter=0.6, via_drill=0.3, priority=2),
-        dict(base, name="USB", clearance=0.2, track_width=0.3, via_diameter=0.6, via_drill=0.3,
+        dict(base, name="Power", clearance=0.15, track_width=0.3, via_diameter=0.6, via_drill=0.3, priority=1),
+        dict(base, name="Battery", clearance=0.15, track_width=0.3, via_diameter=0.6, via_drill=0.3, priority=0),
+        # about 50 ohm on an outer layer over the 0.1 mm prepreg to its ground plane
+        dict(base, name="Fast", clearance=0.15, track_width=0.18, via_diameter=0.45, via_drill=0.2, priority=2),
+        dict(base, name="USB", clearance=0.15, track_width=0.3, via_diameter=0.45, via_drill=0.2,
              diff_pair_width=0.3, diff_pair_gap=0.15, priority=3),
     ]
     ns["netclass_patterns"] = (
