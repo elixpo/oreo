@@ -39,7 +39,7 @@ ORIGIN = (40.0, 30.0)                     # where the board sits on the page
 # Front-face features.
 PANEL = (9.4, 60.0, 69.2, 50.0)           # top at 60 mm: the name card covers 0-60 mm           # DT028BTFT outline, landscape: x, y, w, h
 BATTERY = (18.0, 74.0, 50.0, 34.0)        # 603450 cell on the back, low for a low centre of gravity
-SPEAKER = (57.5, 6.0, 15.0, 11.0)         # 1511 speaker on the back, top right
+SPEAKER = (70.5, 7.0, 15.0, 11.0)         # 1511 speaker on the back, under the right clip slot
 SLOTS = ((10.0, 4.0), (78.0, 4.0))        # lanyard-clip slot centres
 SLOT_LEN, SLOT_W = 10.0, 3.2
 FPC_SLOT = (79.4, 71.0, 1.6, 28.0)
@@ -143,12 +143,12 @@ PLACE = {
     "C60": (66, 32.5, 0, B),
     "C61": (70.5, 28, 90, B),
     "R60": (61.5, 28, 90, B),
-    "Q1": (78, 25, 0, B),
-    "R71": (82, 25, 90, B),
-    "R72": (74, 25, 90, B),
-    "R73": (78, 30, 0, B),
-    "R70": (80.5, 18.5, 0, B),
-    "C70": (76.5, 18.5, 0, B),
+    "Q1": (78, 28.5, 0, B),
+    "R71": (81.5, 28.5, 90, B),
+    "R72": (74.5, 28.5, 90, B),
+    "R73": (78, 33, 0, B),
+    "R70": (79, 21.5, 90, B),
+    "C70": (76.5, 21.5, 90, B),
     "J3": (74, 85, 270, B),
     "C30": (74, 101.5, 0, B),
     "C31": (74, 103.5, 0, B),
@@ -215,8 +215,8 @@ PLACE = {
     "C28": (65.5, 129, 0, B),
     "SW3": (84, 111, 270, B),
     "J5": (83.6, 123.5, 270, B),
-    "U8": (80, 13, 0, B),
-    "D10": (84.5, 20.5, 90, B),
+    "U8": (86, 28, 90, B),
+    "D10": (70.5, 22, 0, B),
 }
 # Button pull-ups: two rows beside the expander.
 for i in range(8):
@@ -640,7 +640,7 @@ def main():
             if name and not name.startswith("unconnected-"):
                 pad.SetNet(nets[name])
         # Dense passives carry their reference on the fab layer, not silk.
-        if not re.match(r"(U\d|J\d|Q\d|SW3$)", ref) or ref in ("U9", "J7"):
+        if not re.match(r"(U\d|J\d|Q\d|SW3$)", ref) or ref in ("U9", "J7", "U8"):
             fp.Reference().SetLayer(pcbnew.F_Fab)   # the flip below moves it to B.Fab
         x, y, rot, side = PLACE[ref]
         place(fp, x, y, rot, side)
