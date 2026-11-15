@@ -1,0 +1,57 @@
+Group,Designators,Qty per badge,Part,Footprint,LCSC #,LCSC unit USD (2026-11-15),Line USD,Notes
+A JLCPCB assembles (basic),C1 C21 C28,3,"Samsung CL21A226MAQNNNE, 22 uF 25 V X5R 0805",C_0805_2012Metric,C45783,0.1084,0.3252,
+A JLCPCB assembles (basic),C2 C22 C27 C40 C61 C62 C64 C65 C66 C68 C71,11,"Samsung CL05B104KO5NNNC, 100 nF 16 V X7R 0402",C_0402_1005Metric,C1525,0.0024,0.0264,
+A JLCPCB assembles (basic),C3 C29,2,"Samsung CL05A105KA5NQNC, 1 uF 25 V X5R 0402",C_0402_1005Metric,C52923,0.0057,0.0114,
+A JLCPCB assembles (basic),C20 C30 C60 C67,4,"Samsung CL21A106KAYNNNE, 10 uF 25 V X5R 0805",C_0805_2012Metric,C15850,0.0311,0.1244,
+A JLCPCB assembles (basic),C23,1,"FH 0402B102K500NT, 1 nF 50 V X7R 0402",C_0402_1005Metric,C1523,0.0036,0.0036,
+A JLCPCB assembles (basic),C24,1,"Samsung CL10A105KB8NNNC, 1 uF 50 V X5R 0603",C_0603_1608Metric,C15849,0.0083,0.0083,USB input: needs 25 V or more
+A JLCPCB assembles (basic),C25 C26 C70,3,"Samsung CL10A475KO8NNNC, 4.7 uF 16 V X5R 0603",C_0603_1608Metric,C19666,0.015,0.045,
+A JLCPCB assembles (basic),Q1,1,"CJ MMBT2222A, NPN SOT-23",SOT-23,C8512,0.0182,0.0182,
+A JLCPCB assembles (basic),Q3,1,"AOS AO3401A, P-MOSFET SOT-23",SOT-23,C15127,0.0814,0.0814,
+A JLCPCB assembles (basic),R1 R2 R16 R27 R42 R43 R44 R45 R50 R51 R52 R53 R54 R55 R56 R57 R61 R62 R63 R64 R65 R66 R67,23,"UNI-ROYAL 0402WGF1002TCE, 10 k 1% 0402",R_0402_1005Metric,C25744,0.001,0.023,
+A JLCPCB assembles (basic),R3 R4 R12 R13,4,"UNI-ROYAL 0402WGF220JTCE, 22 R 0402",R_0402_1005Metric,C25092,0.001,0.004,
+A JLCPCB assembles (basic),R5,1,"UNI-ROYAL 0402WGF330JTCE, 33 R 0402",R_0402_1005Metric,C25105,0.0011,0.0011,
+A JLCPCB assembles (basic),R10 R11,2,"UNI-ROYAL 0402WGF5101TCE, 5.1 k 1% 0402",R_0402_1005Metric,C25905,0.0014,0.0028,
+A JLCPCB assembles (basic),R14 R15,2,"UNI-ROYAL 0402WGF2001TCE, 2 k 1% 0402",R_0402_1005Metric,C4109,0.0019,0.0038,Sets the charge current; Sets the USB input limit
+A JLCPCB assembles (basic),R17 R18 R72,3,"UNI-ROYAL 0402WGF1003TCE, 100 k 1% 0402",R_0402_1005Metric,C25741,0.0009,0.0027,
+A JLCPCB assembles (basic),R19 R60,2,"UNI-ROYAL 0402WGF1004TCE, 1 M 1% 0402",R_0402_1005Metric,C26083,0.0012,0.0024,
+A JLCPCB assembles (basic),R22,1,"UNI-ROYAL 0402WGF4702TCE, 47 k 1% 0402",R_0402_1005Metric,C25792,0.0019,0.0019,Charger safety timer
+A JLCPCB assembles (basic),R23 R24 R71,3,"UNI-ROYAL 0402WGF1001TCE, 1 k 1% 0402",R_0402_1005Metric,C11702,0.0013,0.0039,
+A JLCPCB assembles (basic),R25,1,"UNI-ROYAL 0402WGF3301TCE, 3.3 k 1% 0402",R_0402_1005Metric,C25890,0.0036,0.0036,Charge termination current
+A JLCPCB assembles (basic),R26,1,"UNI-ROYAL 0402WGF100JTCE, 10 R 0402",R_0402_1005Metric,C25077,0.001,0.001,
+A JLCPCB assembles (basic),R40 R41,2,"UNI-ROYAL 0402WGF2201TCE, 2.2 k 1% 0402",R_0402_1005Metric,C25879,0.0011,0.0022,
+A JLCPCB assembles (basic),R70,1,"UNI-ROYAL 0402WGF1000TCE, 100 R 1% 0402",R_0402_1005Metric,C25076,0.0012,0.0012,
+A JLCPCB assembles (basic),R73,1,"UNI-ROYAL 0805W8F470JT5E, 47 R 0805",R_0805_2012Metric,C17714,0.0027,0.0027,125 mW part: enough for the IR LED's short pulses
+A JLCPCB assembles (basic),R74,1,"UNI-ROYAL 0402WGF3300TCE, 330 R 1% 0402",R_0402_1005Metric,C25104,0.0011,0.0011,
+"B Buy, hand-solder SMD",C63,1,"FH 0402B222K500NT, 2.2 nF 50 V X7R 0402",C_0402_1005Metric,C1531,0.0025,0.0025,No basic 2.2 nF in 0402; MPU-6050 charge pump
+"B Buy, hand-solder SMD",D1 D2 D3 D4 D21 D30 D31 D32 D33 D34 D35 D36 D37,13,"KENTO KT-0603O, orange (598 nm) 0603",LED_0603_1608Metric,C111340,0.0117,0.1521,"Front corners. Basic red KT-0603R (C2286) would let JLCPCB fit it, but changes the look; Front, charging; Back corner curves. Same red option as the corner LEDs"
+"B Buy, hand-solder SMD",D10,1,"Vishay VSMY2940GX01, 940 nm 1206",LED_1206_3216Metric,C3202699,0.7625,0.7625,"Front, IR emitter"
+"B Buy, hand-solder SMD",D20,1,"KENTO KT-0603G, green 0603",LED_0603_1608Metric,C12624,0.0119,0.0119,Front. Basic white KT-0603W (C2290) works too
+"B Buy, hand-solder SMD",J1,1,"GCT USB4105-GF-A, USB-C receptacle",USB_C_Receptacle_GCT_USB4105-xx-A_16P_TopMnt_Horizontal,C3020560,1.021,1.021,Solder the shell pegs too
+"B Buy, hand-solder SMD",J2,1,"JST S2B-PH-SM4-TB(LF)(SN), PH 2-pin side entry",JST_PH_S2B-PH-SM4-TB_1x02-1MP_P2.00mm_Horizontal,,,,Not stocked at LCSC: Mouser / DigiKey
+"B Buy, hand-solder SMD",J4,1,"Hirose DM3AT-SF-PEJM5, microSD",microSD_HC_Hirose_DM3AT-SF-PEJM5,C114218,1.3908,1.3908,
+"B Buy, hand-solder SMD",J5,1,"JST SM04B-SRSS-TB(LF)(SN), SH 4-pin",JST_SH_SM04B-SRSS-TB_1x04-1MP_P1.00mm_Horizontal,C51940130,0.0393,0.0393,LCSC part is the XYECONN equivalent; JST original at Mouser
+"B Buy, hand-solder SMD",J7,1,"JST SM02B-SRSS-TB(LF)(SN), SH 2-pin (speaker plug)",JST_SH_SM02B-SRSS-TB_1x02-1MP_P1.00mm_Horizontal,C160402,0.1322,0.1322,
+"B Buy, hand-solder SMD",L1,1,"Taiyo Yuden NR3015T1R5N, 1.5 uH",L_Taiyo-Yuden_NR-30xx,C87169,0.0701,0.0701,Out of stock at LCSC on the price date: Mouser / DigiKey
+"B Buy, hand-solder SMD",SW1 SW2,2,"Panasonic EVQ-P2002W, side-push tact",SW_SPST_EVQP2_ShortPushTravel_H2.5mm,,,,Not stocked at LCSC: Mouser / DigiKey
+"B Buy, hand-solder SMD",SW3,1,"C&K JS102011SAQN, slide switch",SW_SPDT_CK_JS102011SAQN,C221660,0.8541,0.8541,
+"B Buy, hand-solder SMD",U1,1,Espressif ESP32-S3-WROOM-1-N16R8,ESP32-S3-WROOM-1,C2913202,5.3485,5.3485,Solder the ground pad through its vias from the front
+"B Buy, hand-solder SMD",U3,1,"ST USBLC6-2SC6, USB ESD",SOT-23-6,C7519,0.157,0.157,
+"B Buy, hand-solder SMD",U4,1,"TI BQ24074RGTR, charger, VQFN-16",VQFN-16-1EP_3x3mm_P0.5mm_EP1.6x1.6mm,C54313,2.1188,2.1188,Exposed pad: hot air or hot plate
+"B Buy, hand-solder SMD",U5,1,"TI TPS63031DSKR, 3.3 V buck-boost, WSON-10",WSON-10-1EP_2.5x2.5mm_P0.5mm_EP1.2x2mm,C15516,1.1568,1.1568,Exposed pad: hot air or hot plate
+"B Buy, hand-solder SMD",U7,1,"TDK InvenSense MPU-6050, QFN-24",InvenSense_QFN-24_4x4mm_P0.5mm,C24112,21.0013,21.0013,Costly and scarce as a bare chip: buy from an authorised distributor
+"B Buy, hand-solder SMD",U9,1,"Worldsemi WS2812B-2020, status LED",LED_WS2812B-2020_PLCC4_2.0x2.0mm,C965555,0.1165,0.1165,Out of stock at LCSC on the price date; pads underneath: hot air
+"B Buy, hand-solder SMD",U10,1,"ADI MAX17048G+T10, fuel gauge, TDFN-8",TDFN-8-1EP_2x2mm_P0.5mm_EP0.8x1.2mm,C2682616,1.9438,1.9438,Exposed pad: hot air or hot plate
+"B Buy, hand-solder SMD",U11,1,"Awinic AW9523BTQR, I2C expander, QFN-24",QFN-24-1EP_4x4mm_P0.5mm_EP2.7x2.7mm,C148077,0.3266,0.3266,Exposed pad: hot air or hot plate
+"B Buy, hand-solder SMD",U12,1,"ADI MAX98357AETE+T, I2S amplifier, TQFN-16",TQFN-16-1EP_3x3mm_P0.5mm_EP1.23x1.23mm,C910544,1.3089,1.3089,Exposed pad: hot air or hot plate
+"B Buy, hand-solder SMD",U13,1,"Micro Crystal RV-3028-C7 32.768kHz 1ppm-TA-QC, RTC",MicroCrystal_C7_SON-8_1.5x3.2mm_P0.9mm,C3019759,2.4722,2.4722,Out of stock at LCSC on the price date: Mouser / DigiKey
+"C Buy, hand-solder through-hole",J3,1,"1x14 female header, 2.54 mm, 8.5 mm tall",PinSocket_1x14_P2.54mm_Vertical,C41417326,0.2363,0.2363,The display module plugs into it
+"C Buy, hand-solder through-hole",SW11 SW12 SW13 SW14 SW15 SW16 SW17 SW18,8,"6 x 6 mm tactile switch, 4-pin through-hole (5-7 mm tall)",SW_PUSH_6mm,,,,Any generic 6x6 THT tact
+"C Buy, hand-solder through-hole",U8,1,"Vishay TSOP38238, 38 kHz IR receiver",Vishay_MINICAST-3Pin,C141632,0.648,0.648,"Front, lying flat, lens facing out"
+D Off-board / mechanical,LCD1,1,"2.8in 240x320 ILI9341 SPI module with touch, 14-pin header (LCDwiki MSP2807 type)",,,,,"Check its header reads VCC, GND, CS ... T_IRQ from pin 1"
+D Off-board / mechanical,BT1,1,"LiPo 1000 mAh, 603450 (6 x 34 x 50 mm), protection PCB, JST-PH 2.0 lead",,,,,Check the lead polarity against J2 before plugging in
+D Off-board / mechanical,LS1,1,"Speaker 8 ohm 0.7 W, 15 x 11 mm (1511), leads with a JST-SH 1.0 2-pin plug",,,,,"Foam tape around the rim, over the grille"
+D Off-board / mechanical,HW1-HW4,4,"M3 standoff, female-female, about 11 mm",,,,,Match the socket + header stack
+D Off-board / mechanical,HW5-HW12,8,M3 x 5 mm screw,,,,,"Four from the back, four through the module"
+D Off-board / mechanical,BH1,1,"Battery holder, L-shaped, 3D printed (50 mm long, 6 mm wall, 10-12 mm lip)",,,,,Outline on the back silkscreen
+D Off-board / mechanical,HW13-HW14,2,M2 x 6 mm screw,,,,,Holds the battery holder in H5-H6
