@@ -38,7 +38,7 @@ HERE = Path(__file__).resolve().parent
 BOARD = HERE / "elixpo.kicad_pcb"
 MM = pcbnew.FromMM
 
-ROUTE_LAYERS = (pcbnew.F_Cu, pcbnew.In2_Cu, pcbnew.In3_Cu, pcbnew.B_Cu)
+ROUTE_LAYERS = (pcbnew.F_Cu, pcbnew.In2_Cu, pcbnew.In3_Cu, pcbnew.B_Cu)   # 6 layers; set from the board in main
 CLEARANCE = MM(0.15)              # the largest net-class clearance
 EDGE = MM(0.4)                    # copper to board edge, with margin
 HOLE_GAP = MM(0.25)               # drill to drill
@@ -613,6 +613,9 @@ def main():
     if ripup:
         BOARD.write_text(strip_nets(BOARD.read_text(), ripup))
     board = pcbnew.LoadBoard(str(BOARD))
+    global ROUTE_LAYERS
+    if board.GetCopperLayerCount() == 4:          # F / In1 GND / In2 signal / B
+        ROUTE_LAYERS = (pcbnew.F_Cu, pcbnew.In2_Cu, pcbnew.B_Cu)
     pcbnew.ZONE_FILLER(board).Fill(board.Zones())
     board.GetConnectivity().RecalculateRatsnest()
     copper = Copper(board)

@@ -1,14 +1,14 @@
 Group,Designators,Qty per badge,Part,Footprint,LCSC #,LCSC unit USD (2026-11-15),Line USD,Notes
 A JLCPCB assembles (basic),C1 C21 C28,3,"Samsung CL21A226MAQNNNE, 22 uF 25 V X5R 0805",C_0805_2012Metric,C45783,0.1084,0.3252,
 A JLCPCB assembles (basic),C2 C22 C27 C40 C61 C62 C64 C65 C66 C68 C71,11,"Samsung CL05B104KO5NNNC, 100 nF 16 V X7R 0402",C_0402_1005Metric,C1525,0.0024,0.0264,
-A JLCPCB assembles (basic),C3 C29,2,"Samsung CL05A105KA5NQNC, 1 uF 25 V X5R 0402",C_0402_1005Metric,C52923,0.0057,0.0114,
+A JLCPCB assembles (basic),C3,1,"Samsung CL05A105KA5NQNC, 1 uF 25 V X5R 0402",C_0402_1005Metric,C52923,0.0057,0.0057,
 A JLCPCB assembles (basic),C20 C30 C60 C67,4,"Samsung CL21A106KAYNNNE, 10 uF 25 V X5R 0805",C_0805_2012Metric,C15850,0.0311,0.1244,
 A JLCPCB assembles (basic),C23,1,"FH 0402B102K500NT, 1 nF 50 V X7R 0402",C_0402_1005Metric,C1523,0.0036,0.0036,
 A JLCPCB assembles (basic),C24,1,"Samsung CL10A105KB8NNNC, 1 uF 50 V X5R 0603",C_0603_1608Metric,C15849,0.0083,0.0083,USB input: needs 25 V or more
 A JLCPCB assembles (basic),C25 C26 C70,3,"Samsung CL10A475KO8NNNC, 4.7 uF 16 V X5R 0603",C_0603_1608Metric,C19666,0.015,0.045,
 A JLCPCB assembles (basic),Q1,1,"CJ MMBT2222A, NPN SOT-23",SOT-23,C8512,0.0182,0.0182,
 A JLCPCB assembles (basic),Q3,1,"AOS AO3401A, P-MOSFET SOT-23",SOT-23,C15127,0.0814,0.0814,
-A JLCPCB assembles (basic),R1 R2 R16 R27 R42 R43 R44 R45 R50 R51 R52 R53 R54 R55 R56 R57 R61 R62 R63 R64 R65 R66 R67,23,"UNI-ROYAL 0402WGF1002TCE, 10 k 1% 0402",R_0402_1005Metric,C25744,0.001,0.023,
+A JLCPCB assembles (basic),R1 R2 R16 R27 R42 R43 R45 R50 R51 R52 R53 R54 R55 R56 R57 R61 R62 R63 R64 R65 R66 R67,22,"UNI-ROYAL 0402WGF1002TCE, 10 k 1% 0402",R_0402_1005Metric,C25744,0.001,0.022,
 A JLCPCB assembles (basic),R3 R4 R12 R13,4,"UNI-ROYAL 0402WGF220JTCE, 22 R 0402",R_0402_1005Metric,C25092,0.001,0.004,
 A JLCPCB assembles (basic),R5,1,"UNI-ROYAL 0402WGF330JTCE, 33 R 0402",R_0402_1005Metric,C25105,0.0011,0.0011,
 A JLCPCB assembles (basic),R10 R11,2,"UNI-ROYAL 0402WGF5101TCE, 5.1 k 1% 0402",R_0402_1005Metric,C25905,0.0014,0.0028,
@@ -41,7 +41,6 @@ A JLCPCB assembles (basic),R74,1,"UNI-ROYAL 0402WGF3300TCE, 330 R 1% 0402",R_040
 "B Buy, hand-solder SMD",U5,1,"TI TPS63031DSKR, 3.3 V buck-boost, WSON-10",WSON-10-1EP_2.5x2.5mm_P0.5mm_EP1.2x2mm,C15516,1.1568,1.1568,Exposed pad: hot air or hot plate
 "B Buy, hand-solder SMD",U7,1,"TDK InvenSense MPU-6050, QFN-24",InvenSense_QFN-24_4x4mm_P0.5mm,C24112,21.0013,21.0013,"Costly as a genuine bare chip. Cheaper: Robu SKU 162123, generic, Rs 426 incl. GST (Rs 369 at 10+): confirm it ships in the 4 x 4 mm QFN-24 (a 3 x 3 mm chip will not fit)"
 "B Buy, hand-solder SMD",U9,1,"Worldsemi WS2812B-2020, status LED",LED_WS2812B-2020_PLCC4_2.0x2.0mm,C965555,0.1165,0.1165,Out of stock at LCSC on the price date; pads underneath: hot air
-"B Buy, hand-solder SMD",U10,1,"ADI MAX17048G+T10, fuel gauge, TDFN-8",TDFN-8-1EP_2x2mm_P0.5mm_EP0.8x1.2mm,C2682616,1.9438,1.9438,Exposed pad: hot air or hot plate
 "B Buy, hand-solder SMD",U11,1,"Awinic AW9523BTQR, I2C expander, QFN-24",QFN-24-1EP_4x4mm_P0.5mm_EP2.7x2.7mm,C148077,0.3266,0.3266,Exposed pad: hot air or hot plate
 "B Buy, hand-solder SMD",U12,1,"ADI MAX98357AETE+T, I2S amplifier, TQFN-16",TQFN-16-1EP_3x3mm_P0.5mm_EP1.23x1.23mm,C910544,1.3089,1.3089,Exposed pad: hot air or hot plate
 "B Buy, hand-solder SMD",U13,1,"Micro Crystal RV-3028-C7 32.768kHz 1ppm-TA-QC, RTC",MicroCrystal_C7_SON-8_1.5x3.2mm_P0.9mm,C3019759,2.4722,2.4722,Out of stock at LCSC on the price date: Mouser / DigiKey

@@ -40,7 +40,7 @@ D21,1,"amber, charging",Qualified commodity,,LED_SMD:LED_0603_1608Metric,YES,Sel
 J2,1,LiPo JST-PH 2-pin,JST,S2B-PH-SM4-TB(LF)(SN),Connector_JST:JST_PH_S2B-PH-SM4-TB_1x02-1MP_P2.00mm_Horizontal,YES,Active,"Protected 1S LiPo, 1000 mAh 603450; Q3 blocks a reversed pack; Battery connector; pack polarity varies by vendor"
 Q3,1,AO3401A,Alpha & Omega,AO3401A,Package_TO_SOT_SMD:SOT-23,YES,Active,"Reverse-battery protection: P-FET, gate to GND. A correct pack turns it on (conducts both ways, so charging works); a reversed pack leaves it off; Reverse-battery protection, -30 V P-FET, about 50 mOhm at -4.5 V"
 R27,1,10k,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rating,Q3 gate to GND; Use 1% resistors; X7R capacitors with voltage derating
-SW3,1,MAIN POWER,C&K,JS102011SAQN,Button_Switch_SMD:SW_SPDT_CK_JS102011SAQN,YES,Active,"Disconnects the system; charging, the RTC and the fuel gauge stay powered; Main system disconnect"
+SW3,1,MAIN POWER,C&K,JS102011SAQN,Button_Switch_SMD:SW_SPDT_CK_JS102011SAQN,YES,Active,Disconnects the system; charging and the RTC stay powered; Main system disconnect
 U5,1,TPS63031DSK,Texas Instruments,TPS63031DSKR,Package_SON:WSON-10-1EP_2.5x2.5mm_P0.5mm_EP1.2x2mm,YES,Active,Fixed 3.3 V buck-boost; holds 3.3 V across the LiPo's 3.0-4.2 V; Fixed 3.3 V buck-boost
 L1,1,1.5uH 2A shielded,Taiyo Yuden,NR3015T1R5N,Inductor_SMD:L_Taiyo-Yuden_NR-30xx,YES,Verify current,"1.5 uH shielded, >=1.5 A saturation"
 R26,1,10R,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rating,VINA RC filter; Use 1% resistors; X7R capacitors with voltage derating
@@ -51,8 +51,6 @@ C28,1,22uF 10V,Qualified commodity,,Capacitor_SMD:C_0805_2012Metric,YES,Select b
 R17,1,100k 1%,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rating,Battery voltage divider for the ADC (OreoOS battery.py); Use 1% resistors; X7R capacitors with voltage derating
 R18,1,100k 1%,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rating,Use 1% resistors; X7R capacitors with voltage derating
 C22,1,100nF,Qualified commodity,,Capacitor_SMD:C_0402_1005Metric,YES,Select by rating,Use 1% resistors; X7R capacitors with voltage derating
-U10,1,MAX17048G+,Analog Devices / Maxim,MAX17048G+T10,Package_DFN_QFN:TDFN-8-1EP_2x2mm_P0.5mm_EP0.8x1.2mm,YES,Active,Fuel gauge: state of charge over I2C at 0x36; ModelGauge fuel gauge
-C29,1,1uF,Qualified commodity,,Capacitor_SMD:C_0402_1005Metric,YES,Select by rating,Use 1% resistors; X7R capacitors with voltage derating
 J3,1,2.8in ILI9341 SPI module (MSP2807),Generic,"1x14 female header, 2.54 mm, 8.5 mm",Connector_PinSocket_2.54mm:PinSocket_1x14_P2.54mm_Vertical,YES,Active,"1x14 2.54 mm socket for the module's header; hand-soldered; Through-hole, hand-soldered; the module plugs in"
 C30,1,10uF 10V,Qualified commodity,,Capacitor_SMD:C_0805_2012Metric,YES,Select by rating,"Bulk for the module's backlight, at J3 pin 1; Use 1% resistors; X7R capacitors with voltage derating"
 SW11,1,UP,E-Switch / C&K equivalent,,Button_Switch_THT:SW_PUSH_6mm,YES,Mechanical check,Confirm actuator height and force
@@ -69,7 +67,6 @@ R40,1,2.2k,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rat
 R41,1,2.2k,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rating,"I2C pull-up, 400 kHz; Use 1% resistors; X7R capacitors with voltage derating"
 R42,1,10k,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rating,Use 1% resistors; X7R capacitors with voltage derating
 R43,1,10k,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rating,Use 1% resistors; X7R capacitors with voltage derating
-R44,1,10k,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rating,Use 1% resistors; X7R capacitors with voltage derating
 R45,1,10k,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rating,Keeps the touch controller deselected (T_CS high) until the OS drives it; Use 1% resistors; X7R capacitors with voltage derating
 R50,1,10k,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rating,Button pull-up: the AW9523B has none; Use 1% resistors; X7R capacitors with voltage derating
 R51,1,10k,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rating,Button pull-up: the AW9523B has none; Use 1% resistors; X7R capacitors with voltage derating

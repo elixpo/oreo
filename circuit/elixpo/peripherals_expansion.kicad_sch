@@ -1004,7 +1004,7 @@
   (no_connect (at 173.99 72.39) (uuid "68faf6aa-0bd5-5da9-a428-76e72fea3f81"))
   (no_connect (at 173.99 77.47) (uuid "55484203-78ae-53eb-a20f-c0c1ef75cca7"))
   (global_label "+3V3" (shape bidirectional) (at 173.99 82.55000000000001 180) (effects (font (size 0.9 0.9)) (justify right)) (uuid "b1c81813-7c6d-5222-9538-1a9d1f36b38e"))
-  (global_label "GND" (shape bidirectional) (at 173.99 87.63000000000001 180) (effects (font (size 0.9 0.9)) (justify right)) (uuid "55a47b55-4110-53bc-ab56-73e072e9aa61"))
+  (global_label "+3V3" (shape bidirectional) (at 173.99 87.63000000000001 180) (effects (font (size 0.9 0.9)) (justify right)) (uuid "98d9b6b1-a9a1-54d4-9099-0a09e832e80c"))
   (global_label "IMU_REGOUT" (shape bidirectional) (at 173.99 92.71000000000001 180) (effects (font (size 0.9 0.9)) (justify right)) (uuid "bef62776-d8e0-588f-95aa-7d9787d2cb3f"))
   (global_label "GND" (shape bidirectional) (at 173.99 97.79 180) (effects (font (size 0.9 0.9)) (justify right)) (uuid "bfdb9cfd-2ddc-534c-91b5-30789c1f2b1c"))
   (global_label "IMU_INT" (shape bidirectional) (at 173.99 102.87 180) (effects (font (size 0.9 0.9)) (justify right)) (uuid "c1e3a1f0-60f4-5074-a793-52e80e13d55f"))

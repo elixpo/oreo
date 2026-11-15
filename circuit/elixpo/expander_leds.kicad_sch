@@ -214,29 +214,6 @@
       )
       (embedded_fonts no)
     )
-    (symbol "oreo_badge:R44"
-      (pin_names (offset 1.016))
-      (exclude_from_sim no) (in_bom yes) (on_board yes)
-      (property "Reference" "U" (at 0 -15.8 0) (effects (font (size 1.27 1.27))))
-      (property "Value" "10k" (at 0 15.8 0) (effects (font (size 1.27 1.27))))
-      (property "Footprint" "Resistor_SMD:R_0402_1005Metric" (at 0 0 0) (effects (font (size 1.27 1.27)) (hide yes)))
-      (property "Datasheet" "" (at 0 0 0) (effects (font (size 1.27 1.27)) (hide yes)))
-      (property "Description" "" (at 0 0 0) (effects (font (size 1.27 1.27)) (hide yes)))
-      (symbol "R44_0_1"
-        (rectangle (start -7.62 -12.0) (end 7.62 12.0)
-          (stroke (width 0.254) (type solid)) (fill (type background)))
-        (text "10k" (at 0 0 0) (effects (font (size 1.05 1.05) (bold yes))))
-      )
-      (symbol "R44_1_1"
-        (pin bidirectional line (at -10.16 0.0 0) (length 2.54)
-          (name "1" (effects (font (size 0.9 0.9))))
-          (number "1" (effects (font (size 0.9 0.9)))))
-        (pin bidirectional line (at 10.16 0.0 180) (length 2.54)
-          (name "2" (effects (font (size 0.9 0.9))))
-          (number "2" (effects (font (size 0.9 0.9)))))
-      )
-      (embedded_fonts no)
-    )
     (symbol "oreo_badge:R45"
       (pin_names (offset 1.016))
       (exclude_from_sim no) (in_bom yes) (on_board yes)
@@ -736,7 +713,7 @@
   (global_label "BTN_HOME" (shape bidirectional) (at 124.46000000000001 170.17999999999998 180) (effects (font (size 0.9 0.9)) (justify right)) (uuid "542e6320-5977-538d-b56a-97e0ac5f43b9"))
   (global_label "AMP_EN" (shape bidirectional) (at 175.26000000000002 111.75999999999999 0) (effects (font (size 0.9 0.9)) (justify left)) (uuid "f5c4d5d6-9869-5f71-be83-e352cae4a79f"))
   (global_label "SD_DET" (shape bidirectional) (at 175.26000000000002 116.83999999999999 0) (effects (font (size 0.9 0.9)) (justify left)) (uuid "9fad7f88-8d9c-5c5e-980e-57b4e0fa8c69"))
-  (global_label "FG_ALRT" (shape bidirectional) (at 175.26000000000002 121.91999999999999 0) (effects (font (size 0.9 0.9)) (justify left)) (uuid "6e34b361-0a6f-5fad-bffd-0f12c4982715"))
+  (no_connect (at 175.26000000000002 121.91999999999999) (uuid "f7db32f1-9d21-5cdf-ae2f-75cfe8489835"))
   (global_label "EXP_P17" (shape bidirectional) (at 175.26000000000002 126.99999999999999 0) (effects (font (size 0.9 0.9)) (justify left)) (uuid "869fc5bc-04a1-5cbf-9e35-b773ccf15b5e"))
   (global_label "GND" (shape bidirectional) (at 175.26000000000002 132.07999999999998 0) (effects (font (size 0.9 0.9)) (justify left)) (uuid "8e458fb9-fa34-5a4e-8977-03443096e969"))
   (global_label "I2C_SCL" (shape bidirectional) (at 175.26000000000002 137.16 0) (effects (font (size 0.9 0.9)) (justify left)) (uuid "e98d62dc-55c1-5f68-b213-2d34388546b6"))
@@ -756,8 +733,6 @@
   (global_label "+3V3" (shape bidirectional) (at 54.61 105.41 0) (effects (font (size 0.9 0.9)) (justify left)) (uuid "177c93da-2c1d-5652-bc55-cd585f284f1f"))
   (global_label "EXP_RST" (shape bidirectional) (at 85.09 105.41 180) (effects (font (size 0.9 0.9)) (justify right)) (uuid "8d8e8670-0a46-5af2-9b1e-2f0839de2014"))
   (global_label "+3V3" (shape bidirectional) (at 105.41 105.41 0) (effects (font (size 0.9 0.9)) (justify left)) (uuid "525b390e-55ec-5af5-b86c-39874c33e466"))
-  (global_label "FG_ALRT" (shape bidirectional) (at 34.290000000000006 134.62 180) (effects (font (size 0.9 0.9)) (justify right)) (uuid "39982adf-2be5-5cf9-9eca-f552ccfe6672"))
-  (global_label "+3V3" (shape bidirectional) (at 54.61 134.62 0) (effects (font (size 0.9 0.9)) (justify left)) (uuid "310a9ab2-31e0-5f4a-a35e-f8c1bc9de644"))
   (global_label "EXP_P17" (shape bidirectional) (at 85.09 134.62 180) (effects (font (size 0.9 0.9)) (justify right)) (uuid "08c2c913-d677-56cf-86f6-31fa046f5eec"))
   (global_label "+3V3" (shape bidirectional) (at 105.41 134.62 0) (effects (font (size 0.9 0.9)) (justify left)) (uuid "e49164e6-cbe9-59a1-aaaf-91fb72670f9d"))
   (global_label "BTN_UP" (shape bidirectional) (at 245.11 44.45 180) (effects (font (size 0.9 0.9)) (justify right)) (uuid "70561fd9-1b43-5ae1-a4a7-28068fe51527"))
@@ -801,7 +776,7 @@
   (global_label "LED_BR_K" (shape bidirectional) (at 394.96999999999997 134.62 180) (effects (font (size 0.9 0.9)) (justify right)) (uuid "37a0048b-adb0-5a6f-97f4-0f40fd56491c"))
   (global_label "+3V3" (shape bidirectional) (at 415.29 134.62 0) (effects (font (size 0.9 0.9)) (justify left)) (uuid "569067c7-bc50-5c14-ab00-7c1f49101eeb"))
   (text "I2C EXPANDER + CORNER AND EDGE LEDS" (exclude_from_sim no) (at 18 18 0) (effects (font (size 2.0 2.0) (bold yes)) (justify left bottom)) (uuid "9c104031-4d4b-54a6-9ae3-37ae8909a312"))
-  (text "I2C addresses: MAX17048 0x36, RV-3028 0x52, AW9523B 0x58, MPU-6050 0x68." (exclude_from_sim no) (at 18 25 0) (effects (font (size 1.1 1.1)) (justify left bottom)) (uuid "e5e73697-8cc9-5c2b-a718-843d450193ed"))
+  (text "I2C addresses: RV-3028 0x52, AW9523B 0x58, MPU-6050 0x69 (AD0 high)." (exclude_from_sim no) (at 18 25 0) (effects (font (size 1.1 1.1)) (justify left bottom)) (uuid "e5e73697-8cc9-5c2b-a718-843d450193ed"))
   (text "The expander interrupt (GPIO3) is an RTC GPIO, so a button press can wake the badge." (exclude_from_sim no) (at 18 285 0) (effects (font (size 1.05 1.05)) (justify left bottom)) (uuid "ac8aeca6-c6c5-5c07-82b4-cd09b751aa4e"))
   (symbol
     (lib_id "oreo_badge:U11")
@@ -926,23 +901,6 @@
     (instances
       (project "elixpo"
         (path "/fe0792e5-9f87-5b76-b754-53a589d4c014/eb13fab0-d781-52c7-addc-e6d3df612913" (reference "R43") (unit 1)))
-    )
-  )
-  (symbol
-    (lib_id "oreo_badge:R44")
-    (at 44.45 134.62 0) (unit 1)
-    (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no)
-    (uuid "242dab30-5892-598d-94ba-c33c92fc5087")
-    (property "Reference" "R44" (at 44.45 118.82000000000001 0) (effects (font (size 1.1 1.1) (bold yes))))
-    (property "Value" "10k" (at 44.45 150.42000000000002 0) (effects (font (size 1.0 1.0))))
-    (property "Footprint" "Resistor_SMD:R_0402_1005Metric" (at 44.45 134.62 0) (effects (font (size 1.27 1.27)) (hide yes)))
-    (property "Datasheet" "" (at 44.45 134.62 0) (effects (font (size 1.27 1.27)) (hide yes)))
-    (property "Description" "" (at 44.45 134.62 0) (effects (font (size 1.27 1.27)) (hide yes)))
-    (pin "1" (uuid "0669ff4d-c973-5601-afa4-67ae564553e9"))
-    (pin "2" (uuid "36ba740a-4c65-5d00-bcf0-eced461f490b"))
-    (instances
-      (project "elixpo"
-        (path "/fe0792e5-9f87-5b76-b754-53a589d4c014/242dab30-5892-598d-94ba-c33c92fc5087" (reference "R44") (unit 1)))
     )
   )
   (symbol
