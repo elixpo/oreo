@@ -53,6 +53,12 @@ R18,1,100k 1%,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by 
 C22,1,100nF,Qualified commodity,,Capacitor_SMD:C_0402_1005Metric,YES,Select by rating,Use 1% resistors; X7R capacitors with voltage derating
 J3,1,2.8in ILI9341 SPI module (MSP2807),Generic,"1x14 female header, 2.54 mm, 8.5 mm",Connector_PinSocket_2.54mm:PinSocket_1x14_P2.54mm_Vertical,YES,Active,"1x14 2.54 mm socket for the module's header; hand-soldered; Through-hole, hand-soldered; the module plugs in"
 C30,1,10uF 10V,Qualified commodity,,Capacitor_SMD:C_0805_2012Metric,YES,Select by rating,"Bulk for the module's backlight, at J3 pin 1; Use 1% resistors; X7R capacitors with voltage derating"
+U6,1,TPS61023 5V boost,Texas Instruments,TPS61023DRLR,Package_TO_SOT_SMD:SOT-563,YES,Active,5 V boost for the display module; output disconnected from the input when off; Synchronous 5 V boost for the display module
+L2,1,1.5uH 2A shielded,Qualified commodity,,Inductor_SMD:L_Taiyo-Yuden_NR-30xx,YES,Select by rating,"Same part as L1; the TPS61023 takes 0.37-2.9 uH; Confirm current, power and package"
+C31,1,10uF 10V,Qualified commodity,,Capacitor_SMD:C_0805_2012Metric,YES,Select by rating,Boost input; Use 1% resistors; X7R capacitors with voltage derating
+C32,1,22uF 10V,Qualified commodity,,Capacitor_SMD:C_0805_2012Metric,YES,Select by rating,Boost output (10 uF effective minimum); Use 1% resistors; X7R capacitors with voltage derating
+R20,1,150k 1%,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rating,Sets 5.06 V with R21; Use 1% resistors; X7R capacitors with voltage derating
+R21,1,20k 1%,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rating,Use 1% resistors; X7R capacitors with voltage derating
 SW11,1,UP,E-Switch / C&K equivalent,,Button_Switch_THT:SW_PUSH_6mm,YES,Mechanical check,Confirm actuator height and force
 SW12,1,DOWN,E-Switch / C&K equivalent,,Button_Switch_THT:SW_PUSH_6mm,YES,Mechanical check,Confirm actuator height and force
 SW13,1,LEFT,E-Switch / C&K equivalent,,Button_Switch_THT:SW_PUSH_6mm,YES,Mechanical check,Confirm actuator height and force
@@ -68,6 +74,8 @@ R41,1,2.2k,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rat
 R42,1,10k,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rating,Use 1% resistors; X7R capacitors with voltage derating
 R43,1,10k,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rating,Use 1% resistors; X7R capacitors with voltage derating
 R45,1,10k,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rating,Keeps the touch controller deselected (T_CS high) until the OS drives it; Use 1% resistors; X7R capacitors with voltage derating
+Q4,1,AO3401A,TBD,,Package_TO_SOT_SMD:SOT-23,YES,Select,Switches 3.3 V to the IR receiver and the status LED: P1_6 low = on; Confirm availability and mechanical fit
+R46,1,100k,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rating,Keeps +3V3_AUX off until the OS turns it on; Use 1% resistors; X7R capacitors with voltage derating
 R50,1,10k,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rating,Button pull-up: the AW9523B has none; Use 1% resistors; X7R capacitors with voltage derating
 R51,1,10k,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rating,Button pull-up: the AW9523B has none; Use 1% resistors; X7R capacitors with voltage derating
 R52,1,10k,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rating,Button pull-up: the AW9523B has none; Use 1% resistors; X7R capacitors with voltage derating
@@ -115,7 +123,7 @@ R71,1,1k,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by ratin
 R72,1,100k,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rating,Use 1% resistors; X7R capacitors with voltage derating
 D10,1,940nm IR LED,Vishay,VSMY2940GX01,LED_SMD:LED_1206_3216Metric,YES,Active,940 nm IR emitter
 R73,1,47R 0.25W,Qualified commodity,,Resistor_SMD:R_0805_2012Metric,YES,Select by rating,IR pulse current limit; Use 1% resistors; X7R capacitors with voltage derating
-U9,1,WS2812B-2020,Worldsemi,WS2812B-2020,LED_SMD:LED_WS2812B-2020_PLCC4_2.0x2.0mm,YES,Verify source,Status LED; 3.3 V operation as on the DevKit
+U9,1,WS2812B-2020,Worldsemi,WS2812B-2020,LED_SMD:LED_WS2812B-2020_PLCC4_2.0x2.0mm,YES,Verify source,"Status LED, on the switched +3V3_AUX; 3.3 V operation as on the DevKit"
 R74,1,330R,Qualified commodity,,Resistor_SMD:R_0402_1005Metric,YES,Select by rating,Use 1% resistors; X7R capacitors with voltage derating
 C71,1,100nF,Qualified commodity,,Capacitor_SMD:C_0402_1005Metric,YES,Select by rating,Use 1% resistors; X7R capacitors with voltage derating
 J5,1,Qwiic / STEMMA QT,JST,SM04B-SRSS-TB(LF)(SN),Connector_JST:JST_SH_SM04B-SRSS-TB_1x04-1MP_P1.00mm_Horizontal,YES,Active,"I2C accessory port, Qwiic pin order; Qwiic / STEMMA QT port"

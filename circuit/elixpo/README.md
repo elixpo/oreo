@@ -10,6 +10,7 @@ schematic, `elixpo.kicad_sch`, links five sheets:
 
 1. ESP32-S3-WROOM-1-N16R8 module, reset and boot, debug pads.
 2. USB-C, BQ24074 Li-ion power-path charger, battery sense and TPS63031 3.3 V rail.
+   (The display's 5 V boost, U6, is on sheet 3.)
 3. 2.8 inch ILI9341 SPI display module header and the eight buttons.
 4. AW9523B I2C expander, the I2C bus, corner and edge LEDs.
 5. MAX98357A speaker amp, MPU-6050, microSD, infrared, status LED, Qwiic and the
@@ -39,7 +40,8 @@ flat engineering export that is regenerated directly from the schematic model.
 
 On the AW9523B (0x58): P0_0-P0_7 are UP, DOWN, LEFT, RIGHT, A, B, C,
 HOME; P1_0-P1_3 sink the corner LEDs (TL, TR, BL, BR); P1_4 AMP_EN,
-P1_5 SD_DET, P1_6 spare, P1_7 the touch controller's chip select. Other
+P1_5 SD_DET, P1_6 AUX_ON_N (low turns on +3V3_AUX), P1_7 the touch
+controller's chip select. Other
 I2C devices: MPU-6050 0x69 (AD0 tied to its VLOGIC pin;
 `oreoWare/imu.py` tries 0x68, then 0x69).
 
@@ -63,8 +65,18 @@ this board.
   values). These values must be checked against the selected cell before
   production. The battery level comes from the R17/R18 divider on GPIO1 (ADC).
 - The main 3.3 V rail is buck-boost regulated so the badge remains stable over
-  the full Li-ion discharge curve. The display module runs from 3.3 V and
-  switches its own backlight. The speaker amp runs from VSYS.
+  the full Li-ion discharge curve. The speaker amp and the IR LED run from
+  VSYS.
+- The display module runs from its own 5 V rail (LCD_5V), made by U6, a
+  TPS61023 boost from VSYS. Its backlight is fed straight from that pin, so a
+  steady 5 V keeps it equally bright from a full cell down to the cut-off;
+  from 3.3 V or from the battery directly it would dim as the cell drains.
+  The module's own regulator makes 3.3 V for its logic, so the signals stay
+  at 3.3 V. U6's output is disconnected from its input when it is off.
+- The IR receiver and the status LED sit on +3V3_AUX, which Q4 switches
+  off at power-up (R46 pulls its gate high). The OS drives P1_6 low to turn
+  them on, and keeps GPIO48 low while they're off. With them off, standby
+  is set by the ESP32's own sleep current.
 - microSD is on its own 1-bit SDMMC bus (CLK 38, CMD 39, D0 40), as on the
   breadboard, so the display keeps the whole SPI bus for video. DAT1-DAT3
   are pulled up at the socket.

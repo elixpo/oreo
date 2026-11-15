@@ -405,6 +405,18 @@
       },
       {
         "netclass": "Power",
+        "pattern": "+3V3_AUX"
+      },
+      {
+        "netclass": "Power",
+        "pattern": "LCD_5V"
+      },
+      {
+        "netclass": "Power",
+        "pattern": "LCD_BOOST_SW"
+      },
+      {
+        "netclass": "Power",
         "pattern": "GND"
       },
       {

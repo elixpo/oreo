@@ -46,6 +46,15 @@ VIA_D, VIA_DRILL = MM(0.45), MM(0.2)
 STITCH_PITCH = 4.0                # mm: about lambda/30 at 2.4 GHz
 
 
+def is_thermal_pad(fp, pad):
+    """A chip's exposed thermal pad (the module's ground pad, a QFN's EP):
+    the one kind of SMD pad a via may sit in."""
+    if not pad.IsOnCopperLayer():          # a paste opening inside a thermal pad
+        return True
+    size = pad.GetSize(pad.GetLayer())
+    return fp.GetReference().startswith("U") and min(size.x, size.y) >= MM(1.0)
+
+
 class Copper:
     """Every copper item, by layer, for clearance checks."""
 
@@ -56,6 +65,7 @@ class Copper:
                         for code, n in board.GetNetsByNetcode().items()}
         self.items = {l: {} for l in self.layers}      # layer -> cell -> [(shape, netcode)]
         self.holes = []                                  # (centre, radius)
+        self.smd_pads = {}                               # cell -> [pad shape]: no vias in these
         for fp in board.GetFootprints():
             board_only = bool(fp.GetAttributes() & pcbnew.FP_BOARD_ONLY)
             for pad in fp.Pads():
@@ -74,6 +84,14 @@ class Copper:
                     hole = pad.GetEffectiveHoleShape()
                     for l in self.layers:
                         self._put(l, hole, -1, board.GetDesignSettings().m_HoleClearance)
+                if pad.GetAttribute() == pcbnew.PAD_ATTRIB_SMD and not is_thermal_pad(fp, pad):
+                    # No via inside an SMD pad, whatever its net: an open via
+                    # wicks the solder out of the joint. Exposed thermal pads
+                    # are the exception, where vias belong.
+                    l = pad.GetLayer()
+                    shape = pad.GetEffectiveShape(l)
+                    for cell in self._cells(shape.BBox(), 0):
+                        self.smd_pads.setdefault(cell, []).append(shape)
         for t in board.Tracks():
             self.add(t)
         # board rule areas and the footprints' own (the module's antenna, the IMU, the card socket)
@@ -154,6 +172,9 @@ class Copper:
             return False
         for c, r in self.holes:
             if (c - pos).EuclideanNorm() < r + VIA_DRILL // 2 + HOLE_GAP:
+                return False
+        for cell in self._cells(shape.BBox(), 0):
+            if any(p.Collide(shape, 0) for p in self.smd_pads.get(cell, ())):
                 return False
         return all(self.clear(shape, l, net) for l in self.layers)
 
@@ -529,7 +550,11 @@ def close_gaps(board, copper, first=(), skip=()):
                 done = (join(board, copper, net, groups[0], small) or
                         astar(board, copper, net, small, groups[0], track_width(name)) or
                         astar(board, copper, net, small, groups[0], track_width(name),
-                              margin=MM(14), budget=900000))
+                              margin=MM(14), budget=900000) or
+                        # long runs that must swing around a crowded area:
+                        # a coarser grid over a wider box
+                        astar(board, copper, net, small, groups[0], track_width(name),
+                              step=MM(0.5), margin=MM(25), budget=2500000))
             if done:
                 joined += 1
             else:
