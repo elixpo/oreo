@@ -39,9 +39,9 @@ ORIGIN = (40.0, 30.0)                     # where the board sits on the page
 # Front-face features.
 PANEL = (9.4, 60.0, 69.2, 50.0)           # top at 60 mm: the name card covers 0-60 mm           # DT028BTFT outline, landscape: x, y, w, h
 BATTERY = (18.0, 74.0, 50.0, 34.0)        # 603450 cell on the back, low for a low centre of gravity
-SPEAKER = (70.5, 7.0, 15.0, 11.0)         # 1511 speaker on the back, under the right clip slot
-SLOTS = ((10.0, 4.0), (78.0, 4.0))        # lanyard-clip slot centres
-SLOT_LEN, SLOT_W = 10.0, 3.2
+SPEAKER = (70.5, 9.0, 15.0, 11.0)         # 1511 speaker on the back, under the right clip slot
+SLOTS = ((10.0, 5.5), (78.0, 5.5))        # ID-card clip slot centres
+SLOT_LEN, SLOT_W = 13.5, 3.2               # the standard badge-clip slot
 ART = HERE / "art"
 PANDA = (-10.0, 6.0, 54.0)                # front, under the name card: x, y, height (runs off the left edge)
 HEART = (79.0, 35.5, 11.0)                # front, far right, where the panda is looking: centre x, y, width
@@ -115,8 +115,9 @@ PLACE = {
     "SW17": (80.0, DPAD[1], 0, F),             # C
     "D20": (29.0, DPAD[1] - 2.0, 0, F), "D21": (29.0, DPAD[1] + 2.0, 0, F),
     # Corner LEDs around the panel, status LED right of it.
-    "D1": (6.0, 61.5, 90, F), "D2": (82.0, 61.5, 90, F),
-    "D3": (6.0, 108.5, 90, F), "D4": (82.0, 108.5, 90, F),
+    # The four edge LEDs sit in the board's corners (the top two under the clip slots).
+    "D1": (3.6, 11.0, 90, F), "D2": (86.4, 9.0, 90, F),
+    "D3": (3.6, 130.0, 0, F), "D4": (84.4, 130.0, 0, F),
     "U9": (83.5, 85, 90, F),
     # ---- Back: module and RTC at the top, display/expander/IMU behind the top of the
     # screen, battery low, microSD and USB-C at the bottom ----
@@ -336,6 +337,37 @@ def outline(board):
 GRILLE_ROWS = (0x41, 0x4E, 0x57, 0x45, 0x53, 0x48, 0x41)   # one row per byte, MSB on the left
 GRILLE_PITCH = (1.8, 1.6)                                    # column, row (mm)
 GRILLE_HOLES = (0.6, 1.2)                                    # drill for a 0 bit, a 1 bit (mm)
+
+
+# M2 holes beside the panel for standoffs and a bezel that clamps its edges
+# (the bare panel has no holes of its own), and fiducials for assembly.
+MOUNT_HOLES = ((4.7, 63.0), (83.3, 63.0), (4.7, 101.5), (83.3, 101.5))
+FIDUCIALS = {"F": ((2.6, 50.0), (85.4, 47.0), (2.6, 112.0)),
+             "B": ((2.6, 45.0), (85.4, 52.0), (85.4, 96.0))}
+
+
+def board_only(board, fpid, ref, x, y, side="F"):
+    """A footprint with no schematic symbol (holes, fiducials)."""
+    fp = load_footprint(fpid)
+    fp.SetReference(ref)
+    want = pcbnew.FP_BOARD_ONLY | pcbnew.FP_EXCLUDE_FROM_BOM
+    if fp.GetAttributes() & want != want:      # keep the library's own flags when they suffice
+        fp.SetAttributes(fp.GetAttributes() | want)
+    fp.Reference().SetVisible(False)
+    fp.Value().SetVisible(False)
+    board.Add(fp)
+    place(fp, x, y, 0, side)
+    return fp
+
+
+def mechanical(board):
+    for i, (x, y) in enumerate(MOUNT_HOLES, 1):
+        board_only(board, "MountingHole:MountingHole_2.2mm_M2", f"H{i}", x, y)
+    n = 1
+    for side, spots in FIDUCIALS.items():
+        for x, y in spots:
+            board_only(board, "Fiducial:Fiducial_1mm_Mask2mm", f"FID{n}", x, y, side)
+            n += 1
 
 
 def speaker_grille(board):
@@ -676,6 +708,7 @@ def main():
 
     outline(board)
     speaker_grille(board)
+    mechanical(board)
     silkscreen(board)
     planes(board)
 

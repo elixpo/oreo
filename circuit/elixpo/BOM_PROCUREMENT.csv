@@ -126,3 +126,7 @@ J5,1,Qwiic / STEMMA QT,JST,SM04B-SRSS-TB(LF)(SN),Connector_JST:JST_SH_SM04B-SRSS
 BT1,1,"Protected 1S LiPo 1000 mAh, 603450 (6x34x50 mm)",Qualified battery vendor,TBD,Off-board / JST-PH 2-wire,YES,Safety-critical,Must include a protection PCB; check the lead polarity against J2
 LCD1,1,"2.8 inch 240x320 ILI9341 TFT, 45-pin 0.5 mm FPC",Displaytech,DT028BTFT,Off-board / J3,YES,Mechanical check,Second source Raystar RFJ280J-AYW-DNN; confirm the FPC pin table
 LS1,1,"Speaker 8 ohm 0.7 W, 15x11 mm, with leads",Qualified vendor,TBD,Off-board / J7,YES,Select,Mobile-phone type
+HW1-HW4,4,"M2 standoff, 3 mm, female-female",Qualified vendor,TBD,Mechanical / H1-H4,YES,Select,Raises the panel to clear J3; holds the bezel
+HW5-HW12,8,M2 x 4 mm screw,Qualified vendor,TBD,Mechanical / H1-H4,YES,Select,"Four from the back, four through the bezel"
+BZ1,1,Front bezel with a window for the panel,Laser-cut acrylic or 3D print,TBD,Mechanical,YES,Design,Clamps the panel by its edges; the bare panel has no holes
+FT1,1,"Foam gasket, 0.5-1 mm, frame around the panel edge",Qualified vendor,TBD,Mechanical,YES,Select,Cushions the glass under the bezel

@@ -66,8 +66,10 @@ SPI with IM3..IM0 = 1110), sold by DigiKey (1756-1052-ND) and Mouser
 0.5 mm FPC leaves one 50 mm edge and is about 38.6 mm long. As the
 datasheet's "bending for reference" drawing shows, the FPC folds 180 degrees
 behind the panel. J3 therefore sits on the front, under the panel, with its
-opening facing the panel's right edge, and the panel stands on about
-2.5 mm of foam tape to clear the 2 mm connector.
+opening facing the panel's right edge. The panel is raised to clear the
+2 mm connector by four 3 mm M2 standoffs in H1-H4, beside the panel, and a
+front bezel screwed to them clamps the panel by its edges over a thin foam
+gasket (the bare panel has no holes of its own).
 
 Check with a real panel before ordering boards:
 

@@ -541,6 +541,16 @@ def write_bom():
                       "Second source Raystar RFJ280J-AYW-DNN; confirm the FPC pin table"))
         csv.writerow(("LS1", 1, "Speaker 8 ohm 0.7 W, 15x11 mm, with leads",
                       "Qualified vendor", "TBD", "Off-board / J7", "YES", "Select", "Mobile-phone type"))
+        csv.writerow(("HW1-HW4", 4, "M2 standoff, 3 mm, female-female", "Qualified vendor", "TBD",
+                      "Mechanical / H1-H4", "YES", "Select",
+                      "Raises the panel to clear J3; holds the bezel"))
+        csv.writerow(("HW5-HW12", 8, "M2 x 4 mm screw", "Qualified vendor", "TBD",
+                      "Mechanical / H1-H4", "YES", "Select", "Four from the back, four through the bezel"))
+        csv.writerow(("BZ1", 1, "Front bezel with a window for the panel", "Laser-cut acrylic or 3D print",
+                      "TBD", "Mechanical", "YES", "Design",
+                      "Clamps the panel by its edges; the bare panel has no holes"))
+        csv.writerow(("FT1", 1, "Foam gasket, 0.5-1 mm, frame around the panel edge", "Qualified vendor",
+                      "TBD", "Mechanical", "YES", "Select", "Cushions the glass under the bezel"))
 
 
 def write_symbol_library():
