@@ -100,8 +100,9 @@ PARTS = {
     "Qwiic / STEMMA QT": (B, "JST SM04B-SRSS-TB(LF)(SN), SH 4-pin", "C51940130", 0.0393,
                           "LCSC part is the XYECONN equivalent; JST original at Mouser"),
     "Speaker, 8R 0.7W 1511": (B, "JST SM02B-SRSS-TB(LF)(SN), SH 2-pin (speaker plug)", "C160402", 0.1322, ""),
-    "1.5uH 2A shielded": (B, "Sunlord SWPA3015S1R5NT, 1.5 uH 3x3 mm", "C56594", 0.0482,
-                          "Stands in for Taiyo Yuden NR3015T1R5N (out of stock at LCSC), same 3015 size"),
+    "1.5uH 2A shielded": (B, "TDK VLS3015ET-1R5N, 1.5 uH 3x3 mm, 1.5 A, 75 mOhm", "C3221497", 0.0632,
+                          "On LCSC's store (min. 10); Sunlord SWPA3015S1R5NT (C56594) is the JLCPCB-assembly "
+                          "stand-in; Taiyo Yuden NR3015T1R5N is out of stock"),
     "RESET": (B, "Panasonic EVQ-P2002W, side-push tact", "", None, "Not stocked at LCSC: Mouser / DigiKey"),
     "BOOT": (B, "Panasonic EVQ-P2002W, side-push tact", "", None, "Not stocked at LCSC: Mouser / DigiKey"),
     "MAIN POWER": (B, "C&K JS102011SAQN, slide switch", "C221660", 0.8541, ""),
