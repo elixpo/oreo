@@ -685,9 +685,10 @@ def stackup(board):
     ds.m_TrackMinWidth = mm(0.1)        # Freerouting necks tracks to ~0.11 mm at fine-pitch pins
     ds.m_MinClearance = mm(0.127)
     ds.m_ViasMinSize = mm(0.45)
-    ds.m_MinThroughDrill = mm(0.2)       # the module's own thermal vias
+    ds.m_MinThroughDrill = mm(0.3)       # JLCPCB's standard drill: 0.2 mm costs extra
     ds.m_CopperEdgeClearance = mm(0.3)
-    ds.m_HoleClearance = mm(0.25)
+    ds.m_HoleClearance = mm(0.2)         # JLCPCB multilayer via-hole to track
+    ds.m_ViasMinAnnularWidth = mm(0.075)  # JLCPCB multilayer: 0.3 mm hole in a 0.45 mm via pad
     ds.m_SilkClearance = mm(0.0)
 
 
@@ -699,15 +700,15 @@ def write_netclasses():
                 line_style=0, microvia_diameter=0.3, microvia_drill=0.1, pcb_color="rgba(0, 0, 0, 0.000)",
                 schematic_color="rgba(0, 0, 0, 0.000)", wire_width=6, priority=2147483647)
     ns["classes"] = [
-        dict(base, name="Default", clearance=0.13, track_width=0.15, via_diameter=0.45, via_drill=0.2),
+        dict(base, name="Default", clearance=0.13, track_width=0.15, via_diameter=0.45, via_drill=0.3),
         # 0.3 mm reaches the 0.5 mm-pitch QFN/WSON pads of the charger and the
         # regulator within clearance, and carries about 1 A on outer copper:
         # enough for the 0.5-0.8 A these short runs see.
         dict(base, name="Power", clearance=0.13, track_width=0.3, via_diameter=0.6, via_drill=0.3, priority=1),
         dict(base, name="Battery", clearance=0.13, track_width=0.3, via_diameter=0.6, via_drill=0.3, priority=0),
         # about 50 ohm on an outer layer over the 0.1 mm prepreg to its ground plane
-        dict(base, name="Fast", clearance=0.15, track_width=0.18, via_diameter=0.45, via_drill=0.2, priority=2),
-        dict(base, name="USB", clearance=0.15, track_width=0.3, via_diameter=0.45, via_drill=0.2,
+        dict(base, name="Fast", clearance=0.15, track_width=0.18, via_diameter=0.45, via_drill=0.3, priority=2),
+        dict(base, name="USB", clearance=0.15, track_width=0.3, via_diameter=0.45, via_drill=0.3,
              diff_pair_width=0.3, diff_pair_gap=0.15, priority=3),
     ]
     ns["netclass_patterns"] = (
@@ -827,6 +828,11 @@ def main():
         # Dense passives carry their reference on the fab layer, not silk.
         if not re.match(r"(U\d|J\d|Q\d|SW3$)", ref) or ref in ("U9", "J7", "U8", "J5", "U5", "J6", "U4", "Q4", "U6", "U11"):
             fp.Reference().SetLayer(pcbnew.F_Fab)   # the flip below moves it to B.Fab
+        for pad in fp.Pads():
+            # JLCPCB's standard drill is 0.3 mm; the module footprint's thermal
+            # holes are 0.2 mm (0.6 mm pads), so they grow to 0.3 mm.
+            if pad.GetAttribute() == pcbnew.PAD_ATTRIB_PTH and pad.GetDrillSize().x < mm(0.3):
+                pad.SetDrillSize(pcbnew.VECTOR2I(mm(0.3), mm(0.3)))
         x, y, rot, side = PLACE[ref]
         place(fp, x, y, rot, side)
         if comp["footprint"].startswith("Button_Switch_THT:"):

@@ -42,7 +42,7 @@ ROUTE_LAYERS = (pcbnew.F_Cu, pcbnew.In2_Cu, pcbnew.In3_Cu, pcbnew.B_Cu)   # 6 la
 CLEARANCE = MM(0.15)              # the largest net-class clearance
 EDGE = MM(0.4)                    # copper to board edge, with margin
 HOLE_GAP = MM(0.25)               # drill to drill
-VIA_D, VIA_DRILL = MM(0.45), MM(0.2)
+VIA_D, VIA_DRILL = MM(0.45), MM(0.3)          # JLCPCB's standard 0.3 mm drill
 STITCH_PITCH = 4.0                # mm: about lambda/30 at 2.4 GHz
 
 
