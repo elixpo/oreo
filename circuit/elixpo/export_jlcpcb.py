@@ -8,6 +8,8 @@ build/jlcpcb/:
   outline and the plated and unplated drill files (no drill maps).
 - oreo-badge-BOM.csv and oreo-badge-CPL.csv: JLCPCB assembly of the parts
   in its *basic* library only (no extended-part fees), with LCSC numbers.
+- oreo-badge-BOM-plus.csv and oreo-badge-CPL-plus.csv: the same plus the
+  hard-to-hand-solder extended parts on the back (JLC_PLUS).
 
 circuit/elixpo/BOM_ORDER.csv: everything a badge needs, in four groups:
   A  JLCPCB assembles (basic parts)
@@ -37,6 +39,12 @@ INNER = ("In1.Cu,In2.Cu,In3.Cu,In4.Cu" if '"In4.Cu"' in BOARD.read_text()
 LAYERS = ("F.Cu," + INNER + ",B.Cu,F.Paste,B.Paste,"
           "F.Silkscreen,B.Silkscreen,F.Mask,B.Mask,Edge.Cuts")
 PRICE_DATE = "2026-11-15"
+# Extended parts on the back that are hard to solder by hand (pads under the
+# chip, 0.5 mm pitch, tiny 0402s next to them). oreo-badge-BOM-plus.csv and
+# oreo-badge-CPL-plus.csv add them to the basic parts, for when JLCPCB
+# assembles them too (about $3 feeder fee per unique extended part).
+JLC_PLUS = {"BQ24074RGT", "TPS63031DSK", "AW9523B", "MAX98357A", "TPS61023 5V boost",
+            "1.5uH 2A shielded", "USB-C USB2 device", "150k 1%", "2.2nF 50V"}
 
 A, B, C, D = ("A JLCPCB assembles (basic)", "B Buy, hand-solder SMD",
               "C Buy, hand-solder through-hole", "D Off-board / mechanical")
@@ -92,8 +100,8 @@ PARTS = {
     "Qwiic / STEMMA QT": (B, "JST SM04B-SRSS-TB(LF)(SN), SH 4-pin", "C51940130", 0.0393,
                           "LCSC part is the XYECONN equivalent; JST original at Mouser"),
     "Speaker, 8R 0.7W 1511": (B, "JST SM02B-SRSS-TB(LF)(SN), SH 2-pin (speaker plug)", "C160402", 0.1322, ""),
-    "1.5uH 2A shielded": (B, "Taiyo Yuden NR3015T1R5N, 1.5 uH", "C87169", 0.0701,
-                          "Out of stock at LCSC on the price date: Mouser / DigiKey"),
+    "1.5uH 2A shielded": (B, "Sunlord SWPA3015S1R5NT, 1.5 uH 3x3 mm", "C56594", 0.0482,
+                          "Stands in for Taiyo Yuden NR3015T1R5N (out of stock at LCSC), same 3015 size"),
     "RESET": (B, "Panasonic EVQ-P2002W, side-push tact", "", None, "Not stocked at LCSC: Mouser / DigiKey"),
     "BOOT": (B, "Panasonic EVQ-P2002W, side-push tact", "", None, "Not stocked at LCSC: Mouser / DigiKey"),
     "MAIN POWER": (B, "C&K JS102011SAQN, slide switch", "C221660", 0.8541, ""),
@@ -176,12 +184,8 @@ def assembly():
         raise SystemExit(f"no sourcing row for: {missing}")
 
     jlc = [r for r in rows if PARTS[r["Val"]][0] == JLC]
-    with (OUT / "oreo-badge-CPL.csv").open("w", newline="") as f:
-        w = csv.writer(f)
-        w.writerow(("Designator", "Mid X", "Mid Y", "Layer", "Rotation"))
-        for r in jlc:
-            w.writerow((r["Ref"], f'{float(r["PosX"]):.4f}mm', f'{float(r["PosY"]):.4f}mm',
-                        "Top" if r["Side"] == "top" else "Bottom", f'{float(r["Rot"]):.1f}'))
+    plus = [r for r in rows if PARTS[r["Val"]][0] == JLC or
+            (r["Val"] in JLC_PLUS and r["Side"] == "bottom")]
 
     # group by the part bought, not the value text
     lines = OrderedDict()
@@ -193,13 +197,25 @@ def assembly():
         if note and note not in line["notes"]:
             line["notes"].append(note)
 
-    with (OUT / "oreo-badge-BOM.csv").open("w", newline="") as f:
-        w = csv.writer(f)
-        w.writerow(("Comment", "Designator", "Footprint", "Quantity", "Manufacturer Part", "LCSC Part #"))
-        for (group, part, lcsc), line in lines.items():
-            if group == JLC:
-                w.writerow((part.split(", ", 1)[-1], ",".join(line["refs"]), line["pkg"], len(line["refs"]),
-                            part.split(",")[0], lcsc))
+    def write_jlc(chosen, suffix):
+        refs = {r["Ref"] for r in chosen}
+        with (OUT / f"oreo-badge-CPL{suffix}.csv").open("w", newline="") as f:
+            w = csv.writer(f)
+            w.writerow(("Designator", "Mid X", "Mid Y", "Layer", "Rotation"))
+            for r in chosen:
+                w.writerow((r["Ref"], f'{float(r["PosX"]):.4f}mm', f'{float(r["PosY"]):.4f}mm',
+                            "Top" if r["Side"] == "top" else "Bottom", f'{float(r["Rot"]):.1f}'))
+        with (OUT / f"oreo-badge-BOM{suffix}.csv").open("w", newline="") as f:
+            w = csv.writer(f)
+            w.writerow(("Comment", "Designator", "Footprint", "Quantity", "Manufacturer Part", "LCSC Part #"))
+            for (group, part, lcsc), line in lines.items():
+                mine = [x for x in line["refs"] if x in refs]
+                if mine:
+                    w.writerow((part.split(", ", 1)[-1], ",".join(mine), line["pkg"], len(mine),
+                                part.split(",")[0], lcsc))
+
+    write_jlc(jlc, "")
+    write_jlc(plus, "-plus")
 
     totals = {}
     with ORDER.open("w", newline="") as f:
@@ -223,6 +239,7 @@ if __name__ == "__main__":
     parts, lines, totals = assembly()
     print(f"Gerber zip: {len(files)} files")
     print(f"JLCPCB assembly: {parts} placements, {lines} BOM lines, all basic -> {OUT}")
+    print(f"  oreo-badge-BOM-plus.csv / -CPL-plus.csv add the hard chips: {', '.join(sorted(JLC_PLUS))}")
     for group, usd in sorted(totals.items()):
         print(f"  {group}: about ${usd:.2f} per badge at LCSC single-unit prices (where listed)")
     print(f"Full order list: {ORDER}")
