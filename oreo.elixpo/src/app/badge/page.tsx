@@ -8,14 +8,14 @@ import {
 } from "lucide-react";
 
 const SPECS = [
-  { Icon: Cpu,          k: "MCU",      v: "ESP32-S3 dual core @ 240 MHz" },
-  { Icon: MemoryStick,  k: "Memory",   v: "16 MB flash · 8 MB PSRAM" },
-  { Icon: Radio,        k: "Radio",    v: "WiFi 2.4 GHz · BLE 5 · IR transceiver" },
-  { Icon: Layout,       k: "Display",  v: "ST7789 240×320 IPS · portrait" },
-  { Icon: Battery,      k: "Power",    v: "USB-C + LiPo deep-sleep · ~5 µA standby" },
-  { Icon: Usb,          k: "I/O",      v: "8-button matrix · IMU · 1-wire IR · I²C bus" },
-  { Icon: Ruler,        k: "Dimensions", v: "55 × 90 mm portrait PCB" },
-  { Icon: Layers,       k: "Layers",   v: "4-layer FR-4 · 1.6 mm · ENIG finish" },
+  { Icon: Cpu,          k: "MCU",      v: "ESP32-S3-WROOM-1 · dual core @ 240 MHz" },
+  { Icon: MemoryStick,  k: "Memory",   v: "16 MB flash · 8 MB PSRAM · microSD" },
+  { Icon: Radio,        k: "Radio",    v: "Wi-Fi 2.4 GHz · Bluetooth LE 5 · IR transmit and receive" },
+  { Icon: Layout,       k: "Display",  v: "2.8″ ILI9341 320×240 · resistive touch · landscape" },
+  { Icon: Battery,      k: "Power",    v: "LiPo · USB-C charging (BQ24074) · 3.3 V buck-boost" },
+  { Icon: Usb,          k: "I/O",      v: "8 buttons · MPU-6050 · speaker · Qwiic · 4-GPIO header" },
+  { Icon: Ruler,        k: "Dimensions", v: "88 × 133.5 mm portrait PCB" },
+  { Icon: Layers,       k: "Layers",   v: "4-layer FR-4 · 1.6 mm · black mask" },
 ];
 
 const STACK = [
@@ -44,7 +44,7 @@ export default function BadgePage() {
         <div className="max-w-3xl">
           <motion.div initial="hidden" animate="visible" variants={staggerContainer}>
             <motion.span variants={fadeUp} className="chip mb-6">
-              ESP32-S3-DevKitC · breadboard phase
+              PCB v1 · first boards ordered
             </motion.span>
             <motion.h1
               variants={fadeUp}
@@ -57,25 +57,32 @@ export default function BadgePage() {
               </span>
             </motion.h1>
             <motion.p variants={fadeUp} className="mt-5 max-w-2xl text-text-dim">
-              Tufty-classic portrait layout. Eight buttons, IR for line-of-sight
-              quests, an MPU6050 for shake and tilt, four LEDs around the frame.
-              The build guide, BOM and KiCad schematics live in the repo — fork
-              them and roll your own.
+              A 2.8″ touch screen, eight buttons, IR for line-of-sight quests,
+              an MPU-6050 for shake and tilt, a speaker, and LEDs around the
+              frame. The KiCad design, the bill of materials and the build
+              notes live in the repo, so you can fork them and make your own.
             </motion.p>
             <motion.div variants={fadeUp} className="mt-8 flex flex-wrap gap-3">
               <a
-                href="https://github.com/elixpo/oreo/blob/main/docs/HARDWARE.md"
+                href="https://github.com/elixpo/oreo/blob/main/circuit/elixpo/README.md"
                 target="_blank" rel="noreferrer"
                 className="btn-primary"
               >
-                <Github className="h-4 w-4" /> Build guide + BOM
+                <Github className="h-4 w-4" /> Board design notes
+              </a>
+              <a
+                href="https://github.com/elixpo/oreo/blob/main/circuit/elixpo/BOM_COST.md"
+                target="_blank" rel="noreferrer"
+                className="btn-ghost"
+              >
+                Bill of materials
               </a>
               <a
                 href="https://github.com/elixpo/oreo/tree/main/circuit/elixpo"
                 target="_blank" rel="noreferrer"
                 className="btn-ghost"
               >
-                KiCad schematics
+                KiCad files
               </a>
               <a
                 href="https://github.com/elixpo/oreo"
@@ -108,18 +115,32 @@ export default function BadgePage() {
 
         </div>
 
-        {/* ── BOARD SCHEMATIC ─────────────────────────────────────────── */}
+        {/* ── THE BOARD ───────────────────────────────────────────────── */}
         <Reveal>
-          <figure className="mt-16 overflow-hidden rounded-lg border border-border bg-bg-raised/40">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/bom_board.webp"
-              alt="Oreo Badge board schematic and bill of materials"
-              className="h-auto w-full object-contain"
-              loading="lazy"
-              decoding="async"
-            />
-          </figure>
+          <div className="mt-16 grid gap-4 sm:grid-cols-2">
+            {[
+              { src: "/pcb_front.jpg", alt: "Front of the Oreo badge PCB", label: "Front" },
+              { src: "/pcb_back.jpg",  alt: "Back of the Oreo badge PCB",  label: "Back" },
+            ].map((img) => (
+              <figure
+                key={img.src}
+                className="overflow-hidden rounded-lg border border-border bg-bg-raised/40"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={img.src}
+                  alt={img.alt}
+                  className="h-auto w-full object-contain"
+                  width={700} height={1064}
+                  loading="lazy"
+                  decoding="async"
+                />
+                <figcaption className="px-4 py-3 text-xs uppercase tracking-widest text-muted">
+                  {img.label}
+                </figcaption>
+              </figure>
+            ))}
+          </div>
         </Reveal>
 
         {/* ── SPEC GRID ────────────────────────────────────────────── */}

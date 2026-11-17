@@ -450,16 +450,33 @@ user through this exact workflow.
 
 ## 🛠 Hardware
 
-| | |
-|---|---|
-| **MCU** | ESP32-S3-DevKitC-1-N16R8 (16 MB flash, 8 MB PSRAM) |
-| **Display** | ST7789 IPS, 2.0", 320×240, 4-wire SPI @ 40 MHz |
-| **Input** | 8 tactile buttons (HOME, A, B, C and a D-pad), also the wake-from-sleep source. Touch pads are not fitted (#102) |
-| **Sensors** | MPU-6050 (6-DoF IMU), TSOP38238 (IR RX) |
-| **Output** | 4 corner LEDs, WS2812 status NeoPixel, IR LED (940 nm) + 2N2222 driver |
-| **Comms** | WiFi 802.11 b/g/n, BLE 5.0, IR, USB-C |
-| **Power** | 18650 cell + MAX17048 fuel gauge, USB-C charging, AMS1117-3.3 LDO |
-| **Clock** | RTC backed by NTP — boot sync + manual re-sync from Settings / C-panel |
+OreoOS runs today on a breadboard badge built from an ESP32-S3 DevKitC. The
+PCB badge, designed in KiCad under [`circuit/elixpo/`](circuit/elixpo/), is
+finished: the first five boards were ordered in November 2026, and OreoOS is
+flashed onto it once a board is assembled.
+
+<div align="center">
+<img src="circuit/elixpo/renders/front.jpg" alt="Oreo badge PCB, front" width="300">
+<img src="circuit/elixpo/renders/back.jpg" alt="Oreo badge PCB, back" width="300">
+</div>
+
+| | Breadboard badge (runs today) | PCB badge (first boards ordered) |
+|---|---|---|
+| **MCU** | ESP32-S3-DevKitC-1-N16R8 | ESP32-S3-WROOM-1-N16R8 (16 MB flash, 8 MB PSRAM) |
+| **Display** | ST7789 IPS, 2.0", 320×240 | ILI9341 2.8", 320×240, resistive touch, on its own 5 V boost |
+| **Input** | 8 buttons on GPIOs | 8 buttons on an AW9523B I²C expander, plus RESET and BOOT |
+| **Sensors** | MPU-6050, TSOP38238 IR receiver | MPU-6050 (I²C 0x69), TSOP38238 IR receiver |
+| **Output** | 4 corner LEDs, WS2812 status LED, IR LED | 4 corner LEDs (each with 2 more on the back edge), WS2812B status LED, IR LED, MAX98357A amp and speaker |
+| **Storage** | — | microSD (1-bit SDMMC) |
+| **Expansion** | — | Qwiic (I²C) and a 4-GPIO header (I²C, SPI or GPIO) |
+| **Comms** | Wi-Fi, BLE 5.0, IR, USB-C | Wi-Fi, BLE 5.0, IR, native USB-C |
+| **Power** | 18650 + MAX17048, AMS1117-3.3 | LiPo with BQ24074 USB-C charger, TPS63031 3.3 V buck-boost |
+| **Clock** | RTC backed by NTP | ESP32 clock, set by NTP after a cold start |
+| **Board** | — | 4 layers, 88 × 133.5 mm, OSHWA-certified (IN000107) |
+
+The PCB's design notes, pin map and ordering steps are in
+[`circuit/elixpo/README.md`](circuit/elixpo/README.md), and the parts and cost
+of one badge in [`circuit/elixpo/BOM_COST.md`](circuit/elixpo/BOM_COST.md).
 
 📄 **Full electrical / mechanical specs:** see [`docs/DATASHEET.md`](docs/DATASHEET.md)
 🔧 **Build guide + pinout + soldering tips:** see [`docs/HARDWARE.md`](docs/HARDWARE.md)
