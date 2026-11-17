@@ -12,10 +12,17 @@ There are two designs:
   today, and its pins are the ones in
   [`oreoWare/pins.py`](../oreoWare/pins.py).
 - **The PCB badge** ([`circuit/elixpo/`](../circuit/elixpo/), KiCad 10): a
-  bare ESP32-S3R8 board with a BQ24074 power-path charger and a TPS63031
-  buck-boost 3.3 V rail, about 90×54 mm to fit a lanyard slot. The
-  schematic exists and the board is not laid out yet. Help is welcome:
-  see [Work on the hardware](../CONTRIBUTING.md#work-on-the-hardware).
+  4-layer, 88 × 133.5 mm board with an ESP32-S3-WROOM-1-N16R8 module, a
+  2.8" ILI9341 touch display on its own 5 V boost, a BQ24074 USB-C charger
+  and a TPS63031 3.3 V buck-boost rail, the buttons on an AW9523B expander,
+  a speaker amp, microSD, Qwiic and a 4-GPIO expansion header. It is fully
+  routed and passes ERC and DRC; the first five boards were ordered in
+  November 2026. Its design notes, pin map and ordering steps are in
+  [`circuit/elixpo/README.md`](../circuit/elixpo/README.md), and the parts
+  and cost of one badge in
+  [`circuit/elixpo/BOM_COST.md`](../circuit/elixpo/BOM_COST.md). OreoOS
+  needs a matching pin map and drivers before it runs on this board
+  (#154); it is flashed once a board is assembled.
 
 Where the two differ, the parts lists and power section below describe the
 breadboard.

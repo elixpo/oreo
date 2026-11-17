@@ -4,8 +4,14 @@ The Oreo Badge is certified open source hardware by the Open Source Hardware
 Association, UID [IN000107](https://certification.oshwa.org/in000107.html). The design is licensed under
 CERN-OHL-P-2.0 (see `LICENSE` in this directory).
 
+<p align="center">
+<img src="renders/front.jpg" alt="Front of the board" width="300">
+<img src="renders/back.jpg" alt="Back of the board" width="300">
+</p>
+
 This KiCad 10 project is the PCB successor to the ESP32-S3 DevKitC
-breadboard: a 4-layer, 88 x 133.5 mm board, fully routed. The root
+breadboard: a 4-layer, 88 x 133.5 mm board, fully routed. The first five
+boards were ordered in November 2026. The root
 schematic, `elixpo.kicad_sch`, links five sheets:
 
 1. ESP32-S3-WROOM-1-N16R8 module, reset and boot, debug pads.
@@ -21,7 +27,9 @@ produce the ERC report, PDF and KiCad-native BOM under `circuit/elixpo/build/`.
 
 `BOM_PROCUREMENT.csv` is the sourcing-oriented BOM. `BOM_PRELIMINARY.csv` is a
 flat engineering export that is regenerated directly from the schematic model.
-`BOM_ORDER.csv` is the shopping list (see Assembly below).
+`BOM_ORDER.csv` is the shopping list generated from the schematic (see
+Assembly below), and `BOM_COST.md` is the bill of materials for one badge
+as it was actually ordered, with the cost of each part.
 
 ## Pin map
 
@@ -89,7 +97,7 @@ this board.
   pins. GPIO0 has a dedicated BOOT switch and EN has the recommended
   10 kohm/1 uF reset network.
 
-## Before ordering and on the first boards
+## On the first boards
 
 - Check the display module's header order against J3, and the battery
   lead's polarity against J2.
@@ -116,21 +124,46 @@ Before soldering J3, check that the module's header reads VCC, GND, CS,
 RESET, DC, SDI, SCK, LED, SDO, T_CLK, T_CS, T_DIN, T_DO, T_IRQ from pin 1:
 clones differ.
 
+## Ordering the boards
+
+`python3 export_jlcpcb.py` writes `build/jlcpcb/oreo-badge-gerbers.zip`.
+The first boards were ordered from JLCPCB with these options:
+
+| Option | Setting |
+|---|---|
+| Layers, thickness | 4, 1.6 mm, FR-4 TG135, no stackup requirement |
+| Copper | 1 oz outer, 0.5 oz inner |
+| Mask, silkscreen | black, white |
+| Surface finish | HASL (lead-free for boards that are sold) |
+| Vias | 0.3 mm drill, 0.4/0.45 mm pad, plugged |
+| Mark on PCB | Remove Mark (the board has no order-number placeholder) |
+| Electrical test | flying probe, fully tested |
+| PCB assembly, stencil | off |
+
 ## Assembly
 
-JLCPCB assembles the basic-library parts (all on the back); everything
-else is bought and hand-soldered, as `BOM_ORDER.csv` sets out, including
-the through-hole parts: the eight 6 mm buttons, J3, and the IR receiver. The
-corner LEDs D1-D4 on the front stay SMD; each has two more on the back's
-corner curve (D30-D37), in parallel on the same AW9523B channel.
+The first badges are assembled by hand from bare boards. The parts come from
+LCSC, apart from the display, the MPU-6050, the battery and the screws;
+`BOM_COST.md` lists every part as ordered, including the in-stock
+replacements used for the parts LCSC had run out of. The chips with an
+exposed pad (BQ24074, TPS63031, TPS61023, AW9523B, MAX98357A, MPU-6050) and
+the two inductors need solder paste and hot air or a hot plate; everything
+else, including the through-hole buttons, J3 and the IR receiver, is
+soldered with an iron. The corner LEDs D1-D4 on the front stay SMD; each has
+two more on the back's corner curve (D30-D37), in parallel on the same
+AW9523B channel. The speaker's wires solder to J7's pads if it has no
+JST-SH plug.
 
-`python3 export_jlcpcb.py` writes the order files: the Gerber zip, and a
-JLCPCB assembly BOM and placement list in `build/jlcpcb/` that hold only
-parts from JLCPCB's basic library (no extended-part fees; all on the back,
-so assembly is single-sided). `BOM_ORDER.csv` lists everything a badge
-needs: what JLCPCB fits, the SMD and through-hole parts to buy and solder
-by hand (the exposed-pad chips need a stencil and hot air or a hot plate),
-and the off-board parts, with LCSC numbers and prices.
+`export_jlcpcb.py` also writes a JLCPCB assembly BOM and placement list in
+`build/jlcpcb/` holding only parts from JLCPCB's basic library (all on the
+back, so assembly is single-sided), for anyone who wants JLCPCB to fit
+those. `BOM_ORDER.csv` lists everything a badge needs: what JLCPCB can fit,
+the SMD and through-hole parts to solder by hand, and the off-board parts,
+with LCSC numbers and prices.
+
+OreoOS and its firmware are flashed over USB-C once a board is assembled;
+the OS first needs this board's pin map, an ILI9341 driver, a touch driver
+and the expander button driver (#154).
 
 The battery sits on the back in a 3D-printed L-shaped holder: it runs the
 cell's 50 mm edge, is as tall as the cell (6 mm) and has a 10-12 mm lip over
