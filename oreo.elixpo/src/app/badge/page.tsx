@@ -199,6 +199,27 @@ export default function BadgePage() {
             </motion.div>
           ))}
         </div>
+
+        {/* ── CREDITS ───────────────────────────────────────────────── */}
+        <Reveal>
+          <div className="mt-16 card-surface p-6">
+            <h2 className="font-display text-2xl tracking-tight">Made by</h2>
+            <p className="mt-3 max-w-2xl text-text-dim">
+              Designed by{" "}
+              <a href="https://github.com/Circuit-Overtime" target="_blank" rel="noreferrer"
+                 className="text-text underline-offset-4 hover:underline">
+                Ayushman Bhattacharya (@Circuit-Overtime)
+              </a>{" "}
+              with{" "}
+              <a href="https://github.com/anwe-ch" target="_blank" rel="noreferrer"
+                 className="text-text underline-offset-4 hover:underline">
+                Anwesha Chakraborty (@anwe-ch)
+              </a>
+              , Elixpo core maintainer and co-author of the RV565 video format the
+              badge plays.
+            </p>
+          </div>
+        </Reveal>
       </div>
     </div>
   );
