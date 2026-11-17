@@ -38,7 +38,7 @@ INNER = ("In1.Cu,In2.Cu,In3.Cu,In4.Cu" if '"In4.Cu"' in BOARD.read_text()
          else "In1.Cu,In2.Cu")                      # 6 or 4 copper layers
 LAYERS = ("F.Cu," + INNER + ",B.Cu,F.Paste,B.Paste,"
           "F.Silkscreen,B.Silkscreen,F.Mask,B.Mask,Edge.Cuts")
-PRICE_DATE = "2026-11-15"
+PRICE_DATE = "2026-11-17"
 # Extended parts on the back that are hard to solder by hand (pads under the
 # chip, 0.5 mm pitch, tiny 0402s next to them). oreo-badge-BOM-plus.csv and
 # oreo-badge-CPL-plus.csv add them to the basic parts, for when JLCPCB
@@ -52,17 +52,22 @@ JLC = A
 
 # value on the board: (group, part, LCSC number, LCSC unit price USD, note)
 PARTS = {
-    "22uF 10V": (A, "Samsung CL21A226MAQNNNE, 22 uF 25 V X5R 0805", "C45783", 0.1084, ""),
+    "22uF 10V": (A, "Samsung CL21A226MAQNNNE, 22 uF 25 V X5R 0805", "C45783", 0.1084,
+                 "LCSC's store ran out in Nov 2026: Samsung CL21A226MAYNNNE (C602037) was bought"),
     "100nF": (A, "Samsung CL05B104KO5NNNC, 100 nF 16 V X7R 0402", "C1525", 0.0024, ""),
     "1uF": (A, "Samsung CL05A105KA5NQNC, 1 uF 25 V X5R 0402", "C52923", 0.0057, ""),
     "10uF 10V": (A, "Samsung CL21A106KAYNNNE, 10 uF 25 V X5R 0805", "C15850", 0.0311, ""),
     "1nF 50V": (A, "FH 0402B102K500NT, 1 nF 50 V X7R 0402", "C1523", 0.0036, ""),
-    "1uF 25V": (A, "Samsung CL10A105KB8NNNC, 1 uF 50 V X5R 0603", "C15849", 0.0083, "USB input: needs 25 V or more"),
+    "1uF 25V": (A, "Samsung CL10A105KB8NNNC, 1 uF 50 V X5R 0603", "C15849", 0.0083,
+                "USB input: needs 25 V or more. LCSC's store ran out: Taiyo Yuden UMK107BJ105KA-T (C92848) was bought"),
     "4.7uF 10V": (A, "Samsung CL10A475KO8NNNC, 4.7 uF 16 V X5R 0603", "C19666", 0.015, ""),
     "4.7uF": (A, "Samsung CL10A475KO8NNNC, 4.7 uF 16 V X5R 0603", "C19666", 0.015, ""),
-    "10k": (A, "UNI-ROYAL 0402WGF1002TCE, 10 k 1% 0402", "C25744", 0.001, ""),
-    "10k 1%": (A, "UNI-ROYAL 0402WGF1002TCE, 10 k 1% 0402", "C25744", 0.001, ""),
-    "22R": (A, "UNI-ROYAL 0402WGF220JTCE, 22 R 0402", "C25092", 0.001, ""),
+    "10k": (A, "UNI-ROYAL 0402WGF1002TCE, 10 k 1% 0402", "C25744", 0.001,
+            "LCSC's store ran out: YAGEO RC0402JR-0710KL (C60489) was bought"),
+    "10k 1%": (A, "UNI-ROYAL 0402WGF1002TCE, 10 k 1% 0402", "C25744", 0.001,
+               "LCSC's store ran out: YAGEO RC0402JR-0710KL (C60489) was bought"),
+    "22R": (A, "UNI-ROYAL 0402WGF220JTCE, 22 R 0402", "C25092", 0.001,
+            "LCSC's store ran out: YAGEO RC0402FR-0722RL (C114765) was bought"),
     "33R": (A, "UNI-ROYAL 0402WGF330JTCE, 33 R 0402", "C25105", 0.0011, ""),
     "5.1k": (A, "UNI-ROYAL 0402WGF5101TCE, 5.1 k 1% 0402", "C25905", 0.0014, ""),
     "2.0k 1% (445 mA)": (A, "UNI-ROYAL 0402WGF2001TCE, 2 k 1% 0402", "C4109", 0.0019, "Sets the charge current"),
@@ -94,8 +99,8 @@ PARTS = {
                           "Front. Basic white KT-0603W (C2290) works too"),
     "940nm IR LED": (B, "Vishay VSMY2940GX01, 940 nm 1206", "C3202699", 0.7625, "Front, IR emitter"),
     "USB-C USB2 device": (B, "GCT USB4105-GF-A, USB-C receptacle", "C3020560", 1.021, "Solder the shell pegs too"),
-    "LiPo JST-PH 2-pin": (B, "JST S2B-PH-SM4-TB(LF)(SN), PH 2-pin side entry", "", None,
-                          "Not stocked at LCSC: Mouser / DigiKey"),
+    "LiPo JST-PH 2-pin": (B, "XYECONN XY-S2B-PH-SM4-TB, JST-PH 2-pin side entry", "C54582899", 0.0472,
+                          "Equivalent of JST S2B-PH-SM4-TB(LF)(SN)"),
     "microSD push-push": (B, "Hirose DM3AT-SF-PEJM5, microSD", "C114218", 1.3908, ""),
     "Qwiic / STEMMA QT": (B, "JST SM04B-SRSS-TB(LF)(SN), SH 4-pin", "C51940130", 0.0393,
                           "LCSC part is the XYECONN equivalent; JST original at Mouser"),
@@ -103,8 +108,8 @@ PARTS = {
     "1.5uH 2A shielded": (B, "TDK VLS3015ET-1R5N, 1.5 uH 3x3 mm, 1.5 A, 75 mOhm", "C3221497", 0.0632,
                           "On LCSC's store (min. 10); Sunlord SWPA3015S1R5NT (C56594) is the JLCPCB-assembly "
                           "stand-in; Taiyo Yuden NR3015T1R5N is out of stock"),
-    "RESET": (B, "Panasonic EVQ-P2002W, side-push tact", "", None, "Not stocked at LCSC: Mouser / DigiKey"),
-    "BOOT": (B, "Panasonic EVQ-P2002W, side-push tact", "", None, "Not stocked at LCSC: Mouser / DigiKey"),
+    "RESET": (B, "Panasonic EVQP2P02W, side-push tact, 2.5 mm", "C512395", 0.5638, "EVQ-P2 series; EVQ-P2002W fits too"),
+    "BOOT": (B, "Panasonic EVQP2P02W, side-push tact, 2.5 mm", "C512395", 0.5638, ""),
     "MAIN POWER": (B, "C&K JS102011SAQN, slide switch", "C221660", 0.8541, ""),
     "ESP32-S3-WROOM-1-N16R8": (B, "Espressif ESP32-S3-WROOM-1-N16R8", "C2913202", 5.3485,
                                "Solder the ground pad through its vias from the front"),
@@ -114,26 +119,26 @@ PARTS = {
     "MPU-6050": (B, "TDK InvenSense MPU-6050, QFN-24", "C24112", 21.0013,
                  "Costly as a genuine bare chip. Cheaper: Robu SKU 162123, generic, Rs 426 incl. GST "
                  "(Rs 369 at 10+): confirm it ships in the 4 x 4 mm QFN-24 (a 3 x 3 mm chip will not fit)"),
-    "WS2812B-2020": (B, "Worldsemi WS2812B-2020, status LED", "C965555", 0.1165,
-                     "Out of stock at LCSC on the price date; pads underneath: hot air"),
+    "WS2812B-2020": (B, "Worldsemi WS2812B-2020-V6, status LED", "C52917434", 0.0923,
+                     "Same footprint as WS2812B-2020 (C965555, out of stock); pads underneath: hot air"),
     "TPS61023 5V boost": (B, "TI TPS61023DRLR, 5 V boost for the display, SOT-563", "C919459", 0.233,
                           "Small 0.5 mm pitch: stencil and hot air"),
     "150k 1%": (B, "UNI-ROYAL 0402WGF1503TCE, 150 k 1% 0402", "C25755", 0.002, "No basic 150 k; sets the 5 V"),
     "AW9523B": (B, "Awinic AW9523BTQR, I2C expander, QFN-24", "C148077", 0.3266, "Exposed pad: hot air or hot plate"),
     "MAX98357A": (B, "ADI MAX98357AETE+T, I2S amplifier, TQFN-16", "C910544", 1.3089, "Exposed pad: hot air or hot plate"),
 
-    "UP": (C, "6 x 6 mm tactile switch, 4-pin through-hole (5-7 mm tall)", "", None, "Any generic 6x6 THT tact"),
-    "DOWN": (C, "6 x 6 mm tactile switch, 4-pin through-hole (5-7 mm tall)", "", None, ""),
-    "LEFT": (C, "6 x 6 mm tactile switch, 4-pin through-hole (5-7 mm tall)", "", None, ""),
-    "RIGHT": (C, "6 x 6 mm tactile switch, 4-pin through-hole (5-7 mm tall)", "", None, ""),
-    "A": (C, "6 x 6 mm tactile switch, 4-pin through-hole (5-7 mm tall)", "", None, ""),
-    "B": (C, "6 x 6 mm tactile switch, 4-pin through-hole (5-7 mm tall)", "", None, ""),
-    "C": (C, "6 x 6 mm tactile switch, 4-pin through-hole (5-7 mm tall)", "", None, ""),
-    "HOME": (C, "6 x 6 mm tactile switch, 4-pin through-hole (5-7 mm tall)", "", None, ""),
+    "UP": (C, "SHOU HAN TS665CJ, 6 x 6 x 5 mm tactile switch, 4-pin through-hole", "C393938", 0.0196, "Any 6x6 THT tact fits"),
+    "DOWN": (C, "SHOU HAN TS665CJ, 6 x 6 x 5 mm tactile switch, 4-pin through-hole", "C393938", 0.0196, ""),
+    "LEFT": (C, "SHOU HAN TS665CJ, 6 x 6 x 5 mm tactile switch, 4-pin through-hole", "C393938", 0.0196, ""),
+    "RIGHT": (C, "SHOU HAN TS665CJ, 6 x 6 x 5 mm tactile switch, 4-pin through-hole", "C393938", 0.0196, ""),
+    "A": (C, "SHOU HAN TS665CJ, 6 x 6 x 5 mm tactile switch, 4-pin through-hole", "C393938", 0.0196, ""),
+    "B": (C, "SHOU HAN TS665CJ, 6 x 6 x 5 mm tactile switch, 4-pin through-hole", "C393938", 0.0196, ""),
+    "C": (C, "SHOU HAN TS665CJ, 6 x 6 x 5 mm tactile switch, 4-pin through-hole", "C393938", 0.0196, ""),
+    "HOME": (C, "SHOU HAN TS665CJ, 6 x 6 x 5 mm tactile switch, 4-pin through-hole", "C393938", 0.0196, ""),
     "2.8in ILI9341 SPI module (MSP2807)": (C, "1x14 female header, 2.54 mm, 8.5 mm tall", "C41417326", 0.2363,
                                           "The display module plugs into it"),
-    "Expansion: 3V3 GND IO5 IO41 IO42 IO47": (C, "1x6 male header, 2.54 mm (optional)", "", None,
-                                              "Any generic header; or solder wires straight to the pads"),
+    "Expansion: 3V3 GND IO5 IO41 IO42 IO47": (C, "XFCN PZ254V-11-06P, 1x6 male header, 2.54 mm (optional)", "C492405", 0.0431,
+                                              "Any 2.54 mm header; or solder wires straight to the pads"),
     "TSOP38238": (C, "Vishay TSOP38238, 38 kHz IR receiver", "C141632", 0.648, "Front, lying flat, lens facing out"),
 }
 SKIP = {"Fiducial_1mm_Mask2mm"}
@@ -143,8 +148,8 @@ OFF_BOARD = [
     ("BT1", 1, "LiPo 3.7 V with protection PCB and a JST-PH 2.0 lead, up to 6 x 34 x 50 mm "
      "(603450 about 1000 mAh; KP-603048 fits too)",
      "Check the plug is JST-PH 2.0 and the red wire goes to J2's + pin before plugging in"),
-    ("LS1", 1, "Speaker 8 ohm 0.7 W, 15 x 11 mm (1511), leads with a JST-SH 1.0 2-pin plug",
-     "Foam tape around the rim, over the grille"),
+    ("LS1", 1, "Speaker 8 ohm, 15 x 11 mm (1511), e.g. XHXDZ 1511-L60MM (LCSC C50387185)",
+     "Wire leads: solder them to J7's pads, or crimp a JST-SH 1.0 2-pin plug. Foam tape around the rim"),
     ("HW1-HW4", 4, "M3 standoff, female-female, about 11 mm", "Match the socket + header stack"),
     ("HW5-HW12", 8, "M3 x 5 mm screw", "Four from the back, four through the module"),
     ("BH1", 1, "Battery holder, L-shaped, 3D printed (50 mm long, 6 mm wall, 10-12 mm lip)",
