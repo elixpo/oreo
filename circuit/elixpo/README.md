@@ -206,6 +206,11 @@ In short:
 The full guide is the
 [hardware section of CONTRIBUTING.md](../../CONTRIBUTING.md#work-on-the-hardware).
 
+## Fund the badge
+
+The first boards are paid for out of pocket. To help build them, chip in at
+[payouts.elixpo.com/f/oreo-badge](https://payouts.elixpo.com/f/oreo-badge).
+
 ## Credits
 
 The Oreo badge is designed by Ayushman Bhattacharya
