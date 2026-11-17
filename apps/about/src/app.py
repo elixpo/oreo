@@ -110,6 +110,7 @@ class App(oreoOS.App):
             ("r", "MAC", "mac"),
             ("h", "CREDITS", None),
             ("c", "Crafted by @Circuit-Overtime", theme.PRIMARY),
+            ("c", "Co-maintained by @anwe-ch", theme.PURPLE),
             ("c", "github.com/elixpo/oreo", theme.TEAL),
             ("c", "Released " + str(v.get("released", "-")), theme.MUTED),
         )

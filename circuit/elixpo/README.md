@@ -206,6 +206,14 @@ In short:
 The full guide is the
 [hardware section of CONTRIBUTING.md](../../CONTRIBUTING.md#work-on-the-hardware).
 
+## Credits
+
+The Oreo badge is designed by Ayushman Bhattacharya
+([@Circuit-Overtime](https://github.com/Circuit-Overtime)) with Anwesha
+Chakraborty ([@anwe-ch](https://github.com/anwe-ch)), Elixpo core maintainer,
+who co-authored the JLCPCB order files (#173) and the RV565 video format the
+badge plays.
+
 ## Licence
 
 The hardware design files in this directory are Open Hardware, licensed under
