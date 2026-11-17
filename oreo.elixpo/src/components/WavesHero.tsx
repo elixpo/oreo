@@ -20,7 +20,7 @@
  */
 
 import { motion, type Variants } from "framer-motion";
-import { ArrowRight, Sparkles, Github } from "lucide-react";
+import { ArrowRight, Sparkles, Github, Heart } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef } from "react";
 
@@ -380,7 +380,30 @@ export default function WavesHero() {
             >
               <Github className="h-4 w-4" /> Source
             </a>
+            <a
+              href="https://payouts.elixpo.com/f/oreo-badge"
+              target="_blank" rel="noreferrer"
+              className="btn-ghost rounded-pill border-primary/60 px-7 py-3 text-base uppercase
+                         tracking-[0.18em] text-primary backdrop-blur"
+            >
+              <Heart className="h-4 w-4" aria-hidden="true" /> Sponsor the build
+            </a>
           </motion.div>
+
+          <motion.a
+            variants={itemVariants}
+            href="https://payouts.elixpo.com/f/oreo-badge"
+            target="_blank" rel="noreferrer"
+            className="mx-auto mb-10 flex max-w-xl items-center justify-center gap-2
+                       rounded-lg border border-primary/30 bg-primary/10 px-5 py-3
+                       text-sm text-text backdrop-blur transition-colors hover:bg-primary/15"
+          >
+            <span aria-hidden="true">💛</span>
+            <span>
+              The first Oreo PCBs are being made now.{" "}
+              <strong className="text-primary">Even $1 or ₹100 helps</strong> build them.
+            </span>
+          </motion.a>
 
           <motion.ul
             variants={itemVariants}
