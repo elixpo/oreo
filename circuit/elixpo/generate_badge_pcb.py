@@ -58,7 +58,7 @@ HEART = (79.0, 35.5, 11.0)                # front, far right, where the panda is
 BACK_ROW_Y = 47.5                          # centre line of "Elixpo"
 BACK_COLUMN = (15.0, 9.0)                  # front-view centre x and top of the column
 REPO_URL = "github.com/elixpo/oreo"            # under "Elixpo"
-JLC_MARK = "JLCJLCJLCJLC"                     # where JLCPCB puts its order number
+JLC_MARK = None                                 # no JLCPCB order number ("Remove Mark")
 OSHW_H = 12.0                              # height of the OSHWA certification mark
 
 
@@ -566,9 +566,10 @@ def silkscreen(board):
             y += 2.5
     add_text(board, bs, "BATTERY HOLDER", bx + bw / 2, fy + HOLDER_FOOT / 2, 1.0, 0.15, mirror=True)
     add_text(board, bs, "holder lip", bx + bw / 2, ly + 1.4, 0.8, 0.12, mirror=True)
-    # JLCPCB prints its order number over this text ("Specify a location" when
-    # ordering); here the battery covers it.
-    add_text(board, bs, JLC_MARK, bx + bw / 2, ly + 5.5, 1.0, 0.15, mirror=True)
+    # Order with "Remove Mark": no JLCPCB order number. Set JLC_MARK to a
+    # placeholder to have it printed here, under the battery.
+    if JLC_MARK:
+        add_text(board, bs, JLC_MARK, bx + bw / 2, ly + 5.5, 1.0, 0.15, mirror=True)
     add_text(board, bs, "LiPo 3.7 V, up to 6 x 34 x 50 mm", bx + bw / 2, by + bh / 2 - 6, 1.2, 0.15, mirror=True)
     add_text(board, bs, "JST-PH: check polarity", bx + bw / 2, by + bh / 2 - 3, 1.0, 0.15, mirror=True)
     add_rect(board, pcbnew.B_Fab, sx, sy, sw, sh, 0.1)
