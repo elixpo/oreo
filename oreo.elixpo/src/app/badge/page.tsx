@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { Reveal, fadeUp, staggerContainer } from "@/components/MotionWrap";
 import {
   Cpu, MemoryStick, Battery, Radio, Usb, Layers,
-  Layout, Ruler, Github,
+  Layout, Ruler, Github, Heart,
 } from "lucide-react";
 
 const SPECS = [
@@ -64,9 +64,16 @@ export default function BadgePage() {
             </motion.p>
             <motion.div variants={fadeUp} className="mt-8 flex flex-wrap gap-3">
               <a
-                href="https://github.com/elixpo/oreo/blob/main/circuit/elixpo/README.md"
+                href="https://payouts.elixpo.com/f/oreo-badge"
                 target="_blank" rel="noreferrer"
                 className="btn-primary"
+              >
+                <Heart className="h-4 w-4" /> Fund the badge
+              </a>
+              <a
+                href="https://github.com/elixpo/oreo/blob/main/circuit/elixpo/README.md"
+                target="_blank" rel="noreferrer"
+                className="btn-ghost"
               >
                 <Github className="h-4 w-4" /> Board design notes
               </a>

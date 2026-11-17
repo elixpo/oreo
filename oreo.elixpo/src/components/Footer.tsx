@@ -30,6 +30,7 @@ const COLUMNS: FooterColumn[] = [
   {
     title: "Source",
     links: [
+      { label: "Fund the badge",  href: "https://payouts.elixpo.com/f/oreo-badge", external: true },
       { label: "GitHub",          href: "https://github.com/elixpo/oreo", external: true },
       { label: "Issues",          href: "https://github.com/elixpo/oreo/issues", external: true },
       { label: "Changelog",       href: "https://github.com/elixpo/oreo/blob/main/CHANGELOG.md", external: true },
