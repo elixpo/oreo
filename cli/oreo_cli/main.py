@@ -1,7 +1,7 @@
-"""`oreo` entry point: argument parsing, help, and dispatch.
+"""`falera` entry point: argument parsing, help, and dispatch.
 
 Nothing here opens a serial port. A command reaches the badge only through
-Ctx.session(), after discovery has picked a port, so `--help`, `oreo help`
+Ctx.session(), after discovery has picked a port, so `--help`, `falera help`
 and commands run with no badge plugged in never touch the hardware.
 """
 
@@ -19,165 +19,165 @@ from .errors import (EXIT_CANCELLED, EXIT_ERROR, EXIT_LINK, Cancelled, OreoError
                      is_serial_error, local_error_message)
 from .ui import UI, adapt_stdio, esc
 
-HOME = "https://oreo.elixpo.com/docs/cli/"
+HOME = "https://falera.elixpo.com/docs/cli/"
 
 # name -> (one-line summary, long description with examples)
 HELP = {
     "devs": ("List connected badges",
              "Lists badges found by their USB ID 303a:83ec, so nobody has to\n"
              "guess /dev/ttyACM* or COM ports. Never opens a port.\n\n"
-             "  oreo devs\n  oreo devs --all      also show other USB serial devices"),
-    "info": ("OreoOS and firmware version, storage, Wi-Fi, battery",
-             "Shows the OreoOS and MicroPython versions, free space by category\n"
+             "  falera devs\n  falera devs --all      also show other USB serial devices"),
+    "info": ("FaleraOS and firmware version, storage, Wi-Fi, battery",
+             "Shows the FaleraOS and MicroPython versions, free space by category\n"
              "(system, apps, gallery, documents, misc), Wi-Fi, Bluetooth and battery.\n\n"
-             "  oreo info"),
-    "shell": ("MicroPython REPL; OreoOS restarts when you leave",
-              "Stops OreoOS and opens the badge's MicroPython REPL. Leave with\n"
-              "Ctrl-] or Ctrl-X; OreoOS starts again (unless --reset none).\n\n"
-              "  oreo shell"),
+             "  falera info"),
+    "shell": ("MicroPython REPL; FaleraOS restarts when you leave",
+              "Stops FaleraOS and opens the badge's MicroPython REPL. Leave with\n"
+              "Ctrl-] or Ctrl-X; FaleraOS starts again (unless --reset none).\n\n"
+              "  falera shell"),
     "ls": ("List files on the badge",
-           "  oreo ls\n  oreo ls /apps\n  oreo ls :documents"),
+           "  falera ls\n  falera ls /apps\n  falera ls :documents"),
     "push": ("Copy files to the badge",
              "Copies files (or folders with -r) to the badge with a progress bar.\n"
              "Each file is written to a temporary name, renamed into place and\n"
              "checked with SHA-256. Free space is checked first.\n\n"
-             "  oreo push notes.txt /documents/\n"
-             "  oreo push -r myapp /apps/myapp"),
+             "  falera push notes.txt /documents/\n"
+             "  falera push -r myapp /apps/myapp"),
     "pull": ("Copy files from the badge",
-             "  oreo pull /wifi_seen.json\n"
-             "  oreo pull -r /apps/pet ./pet-backup"),
+             "  falera pull /wifi_seen.json\n"
+             "  falera pull -r /apps/pet ./pet-backup"),
     "rm": ("Remove files from the badge",
-           "Folders need -r. OreoOS's own files and anything inside them\n"
+           "Folders need -r. FaleraOS's own files and anything inside them\n"
            "(/oreoOS, /oreoWare, /assets, built-in apps, /main.py, /secrets.py,\n"
            "/wifi.json, ...) also need --force.\n\n"
-           "  oreo rm /documents/old.mdz\n  oreo rm -r /apps/myapp"),
+           "  falera rm /documents/old.mdz\n  falera rm -r /apps/myapp"),
     "add": ("Add a photo, video or document (Gallery / Reader)",
-            "Converts the file to the format OreoOS reads, checks it fits, and\n"
+            "Converts the file to the format FaleraOS reads, checks it fits, and\n"
             "copies it: photos and videos to the Gallery, .md/.txt to the Reader.\n"
             "Videos need ffmpeg on your PATH.\n\n"
-            "  oreo add holiday.jpg\n"
-            "  oreo add clip.mp4 --seconds 8\n"
-            "  oreo add talk-notes.md"),
+            "  falera add holiday.jpg\n"
+            "  falera add clip.mp4 --seconds 8\n"
+            "  falera add talk-notes.md"),
     "transfer": ("Send files to the badge's Transfer app (code shown on the badge)",
                  "Open Transfer on the badge, run this, and type the code the badge\n"
-                 "shows. Files are converted like `oreo add`, sent over USB, checked\n"
-                 "with SHA-256 and land in the Gallery or Reader. OreoOS keeps running.\n\n"
-                 "  oreo transfer send holiday.jpg clip.mp4 notes.md\n"
-                 "  oreo transfer list\n"
-                 "  oreo transfer rm holiday.rz565"),
-    "send": ("Same as `oreo transfer send`",
-             "  oreo send holiday.jpg notes.md"),
+                 "shows. Files are converted like `falera add`, sent over USB, checked\n"
+                 "with SHA-256 and land in the Gallery or Reader. FaleraOS keeps running.\n\n"
+                 "  falera transfer send holiday.jpg clip.mp4 notes.md\n"
+                 "  falera transfer list\n"
+                 "  falera transfer rm holiday.rz565"),
+    "send": ("Same as `falera transfer send`",
+             "  falera send holiday.jpg notes.md"),
     "apps": ("List, install, update and remove apps",
              "Uses the badge's App Store (oreoOS.store). Installing and updating\n"
-             "download over the badge's Wi-Fi, so set that up first (`oreo wifi`).\n\n"
-             "  oreo apps                 installed apps and the catalogue\n"
-             "  oreo apps refresh         fetch the latest catalogue\n"
-             "  oreo apps install snake\n"
-             "  oreo apps update          update every app with a newer version\n"
-             "  oreo apps remove snake"),
+             "download over the badge's Wi-Fi, so set that up first (`falera wifi`).\n\n"
+             "  falera apps                 installed apps and the catalogue\n"
+             "  falera apps refresh         fetch the latest catalogue\n"
+             "  falera apps install snake\n"
+             "  falera apps update          update every app with a newer version\n"
+             "  falera apps remove snake"),
     "run": ("Run a script on the badge",
-            "Stops OreoOS, runs the file and streams its output. Ctrl-C stops it.\n\n"
-            "  oreo run blink.py"),
+            "Stops FaleraOS, runs the file and streams its output. Ctrl-C stops it.\n\n"
+            "  falera run blink.py"),
     "dev": ("Mount a folder for live editing in the REPL",
-            "Stops OreoOS, mounts a folder from your computer at /remote on the\n"
+            "Stops FaleraOS, mounts a folder from your computer at /remote on the\n"
             "badge and opens the REPL there: `import mymodule` loads your local\n"
             "copy, so edits need no copying. A module is imported once; after an\n"
-            "edit, `del sys.modules['mymodule']` and import it again. OreoOS does\n"
+            "edit, `del sys.modules['mymodule']` and import it again. FaleraOS does\n"
             "not run meanwhile, and its drawer lists apps from /apps only, so to\n"
-            "try an app in OreoOS use `oreo app install`. Leave with Ctrl-] or\n"
-            "Ctrl-X (Ctrl-D starts OreoOS and ends live editing).\n\n"
-            "  oreo dev ./scripts\n"
-            "  oreo dev ./scripts --run blink.py"),
+            "try an app in FaleraOS use `falera app install`. Leave with Ctrl-] or\n"
+            "Ctrl-X (Ctrl-D starts FaleraOS and ends live editing).\n\n"
+            "  falera dev ./scripts\n"
+            "  falera dev ./scripts --run blink.py"),
     "logs": ("Follow the badge's console output",
-             "Prints what OreoOS writes to the console without stopping it.\n"
+             "Prints what FaleraOS writes to the console without stopping it.\n"
              "Ctrl-C to stop.\n\n"
-             "  oreo logs\n  oreo logs --restart     restart OreoOS to see boot logs"),
+             "  falera logs\n  falera logs --restart     restart FaleraOS to see boot logs"),
     "wifi": ("Scan, join, list and forget Wi-Fi networks",
              "Wi-Fi on the badge is only for the internet (App Store, updates,\n"
              "GitHub, weather, time). The password is asked for without echo,\n"
              "sent to the badge once, and never printed, logged or kept here.\n\n"
-             "  oreo wifi scan\n"
-             "  oreo wifi connect \"Home Net\"\n"
-             "  oreo wifi saved\n"
-             "  oreo wifi forget \"Old Net\""),
-    "update": ("Update OreoOS to the newest release",
-               "Has the badge download the newest OreoOS release from GitHub over\n"
+             "  falera wifi scan\n"
+             "  falera wifi connect \"Home Net\"\n"
+             "  falera wifi saved\n"
+             "  falera wifi forget \"Old Net\""),
+    "update": ("Update FaleraOS to the newest release",
+               "Has the badge download the newest FaleraOS release from GitHub over\n"
                "its own Wi-Fi (the same update its Updates page does), shows the\n"
                "versions and the download size, asks, installs it, restarts the\n"
                "badge and checks the new version. Apps, photos, documents and\n"
-               "saved Wi-Fi stay. Set up Wi-Fi first (`oreo wifi`).\n\n"
-               "  oreo update                  newest stable release\n"
-               "  oreo update --check          only say whether there is one\n"
-               "  oreo update --channel beta   newest beta release\n\n"
-               "Developers: --repo deploys from an OreoOS checkout (./deploy --board)\n"
+               "saved Wi-Fi stay. Set up Wi-Fi first (`falera wifi`).\n\n"
+               "  falera update                  newest stable release\n"
+               "  falera update --check          only say whether there is one\n"
+               "  falera update --channel beta   newest beta release\n\n"
+               "Developers: --repo deploys from an FaleraOS checkout (./deploy --board)\n"
                "instead; --clean wipes the badge's files first and asks.\n\n"
-               "  oreo update --repo ~/src/oreo\n"
-               "  oreo update --repo ~/src/oreo --clean"),
+               "  falera update --repo ~/src/oreo\n"
+               "  falera update --repo ~/src/oreo --clean"),
     "flash": ("Reflash the firmware from a checkout",
               "Erases the badge, writes the MicroPython firmware and installs\n"
-              "OreoOS (./deploy --full). Asks before erasing. --build runs\n"
+              "FaleraOS (./deploy --full). Asks before erasing. --build runs\n"
               "./build-firmware first (which never touches the badge).\n\n"
-              "  oreo flash --repo ~/src/oreo"),
+              "  falera flash --repo ~/src/oreo"),
     "doctor": ("Check cable, port, permissions and firmware",
                "Looks for the badge and explains what is wrong: wrong cable or\n"
                "port, missing serial permissions (Linux dialout), port busy, wrong\n"
-               "firmware, OreoOS missing. Ends with numbered next steps.\n"
+               "firmware, FaleraOS missing. Ends with numbered next steps.\n"
                "Exit status 0 when nothing failed, 1 otherwise.\n\n"
-               "  oreo doctor"),
+               "  falera doctor"),
     "setup": ("Set the owner profile: GitHub user, name, timezone, weather",
               "Shows what the badge has now, asks for each value (Enter keeps it,\n"
               "- removes it) and writes /profile.json on the badge, which Badge,\n"
               "Commits, Weather and the clock read (docs/PROFILE.md).\n"
               "No .env.local or checkout needed. Values given as options are saved\n"
               "without prompting. The OpenWeatherMap key is asked without echo and\n"
-              "never shown; an empty value removes a key. OreoOS restarts after.\n"
+              "never shown; an empty value removes a key. FaleraOS restarts after.\n"
               "It also copies GITHUB_USER's GitHub avatar to /avatar.bin for the\n"
               "Badge app: downloaded and converted on this computer, only when it\n"
               "is missing or made for another user (--avatar fetches it again).\n\n"
-              "  oreo setup\n"
-              "  oreo setup --show\n"
-              "  oreo setup --github-user octocat --name \"Mona Lisa\" --timezone 5.5\n"
-              "  oreo setup --lat 12.97 --lon 77.59 --weather-name Bengaluru\n"
-              "  oreo setup --owm-key-stdin < owm-key.txt\n"
-              "  oreo setup --designation \"\"     remove the title\n"
-              "  oreo setup --from-file .env.local   the profile keys from your .env.local\n"
-              "  oreo setup --set DISPLAY_NAME=\"Mona Lisa\" --set TIMEZONE_OFFSET=5.5\n"
-              "  oreo setup --avatar                 fetch your GitHub avatar again\n"
+              "  falera setup\n"
+              "  falera setup --show\n"
+              "  falera setup --github-user octocat --name \"Mona Lisa\" --timezone 5.5\n"
+              "  falera setup --lat 12.97 --lon 77.59 --weather-name Bengaluru\n"
+              "  falera setup --owm-key-stdin < owm-key.txt\n"
+              "  falera setup --designation \"\"     remove the title\n"
+              "  falera setup --from-file .env.local   the profile keys from your .env.local\n"
+              "  falera setup --set DISPLAY_NAME=\"Mona Lisa\" --set TIMEZONE_OFFSET=5.5\n"
+              "  falera setup --avatar                 fetch your GitHub avatar again\n"
               "\n"
               "Keys: GITHUB_USER, DISPLAY_NAME, DISPLAY_DESIGNATION, TIMEZONE_OFFSET,\n"
               "OWM_API_KEY, and optionally WEATHER_LAT, WEATHER_LON, WEATHER_NAME.\n"
               "Without WEATHER_LAT/LON, Weather finds the badge's location itself."),
     "new": ("Make a new app folder from the app template",
-            "Copies the OreoOS app template (a counter: A adds, B subtracts) into\n"
+            "Copies the FaleraOS app template (a counter: A adds, B subtracts) into\n"
             "./<id>, with your app's name, id, author and icon module filled in.\n"
             "The id comes from the name: \"My Game\" -> my_game.\n\n"
-            "  oreo new my_game\n"
-            "  oreo new \"My Game\" --author octocat --dir ~/oreo-apps\n"
-            "  oreo app install ./my_game      then try it on the badge"),
+            "  falera new my_game\n"
+            "  falera new \"My Game\" --author octocat --dir ~/oreo-apps\n"
+            "  falera app install ./my_game      then try it on the badge"),
     "app": ("Install an app from a folder on this computer",
             "install checks the folder with the same rules as the repo's\n"
             "tools/validate_app.py, copies the files that belong on the badge\n"
             "to /apps/<id>/ (each one checked with SHA-256), removes files an\n"
-            "earlier install left behind, and restarts OreoOS so the Apps drawer\n"
+            "earlier install left behind, and restarts FaleraOS so the Apps drawer\n"
             "lists it. Built-in apps are not replaced without --force.\n"
-            "Saved data (/state/<id>.json) stays. Store apps: `oreo apps`.\n\n"
-            "  oreo app install ./my_game\n"
-            "  oreo app list\n"
-            "  oreo app remove my_game"),
-    "ui": ("The full-screen Oreo view (also: `oreo` alone)",
+            "Saved data (/state/<id>.json) stays. Store apps: `falera apps`.\n\n"
+            "  falera app install ./my_game\n"
+            "  falera app list\n"
+            "  falera app remove my_game"),
+    "ui": ("The full-screen Falera view (also: `falera` alone)",
            "Opens a full-screen app for the badge: status, files, apps, Wi-Fi,\n"
            "Transfer, owner profile, app install, updates and the REPL shell,\n"
-           "with progress and Cancel (Esc) for long operations. OreoOS is paused\n"
+           "with progress and Cancel (Esc) for long operations. FaleraOS is paused\n"
            "while it is open and restarts when you quit (q or Ctrl-C).\n"
-           "`oreo` alone opens it too, or the numbered menu when the terminal\n"
+           "`falera` alone opens it too, or the numbered menu when the terminal\n"
            "cannot show it (set OREO_UI=menu to always get the menu).\n\n"
-           "  oreo ui\n  oreo ui --port /dev/ttyACM1"),
+           "  falera ui\n  falera ui --port /dev/ttyACM1"),
     "menu": ("The numbered menu (the view for simple terminals)",
-             "The line-by-line menu `oreo` showed before the full-screen view:\n"
+             "The line-by-line menu `falera` showed before the full-screen view:\n"
              "status, files, apps, Wi-Fi, media, Transfer, profile, app install,\n"
              "updates and the shell, one numbered choice at a time.\n\n"
-             "  oreo menu"),
-    "help": ("Help for a command", "  oreo help wifi"),
+             "  falera menu"),
+    "help": ("Help for a command", "  falera help wifi"),
 }
 
 # OREO_UI values that ask for the numbered menu instead of the full-screen view
@@ -197,18 +197,18 @@ def _sub(subs, name, **kw):
 
 def build_parser():
     p = argparse.ArgumentParser(
-        prog="oreo", formatter_class=Formatter,
-        description="oreo %s: control the Elixpo Oreo Badge over USB.\n\n"
-                    "Run `oreo` with no command to find the badge and open the\n"
-                    "full-screen view (`oreo menu`: the numbered menu). Docs: %s"
+        prog="falera", formatter_class=Formatter,
+        description="falera %s: control the Elixpo Falera Badge over USB.\n\n"
+                    "Run `falera` with no command to find the badge and open the\n"
+                    "full-screen view (`falera menu`: the numbered menu). Docs: %s"
                     % (__version__, HOME),
-        epilog="`oreo help <command>` shows details and examples.\n"
+        epilog="`falera help <command>` shows details and examples.\n"
                "Exit status: 0 ok, 1 error, 2 usage, 3 no badge (or several),\n"
-               "4 badge unreachable or busy, 5 OreoOS missing, 130 cancelled.")
-    p.add_argument("--version", action="version", version="oreo-cli " + __version__)
+               "4 badge unreachable or busy, 5 FaleraOS missing, 130 cancelled.")
+    p.add_argument("--version", action="version", version="falera-cli " + __version__)
     p.add_argument("-p", "--port", help="serial port (default: the one badge found; $OREO_PORT)")
     p.add_argument("--reset", choices=("soft", "hard", "none"), default="soft",
-                   help="how to restart OreoOS after a command (default: soft)")
+                   help="how to restart FaleraOS after a command (default: soft)")
     p.add_argument("-y", "--yes", action="store_true", help="answer yes to confirmations")
     p.add_argument("--no-color", action="store_true", help="plain output")
     p.add_argument("-v", "--verbose", action="store_true", help="show the badge's log lines")
@@ -238,7 +238,7 @@ def build_parser():
     s = _sub(subs, "rm")
     s.add_argument("paths", nargs="+", metavar="badge-path")
     s.add_argument("-r", "--recursive", action="store_true", help="remove folders")
-    s.add_argument("--force", action="store_true", help="allow removing OreoOS files")
+    s.add_argument("--force", action="store_true", help="allow removing FaleraOS files")
 
     s = _sub(subs, "add")
     s.add_argument("files", nargs="+", metavar="file")
@@ -256,7 +256,7 @@ def build_parser():
     s = _sub(subs, "apps")
     s.add_argument("action", nargs="?", default="list",
                    choices=("list", "refresh", "install", "update", "remove"))
-    s.add_argument("app", nargs="?", help="app id (see `oreo apps`)")
+    s.add_argument("app", nargs="?", help="app id (see `falera apps`)")
 
     s = _sub(subs, "setup")
     s.add_argument("--show", action="store_true", help="only print the profile (key hidden)")
@@ -304,7 +304,7 @@ def build_parser():
     s.add_argument("--run", metavar="FILE", help="run this file from the folder after mounting")
 
     s = _sub(subs, "logs")
-    s.add_argument("--restart", action="store_true", help="restart OreoOS to show boot logs")
+    s.add_argument("--restart", action="store_true", help="restart FaleraOS to show boot logs")
 
     s = _sub(subs, "wifi")
     s.add_argument("action", nargs="?", default="saved",
@@ -322,14 +322,14 @@ def build_parser():
     s.add_argument("--check", action="store_true", help="only check for a newer release")
     s.add_argument("--channel", choices=("stable", "beta"), default="stable",
                    help="release channel (default: stable)")
-    s.add_argument("--repo", help="developers: deploy from this OreoOS checkout instead")
+    s.add_argument("--repo", help="developers: deploy from this FaleraOS checkout instead")
     s.add_argument("--clean", action="store_true", help="with --repo: wipe the badge's files first")
     s.add_argument("--force", action="store_true", help="with --repo: upload every file")
-    s.add_argument("--no-bump", action="store_true", help="with --repo: keep the OreoOS version")
+    s.add_argument("--no-bump", action="store_true", help="with --repo: keep the FaleraOS version")
     s.add_argument("--override", metavar="APPS", help="with --repo: replace these app folders")
 
     s = _sub(subs, "flash")
-    s.add_argument("--repo", help="path to an OreoOS checkout (required)")
+    s.add_argument("--repo", help="path to an FaleraOS checkout (required)")
     s.add_argument("--build", action="store_true", help="build the firmware first")
 
     _sub(subs, "doctor")
@@ -369,7 +369,7 @@ class Ctx:
 
     @contextlib.contextmanager
     def session(self, reset=None):
-        """A connected badge; OreoOS is restarted on the way out."""
+        """A connected badge; FaleraOS is restarted on the way out."""
         port = self.port()
         b = self.badge(port)
         b.port = port
@@ -380,7 +380,7 @@ class Ctx:
 
 
 def finish_shielded(b, mode):
-    """Restart OreoOS; a second Ctrl-C must not cut that short and leave
+    """Restart FaleraOS; a second Ctrl-C must not cut that short and leave
     the badge at the MicroPython prompt."""
     try:
         b.finish(mode)
@@ -393,14 +393,14 @@ def tui_problem(embedded=False, stdin=None, stdout=None, env=None, find_spec=Non
 
     It needs a real terminal on both ends (not a pipe, not TERM=dumb) and
     Textual installed. `embedded`: main() was given a UI (tests, or a
-    program embedding oreo), which the view would not draw into."""
+    program embedding falera), which the view would not draw into."""
     import importlib.util
     env = os.environ if env is None else env
     stdin = sys.stdin if stdin is None else stdin
     stdout = sys.stdout if stdout is None else stdout
     find_spec = find_spec or importlib.util.find_spec
     if embedded:
-        return "oreo is embedded with its own UI"
+        return "falera is embedded with its own UI"
     if env.get("OREO_UI", "").strip().lower() in MENU_VALUES:
         return "OREO_UI=%s asks for the menu" % env.get("OREO_UI")
     for stream in (stdin, stdout):
@@ -421,8 +421,8 @@ def tui_problem(embedded=False, stdin=None, stdout=None, env=None, find_spec=Non
 
 
 def run_view(ctx, explicit, embedded):
-    """`oreo` alone and `oreo ui`: the full-screen view, or the numbered
-    menu where it cannot run (`oreo ui` says why instead)."""
+    """`falera` alone and `falera ui`: the full-screen view, or the numbered
+    menu where it cannot run (`falera ui` says why instead)."""
     problem = tui_problem(embedded)
     if problem is None:
         from . import tui
@@ -430,13 +430,13 @@ def run_view(ctx, explicit, embedded):
     if explicit:
         if "Textual" in problem:
             raise OreoError("the full-screen view needs Textual, which is not installed",
-                            hint="reinstall oreo-cli (it depends on textual), or pip install "
-                                 "'textual>=8.2,<9'; `oreo menu` works without it")
-        raise UsageError("`oreo ui` cannot run here: %s" % problem,
-                         hint="run it in a terminal window, or use `oreo menu`")
+                            hint="reinstall falera-cli (it depends on textual), or pip install "
+                                 "'textual>=8.2,<9'; `falera menu` works without it")
+        raise UsageError("`falera ui` cannot run here: %s" % problem,
+                         hint="run it in a terminal window, or use `falera menu`")
     if "Textual" in problem:
         ctx.ui.note("Textual is not installed, so this is the numbered menu "
-                    "(reinstall oreo-cli for the full-screen view)")
+                    "(reinstall falera-cli for the full-screen view)")
     from .interactive import run as interactive
     return interactive(ctx)
 
@@ -487,13 +487,13 @@ def main(argv=None, ui=None, comports=None, link_factory=None, runner=None,
         ui.error(e.message, hint=e.hint, detail=getattr(e, "detail", None) if args.verbose else None)
         return e.code
     except BrokenPipeError:
-        # stdout closed early (`oreo cat ... | head`): nothing left to tell.
+        # stdout closed early (`falera cat ... | head`): nothing left to tell.
         return EXIT_ERROR
     except OSError as e:
         if is_serial_error(e):
             # a port that vanished outside the places that already explain it
             ui.error("lost the connection to the badge (%s)" % esc(e),
-                     hint="plug it back in, check with `oreo devs`, then run the command again")
+                     hint="plug it back in, check with `falera devs`, then run the command again")
             return EXIT_LINK
         # anything else is a file or folder on this computer
         ui.error(esc(local_error_message(e)))
@@ -501,11 +501,11 @@ def main(argv=None, ui=None, comports=None, link_factory=None, runner=None,
     except Exception as e:   # never a bare traceback for the person
         if _transport_error(e):
             ui.error("the badge did not answer (%s)" % esc(e),
-                     hint="unplug and replug the badge, then run `oreo doctor`")
+                     hint="unplug and replug the badge, then run `falera doctor`")
             return EXIT_LINK
         import traceback
         ui.error("unexpected error: %s: %s" % (type(e).__name__, esc(e)),
-                 hint="this is a bug in oreo; please report it with `oreo -v ...` output "
-                      "at https://github.com/elixpo/oreo/issues",
+                 hint="this is a bug in falera; please report it with `falera -v ...` output "
+                      "at https://github.com/elixpo/falera/issues",
                  detail=traceback.format_exc() if args.verbose else None)
         return EXIT_ERROR

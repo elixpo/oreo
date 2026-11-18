@@ -1,4 +1,4 @@
-# 📚 OreoOS docs
+# 📚 FaleraOS docs
 
 Everything in this folder is here for one of three audiences:
 
@@ -9,11 +9,11 @@ Everything in this folder is here for one of three audiences:
 
 `CLI.md`, `USB.md` and `TRANSFER.md` are also published on the website,
 rendered from these files when the site is built:
-[oreo.elixpo.com/docs/cli](https://oreo.elixpo.com/docs/cli/),
-[/docs/usb](https://oreo.elixpo.com/docs/usb/) and
-[/docs/transfer](https://oreo.elixpo.com/docs/transfer/). Edit them here.
+[falera.elixpo.com/docs/cli](https://falera.elixpo.com/docs/cli/),
+[/docs/usb](https://falera.elixpo.com/docs/usb/) and
+[/docs/transfer](https://falera.elixpo.com/docs/transfer/). Edit them here.
 
-New here? Read the [preamble](../PREAMBLE.md) first: what OreoOS is, the
+New here? Read the [preamble](../PREAMBLE.md) first: what FaleraOS is, the
 rules it is built by and how it is put together. Then
 [`LEARN.md`](LEARN.md) is a guided tour of the code. How the project is run:
 [`GOVERNANCE.md`](GOVERNANCE.md); reporting a vulnerability:
@@ -29,9 +29,9 @@ itself, see the root [`CONTRIBUTING.md`](../CONTRIBUTING.md) and
 
 | File | What it covers | Audience |
 |---|---|---|
-| [`USB.md`](USB.md) | Using the badge from a computer: which USB-C port, ports and permissions, the oreo CLI, raw `mpremote`, deploying, flashing, troubleshooting | Everyone with a badge |
+| [`USB.md`](USB.md) | Using the badge from a computer: which USB-C port, ports and permissions, the falera CLI, raw `mpremote`, deploying, flashing, troubleshooting | Everyone with a badge |
 | [`HARDWARE.md`](HARDWARE.md) | Narrative build guide — BOM, pinout, power, wake-from-sleep, soldering tips | Anyone building or repairing the badge |
-| [`DATASHEET.md`](DATASHEET.md) | Formal specs — electrical, mechanical, communication interfaces, component reference | Someone designing a PCB or porting OreoOS |
+| [`DATASHEET.md`](DATASHEET.md) | Formal specs — electrical, mechanical, communication interfaces, component reference | Someone designing a PCB or porting FaleraOS |
 | [`BADGE_LAYOUT.md`](BADGE_LAYOUT.md) | Mechanical layout drawings + dimensions | PCB designers, case-makers |
 | [`BREADBOARD_BOM.md`](BREADBOARD_BOM.md) | First-time-builder BOM with through-hole-friendly parts | Workshop teachers, beginner solderers |
 | [`lcd.md`](lcd.md) | Display init, RAMWR strategy, refresh fps notes | Anyone touching `oreoWare/display.py` |
@@ -41,7 +41,7 @@ itself, see the root [`CONTRIBUTING.md`](../CONTRIBUTING.md) and
 | [`../paper/`](../paper/) | Academic RV565 paper source, TikZ architecture, references, and blank evaluation tables | Researchers and artifact reviewers |
 | [`APPS.md`](APPS.md) | Writing an app: layout, lifecycle, input, drawing, saving state, network, validation, PR checklist | App developers |
 | [`PROFILE.md`](PROFILE.md) | Setting the owner's GitHub user, name, timezone and weather location (`/profile.json`, `.env.local`) | Badge owners, app developers |
-| [`CLI.md`](CLI.md) | The `oreo` command-line tool: talking to the badge over USB | Badge owners, app developers |
+| [`CLI.md`](CLI.md) | The `falera` command-line tool: talking to the badge over USB | Badge owners, app developers |
 | [`TRANSFER.md`](TRANSFER.md) | The Transfer app: sending photos, videos and documents over USB with the code the badge shows, and its protocol | Badge owners, contributors |
 | [`OS_ROADMAP.md`](OS_ROADMAP.md) | What the OS does today and what is planned | Contributors |
 | [`MEDIA_INGESTION.md`](MEDIA_INGESTION.md) | Turning photos and videos into Gallery assets | Anyone adding media |

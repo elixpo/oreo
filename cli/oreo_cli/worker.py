@@ -34,7 +34,7 @@ except ImportError:  # pragma: no cover - rich is a dependency
 
 class Job:
     """One operation on the badge. `cancellable=False` for steps that must
-    not stop half way (installing an OreoOS update)."""
+    not stop half way (installing an FaleraOS update)."""
 
     def __init__(self, title, cancellable=True, interrupt=False):
         self.title = title
@@ -61,7 +61,7 @@ class Job:
 
 
 class BadgeSession:
-    """The badge the view holds: OreoOS stays paused while it is entered,
+    """The badge the view holds: FaleraOS stays paused while it is entered,
     and restarts when the session closes."""
 
     def __init__(self, ctx, on_text=None):
@@ -120,7 +120,7 @@ class BadgeSession:
         return bool(self.badge is not None and self.badge.entered)
 
     def close(self, mode="soft", wait=20.0):
-        """Restart OreoOS (unless mode is none) and let go of the port.
+        """Restart FaleraOS (unless mode is none) and let go of the port.
         Waits up to `wait` seconds for a running job to stop first."""
         b = self.badge
         if b is None:
@@ -171,9 +171,9 @@ def explain(e):
         return "error", esc(local_error_message(e)), None, None, False
     if type(e).__name__ == "TransportError":
         return ("error", "the badge did not answer (%s)" % esc(e),
-                "unplug and replug the badge, then run `oreo doctor`", None, True)
+                "unplug and replug the badge, then run `falera doctor`", None, True)
     return ("error", "unexpected error: %s: %s" % (type(e).__name__, esc(e)),
-            "this is a bug in oreo; please report it at https://github.com/elixpo/oreo/issues",
+            "this is a bug in falera; please report it at https://github.com/elixpo/falera/issues",
             traceback.format_exc(), False)
 
 

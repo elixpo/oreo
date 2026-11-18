@@ -1,6 +1,6 @@
-"""`oreo new`, `oreo app` and `oreo dev`'s notes, against the FakeTransport.
+"""`falera new`, `falera app` and `falera dev`'s notes, against the FakeTransport.
 
-Inside an OreoOS checkout this also checks that the vendored validator
+Inside an FaleraOS checkout this also checks that the vendored validator
 (oreo_cli/appcheck.py) and the packaged template (oreo_cli/app_template)
 match tools/validate_app.py and app_templates/, so they cannot drift.
 """
@@ -51,7 +51,7 @@ class TmpDir(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.tmp, True)
 
 
-@unittest.skipUnless(IN_REPO, "not inside an OreoOS checkout")
+@unittest.skipUnless(IN_REPO, "not inside an FaleraOS checkout")
 class NoDriftTest(TmpDir):
     def test_vendored_rules_match_tools_validate_app(self):
         tool = top_level(TOOL)
@@ -165,7 +165,7 @@ class NewTest(TmpDir):
         self.assertIn('draw_header(d, "MY GAME")', src)
         self.assertIn('state.app_id(__name__, "my_game")', src)
         ast.parse(src)
-        self.assertIn("oreo app install", (app / "README.md").read_text())
+        self.assertIn("falera app install", (app / "README.md").read_text())
         self.assertIn("created", r.out)
 
     def test_refuses_an_existing_folder(self):
@@ -224,7 +224,7 @@ class AppInstallTest(TmpDir):
         self.assertEqual(self.fake.get("/apps/my_game/src/app.py"),
                          (self.app / "src/app.py").read_bytes())
         self.assertIn("installed My Game to /apps/my_game", r.out)
-        self.assertIn("OreoOS is restarting; open My Game", r.out)
+        self.assertIn("FaleraOS is restarting; open My Game", r.out)
         self.assertEqual(self.fake.restarts, ["soft"])
         # the verified push: temp file, SHA-256 compared, renamed into place
         self.assertTrue(any("hashlib.sha256" in c and "os.rename" in c for c in self.fake.sent))
@@ -314,14 +314,14 @@ class DevNotesTest(TmpDir):
         (self.tmp / "manifest.json").write_text("{}")
         text = " ".join(commands.dev_notes(self.tmp))
         self.assertIn("/remote", text)
-        self.assertIn("oreo app install", text)
+        self.assertIn("falera app install", text)
         self.assertIn("sys.modules", text)
         plain = " ".join(commands.dev_notes(self.tmp / "nothing"))
-        self.assertNotIn("oreo app install", plain)
+        self.assertNotIn("falera app install", plain)
 
     @unittest.skipUnless((REPO / "oreoOS" / "launcher.py").exists(), "not in a checkout")
     def test_launcher_loads_remote_apps(self):
-        # dev_notes() says OreoOS started from the REPL loads apps from
+        # dev_notes() says FaleraOS started from the REPL loads apps from
         # /remote/apps. If the launcher drops that, update the notes.
         src = (REPO / "oreoOS" / "launcher.py").read_text(encoding="utf-8")
         self.assertIn('REMOTE_APPS = "/remote/apps"', src)
@@ -342,14 +342,14 @@ class HelpAndDocsTest(unittest.TestCase):
     def test_help_has_examples(self):
         from oreo_cli.main import HELP
         for name in self.NEW:
-            # `oreo help <name>` itself is covered in test_safety
-            self.assertIn("  oreo %s" % name, HELP[name][1], name)
+            # `falera help <name>` itself is covered in test_safety
+            self.assertIn("  falera %s" % name, HELP[name][1], name)
 
     @unittest.skipUnless((REPO / "docs" / "CLI.md").exists(), "not in a checkout")
     def test_cli_md_documents_the_new_commands(self):
         text = (REPO / "docs" / "CLI.md").read_text(encoding="utf-8")
-        for heading in ("### `oreo setup`", "### `oreo new`", "### `oreo app`",
-                        "### `oreo dev`"):
+        for heading in ("### `falera setup`", "### `falera new`", "### `falera app`",
+                        "### `falera dev`"):
             self.assertIn(heading, text)
         for key in ("| **t** |", "| **p** |", "| **i** |"):
             self.assertIn(key, text)

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-"""Precompiled .mpy for OreoOS: which files, and the pinned compiler.
+"""Precompiled .mpy for FaleraOS: which files, and the pinned compiler.
 
 Shared by tools/build_release.py (OTA releases) and tools/deploy.py (USB).
 
@@ -17,7 +17,7 @@ under oreoOS/, oreoWare/ and built-in apps' src/. Never:
   * entry points run by path or found by name before import: /main.py
     (oreoOS/entry.py), apps/<name>/main.py, boot.py;
   * package markers (__init__.py);
-  * oreoOS/config.py: CI stamps VERSION into its text and oreo-cli checks
+  * oreoOS/config.py: CI stamps VERSION into its text and falera-cli checks
     for the file by name.
 
 The compiler is pinned: mpy-cross from MicroPython 1.28.0, the firmware's

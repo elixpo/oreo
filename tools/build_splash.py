@@ -3,7 +3,7 @@
 The badge has no font engine for anti-aliased type or complex scripts, so
 the greetings ("hello" in many languages, each in its own script) are
 rendered here as 16-level coverage masks, and the static parts (the dimmed
-photo backdrop, the logo top left and the small "OreoOS" line) are baked
+photo backdrop, the logo top left and the small "FaleraOS" line) are baked
 into one 320x240 frame. On the badge, oreoOS/splash.py restores the
 greeting band from that frame and draws two masks per frame with
 framebuf's palette blit (C), so words roll smoothly over the photo.
@@ -14,7 +14,7 @@ framebuf's palette blit (C), so words roll smoothly over the photo.
 
 It also writes oreoOS/wallpaper.bin, the home screen wallpaper: the light
 wallpaper as a raw 320x240 big-endian RGB565 frame (oreoOS/home.py reads it
-straight into a buffer). Both wallpapers come from oreo.elixpo/public, so
+straight into a buffer). Both wallpapers come from falera.elixpo/public, so
 the website and the badge share one copy.
 
 Fonts (SIL Open Font License 1.1, rendered to bitmaps): Inter SemiBold for
@@ -30,7 +30,7 @@ panel's byte order):
     u16 bar_x | u16 bar_y | u16 bar_w | u16 bar_h | u16 bar_track | u16 bar_fill
     u16 key                       palette entry 0 as framebuf reads it
     16 x 2 bytes                  palette: coverage 0..15 -> colour (BE)
-    320 x 240 x 2 bytes           backdrop with logo and "OreoOS" baked in
+    320 x 240 x 2 bytes           backdrop with logo and "FaleraOS" baked in
     count x ( u16 w | (w / 2) * band_h bytes GS4_HMSB mask )   (w is even)
 """
 
@@ -42,9 +42,9 @@ from PIL import Image, ImageDraw, ImageFont, ImageStat, features
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "oreoOS" / "splash.bin"
-LOGO_SRC = ROOT / "oreo.elixpo" / "public" / "favicon.ico"
-BG_SRC = ROOT / "oreo.elixpo" / "public" / "wallpaper_dark.png"
-HOME_SRC = ROOT / "oreo.elixpo" / "public" / "wallpaper_light.png"
+LOGO_SRC = ROOT / "falera.elixpo" / "public" / "favicon.ico"
+BG_SRC = ROOT / "falera.elixpo" / "public" / "wallpaper_dark.png"
+HOME_SRC = ROOT / "falera.elixpo" / "public" / "wallpaper_light.png"
 HOME_OUT = ROOT / "oreoOS" / "wallpaper.bin"
 HOME_WASH = 0.15                # towards theme.BG, so Home's dark text reads
 THEME_BG = (255, 248, 235)
@@ -52,7 +52,7 @@ THEME_BG = (255, 248, 235)
 SW, SH = 320, 240
 BG_DIM = 0.75                   # the dark wallpaper, a touch darker for text
 INK = (250, 246, 236)           # greeting: warm cream on the dark photo
-TAG = (255, 140, 150)           # "OreoOS": light theme pink
+TAG = (255, 140, 150)           # "FaleraOS": light theme pink
 BAR_TRACK = (40, 46, 70)
 BAR_FILL = (255, 190, 30)       # theme.GOLD
 
@@ -204,7 +204,7 @@ def main():
     frame = bg.copy()
     lg = logo()
     frame.paste(lg, (12, 12), lg)
-    tag = coverage("OreoOS", INTER_TAG, 0, "en", TAG_SIZE)
+    tag = coverage("FaleraOS", INTER_TAG, 0, "en", TAG_SIZE)
     tag_y = BAND_Y + BAND_H + 2
     frame.paste(Image.new("RGB", tag.size, TAG), ((SW - tag.width) // 2, tag_y), tag)
 

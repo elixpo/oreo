@@ -8,7 +8,7 @@ Exit status (documented in docs/CLI.md, "Exit status"):
     3    no badge found, or more than one and no --port
     4    the badge could not be reached: port busy or missing, no answer,
          connection lost
-    5    the badge is not running OreoOS (or the OreoOS on it is too old
+    5    the badge is not running FaleraOS (or the FaleraOS on it is too old
          for this command)
     130  cancelled (Ctrl-C, or "no" at a confirmation)
 """
@@ -65,7 +65,7 @@ class BadgeError(OreoError):
 
 
 class NoOreoOS(BadgeError):
-    """The badge answers, but OreoOS (or the part of it needed) is missing."""
+    """The badge answers, but FaleraOS (or the part of it needed) is missing."""
     code = EXIT_NO_OREOOS
 
 

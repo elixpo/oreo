@@ -51,7 +51,7 @@ class NoTouchTest(unittest.TestCase):
     def test_help_does_not_touch(self):
         code, out = self._exit(["--help"])
         self.assertEqual(code, 0)
-        self.assertIn("oreo help <command>", out)
+        self.assertIn("falera help <command>", out)
 
     def test_every_command_has_help(self):
         from oreo_cli.main import HELP
@@ -73,7 +73,7 @@ class NoTouchTest(unittest.TestCase):
             self.assertEqual(r.links, [], argv)
             self.assertNotEqual(r.rc, 0, argv)
         r = run_cli(["info"], ports=[])
-        self.assertIn("no Oreo Badge found", r.out)
+        self.assertIn("no Falera Badge found", r.out)
 
     def test_devs_lists_without_opening(self):
         r = run_cli(["devs", "--all"], ports=[badge_port("/dev/ttyACM0", "SN42"),
@@ -134,7 +134,7 @@ class RestartTest(unittest.TestCase):
 class NonUtf8OutputTest(unittest.TestCase):
     """A Windows pipe or redirect is cp1252, not UTF-8: the marks and rich's
     rules must not crash a command there (the release smoke test runs
-    `oreo devs` that way and expects exit code 3)."""
+    `falera devs` that way and expects exit code 3)."""
 
     def _cp1252(self):
         return io.TextIOWrapper(io.BytesIO(), encoding="cp1252", newline="\n")
@@ -156,7 +156,7 @@ class NonUtf8OutputTest(unittest.TestCase):
         self.assertEqual(rc, 3)
         text = out.buffer.getvalue().decode("cp1252")
         self.assertIn("no badge connected", text)
-        self.assertIn("* oreo", text)            # ASCII brand mark
+        self.assertIn("* falera", text)            # ASCII brand mark
 
     def test_doctor_marks_on_cp1252_stdout(self):
         import sys

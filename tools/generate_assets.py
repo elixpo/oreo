@@ -1,4 +1,4 @@
-"""Generate Oreo Badge assets via the Pollinations AI image API.
+"""Generate Falera Badge assets via the Pollinations AI image API.
 
 Top-level icons:
   python tools/generate_assets.py              # all active entries

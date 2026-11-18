@@ -1,12 +1,12 @@
 # App template
 
-The minimal skeleton for a new OreoOS app. Copy this directory, rename
+The minimal skeleton for a new FaleraOS app. Copy this directory, rename
 it, and start editing. Everything here is intentionally tiny — the
 full reference (lifecycle hooks, input, drawing, saving state, the
 network, the PR checklist) is in the repo:
 
 ➡ **[`docs/APPS.md`](../docs/APPS.md)** (also on the website:
-<https://oreo.elixpo.com/docs/apps/>)
+<https://falera.elixpo.com/docs/apps/>)
 
 ---
 

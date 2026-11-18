@@ -1,7 +1,7 @@
 """Find badges by USB ID on Linux, macOS and Windows.
 
 Only enumerates ports (pyserial's list_ports); nothing here opens a port,
-so `oreo devs` and `oreo doctor`'s first checks never disturb a badge.
+so `falera devs` and `falera doctor`'s first checks never disturb a badge.
 """
 
 import os
@@ -12,12 +12,12 @@ from . import OREO_PID, OREO_VID
 from .errors import ManyBadges, NoBadge
 
 # Other USB IDs a badge (or a bare devkit) can show up as, and what that
-# means. Used by `oreo devs --all` and `oreo doctor` to explain why no
+# means. Used by `falera devs --all` and `falera doctor` to explain why no
 # 303a:83ec port was found.
 KNOWN_IDS = {
     (0x303A, 0x1001): "ESP32-S3 USB-Serial/JTAG: stock firmware, or the ROM bootloader",
     (0x303A, 0x0002): "ESP32-S3 in download mode (BOOT held at reset)",
-    (0x303A, 0x4001): "Espressif TinyUSB default ID: generic MicroPython, not the Oreo Badge build",
+    (0x303A, 0x4001): "Espressif TinyUSB default ID: generic MicroPython, not the Falera Badge build",
     (0x10C4, 0xEA60): "CP210x USB-UART bridge (devkit UART port, not native USB)",
     (0x1A86, 0x7523): "CH340 USB-UART bridge (devkit UART port, not native USB)",
     (0x1A86, 0x55D4): "CH9102 USB-UART bridge (devkit UART port, not native USB)",
@@ -63,7 +63,7 @@ def _default_comports():
     except ImportError:
         from .errors import OreoError
         raise OreoError("pyserial is not installed",
-                        hint="pip install pyserial (or reinstall oreo-cli)")
+                        hint="pip install pyserial (or reinstall falera-cli)")
     return list_ports.comports()
 
 
@@ -130,15 +130,15 @@ def pick(port=None, comports=None, env=None):
         return badges[0].device
     if not badges:
         others = [p for p in all_ports(comports) if p.known]
-        hint = "check the cable (it must carry data) and run `oreo doctor`"
+        hint = "check the cable (it must carry data) and run `falera doctor`"
         if others:
             o = others[0]
-            hint = "%s is %s: %s. Run `oreo doctor`" % (o.device, o.usb_id, o.known)
-        raise NoBadge("no Oreo Badge found (USB %04x:%04x)" % (OREO_VID, OREO_PID),
+            hint = "%s is %s: %s. Run `falera doctor`" % (o.device, o.usb_id, o.known)
+        raise NoBadge("no Falera Badge found (USB %04x:%04x)" % (OREO_VID, OREO_PID),
                       hint=hint)
     raise ManyBadges("%d badges connected: %s" % (
         len(badges), ", ".join(b.device for b in badges)),
-        hint="choose one with --port <device> (see `oreo devs`)")
+        hint="choose one with --port <device> (see `falera devs`)")
 
 
 def find_again(device, serial=None, comports=None):

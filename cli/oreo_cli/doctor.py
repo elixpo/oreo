@@ -1,8 +1,8 @@
-"""`oreo doctor`: check the cable, port, permissions and firmware.
+"""`falera doctor`: check the cable, port, permissions and firmware.
 
 Host checks run first and never touch a port. Only when exactly one badge
 is found and the port is accessible does doctor open it and read the
-firmware banner (which stops OreoOS briefly; it is restarted afterwards).
+firmware banner (which stops FaleraOS briefly; it is restarted afterwards).
 """
 
 import os
@@ -51,7 +51,7 @@ def check_permissions(device, platform=None, access=None, groups=None):
 
 def run_checks(port=None, comports=None, badge_factory=None, reset="soft"):
     """Yield (status, title, message, hint) rows."""
-    yield OK, "oreo", "oreo-cli %s on Python %s, %s" % (
+    yield OK, "falera", "falera-cli %s on Python %s, %s" % (
         __version__, sys.version.split()[0], sys.platform), None
 
     try:
@@ -94,10 +94,10 @@ def run_checks(port=None, comports=None, badge_factory=None, reset="soft"):
         if others:
             for o in others:
                 yield WARN, "badge", "%s is %s: %s" % (o.device, o.usb_id, o.known), \
-                    "this is not the Oreo Badge firmware; flash it with " \
-                    "`oreo flash --repo <checkout>`, or use the native USB port"
+                    "this is not the Falera Badge firmware; flash it with " \
+                    "`falera flash --repo <checkout>`, or use the native USB port"
         elif ports:
-            yield FAIL, "badge", "no Oreo Badge among %d USB serial port(s)" % len(ports), \
+            yield FAIL, "badge", "no Falera Badge among %d USB serial port(s)" % len(ports), \
                 "plug the badge into its native USB port (on the DevKitC-1, the one " \
                 "labelled USB), and check it is switched on"
         else:
@@ -124,9 +124,9 @@ def run_checks(port=None, comports=None, badge_factory=None, reset="soft"):
     mpy = info.get("mpy") or "?"
     yield (OK if mpy.startswith("1.28") else WARN), "firmware", \
         "MicroPython %s on %s" % (mpy, info.get("machine") or "?"), \
-        None if mpy.startswith("1.28") else "OreoOS needs MicroPython 1.28; reflash"
+        None if mpy.startswith("1.28") else "FaleraOS needs MicroPython 1.28; reflash"
     if info.get("os"):
-        yield OK, "OreoOS", "%s (check for a newer one: `oreo update --check`)" % info["os"], None
+        yield OK, "FaleraOS", "%s (check for a newer one: `falera update --check`)" % info["os"], None
     else:
-        yield FAIL, "OreoOS", "not installed on this badge", \
-            "install it with `oreo flash --repo <checkout>` (see docs/CLI.md)"
+        yield FAIL, "FaleraOS", "not installed on this badge", \
+            "install it with `falera flash --repo <checkout>` (see docs/CLI.md)"

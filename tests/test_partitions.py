@@ -1,4 +1,4 @@
-"""Tests for the Oreo Badge flash layout."""
+"""Tests for the Falera Badge flash layout."""
 
 import unittest
 from pathlib import Path

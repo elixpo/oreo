@@ -2,8 +2,8 @@
 
 The badge never downloads or decodes images for this: the computer
 fetches the picture, turns it into a small circular RGB565 tile and
-`oreo setup` copies it over USB to /avatar.bin, next to /profile.json and
-outside every app folder, so an OreoOS update or a deploy never replaces
+`falera setup` copies it over USB to /avatar.bin, next to /profile.json and
+outside every app folder, so an FaleraOS update or a deploy never replaces
 it. The file records the GitHub user it was made for, and the Badge app
 shows it only while that user is the profile's GITHUB_USER
 (oreoOS/profile.py `avatar()`), so a badge never shows someone else's face.
@@ -18,8 +18,8 @@ shows it only while that user is the profile's GITHUB_USER
                        0xF81F (magenta) is transparent on the badge
 
 This module needs only the standard library and Pillow (a dependency of
-oreo-cli, imported when a picture is converted). It imports nothing else
-from the package, so tools/fetch_avatar.py in an OreoOS checkout loads it
+falera-cli, imported when a picture is converted). It imports nothing else
+from the package, so tools/fetch_avatar.py in an FaleraOS checkout loads it
 by path and the two never drift apart.
 """
 
@@ -28,15 +28,15 @@ from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 # Same values as AVATAR_PATH and AVATAR_MAGIC in oreoOS/profile.py (a
-# contract test checks them inside an OreoOS checkout).
+# contract test checks them inside an FaleraOS checkout).
 PATH = "/avatar.bin"
 MAGIC = b"OAV1"
-SIZE = 72                       # fills the Badge app's 72 px disc; OreoOS reads up to 72
+SIZE = 72                       # fills the Badge app's 72 px disc; FaleraOS reads up to 72
 CHROMA_KEY_RGB = (248, 0, 248)
 CHROMA_KEY_565 = 0xF81F
 HEADER = len(MAGIC) + 3
 URL = "https://github.com/%s.png?size=%d"
-USER_AGENT = "oreo-cli"
+USER_AGENT = "falera-cli"
 TIMEOUT = 20
 
 

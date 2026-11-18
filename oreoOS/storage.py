@@ -1,4 +1,4 @@
-"""Filesystem accounting for OreoOS.
+"""Filesystem accounting for FaleraOS.
 
 Walks the device root once and buckets every file into one of five
 human-meaningful categories so the user can see at a glance what's

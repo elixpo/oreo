@@ -2,10 +2,10 @@
 
 Put a photo (or a short video) on the badge and flip to it in the
 **Gallery** app. There are three ways; the first needs nothing but the
-`oreo` command.
+`falera` command.
 
 - **Difficulty:** beginner, about 8 minutes
-- **You need:** a badge, a USB-C cable and [oreo-cli](../CLI.md#install);
+- **You need:** a badge, a USB-C cable and [falera-cli](../CLI.md#install);
   `ffmpeg` on your computer for videos
 
 ## What the Gallery shows
@@ -17,13 +17,13 @@ your computer into a format the badge draws directly:
 |---|---|---|
 | A photo (`.jpg`, `.png`, ...) | `.rz565`: RGB565 pixels, zlib-compressed | longest side 240 px by default (`--photo-max`) |
 | A video (`.mp4`, `.mov`, ...) | `.rv565`: RV565 video, independent compressed frames | 180x135 at 24 fps, first 10 seconds by default |
-| A photo baked into OreoOS | a `.py` module in `apps/gallery/assets/optimized/` | fitted into 320x196 |
+| A photo baked into FaleraOS | a `.py` module in `apps/gallery/assets/optimized/` | fitted into 320x196 |
 
 All of them live in `/apps/gallery/assets/optimized/` on the badge.
 
 ## Way 1: the Transfer app (easiest)
 
-OreoOS keeps running, and the person holding the badge approves the
+FaleraOS keeps running, and the person holding the badge approves the
 transfer with a code.
 
 1. On the badge, open the apps drawer, go to **Tools** and open
@@ -31,7 +31,7 @@ transfer with a code.
 2. On your computer:
 
    ```bash
-   oreo transfer send me.jpg
+   falera transfer send me.jpg
    ```
 
 3. Type the code from the badge when asked.
@@ -42,22 +42,22 @@ shows a notification. Press **HOME**, open **Gallery** and use
 
 More in [TRANSFER.md](../TRANSFER.md).
 
-## Way 2: `oreo add` (no app, no code)
+## Way 2: `falera add` (no app, no code)
 
 When the badge is yours and nobody else needs to approve:
 
 ```bash
-oreo add me.jpg
-oreo add clip.mp4 --seconds 8
+falera add me.jpg
+falera add clip.mp4 --seconds 8
 ```
 
-This pauses OreoOS, copies the converted file over the USB console and
-restarts OreoOS. Same formats, same folder. Use `--save DIR` to keep the
+This pauses FaleraOS, copies the converted file over the USB console and
+restarts FaleraOS. Same formats, same folder. Use `--save DIR` to keep the
 converted files on your computer too.
 
 ## Way 3: bake it into your build
 
-If you build OreoOS from a checkout and want the photo on every badge you
+If you build FaleraOS from a checkout and want the photo on every badge you
 deploy:
 
 ```bash
@@ -73,8 +73,8 @@ whose source you deleted. Keep personal photos out of commits.
 ## Removing a photo
 
 ```bash
-oreo transfer list              # what is on the badge, and free space
-oreo transfer rm me.rz565       # asks first
+falera transfer list              # what is on the badge, and free space
+falera transfer rm me.rz565       # asks first
 ```
 
 In the Gallery app, **B** deletes the uploaded file being shown, straight
@@ -84,15 +84,15 @@ would push them back.
 
 ## Limits
 
-- One file can be up to 8 MiB over Transfer; `oreo add` checks a 5 MiB
-  media budget. The badge keeps 256 KiB free for OreoOS.
+- One file can be up to 8 MiB over Transfer; `falera add` checks a 5 MiB
+  media budget. The badge keeps 256 KiB free for FaleraOS.
 - A file with the same name replaces the old one.
-- Only one program can use the USB port at a time: close `oreo logs`,
+- Only one program can use the USB port at a time: close `falera logs`,
   `mpremote` or a serial monitor first.
 
 ## See also
 
-- [CLI.md: oreo transfer](../CLI.md#oreo-transfer-send-files-to-the-transfer-app)
-  and [oreo add](../CLI.md#oreo-add-photos-videos-and-documents-without-the-transfer-app)
+- [CLI.md: falera transfer](../CLI.md#oreo-transfer-send-files-to-the-transfer-app)
+  and [falera add](../CLI.md#oreo-add-photos-videos-and-documents-without-the-transfer-app)
 - [MEDIA_INGESTION.md](../MEDIA_INGESTION.md): how files are converted and
   checked

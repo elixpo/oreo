@@ -1,6 +1,6 @@
 # Media ingestion and storage boundary
 
-OreoOS never transfers arbitrary source media directly to badge storage. Both
+FaleraOS never transfers arbitrary source media directly to badge storage. Both
 the badge-hosted web page and `tools/media_ingest.py` use the same sequence:
 
 1. detect the source as image, video, Markdown, or text;

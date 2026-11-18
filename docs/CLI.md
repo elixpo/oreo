@@ -1,7 +1,8 @@
-# oreo-cli: the Oreo Badge command-line tool
+# falera-cli: the Falera Badge command-line tool
 
-**oreo-cli** controls the Elixpo Oreo Badge from a computer over USB. The
-command it installs is `oreo`. With it you can:
+**falera-cli** controls the Elixpo Falera Badge from a computer over USB. The
+command it installs is `falera`. It was called `oreo` until November 2026; `oreo`
+still works as an alias for a few releases. With it you can:
 
 - see the badge's status
 - send photos, videos and documents to the **Transfer** app
@@ -9,14 +10,14 @@ command it installs is `oreo`. With it you can:
 - set up Wi-Fi
 - follow the badge's logs
 - open a MicroPython shell
-- update OreoOS
+- update FaleraOS
 
 It finds the badge by its USB ID (`303a:83ec`), so you never have to guess
 `/dev/ttyACM0` or `COM5`.
 
-The code lives in [`cli/`](../cli). The Python package is `oreo-cli` and the
-command is `oreo`; the package also installs `oreo-cli` as a second name for
-the same command. The CLI is released separately from OreoOS, with tags
+The code lives in [`cli/`](../cli). The Python package is `falera-cli` and the
+command is `falera`; the package also installs `falera-cli` as a second name for
+the same command. The CLI is released separately from FaleraOS, with tags
 `cli-v<version>`. See [cli/CHANGELOG.md](../cli/CHANGELOG.md) for what each
 release changed.
 
@@ -24,8 +25,8 @@ release changed.
 > stable. Later 1.x releases may add to them but will not change them. Every
 > command is tested against a simulated badge, and the checks to run by hand
 > are listed in [Testing on a badge](#testing-on-a-badge). If something goes
-> wrong, run `oreo doctor` and attach its output to an
-> [issue](https://github.com/elixpo/oreo/issues).
+> wrong, run `falera doctor` and attach its output to an
+> [issue](https://github.com/elixpo/falera/issues).
 
 Related guides:
 
@@ -36,8 +37,8 @@ Related guides:
 
 Contents: [Install](#install) · [First run](#first-run) ·
 [Interactive UI](#interactive-ui) ·
-[Commands](#commands) · [Sending files: `oreo transfer`](#oreo-transfer-send-files-to-the-transfer-app) ·
-[Wi-Fi setup](#wi-fi-setup) · [Updating OreoOS](#oreo-update-update-oreoos) ·
+[Commands](#commands) · [Sending files: `falera transfer`](#oreo-transfer-send-files-to-the-transfer-app) ·
+[Wi-Fi setup](#wi-fi-setup) · [Updating FaleraOS](#oreo-update-update-oreoos) ·
 [Exit status](#exit-status) · [Troubleshooting](#troubleshooting) ·
 [FAQ](#faq) · [Transfer speed](#transfer-speed) ·
 [Testing on a badge](#testing-on-a-badge) · [Releasing](#releasing)
@@ -50,7 +51,7 @@ You need Python 3.9 or newer and either [pipx](https://pipx.pypa.io/) or
 1. picks pipx if you have it, and uv otherwise;
 2. downloads the release wheel and its `.sha256` file;
 3. checks the SHA-256;
-4. installs `oreo` as an isolated tool.
+4. installs `falera` as an isolated tool.
 
 If you have neither pipx nor uv, it tells you how to get one and stops.
 
@@ -58,17 +59,17 @@ If you have neither pipx nor uv, it tells you how to get one and stops.
 
 ```sh
 curl --proto '=https' --tlsv1.2 -LsSf \
-  https://raw.githubusercontent.com/elixpo/oreo/main/cli/install.sh | sh
+  https://raw.githubusercontent.com/elixpo/falera/main/cli/install.sh | sh
 ```
 
 **Windows (PowerShell)**
 
 ```powershell
-irm https://raw.githubusercontent.com/elixpo/oreo/main/cli/install.ps1 | iex
+irm https://raw.githubusercontent.com/elixpo/falera/main/cli/install.ps1 | iex
 ```
 
 To upgrade, run the same command again. It replaces the installed version.
-Check what you have with `oreo --version`.
+Check what you have with `falera --version`.
 
 ### Installer options
 
@@ -76,23 +77,23 @@ Check what you have with `oreo --version`.
 |---|---|
 | `OREO_CLI_VERSION` | Release to install: `latest` (the default), or a version written as `cli-v1.0.0`, `v1.0.0` or `1.0.0` |
 | `OREO_CLI_INSTALLER` | `pipx` or `uv` (default: pipx if present, otherwise uv) |
-| `OREO_CLI_REPOSITORY` | GitHub repository to install from (default `elixpo/oreo`) |
+| `OREO_CLI_REPOSITORY` | GitHub repository to install from (default `elixpo/falera`) |
 | `OREO_CLI_DOWNLOAD_BASE` | Download the wheel from this URL instead of the release. For testing; needs a pinned version |
 
 To install a specific version:
 
 ```sh
 curl --proto '=https' --tlsv1.2 -LsSf \
-  https://raw.githubusercontent.com/elixpo/oreo/main/cli/install.sh |
+  https://raw.githubusercontent.com/elixpo/falera/main/cli/install.sh |
   OREO_CLI_VERSION=cli-v1.1.0 sh
 ```
 
 ```powershell
 $env:OREO_CLI_VERSION = "cli-v1.1.0"
-irm https://raw.githubusercontent.com/elixpo/oreo/main/cli/install.ps1 | iex
+irm https://raw.githubusercontent.com/elixpo/falera/main/cli/install.ps1 | iex
 ```
 
-The repository's "Latest" GitHub release is always OreoOS, not the CLI. So
+The repository's "Latest" GitHub release is always FaleraOS, not the CLI. So
 for `latest`, the installers ask the GitHub API for the newest `cli-vX.Y.Z`
 tag. The API allows 60 requests an hour without a token. Pre-releases such as
 `1.1.0rc1` are installed only when you name them. Pinning a version skips the
@@ -111,19 +112,19 @@ Every release has assets with fixed names:
 pipx and uv can install the wheel straight from its release URL:
 
 ```sh
-pipx install https://github.com/elixpo/oreo/releases/download/cli-v1.1.0/oreo_cli-1.1.0-py3-none-any.whl
+pipx install https://github.com/elixpo/falera/releases/download/cli-v1.1.0/oreo_cli-1.1.0-py3-none-any.whl
 # or
-uv tool install https://github.com/elixpo/oreo/releases/download/cli-v1.1.0/oreo_cli-1.1.0-py3-none-any.whl
+uv tool install https://github.com/elixpo/falera/releases/download/cli-v1.1.0/oreo_cli-1.1.0-py3-none-any.whl
 ```
 
 To check the file before you install it:
 
 ```sh
 V=1.1.0
-curl -LO https://github.com/elixpo/oreo/releases/download/cli-v$V/oreo_cli-$V-py3-none-any.whl
-curl -LO https://github.com/elixpo/oreo/releases/download/cli-v$V/SHA256SUMS
+curl -LO https://github.com/elixpo/falera/releases/download/cli-v$V/oreo_cli-$V-py3-none-any.whl
+curl -LO https://github.com/elixpo/falera/releases/download/cli-v$V/SHA256SUMS
 sha256sum --check --ignore-missing SHA256SUMS      # macOS: shasum -a 256 -c --ignore-missing SHA256SUMS
-gh attestation verify oreo_cli-$V-py3-none-any.whl -R elixpo/oreo
+gh attestation verify oreo_cli-$V-py3-none-any.whl -R elixpo/falera
 pipx install oreo_cli-$V-py3-none-any.whl          # or: uv tool install oreo_cli-$V-py3-none-any.whl
 ```
 
@@ -131,7 +132,7 @@ pipx install oreo_cli-$V-py3-none-any.whl          # or: uv tool install oreo_cl
 confirms that the file was built by this repository's `cli-release` workflow
 from the tagged commit.
 
-oreo-cli is not on PyPI; install it from the GitHub release.
+falera-cli is not on PyPI; install it from the GitHub release.
 
 ### From a checkout
 
@@ -146,11 +147,11 @@ These are installed with the CLI:
 - `rich`
 - `pyserial`
 - `mpremote` 1.28.x, which must match the badge's MicroPython 1.28
-- `Pillow`, for photos and for your GitHub avatar (`oreo setup`)
+- `Pillow`, for photos and for your GitHub avatar (`falera setup`)
 - `textual` 8.x, for the [full-screen view](#interactive-ui)
 
 Converting **videos** also needs [ffmpeg](https://ffmpeg.org/) on your PATH
-(for `oreo transfer send` and `oreo add`). Photos and documents do not.
+(for `falera transfer send` and `falera add`). Photos and documents do not.
 
 | System | Command |
 |---|---|
@@ -167,12 +168,12 @@ Arch):
 sudo usermod -aG dialout "$USER"     # then log out and back in
 ```
 
-`oreo doctor` checks this. macOS and Windows need no setup.
+`falera doctor` checks this. macOS and Windows need no setup.
 
 ### Uninstall
 
 ```sh
-pipx uninstall oreo-cli      # or: uv tool uninstall oreo-cli
+pipx uninstall falera-cli      # or: uv tool uninstall falera-cli
 ```
 
 The CLI stores nothing else on the computer.
@@ -185,44 +186,44 @@ The CLI stores nothing else on the computer.
 2. Run:
 
    ```sh
-   oreo devs        # is the badge there? (never opens the port)
-   oreo             # the full-screen Oreo view
+   falera devs        # is the badge there? (never opens the port)
+   falera             # the full-screen Falera view
    ```
 
-3. If no badge is found, run `oreo doctor`.
+3. If no badge is found, run `falera doctor`.
 
 ## Interactive UI
 
-`oreo` with no command (or `oreo ui`) switches the terminal to a full-screen
-Oreo view that handles everything about the badge. It opens at once, waits
+`falera` with no command (or `falera ui`) switches the terminal to a full-screen
+Falera view that handles everything about the badge. It opens at once, waits
 for a badge to be plugged in if there is none, and asks which one to use if
 there are several. Leaving it puts your terminal back as it was.
 
 ```
- Oreo Badge OREO01 — OreoOS v2.0.0 · /dev/ttyACM0 · OreoOS paused
+ Falera Badge OREO01 — FaleraOS v2.0.0 · /dev/ttyACM0 · FaleraOS paused
 ╭──────────────────────────╮╭────────────────────────────────────────────────────────╮
-│ 1  Status                ││ ╭─ Oreo Badge ─────────────────────────────────────╮   │
-│ 2  Files                 ││ │    OreoOS  v2.0.0 (2026-11-07)                   │   │
+│ 1  Status                ││ ╭─ Falera Badge ─────────────────────────────────────╮   │
+│ 2  Files                 ││ │    FaleraOS  v2.0.0 (2026-11-07)                   │   │
 │ 3  Apps                  ││ │  firmware  MicroPython 1.28.0                    │   │
 │ 4  Wi-Fi                 ││ │      port  /dev/ttyACM0                          │   │
 │ 5  Transfer              ││ │     Wi-Fi  connected 192.168.1.42, 2 saved       │   │
 │ 6  Profile               ││ │   battery  87% (4.01 V)                          │   │
 │ 7  Install app           ││ ╰──────────────────────────────────────────────────╯   │
-│ 8  Update OreoOS         ││ storage  1.2 MiB used of 8.0 MiB, 6.8 MiB free         │
+│ 8  Update FaleraOS         ││ storage  1.2 MiB used of 8.0 MiB, 6.8 MiB free         │
 │ ──────────────────────── ││  Category    Size   Files                              │
 │ s  Shell (REPL)          ││  system   812.0 KiB    96   ...                        │
 │ q  Quit                  ││                                                        │
 │ ──────────────────────── │╰────────────────────────────────────────────────────────╯
 │ source                   │ ⠹ copying to /documents: song.mp3  1.1 MiB / 3.0 MiB ━━━━── 37%  Esc cancel
-│ github.com/elixpo/oreo   │╭────────────────────────────────────────────────────────╮
-│ docs                     ││ badge on /dev/ttyACM0; pausing OreoOS while this view  │
-│ oreo.elixpo.com/docs/cli ││ ✓ notes.md  1.2 KiB                                    │
+│ github.com/elixpo/falera   │╭────────────────────────────────────────────────────────╮
+│ docs                     ││ badge on /dev/ttyACM0; pausing FaleraOS while this view  │
+│ falera.elixpo.com/docs/cli ││ ✓ notes.md  1.2 KiB                                    │
 │                          ││                                                        │
 ╰──────────────────────────╯╰────────────────────────────────────────────────────────╯
  s Shell  r Refresh  esc Cancel  l Log  q Quit  d Download  u Upload here  x Delete
 ```
 
-The header shows the badge, its port, the OreoOS version and whether OreoOS
+The header shows the badge, its port, the FaleraOS version and whether FaleraOS
 is paused. The sidebar lists the sections, and under them the links to the
 source code and to this guide (clickable in terminals that support links).
 The bar under the section shows what is running (with a progress bar and
@@ -234,19 +235,19 @@ section you are in. The mouse works too, but every action has a key.
 
 | Key | Section or action |
 |---|---|
-| **1** | Status: versions, storage, Wi-Fi, battery (`oreo info`) |
-| **2** | Files: Enter opens a folder, Backspace goes up, **d** downloads, **u** uploads files or folders into the folder shown, **a** adds photos, videos or documents (`oreo add`), **x** deletes (asks first; OreoOS's own files are refused) |
+| **1** | Status: versions, storage, Wi-Fi, battery (`falera info`) |
+| **2** | Files: Enter opens a folder, Backspace goes up, **d** downloads, **u** uploads files or folders into the folder shown, **a** adds photos, videos or documents (`falera add`), **x** deletes (asks first; FaleraOS's own files are refused) |
 | **3** | Apps: installed apps and the App Store; **f** fetches the catalogue, **i** installs, **u** updates all, **x** removes |
 | **4** | Wi-Fi: saved networks; **n** scans, **c** connects (password asked without echo), **x** forgets |
-| **5** | Transfer: type the files, Enter; OreoOS restarts, open Transfer on the badge and type the code it shows (`oreo transfer send`) |
-| **6** | Profile: **e** edits it field by field, **f** loads the keys from an `.env`-style file (`oreo setup`) |
-| **7** | Install app: an app folder from this computer (`oreo app install`) |
-| **8** | Update OreoOS: **c** checks, **u** updates (`oreo update`) |
+| **5** | Transfer: type the files, Enter; FaleraOS restarts, open Transfer on the badge and type the code it shows (`falera transfer send`) |
+| **6** | Profile: **e** edits it field by field, **f** loads the keys from an `.env`-style file (`falera setup`) |
+| **7** | Install app: an app folder from this computer (`falera app install`) |
+| **8** | Update FaleraOS: **c** checks, **u** updates (`falera update`) |
 | **s** | Shell: the badge's MicroPython REPL in this terminal; Ctrl-] or Ctrl-X comes back to the view |
 | **r** | Refresh the section shown |
 | **l** | A bigger log, or back to three lines |
 | **Esc** | Cancel the running operation (in a text field with nothing running: back to the sidebar) |
-| **q**, **Ctrl-C** | Quit; OreoOS starts again |
+| **q**, **Ctrl-C** | Quit; FaleraOS starts again |
 
 How it behaves:
 
@@ -257,29 +258,29 @@ How it behaves:
 - **Cancel** stops copies, downloads, App Store installs and Transfer between
   two chunks, and a half-copied file is removed, as with Ctrl-C in the plain
   commands. Scans and Wi-Fi joins are interrupted on the badge. Once an
-  OreoOS update starts it cannot be cancelled (quitting waits for it).
+  FaleraOS update starts it cannot be cancelled (quitting waits for it).
 - **Questions are dialogs.** Confirmations, the Transfer code and passwords
   appear in a box; Esc cancels the operation that asked.
-- **OreoOS is paused while the view is open**, so the badge's screen shows
-  what the computer is doing during long operations (with an OreoOS that has
+- **FaleraOS is paused while the view is open**, so the badge's screen shows
+  what the computer is doing during long operations (with an FaleraOS that has
   `oreoOS/hostui.py`). It restarts when you quit: with **q**, with Ctrl-C,
   and if anything fails. `--reset hard|none` works as for the commands. The
-  Transfer section is the exception: the Transfer app runs inside OreoOS, so
-  it restarts OreoOS first, and the next section that needs the badge pauses
-  it again. A profile saved or an app installed takes effect when OreoOS
+  Transfer section is the exception: the Transfer app runs inside FaleraOS, so
+  it restarts FaleraOS first, and the next section that needs the badge pauses
+  it again. A profile saved or an app installed takes effect when FaleraOS
   restarts, which happens when you quit.
 - **Unplugged?** The view goes back to waiting and picks the badge up again
   when it returns.
 
 The view is built with [Textual](https://textual.textualize.io/), which is
-installed with the CLI. Where it cannot run, `oreo` falls back to the
+installed with the CLI. Where it cannot run, `falera` falls back to the
 numbered menu below: when standard input or output is not a terminal, with
-`TERM=dumb`, or when Textual is missing. `oreo ui` says why instead of falling
-back. To always get the menu, run `oreo menu` or set `OREO_UI=menu`.
+`TERM=dumb`, or when Textual is missing. `falera ui` says why instead of falling
+back. To always get the menu, run `falera menu` or set `OREO_UI=menu`.
 
 ### The numbered menu
 
-`oreo menu` (and `oreo` where the full-screen view cannot run) shows the
+`falera menu` (and `falera` where the full-screen view cannot run) shows the
 badge's status and then a menu:
 
 | Key | Action |
@@ -289,49 +290,49 @@ badge's status and then a menu:
 | **3** | apps |
 | **4** | Wi-Fi |
 | **5** | add a photo, video or document |
-| **t** | send files to Transfer (the same flow as `oreo transfer send`) |
-| **p** | owner profile (the same flow as `oreo setup`) |
-| **i** | install an app from a folder (the same checks as `oreo app install`) |
-| **u** | update OreoOS |
+| **t** | send files to Transfer (the same flow as `falera transfer send`) |
+| **p** | owner profile (the same flow as `falera setup`) |
+| **i** | install an app from a folder (the same checks as `falera app install`) |
+| **u** | update FaleraOS |
 | **s** | shell |
 | **q** | quit |
 
 In the file view, `u <path>` uploads a file from the computer into the folder
 shown, and `p` downloads one. Ctrl-C stops the current action and goes back
-to the menu. OreoOS stays paused while the menu is open and starts again when
-you quit. Without a terminal (in a script, for example), `oreo` prints the
+to the menu. FaleraOS stays paused while the menu is open and starts again when
+you quit. Without a terminal (in a script, for example), `falera` prints the
 status and exits.
 
-**t** is the one entry that needs OreoOS running: it checks and converts the
-files first, then restarts OreoOS and asks for the code the Transfer app shows
-(apps drawer -> Tools -> Transfer). OreoOS keeps running afterwards; the next
+**t** is the one entry that needs FaleraOS running: it checks and converts the
+files first, then restarts FaleraOS and asks for the code the Transfer app shows
+(apps drawer -> Tools -> Transfer). FaleraOS keeps running afterwards; the next
 entry that needs the badge pauses it again. A profile saved with **p** and an
-app installed with **i** take effect when OreoOS restarts, which happens when
+app installed with **i** take effect when FaleraOS restarts, which happens when
 you quit the menu.
 
-To send photos and documents while OreoOS keeps running, use the Transfer app
-instead (see [`oreo transfer`](#oreo-transfer-send-files-to-the-transfer-app)).
+To send photos and documents while FaleraOS keeps running, use the Transfer app
+instead (see [`falera transfer`](#oreo-transfer-send-files-to-the-transfer-app)).
 
-### How `oreo` uses the badge
+### How `falera` uses the badge
 
 - **The badge is only touched when a command needs it.** `--help`,
-  `oreo help`, `oreo devs`, mistyped arguments and "no badge found" never
+  `falera help`, `falera devs`, mistyped arguments and "no badge found" never
   open the serial port.
 - **One badge is picked automatically.** If several are connected, choose
-  one with `--port` or `$OREO_PORT` (see `oreo devs`).
-- **Most commands pause OreoOS and then restart it.** Such a command stops
-  OreoOS, does its work and then soft-resets the badge so OreoOS starts
+  one with `--port` or `$OREO_PORT` (see `falera devs`).
+- **Most commands pause FaleraOS and then restart it.** Such a command stops
+  FaleraOS, does its work and then soft-resets the badge so FaleraOS starts
   again. `--reset hard` does a hardware reset instead, and `--reset none`
   leaves the badge at the MicroPython prompt.
-- **Some commands do not stop OreoOS.** `oreo transfer` talks to the Transfer
-  app while it runs, and `oreo logs` only listens.
-- **The badge's screen shows long operations.** While OreoOS is paused for
+- **Some commands do not stop FaleraOS.** `falera transfer` talks to the Transfer
+  app while it runs, and `falera logs` only listens.
+- **The badge's screen shows long operations.** While FaleraOS is paused for
   `push`, `pull`, `add`, `app install`, `apps install`/`update` and
   `update`, the badge shows what is happening and how far it has got
-  (through `oreoOS/hostui.py`, in OreoOS versions that have it), and clears
+  (through `oreoOS/hostui.py`, in FaleraOS versions that have it), and clears
   the screen at the end. The updates ride along with the commands the CLI
-  sends anyway, so they cost no extra time; an OreoOS without it works as
-  before. (`oreo transfer` needs none: the Transfer app shows its own
+  sends anyway, so they cost no extra time; an FaleraOS without it works as
+  before. (`falera transfer` needs none: the Transfer app shows its own
   progress.)
 - **Destructive actions ask first.** These are `rm -r`, `apps remove`, `app remove`,
   `transfer rm`, `update`, `update --clean` and `flash`. Without a terminal,
@@ -339,12 +340,12 @@ instead (see [`oreo transfer`](#oreo-transfer-send-files-to-the-transfer-app)).
 
 ### Global options
 
-Put these before the command, for example `oreo --port /dev/ttyACM1 info`.
+Put these before the command, for example `falera --port /dev/ttyACM1 info`.
 
 | Option | Meaning |
 |---|---|
 | `-p`, `--port PORT` | Serial port to use (default: the one badge found; also `$OREO_PORT`) |
-| `--reset soft\|hard\|none` | How OreoOS is restarted after a command (default `soft`) |
+| `--reset soft\|hard\|none` | How FaleraOS is restarted after a command (default `soft`) |
 | `-y`, `--yes` | Answer yes to confirmations |
 | `--no-color` | Plain output |
 | `-v`, `--verbose` | Show the badge's log lines and full tracebacks |
@@ -352,55 +353,55 @@ Put these before the command, for example `oreo --port /dev/ttyACM1 info`.
 
 ## Commands
 
-| Command | What it does | Stops OreoOS? |
+| Command | What it does | Stops FaleraOS? |
 |---|---|---|
-| [`oreo`](#interactive-ui) / `oreo ui` | The full-screen Oreo view | while it is open |
-| [`oreo menu`](#the-numbered-menu) | The numbered menu, for simple terminals | while it is open |
-| [`oreo devs`](#oreo-devs-list-badges) | List badges | no (never opens a port) |
-| [`oreo info`](#oreo-info-status) | Versions, storage, Wi-Fi, battery | briefly |
-| [`oreo transfer`](#oreo-transfer-send-files-to-the-transfer-app) / `oreo send` | Send files to the Transfer app, using the code on the badge | **no** |
-| [`oreo add`](#oreo-add-photos-videos-and-documents-without-the-transfer-app) | Send photos, videos and documents without opening an app | briefly |
-| [`oreo ls` / `push` / `pull` / `rm`](#oreo-ls--push--pull--rm-files) | Any file on the badge | briefly |
-| [`oreo apps`](#oreo-apps-the-app-store) | App Store: list, install, update, remove | briefly |
-| [`oreo setup`](#oreo-setup-owner-profile) | Owner profile: GitHub user, name, timezone, weather | briefly, then restarts |
-| [`oreo new`](#oreo-new-start-an-app) | Make a new app folder from the app template | no (never opens a port) |
-| [`oreo app`](#oreo-app-install-an-app-from-a-folder) | Install, list or remove an app from a folder on this computer | briefly, then restarts |
-| [`oreo wifi`](#wi-fi-setup) | Scan, connect, list and forget networks | briefly |
-| [`oreo update`](#oreo-update-update-oreoos) | Update OreoOS (downloaded by the badge) | yes, then restarts |
-| [`oreo logs`](#oreo-logs-console-output) | Follow the console | no |
-| [`oreo shell`](#oreo-shell-micropython-repl) / [`run`](#oreo-run-run-a-script) / [`dev`](#oreo-dev-live-editing) | MicroPython prompt, scripts, live editing | while it runs |
-| [`oreo flash`](#oreo-flash-firmware) | Reflash the firmware (developers) | yes |
-| [`oreo doctor`](#oreo-doctor-diagnose-the-connection) | Diagnose cable, port, permissions, firmware | briefly |
+| [`falera`](#interactive-ui) / `falera ui` | The full-screen Falera view | while it is open |
+| [`falera menu`](#the-numbered-menu) | The numbered menu, for simple terminals | while it is open |
+| [`falera devs`](#oreo-devs-list-badges) | List badges | no (never opens a port) |
+| [`falera info`](#oreo-info-status) | Versions, storage, Wi-Fi, battery | briefly |
+| [`falera transfer`](#oreo-transfer-send-files-to-the-transfer-app) / `falera send` | Send files to the Transfer app, using the code on the badge | **no** |
+| [`falera add`](#oreo-add-photos-videos-and-documents-without-the-transfer-app) | Send photos, videos and documents without opening an app | briefly |
+| [`falera ls` / `push` / `pull` / `rm`](#oreo-ls--push--pull--rm-files) | Any file on the badge | briefly |
+| [`falera apps`](#oreo-apps-the-app-store) | App Store: list, install, update, remove | briefly |
+| [`falera setup`](#oreo-setup-owner-profile) | Owner profile: GitHub user, name, timezone, weather | briefly, then restarts |
+| [`falera new`](#oreo-new-start-an-app) | Make a new app folder from the app template | no (never opens a port) |
+| [`falera app`](#oreo-app-install-an-app-from-a-folder) | Install, list or remove an app from a folder on this computer | briefly, then restarts |
+| [`falera wifi`](#wi-fi-setup) | Scan, connect, list and forget networks | briefly |
+| [`falera update`](#oreo-update-update-oreoos) | Update FaleraOS (downloaded by the badge) | yes, then restarts |
+| [`falera logs`](#oreo-logs-console-output) | Follow the console | no |
+| [`falera shell`](#oreo-shell-micropython-repl) / [`run`](#oreo-run-run-a-script) / [`dev`](#oreo-dev-live-editing) | MicroPython prompt, scripts, live editing | while it runs |
+| [`falera flash`](#oreo-flash-firmware) | Reflash the firmware (developers) | yes |
+| [`falera doctor`](#oreo-doctor-diagnose-the-connection) | Diagnose cable, port, permissions, firmware | briefly |
 
-`oreo help <command>` (or `oreo <command> --help`) shows each command's
+`falera help <command>` (or `falera <command> --help`) shows each command's
 options and examples.
 
-### `oreo devs`: list badges
+### `falera devs`: list badges
 
 ```sh
-oreo devs           # badges, by USB ID 303a:83ec
-oreo devs --all     # also other USB serial devices, with what they probably are
+falera devs           # badges, by USB ID 303a:83ec
+falera devs --all     # also other USB serial devices, with what they probably are
 ```
 
 This never opens a port. It exits with status 3 when no badge is connected.
 
-### `oreo info`: status
+### `falera info`: status
 
 ```sh
-oreo info
+falera info
 ```
 
 Shows:
 
-- the OreoOS version and date, and the MicroPython version;
+- the FaleraOS version and date, and the MicroPython version;
 - the board and port;
 - space used by the system, apps, gallery, documents and other files;
 - Wi-Fi status and the Bluetooth boot setting;
 - battery and free RAM.
 
-### `oreo transfer`: send files to the Transfer app
+### `falera transfer`: send files to the Transfer app
 
-The easiest way to put photos, videos and documents on the badge. OreoOS keeps
+The easiest way to put photos, videos and documents on the badge. FaleraOS keeps
 running the whole time, and you prove you are at the right badge by typing
 the code it shows. How it works inside is in [TRANSFER.md](TRANSFER.md).
 
@@ -409,7 +410,7 @@ the code it shows. How it works inside is in [TRANSFER.md](TRANSFER.md).
 2. On the computer, run:
 
    ```sh
-   oreo transfer send holiday.jpg clip.mp4 talk-notes.md
+   falera transfer send holiday.jpg clip.mp4 talk-notes.md
    ```
 
 3. When asked, type the code from the badge. Case does not matter, and you
@@ -419,10 +420,10 @@ the code it shows. How it works inside is in [TRANSFER.md](TRANSFER.md).
    badge shows a notification for each file.
 
 ```text
-$ oreo transfer send holiday.jpg talk-notes.md
+$ falera transfer send holiday.jpg talk-notes.md
 holiday.jpg -> holiday.rz565  41.2 KB (6% of the original)
 talk-notes.md -> talk-notes.mdz  2.1 KB (38% of the original)
-✓ Transfer is open on the badge (OreoOS 2.x.y), 9.8 MB free
+✓ Transfer is open on the badge (FaleraOS 2.x.y), 9.8 MB free
 Code shown on the badge: K7M2QX
 ✓ code accepted
 ✓ holiday.rz565 is in the Gallery (/apps/gallery/assets/optimized/holiday.rz565, SHA-256 checked)
@@ -435,16 +436,16 @@ Code shown on the badge: K7M2QX
 Other actions, in the same session style (open Transfer, type the code):
 
 ```sh
-oreo transfer list                    # photos, videos and documents on the badge, and free space
-oreo transfer rm holiday.rz565        # remove one (asks first; names from `transfer list`)
-oreo send holiday.jpg                 # short for `oreo transfer send`
+falera transfer list                    # photos, videos and documents on the badge, and free space
+falera transfer rm holiday.rz565        # remove one (asks first; names from `transfer list`)
+falera send holiday.jpg                 # short for `falera transfer send`
 ```
 
-`oreo transfer` with no action means `send`.
+`falera transfer` with no action means `send`.
 
 | Option | Meaning |
 |---|---|
-| `--code CODE` | The code shown on the badge. Without it, `oreo` asks. A script with no terminal must pass it |
+| `--code CODE` | The code shown on the badge. Without it, `falera` asks. A script with no terminal must pass it |
 | `--wait SECONDS` | How long to wait for the Transfer app to be open (default 60) |
 | `--kind image\|video\|document` | Override the file type detection |
 | `--seconds N` | Video length to keep (default 10) |
@@ -468,47 +469,47 @@ Things to know:
 - **The code changes.** Every session gets a new code: when the CLI says
   goodbye, when the session is cancelled, and after a lockout. **RIGHT** on
   the badge draws a new one while no computer is connected.
-- **Wrong codes.** In a terminal, `oreo` tells you how many tries are left
+- **Wrong codes.** In a terminal, `falera` tells you how many tries are left
   and asks again. After 5 wrong codes, the badge locks for 60 seconds and
   then shows a new code. With `--code`, or without a terminal, one wrong
   code ends the command.
-- **Waiting for the app.** If Transfer is not open, `oreo` waits. After a
+- **Waiting for the app.** If Transfer is not open, `falera` waits. After a
   couple of seconds it tells you to open it, and it gives up after `--wait`
   seconds. It sends nothing to the badge until the app has announced
   itself, so a closed app is never sent bytes it cannot read.
 - **Cancelling.** **B** on the badge cancels the session and Ctrl-C on the
   computer stops it. A half-sent file is always thrown away; the old file
   with the same name, if any, is kept.
-- **Same name.** A file with the same name replaces the old one, and `oreo`
+- **Same name.** A file with the same name replaces the old one, and `falera`
   says "replaced the old one".
 - **Limits.** One file can be up to 8 MiB, and the badge keeps 256 KiB free
-  for OreoOS. A file that does not fit fails on its own and the others still
+  for FaleraOS. A file that does not fit fails on its own and the others still
   go through. The command then exits with status 1 and lists what was not
   sent.
 - **Timeouts.** The badge drops a computer that stays silent: after 5 minutes
   while waiting for the code, after 2 minutes once the code is accepted, and
   after 20 seconds in the middle of a file.
-- **While Transfer is open, close it before using other `oreo` commands.**
+- **While Transfer is open, close it before using other `falera` commands.**
   The app turns off Ctrl-C on the USB console so that no byte can interrupt
-  OreoOS. Commands that pause OreoOS (`info`, `add`, `push`, `shell`,
+  FaleraOS. Commands that pause FaleraOS (`info`, `add`, `push`, `shell`,
   `update`, ...) therefore cannot stop it, and they fail with "the badge did
   not answer" (exit 4). Press **HOME** or **B** on the badge to leave
   Transfer, then run the command again.
-- **Only one program can have the port open.** Stop `oreo logs`, `mpremote`
-  or a serial monitor before running `oreo transfer`.
+- **Only one program can have the port open.** Stop `falera logs`, `mpremote`
+  or a serial monitor before running `falera transfer`.
 
-### `oreo add`: photos, videos and documents without the Transfer app
+### `falera add`: photos, videos and documents without the Transfer app
 
 ```sh
-oreo add holiday.jpg                  # Gallery
-oreo add clip.mp4 --seconds 8         # Gallery (needs ffmpeg)
-oreo add talk-notes.md reading.txt    # Reader
+falera add holiday.jpg                  # Gallery
+falera add clip.mp4 --seconds 8         # Gallery (needs ffmpeg)
+falera add talk-notes.md reading.txt    # Reader
 ```
 
-Same conversion and destinations as `oreo transfer send`. The difference is
-that `add` needs no app and no code: it pauses OreoOS and copies the files
-over the MicroPython REPL, then restarts OreoOS. Use it in scripts, or when
-you have the badge to yourself; use `oreo transfer` when you want OreoOS to
+Same conversion and destinations as `falera transfer send`. The difference is
+that `add` needs no app and no code: it pauses FaleraOS and copies the files
+over the MicroPython REPL, then restarts FaleraOS. Use it in scripts, or when
+you have the badge to yourself; use `falera transfer` when you want FaleraOS to
 stay up, or want the person holding the badge to approve the transfer.
 
 Before anything is copied, the converted size is checked against the media
@@ -523,17 +524,17 @@ budget (5 MiB for photos and videos) and the badge's free space.
 | `--photo-max N` | Longest side of a photo (default 240) |
 | `--save DIR` | Also keep the converted files on the computer |
 
-### `oreo ls` / `push` / `pull` / `rm`: files
+### `falera ls` / `push` / `pull` / `rm`: files
 
 ```sh
-oreo ls                              # the badge's root folder
-oreo ls /apps
-oreo push notes.txt /documents/
-oreo push -r myapp /apps/myapp       # a whole folder
-oreo pull /wifi_seen.json            # into the current folder
-oreo pull -r /apps/pet ./pet-backup
-oreo rm /documents/old.mdz
-oreo rm -r /apps/myapp               # asks first
+falera ls                              # the badge's root folder
+falera ls /apps
+falera push notes.txt /documents/
+falera push -r myapp /apps/myapp       # a whole folder
+falera pull /wifi_seen.json            # into the current folder
+falera pull -r /apps/pet ./pet-backup
+falera rm /documents/old.mdz
+falera rm -r /apps/myapp               # asks first
 ```
 
 - `push` checks free space before writing anything. Each file is written to
@@ -541,43 +542,43 @@ oreo rm -r /apps/myapp               # asks first
   then renames it into place, so a damaged copy leaves the old file
   untouched. `--no-verify` skips the hash.
 - `push` copies files as they are. To make a photo or video viewable, use
-  `oreo transfer send` or `oreo add`, which convert it first.
-- `rm` refuses OreoOS's own files (`/oreoOS`, `/oreoWare`, `/assets`, the
+  `falera transfer send` or `falera add`, which convert it first.
+- `rm` refuses FaleraOS's own files (`/oreoOS`, `/oreoWare`, `/assets`, the
   built-in apps, `/main.py`, `/secrets.py`, `/wifi.json`, ...) and anything
   inside those folders unless you add `--force`. Removing them can stop the
   badge from booting.
 - A badge path can be written with a leading `:` (`:documents/`). In Git Bash
   on Windows you need it (see [Troubleshooting](#troubleshooting)).
 
-### `oreo apps`: the App Store
+### `falera apps`: the App Store
 
 ```sh
-oreo apps                    # installed apps and the catalogue
-oreo apps refresh            # fetch the latest catalogue
-oreo apps install snake
-oreo apps update             # every app with a newer version
-oreo apps update snake
-oreo apps remove snake       # asks first
+falera apps                    # installed apps and the catalogue
+falera apps refresh            # fetch the latest catalogue
+falera apps install snake
+falera apps update             # every app with a newer version
+falera apps update snake
+falera apps remove snake       # asks first
 ```
 
 The badge downloads apps itself, over its own Wi-Fi, so set up Wi-Fi first
 (see [Wi-Fi setup](#wi-fi-setup)). Before `refresh`, `install` and `update`,
-`oreo` brings Wi-Fi up from the badge's saved networks and then shows the
+`falera` brings Wi-Fi up from the badge's saved networks and then shows the
 download progress. Built-in apps (including Transfer) cannot be removed.
 
-### `oreo setup`: owner profile
+### `falera setup`: owner profile
 
 ```sh
-oreo setup                                     # show the profile, ask for each value
-oreo setup --show                              # only print it (the key is hidden)
-oreo setup --github-user octocat --name "Mona Lisa" --timezone 5.5
-oreo setup --lat 12.97 --lon 77.59 --weather-name Bengaluru
-oreo setup --owm-key-stdin < owm-key.txt       # the OpenWeatherMap key, kept out of history
-oreo setup --designation ""                    # remove a value
-oreo setup --from-file .env.local              # the profile keys from an .env-style file
-oreo setup --set DISPLAY_NAME="Mona Lisa" --set TIMEZONE_OFFSET=5.5   # one key at a time
-oreo setup --avatar                            # fetch your GitHub avatar again
-oreo setup --github-user octocat --no-avatar   # leave the avatar alone
+falera setup                                     # show the profile, ask for each value
+falera setup --show                              # only print it (the key is hidden)
+falera setup --github-user octocat --name "Mona Lisa" --timezone 5.5
+falera setup --lat 12.97 --lon 77.59 --weather-name Bengaluru
+falera setup --owm-key-stdin < owm-key.txt       # the OpenWeatherMap key, kept out of history
+falera setup --designation ""                    # remove a value
+falera setup --from-file .env.local              # the profile keys from an .env-style file
+falera setup --set DISPLAY_NAME="Mona Lisa" --set TIMEZONE_OFFSET=5.5   # one key at a time
+falera setup --avatar                            # fetch your GitHub avatar again
+falera setup --github-user octocat --no-avatar   # leave the avatar alone
 ```
 
 Keys use the `.env.local` names: `GITHUB_USER`, `DISPLAY_NAME`,
@@ -615,12 +616,12 @@ No checkout or `.env.local` is needed.
 - The new file is merged on the badge, written to `/profile.json.tmp`, read
   back and then renamed over `/profile.json`, so a cut-off save never leaves
   a half-written profile. If the power goes between removing the old file
-  and the rename, OreoOS reads the `.tmp` copy, and the next save repairs it.
-- OreoOS restarts afterwards so the apps read the new profile (`--reset none`
+  and the rename, FaleraOS reads the `.tmp` copy, and the next save repairs it.
+- FaleraOS restarts afterwards so the apps read the new profile (`--reset none`
   leaves it at the MicroPython prompt). A new timezone applies at the next
-  time sync, which happens as OreoOS starts.
+  time sync, which happens as FaleraOS starts.
 
-**Your avatar.** After the profile, `oreo setup` puts the GitHub avatar of
+**Your avatar.** After the profile, `falera setup` puts the GitHub avatar of
 `GITHUB_USER` on the badge for the Badge app. This computer downloads it
 (`https://github.com/<user>.png`, not the rate-limited API), crops it to a
 72x72 circle in RGB565 with Pillow, and copies it over USB to
@@ -635,39 +636,39 @@ downloads and decodes nothing.
   setup removes `/avatar.bin`.
 - If the download fails (offline, unknown user), the profile is still saved
   and setup says so; an avatar made for someone else is removed, never left
-  behind. Run `oreo setup --avatar` later.
+  behind. Run `falera setup --avatar` later.
 - `/avatar.bin` sits next to `/profile.json`, outside every app folder, so
-  OreoOS updates and deploys keep it (`tools/deploy.py --clean` wipes both).
+  FaleraOS updates and deploys keep it (`tools/deploy.py --clean` wipes both).
 - `--show` names whose avatar is on the badge.
 
-### `oreo new`: start an app
+### `falera new`: start an app
 
 ```sh
-oreo new my_game                               # ./my_game, shown as "My Game"
-oreo new "My Game" --author octocat --dir ~/oreo-apps
+falera new my_game                               # ./my_game, shown as "My Game"
+falera new "My Game" --author octocat --dir ~/oreo-apps
 ```
 
 Copies the app template (a counter: **A** adds, **B** takes one away; the same
-files as `app_templates/` in the OreoOS repo, shipped inside oreo-cli) into a
+files as `app_templates/` in the FaleraOS repo, shipped inside falera-cli) into a
 new folder, and fills in the app id, the name shown on the badge, the author
 (from `--author`, else `git config github.user` or `user.name`) and the icon
 module. The id comes from the name: `My Game` -> `my_game`. Edit
-`src/app.py`, then `oreo app install ./my_game`. The app guide is
+`src/app.py`, then `falera app install ./my_game`. The app guide is
 [APPS.md](APPS.md).
 
-### `oreo app`: install an app from a folder
+### `falera app`: install an app from a folder
 
 ```sh
-oreo app install ./my_game      # check, copy to /apps/my_game/, restart OreoOS
-oreo app install ./badge --force   # over a built-in app (working on OreoOS itself)
-oreo app list                   # installed apps
-oreo app remove my_game         # asks first
+falera app install ./my_game      # check, copy to /apps/my_game/, restart FaleraOS
+falera app install ./badge --force   # over a built-in app (working on FaleraOS itself)
+falera app list                   # installed apps
+falera app remove my_game         # asks first
 ```
 
 `install`:
 
 1. checks the folder with the same rules as `tools/validate_app.py` (a copy
-   ships in oreo-cli, and a test keeps them the same). Errors stop it before
+   ships in falera-cli, and a test keeps them the same). Errors stop it before
    the badge is touched; warnings are shown;
 2. refuses to replace a built-in app unless you add `--force`;
 3. checks free space, then copies only the files that belong on the badge
@@ -676,36 +677,36 @@ oreo app remove my_game         # asks first
    (`--no-verify` skips the hash);
 4. removes files an earlier install left that are no longer in the folder.
    Saved data in `/state/<id>.json` stays;
-5. restarts OreoOS, so the app is in the Apps drawer.
+5. restarts FaleraOS, so the app is in the Apps drawer.
 
-OreoOS imports an app once per boot, so to try a change run
-`oreo app install` again: OreoOS restarts and loads the new code.
+FaleraOS imports an app once per boot, so to try a change run
+`falera app install` again: FaleraOS restarts and loads the new code.
 
-`list` and `remove` are the same as `oreo apps list` and `oreo apps remove`.
+`list` and `remove` are the same as `falera apps list` and `falera apps remove`.
 
-### `oreo wifi`: Wi-Fi
+### `falera wifi`: Wi-Fi
 
 ```sh
-oreo wifi scan
-oreo wifi connect "Home Net"
-oreo wifi saved
-oreo wifi forget "Old Net"
+falera wifi scan
+falera wifi connect "Home Net"
+falera wifi saved
+falera wifi forget "Old Net"
 ```
 
 See [Wi-Fi setup](#wi-fi-setup).
 
-### `oreo update`: update OreoOS
+### `falera update`: update FaleraOS
 
 ```sh
-oreo update                    # newest stable release
-oreo update --check            # only say whether there is a newer one
-oreo update --channel beta     # newest beta release
+falera update                    # newest stable release
+falera update --check            # only say whether there is a newer one
+falera update --channel beta     # newest beta release
 ```
 
 The badge updates itself with the same code its **Settings > Updates** page
-uses (`oreoOS/ota.py`). `oreo` steers it and shows each step:
+uses (`oreoOS/ota.py`). `falera` steers it and shows each step:
 
-1. Reads the OreoOS version on the badge.
+1. Reads the FaleraOS version on the badge.
 2. Brings up the badge's Wi-Fi from its saved networks. Set up a network
    first (see [Wi-Fi setup](#wi-fi-setup)).
 3. Asks GitHub, from the badge, for the newest release on the channel.
@@ -726,73 +727,73 @@ Apps, photos, documents, saved Wi-Fi and your profile are kept.
   next time it starts.
 - **An update the badge already downloaded** by itself is offered for
   installing.
-- **Without a terminal**, `oreo update` answers "no" unless you pass
+- **Without a terminal**, `falera update` answers "no" unless you pass
   `--yes`.
 - **GitHub limit:** the badge asks GitHub without a token, which allows 60
   requests an hour per network.
 
-**Developers:** `--repo` deploys from an OreoOS checkout instead of a
+**Developers:** `--repo` deploys from an FaleraOS checkout instead of a
 release:
 
 ```sh
-oreo update --repo ~/src/oreo            # ./deploy --board from that checkout
-oreo update --repo ~/src/oreo --clean    # wipe the badge's files first (asks)
+falera update --repo ~/src/oreo            # ./deploy --board from that checkout
+falera update --repo ~/src/oreo --clean    # wipe the badge's files first (asks)
 ```
 
 With `--repo`, `update` also takes:
 
 - `--force`: upload every file;
-- `--no-bump`: keep the OreoOS version;
+- `--no-bump`: keep the FaleraOS version;
 - `--override APPS`: replace these app folders.
 
-### `oreo logs`: console output
+### `falera logs`: console output
 
 ```sh
-oreo logs              # follow what OreoOS prints; Ctrl-C to stop
-oreo logs --restart    # restart OreoOS first, to see the boot log
+falera logs              # follow what FaleraOS prints; Ctrl-C to stop
+falera logs --restart    # restart FaleraOS first, to see the boot log
 ```
 
-`logs` does not stop OreoOS. It keeps following when the badge restarts, or
+`logs` does not stop FaleraOS. It keeps following when the badge restarts, or
 is unplugged and plugged back in, even under a new port name. While the
 Transfer app is open you will see its `@OTB ...` protocol lines in the log;
 that is normal.
 
-### `oreo shell`: MicroPython REPL
+### `falera shell`: MicroPython REPL
 
 ```sh
-oreo shell
+falera shell
 ```
 
-Pauses OreoOS and opens the badge's MicroPython prompt. Leave with
-**Ctrl-]** or **Ctrl-X**, and OreoOS starts again.
+Pauses FaleraOS and opens the badge's MicroPython prompt. Leave with
+**Ctrl-]** or **Ctrl-X**, and FaleraOS starts again.
 
-### `oreo run`: run a script
+### `falera run`: run a script
 
 ```sh
-oreo run blink.py
+falera run blink.py
 ```
 
 Runs a file from the computer on the badge and streams its output.
 **Ctrl-C** stops the script on the badge.
 
-### `oreo dev`: live editing
+### `falera dev`: live editing
 
 ```sh
-oreo dev ./scripts                 # mount ./scripts at /remote, open the REPL
-oreo dev ./scripts --run blink.py  # and run blink.py from it
+falera dev ./scripts                 # mount ./scripts at /remote, open the REPL
+falera dev ./scripts --run blink.py  # and run blink.py from it
 ```
 
-OreoOS stops, the folder on the computer appears on the badge at `/remote`,
+FaleraOS stops, the folder on the computer appears on the badge at `/remote`,
 and the REPL opens there. `import mymodule` loads your local copy, so edits
 need no copying. MicroPython imports a module once: after an edit, run
 `import sys; del sys.modules['mymodule']` and import it again. To reach
-OreoOS's own modules, `import sys; sys.path.append('/')`.
+FaleraOS's own modules, `import sys; sys.path.append('/')`.
 
-OreoOS does not run while you are in the REPL. To edit an app live, mount a
-folder that contains `apps/<id>/` and start OreoOS from the REPL:
+FaleraOS does not run while you are in the REPL. To edit an app live, mount a
+folder that contains `apps/<id>/` and start FaleraOS from the REPL:
 
 ```sh
-oreo dev ~/work                    # ~/work/apps/my_app/{manifest.json,main.py,...}
+falera dev ~/work                    # ~/work/apps/my_app/{manifest.json,main.py,...}
 ```
 
 ```python
@@ -800,30 +801,30 @@ oreo dev ~/work                    # ~/work/apps/my_app/{manifest.json,main.py,.
 ```
 
 Apps under `/remote/apps` load from the computer instead of `/apps` (the
-console prints `[dev] my_app from /remote/apps`), and OreoOS re-reads an
+console prints `[dev] my_app from /remote/apps`), and FaleraOS re-reads an
 app's files every time it opens, so save on the computer, press HOME and
-reopen the app. Leaving `oreo dev` resets the badge and the installed apps
+reopen the app. Leaving `falera dev` resets the badge and the installed apps
 are used again. To copy an app onto the badge instead, use
-[`oreo app install`](#oreo-app-install-an-app-from-a-folder). Details:
+[`falera app install`](#oreo-app-install-an-app-from-a-folder). Details:
 [docs/APPS.md](APPS.md#live-editing-with-oreo-dev).
 
 Leave with Ctrl-] or Ctrl-X. Ctrl-D soft-resets the badge, which starts
-OreoOS and ends live editing.
+FaleraOS and ends live editing.
 
-### `oreo flash`: firmware
+### `falera flash`: firmware
 
 ```sh
-oreo flash --repo ~/src/oreo            # erase, write firmware, install OreoOS (asks)
-oreo flash --repo ~/src/oreo --build    # run ./build-firmware first
+falera flash --repo ~/src/oreo            # erase, write firmware, install FaleraOS (asks)
+falera flash --repo ~/src/oreo --build    # run ./build-firmware first
 ```
 
-Needs an OreoOS checkout. Erasing always asks first, and it removes
+Needs an FaleraOS checkout. Erasing always asks first, and it removes
 everything on the badge, including photos, documents and Store apps.
 
-### `oreo doctor`: diagnose the connection
+### `falera doctor`: diagnose the connection
 
 ```sh
-oreo doctor
+falera doctor
 ```
 
 Checks, in this order:
@@ -831,36 +832,36 @@ Checks, in this order:
 1. the computer: Python, pyserial, mpremote, ffmpeg;
 2. the badge's USB ID, and what any other USB IDs it finds probably are;
 3. on Linux, membership of `dialout` / `uucp`;
-4. only then, it opens the port to read the firmware and OreoOS versions.
+4. only then, it opens the port to read the firmware and FaleraOS versions.
 
 It ends with numbered **next steps**, failures first. It exits with `0` when
 nothing failed (warnings are fine) and `1` otherwise.
 
-### `oreo help`
+### `falera help`
 
 ```sh
-oreo help            # list commands
-oreo help transfer   # one command, with examples
+falera help            # list commands
+falera help transfer   # one command, with examples
 ```
 
 ## Wi-Fi setup
 
-The badge uses Wi-Fi **only for the internet**: the App Store, OreoOS
+The badge uses Wi-Fi **only for the internet**: the App Store, FaleraOS
 updates, GitHub data (Badge, Commits), weather and the clock. Files never go
-over Wi-Fi; they go over USB with `oreo transfer`. The badge joins 2.4 GHz
+over Wi-Fi; they go over USB with `falera transfer`. The badge joins 2.4 GHz
 networks only.
 
 The badge has no keyboard, so networks with a password are added from the
 computer:
 
 ```sh
-oreo wifi scan                     # networks the badge can see, with signal and security
-oreo wifi connect "Home Net"       # asks for the password without echo
-oreo wifi saved                    # names of saved networks
-oreo wifi forget "Old Net"
+falera wifi scan                     # networks the badge can see, with signal and security
+falera wifi connect "Home Net"       # asks for the password without echo
+falera wifi saved                    # names of saved networks
+falera wifi forget "Old Net"
 ```
 
-`connect` joins the network and saves it, so OreoOS joins it by itself from
+`connect` joins the network and saves it, so FaleraOS joins it by itself from
 then on. Open networks can also be joined on the badge, from
 **Settings > WiFi**.
 
@@ -874,7 +875,7 @@ then on. Open networks can also be joined on the badge, from
 
 ```sh
 # In a script, so the password never appears on the command line:
-printf '%s\n' "$WIFI_PASSWORD" | oreo wifi connect "Home Net" --password-stdin
+printf '%s\n' "$WIFI_PASSWORD" | falera wifi connect "Home Net" --password-stdin
 ```
 
 Before touching the badge, `connect` checks that the network name is 1 to 32
@@ -882,18 +883,18 @@ bytes and that the password is 8 to 63 characters (or 64 hex digits).
 
 **The password stays private.** It is read before the badge is touched and
 sent to the badge once. It is never printed, logged, returned or stored on
-the computer, and it is removed from error messages. `oreo wifi saved` lists
+the computer, and it is removed from error messages. `falera wifi saved` lists
 names only.
 
 Results are reported plainly:
 
 - **wrong password**;
 - **not in range**: the badge sees only 2.4 GHz networks; check
-  `oreo wifi scan`;
+  `falera wifi scan`;
 - **did not answer in time**: move closer, or try `--timeout 30`.
 
 Networks written into the deploy-time `.env` file come back at the next boot
-even after `forget`, and `oreo` warns about that. To forget them for good,
+even after `forget`, and `falera` warns about that. To forget them for good,
 remove them from `.env` and deploy again.
 
 ## Exit status
@@ -907,38 +908,38 @@ These are stable across 1.x, so scripts can rely on them:
 | `2` | Usage error: a missing or invalid argument (checked before the badge is touched) |
 | `3` | No badge found, or several and no `--port` |
 | `4` | The badge could not be reached: port missing or busy, no answer, connection lost |
-| `5` | The badge answers but has no OreoOS, or one too old for the command |
+| `5` | The badge answers but has no FaleraOS, or one too old for the command |
 | `130` | Cancelled: Ctrl-C, or "no" at a confirmation |
 
 Special cases:
 
-- `oreo devs` exits `3` when no badge is connected.
-- `oreo doctor` exits `1` when a check failed.
-- `oreo transfer` exits `1` when the Transfer app is not open, the code is
+- `falera devs` exits `3` when no badge is connected.
+- `falera doctor` exits `1` when a check failed.
+- `falera transfer` exits `1` when the Transfer app is not open, the code is
   wrong, the badge is locked, or a file was refused. A failure to open the
   port is `4`, as for other commands. With no code typed, it exits `130`.
 
 ## Troubleshooting
 
-Start with `oreo doctor`. [USB.md](USB.md#troubleshooting) has more on
+Start with `falera doctor`. [USB.md](USB.md#troubleshooting) has more on
 cables, ports and drivers.
 
 **Connection**
 
 | Symptom | What to do |
 |---|---|
-| `no Oreo Badge found (USB 303a:83ec)` | Use a data cable (some are charge-only) and, on the DevKitC-1, the **USB** port. `oreo devs --all` shows what is connected. |
-| A `303a:1001` device | Stock ESP32-S3 USB-Serial/JTAG: the board has no OreoOS firmware yet, or it is in the bootloader. Flash it with `oreo flash --repo <checkout>`. |
+| `no Falera Badge found (USB 303a:83ec)` | Use a data cable (some are charge-only) and, on the DevKitC-1, the **USB** port. `falera devs --all` shows what is connected. |
+| A `303a:1001` device | Stock ESP32-S3 USB-Serial/JTAG: the board has no FaleraOS firmware yet, or it is in the bootloader. Flash it with `falera flash --repo <checkout>`. |
 | A `303a:0002` device | Download mode (BOOT was held at reset). Press RESET without BOOT. |
-| A `303a:4001` device | Generic MicroPython, not the Oreo Badge build. Flash the badge firmware. |
+| A `303a:4001` device | Generic MicroPython, not the Falera Badge build. Flash the badge firmware. |
 | A CP210x, CH340, CH343 or CH9102 device | That is the devkit's UART bridge. Plug into the native **USB** port instead. |
-| `2 badges connected` | Pick one: `oreo --port /dev/ttyACM1 info` or `export OREO_PORT=/dev/ttyACM1`. |
+| `2 badges connected` | Pick one: `falera --port /dev/ttyACM1 info` or `export OREO_PORT=/dev/ttyACM1`. |
 | `Permission denied` on Linux | Join `dialout` (`uucp` on Arch), then log out and back in. |
-| Port busy | Close other programs using it: another `oreo`, `oreo logs`, `mpremote`, Thonny, a serial monitor, the Arduino IDE. |
-| `the badge did not answer` (exit 4) | Is the **Transfer** app open? Leave it (HOME) and try again. Otherwise OreoOS is busy with something that delays Ctrl-C (a download, an app): wait a few seconds and retry. If it stays stuck, press RESET or replug. |
-| `lost the connection to the badge` (exit 4) | It was unplugged or restarted. Plug it back in, check with `oreo devs`, and run the command again. |
-| `this needs OreoOS` (exit 5) | The badge has MicroPython but no OreoOS: `oreo flash --repo <checkout>`. |
-| The badge stays at the `>>>` prompt | A command ran with `--reset none`, or OreoOS failed to start. Try `oreo --reset hard info`, then `oreo logs --restart`. |
+| Port busy | Close other programs using it: another `falera`, `falera logs`, `mpremote`, Thonny, a serial monitor, the Arduino IDE. |
+| `the badge did not answer` (exit 4) | Is the **Transfer** app open? Leave it (HOME) and try again. Otherwise FaleraOS is busy with something that delays Ctrl-C (a download, an app): wait a few seconds and retry. If it stays stuck, press RESET or replug. |
+| `lost the connection to the badge` (exit 4) | It was unplugged or restarted. Plug it back in, check with `falera devs`, and run the command again. |
+| `this needs FaleraOS` (exit 5) | The badge has MicroPython but no FaleraOS: `falera flash --repo <checkout>`. |
+| The badge stays at the `>>>` prompt | A command ran with `--reset none`, or FaleraOS failed to start. Try `falera --reset hard info`, then `falera logs --restart`. |
 | Git Bash: `looks like a path on this computer` | Git Bash rewrote `/documents` into a Windows path. Write `:documents/`, or set `MSYS_NO_PATHCONV=1`. |
 
 **Transfer**
@@ -951,77 +952,77 @@ cables, ports and drivers.
 | `the session was cancelled on the badge` | Someone pressed **B** on the badge. Run the command again. |
 | `the Transfer app was closed` | The app was left in the middle of a session. Open it and run the command again. |
 | `the badge waited too long` | The session timed out (5 min without the code, 2 min idle, 20 s mid-file). Run the command again. |
-| `not enough free space` | Free space with `oreo transfer list` and `oreo transfer rm`, or `oreo info` / `oreo rm`. |
-| `larger than 8192 KB` | Shorten the video with `--seconds`. To make it smaller still, use `oreo add` with `--width` / `--height`. |
+| `not enough free space` | Free space with `falera transfer list` and `falera transfer rm`, or `falera info` / `falera rm`. |
+| `larger than 8192 KB` | Shorten the video with `--seconds`. To make it smaller still, use `falera add` with `--width` / `--height`. |
 | `the badge only takes ...` | Send photos, videos, `.md` or `.txt`; other files cannot be shown on the badge. |
 | `SHA-256 mismatch` / `damaged chunk` | The copy was damaged on the way and dropped. Run it again; if it repeats, try another cable or USB port. |
-| `speaks Transfer protocol v...` | The CLI and OreoOS are from different generations. Update both: rerun the installer, then `oreo update`. |
+| `speaks Transfer protocol v...` | The CLI and FaleraOS are from different generations. Update both: rerun the installer, then `falera update`. |
 | `no code given` | No terminal to ask in. Pass `--code ABC123`. |
 
 **Updates, apps and media**
 
 | Symptom | What to do |
 |---|---|
-| `oreo update`: `could not get online` | Set up Wi-Fi first: `oreo wifi scan`, `oreo wifi connect <name>`. |
-| `oreo update`: `could not reach GitHub` | Check the network. GitHub allows 60 requests an hour per network without a token. |
-| `oreo update`: `did not come back on USB` | It may still be installing. Wait, then run `oreo info`. If the screen stays dark, press RESET. |
-| `oreo update`: `too old to be updated from the CLI` | Update once from the badge (Settings > Updates) or with `oreo update --repo`. |
-| `apps install` fails | Check Wi-Fi first: `oreo wifi saved`, `oreo wifi connect <name>`. |
-| Wi-Fi: not in range | The badge sees 2.4 GHz only. Check `oreo wifi scan`. |
-| `not enough space on the badge` | See what uses it with `oreo info`; free some with `oreo rm` or `oreo apps remove`. |
+| `falera update`: `could not get online` | Set up Wi-Fi first: `falera wifi scan`, `falera wifi connect <name>`. |
+| `falera update`: `could not reach GitHub` | Check the network. GitHub allows 60 requests an hour per network without a token. |
+| `falera update`: `did not come back on USB` | It may still be installing. Wait, then run `falera info`. If the screen stays dark, press RESET. |
+| `falera update`: `too old to be updated from the CLI` | Update once from the badge (Settings > Updates) or with `falera update --repo`. |
+| `apps install` fails | Check Wi-Fi first: `falera wifi saved`, `falera wifi connect <name>`. |
+| Wi-Fi: not in range | The badge sees 2.4 GHz only. Check `falera wifi scan`. |
+| `not enough space on the badge` | See what uses it with `falera info`; free some with `falera rm` or `falera apps remove`. |
 | `ffmpeg was not found` | Install ffmpeg (see [Dependencies](#dependencies)). Only videos need it. |
 | `checksum mismatch after copy` | Run it again. If it repeats, try another cable or USB port. |
 | An installer says `pipx or uv ... neither was found` | Install one of them (the message has the command), then run the installer again. |
-| Something else | Re-run with `-v`, and include the `oreo doctor` output in an issue. |
+| Something else | Re-run with `-v`, and include the `falera doctor` output in an issue. |
 
 ## FAQ
 
-**Is it `oreo` or `oreo-cli`?**
-The package is **oreo-cli**. The command is **oreo**; `oreo-cli` also works
+**Is it `falera` or `falera-cli`?**
+The package is **falera-cli**. The command is **falera**; `falera-cli` also works
 and runs the same thing.
 
-**Do I need to clone the OreoOS repository?**
-No. Everything except `oreo flash` and the `--repo` developer options works
+**Do I need to clone the FaleraOS repository?**
+No. Everything except `falera flash` and the `--repo` developer options works
 from the installed CLI alone.
 
 **Can I send files over Wi-Fi?**
 No. The old Send Files page and the upload web page are gone. Wi-Fi on the
-badge is for the internet only; files go over USB with `oreo transfer` or
-`oreo add`.
+badge is for the internet only; files go over USB with `falera transfer` or
+`falera add`.
 
 **Why do I have to type a code?**
 The code is shown only on the badge's screen, so typing it proves you can see
 the badge you are sending to. Nothing is written until the code is accepted.
 See [TRANSFER.md](TRANSFER.md).
 
-**`oreo transfer` or `oreo add`?**
+**`falera transfer` or `falera add`?**
 Both convert files the same way and put them in the same places.
-`oreo transfer` keeps OreoOS running and needs the Transfer app open and the
-code. `oreo add` needs neither, but pauses OreoOS while it copies. It also
+`falera transfer` keeps FaleraOS running and needs the Transfer app open and the
+code. `falera add` needs neither, but pauses FaleraOS while it copies. It also
 has the video size options (`--fps`, `--width`, `--height`) and `--save`.
 
-**Can I send any file with `oreo transfer`?**
+**Can I send any file with `falera transfer`?**
 Only things the badge can show: photos, videos and Markdown or text
 documents. For anything else (app files, your `profile.json`), use
-`oreo push`.
+`falera push`.
 
 **Does the CLI need the internet?**
-Only to install it. `oreo update`, `oreo apps install` and `oreo apps refresh`
+Only to install it. `falera update`, `falera apps install` and `falera apps refresh`
 need the *badge* to be online, because the badge does the downloading.
 
-**Does `oreo update` touch my photos, apps or Wi-Fi?**
-No. Only OreoOS's own files change.
+**Does `falera update` touch my photos, apps or Wi-Fi?**
+No. Only FaleraOS's own files change.
 
 **What about Bluetooth?**
 Bluetooth file sharing is not available yet. It is planned last, together
 with the mobile app (issues #101, #103, #124).
 
 **Several badges on one computer?**
-`oreo devs` lists them. Pick one with `--port` or `$OREO_PORT`.
+`falera devs` lists them. Pick one with `--port` or `$OREO_PORT`.
 
 **Windows and macOS?**
 Both are supported. On Windows the port is a `COM` name (`--port com5` works).
-On macOS, `oreo` uses the `/dev/cu.*` name even if you give the
+On macOS, `falera` uses the `/dev/cu.*` name even if you give the
 `/dev/tty.*` one.
 
 **Where are my settings stored on the computer?**
@@ -1029,7 +1030,7 @@ Nowhere. The CLI keeps no configuration and no history.
 
 ## Transfer speed
 
-`oreo push`, `oreo add` and the interactive upload send files as base64
+`falera push`, `falera add` and the interactive upload send files as base64
 inside short MicroPython snippets over the raw REPL ("raw paste" mode):
 
 - Each file goes to a `.part` file in 8 KiB chunks.
@@ -1056,7 +1057,7 @@ For big files, the chunk size hardly matters. The time goes to raw-paste flow
 control (one round trip per 256 bytes of code) and to flash writes. For many
 small files, what counts is fewer execs per file (2 instead of 6).
 
-`oreo transfer` uses a different path: a line protocol to the Transfer app,
+`falera transfer` uses a different path: a line protocol to the Transfer app,
 with 3 KiB chunks and up to 4 chunks in flight before it waits for an
 acknowledgement (see [TRANSFER.md](TRANSFER.md#the-protocol)). Its speed has
 not been measured on a badge yet.
@@ -1066,39 +1067,39 @@ not been measured on a badge yet.
 CI has no badge. These are the checks to run by hand on one; please attach
 the output when you report a problem.
 
-1. `oreo doctor`: all checks pass, ending in "all good".
-2. `oreo info`, then `oreo` (the menu): status, files (open a folder, `u` an
+1. `falera doctor`: all checks pass, ending in "all good".
+2. `falera info`, then `falera` (the menu): status, files (open a folder, `u` an
    upload, `p` a download), the apps list, saved Wi-Fi, and **q** restarts
-   OreoOS.
-3. `oreo push` a 1 MiB file and a folder of small files. Note the time and
-   speed shown, `oreo pull` them back and compare them (`sha256sum`).
-4. Pull the cable during a large `oreo push`. Expect "lost the connection"
+   FaleraOS.
+3. `falera push` a 1 MiB file and a folder of small files. Note the time and
+   speed shown, `falera pull` them back and compare them (`sha256sum`).
+4. Pull the cable during a large `falera push`. Expect "lost the connection"
    (exit 4) and no traceback. After replugging, the old file at the
    destination is intact, and no `.part` file is left after the next push.
-5. `oreo wifi scan`, `oreo wifi connect <name>`, `oreo apps install <app>`.
-6. `oreo update --check`, then `oreo update` on a badge one release behind:
+5. `falera wifi scan`, `falera wifi connect <name>`, `falera apps install <app>`.
+6. `falera update --check`, then `falera update` on a badge one release behind:
    versions shown, progress, restart, "installed and running". Also try it
    with the badge offline (expect the Wi-Fi hint) and when it is up to date.
-7. `oreo logs`, then press RESET on the badge: logging carries on after the
+7. `falera logs`, then press RESET on the badge: logging carries on after the
    restart. Ctrl-C stops it (also on Windows).
-8. `oreo shell`, and `oreo run` a script that prints. Ctrl-C stops it and
-   OreoOS restarts.
-9. Transfer: open **Tools > Transfer**, then `oreo transfer send` a photo, a
+8. `falera shell`, and `falera run` a script that prints. Ctrl-C stops it and
+   FaleraOS restarts.
+9. Transfer: open **Tools > Transfer**, then `falera transfer send` a photo, a
    10-second video and a `.md` file. Each appears in the Gallery or Reader,
    with a notification. Also check:
    - a wrong code: the tries left are shown;
    - five wrong codes: a 60 s lockout, then a new code;
    - **B** on the badge mid-file: no half file is left;
    - Ctrl-C mid-file;
-   - `oreo transfer list` and `oreo transfer rm`;
+   - `falera transfer list` and `falera transfer rm`;
    - running the command with Transfer closed, then opening it while
-     `oreo` waits;
-   - afterwards, with Transfer closed, `oreo info` still works;
-   - with Transfer open, `oreo info` fails with exit 4 and the hint.
-10. On Windows (PowerShell and Git Bash) and macOS: `oreo devs`, `oreo info`,
-    `oreo push notes.txt :documents/`, `oreo transfer send photo.jpg`, and
-    `oreo --port com5 info` / `oreo --port /dev/tty.usbmodem* info`.
-11. The full-screen view (`oreo`), on Linux, macOS and Windows Terminal:
+     `falera` waits;
+   - afterwards, with Transfer closed, `falera info` still works;
+   - with Transfer open, `falera info` fails with exit 4 and the hint.
+10. On Windows (PowerShell and Git Bash) and macOS: `falera devs`, `falera info`,
+    `falera push notes.txt :documents/`, `falera transfer send photo.jpg`, and
+    `falera --port com5 info` / `falera --port /dev/tty.usbmodem* info`.
+11. The full-screen view (`falera`), on Linux, macOS and Windows Terminal:
     - started with no badge: the waiting screen; plug it in and it opens;
       with two badges, the chooser;
     - every section loads; switching sections quickly never errors (one
@@ -1109,28 +1110,28 @@ the output when you report a problem.
       app install from a folder; Transfer with the code; update check;
     - **s** opens the REPL and Ctrl-] comes back to the view;
     - **q**, Ctrl-C, and pulling the cable: the terminal is restored, and
-      OreoOS starts again (or the view waits for the badge to come back).
-12. `oreo setup --github-user <you>`: "saved /avatar.bin"; open **Badge**
-    and your avatar is in the ring. `oreo setup --github-user octocat`
-    replaces it; offline, `oreo setup --github-user <someone>` keeps the
+      FaleraOS starts again (or the view waits for the badge to come back).
+12. `falera setup --github-user <you>`: "saved /avatar.bin"; open **Badge**
+    and your avatar is in the ring. `falera setup --github-user octocat`
+    replaces it; offline, `falera setup --github-user <someone>` keeps the
     profile, warns, and Badge shows initials (never the previous face).
-    `oreo setup --avatar` fetches it again; `--show` names its user.
-13. With an OreoOS that has `oreoOS/hostui.py`: the badge's screen shows the
-    progress of `oreo push`/`pull` of a large file, `oreo add`,
-    `oreo app install`, `oreo apps install` and `oreo update`, and is cleared
-    when each finishes; with an older OreoOS, the same commands work as
+    `falera setup --avatar` fetches it again; `--show` names its user.
+13. With an FaleraOS that has `oreoOS/hostui.py`: the badge's screen shows the
+    progress of `falera push`/`pull` of a large file, `falera add`,
+    `falera app install`, `falera apps install` and `falera update`, and is cleared
+    when each finishes; with an older FaleraOS, the same commands work as
     before.
 
 ## Releasing
 
-Maintainers only. CLI releases are independent of OreoOS releases and do not
+Maintainers only. CLI releases are independent of FaleraOS releases and do not
 touch them:
 
 - the `cli-release` workflow runs only for `cli-v*` tags (on pull requests
   that change `cli/`, it builds and tests without releasing);
 - its tags do not match the badge's OTA prefixes (`stable/`, `beta/`);
 - the release is created with `--latest=false`, so the repository's "Latest"
-  release stays OreoOS.
+  release stays FaleraOS.
 
 Steps:
 

@@ -1,4 +1,4 @@
-"""Deploy Oreo Badge OS to the ESP32-S3 via mpremote.
+"""Deploy Falera Badge OS to the ESP32-S3 via mpremote.
 
 Usage:
     python tools/deploy.py                          # auto-detect port
@@ -6,7 +6,7 @@ Usage:
     python tools/deploy.py --clean                  # wipe device first
     python tools/deploy.py --website                # build + ship the
                                                     # Cloudflare Pages site
-                                                    # in oreo.elixpo/ (no
+                                                    # in falera.elixpo/ (no
                                                     # badge interaction)
     python tools/deploy.py --website --preview      # deploy to branch alias
                                                     # instead of production
@@ -216,7 +216,7 @@ if _fonts_dir.exists():
 
 # Personal files a checkout may still hold that never go to a badge: the
 # avatar module older tools/fetch_avatar.py wrote (one person's face on
-# every badge, #133). The owner's avatar is /avatar.bin, from `oreo setup`.
+# every badge, #133). The owner's avatar is /avatar.bin, from `falera setup`.
 NEVER_SHIP = (
     "apps/badge/assets/optimized/avatar.py",
 )
@@ -600,7 +600,7 @@ def profile_note(blank):
 # A badge deployed before still has their folder, which the drawer would
 # keep showing as a tile, so every deploy deletes these folders, plus any
 # OS files that only they used. Nothing else under /apps is touched: App
-# Store installs and apps the owner put there with `oreo push` stay.
+# Store installs and apps the owner put there with `falera push` stay.
 # A name that is back in apps/ or in the App Store is never removed.
 RETIRED_APPS = (
     "identity",          # merged into Badge (name, title and GitHub card)
@@ -731,14 +731,14 @@ remote_dirs = sorted(remote_dirs, key=lambda p: p.count("/"))
 
 # ── website deploy ───────────────────────────────────────────────────────────
 
-WEBSITE_DIR    = Path("oreo.elixpo")
-WEBSITE_PROJECT = "oreo"        # Cloudflare Pages project name
+WEBSITE_DIR    = Path("falera.elixpo")
+WEBSITE_PROJECT = "falera"        # Cloudflare Pages project name
 
 def deploy_website():
     """Build the Next.js static export and push it to Cloudflare Pages.
     Production by default; pass `--preview` for a branch-alias deploy.
 
-    The site lives in oreo.elixpo/ and exports to oreo.elixpo/out/. We
+    The site lives in falera.elixpo/ and exports to falera.elixpo/out/. We
     shell out to the project's own `next build` + `wrangler pages
     deploy` so behaviour stays identical whether the user runs this
     helper or the package.json `deploy` script directly.
@@ -760,7 +760,7 @@ def deploy_website():
         sys.exit(1)
 
     # `--branch=main` pins the deploy to the production alias so the
-    # custom domain (oreo.elixpo.com) actually serves the new bytes.
+    # custom domain (falera.elixpo.com) actually serves the new bytes.
     # Without it wrangler defaults to the current git branch, which
     # only updates the branch-alias preview URL.
     cmd = ["npx", "wrangler", "pages", "deploy", "out",
@@ -791,7 +791,7 @@ def main():
 
     import time as _t
     t0 = _t.time()
-    print("Deploying Oreo Badge OS → %s\n" % PORT)
+    print("Deploying Falera Badge OS → %s\n" % PORT)
 
     # Verify the device is reachable before changing anything locally, so a
     # missing or busy badge never leaves a version bump behind.
@@ -953,7 +953,7 @@ def main():
     }
     # Apps the App Store installs (apps_market/index.json) live under apps/
     # too; with their market folder names (an older Store saved e.g.
-    # "Oreo Pet") they are never removed.
+    # "Lumi") they are never removed.
     store_apps = set()
     try:
         for e in json.loads(Path("apps_market/index.json").read_text())["apps"]:
@@ -1050,7 +1050,7 @@ def main():
         print("\nDone in %.1fs." % elapsed)
         print("Resetting device...")
         mpremote("reset")
-        print("Oreo OS is booting.")
+        print("FaleraOS is booting.")
     else:
         print("\nBatch exited with code %d after %.1fs (cache not changed)." %
               (rc, elapsed))

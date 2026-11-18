@@ -12,7 +12,7 @@ window, like Commits.
 
 Everything fits one 320x240 screen, no scrolling (y on the left):
 
-   0 ┌───────────────── OREO BADGE ─────────────────┐ OS header
+   0 ┌───────────────── FALERA BADGE ─────────────────┐ OS header
   32 │╭▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀ (slot) ▀▀▀▀▀▀▀▀▀▀ 2h ago ╮ │ gold edge, slot,
      ││                                           │ │ status pill (38)
   52 ││  ╭──────╮  Ayushman                       │ │ name: Pixelify
@@ -27,7 +27,7 @@ Everything fits one 320x240 screen, no scrolling (y on the left):
  224 └────────────── A=refresh  HOME=back ──────────┘ OS hint bar
        x: card 8..311, avatar disc centre (60, 99) r 38, text 110..302
 
-The avatar is the owner's own: `oreo setup` fetches GITHUB_USER's GitHub
+The avatar is the owner's own: `falera setup` fetches GITHUB_USER's GitHub
 avatar on the computer and copies it to /avatar.bin over USB, with the user
 it was made for (oreoOS.profile.avatar). It shows only while that user is
 the profile's GITHUB_USER; otherwise, or without the file, the badge draws
@@ -47,7 +47,7 @@ from oreoOS import theme, widgets
 SW = api.SCREEN_W
 SH = api.SCREEN_H
 
-TITLE = "OREO BADGE"
+TITLE = "FALERA BADGE"
 HINT = "A=refresh  HOME=back"
 HINT_NO_USER = "HOME=back"
 
@@ -100,7 +100,7 @@ SETUP_LINES = (
     ("come from your owner profile.", "text"),
     ("", None),
     ("On your computer, run:", "text"),
-    ("oreo setup --from-file .env.local", "cmd"),
+    ("falera setup --from-file .env.local", "cmd"),
     ("or follow docs/PROFILE.md.", "text"),
     ("", None),
     ("Keys: GITHUB_USER, DISPLAY_NAME,", "dim"),
@@ -613,7 +613,7 @@ class App(oreoOS.App):
         self._draw_note_box(d, (
             ("No GitHub user set.", theme.PRIMARY),
             ("For your GitHub card, run:", theme.TEXT_BRIGHT),
-            ("oreo setup --set GITHUB_USER=you", theme.TEXT_DIM),
+            ("falera setup --set GITHUB_USER=you", theme.TEXT_DIM),
             ("See docs/PROFILE.md.", theme.MUTED),
         ))
 

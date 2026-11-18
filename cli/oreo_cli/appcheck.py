@@ -1,7 +1,7 @@
 """App folder checks, vendored from tools/validate_app.py.
 
-`oreo app install` and `oreo new` run the same checks as the repo's
-validator, without needing an OreoOS checkout. Everything below the
+`falera app install` and `falera new` run the same checks as the repo's
+validator, without needing an FaleraOS checkout. Everything below the
 imports is a copy of tools/validate_app.py (main() and all_apps() left
 out); cli/tests/test_devtools.py compares the two inside a checkout, so
 change both together.

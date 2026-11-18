@@ -13,7 +13,7 @@ them into a time estimate with a simple, stated model of the USB link:
 The constants are assumptions (USB full speed, MicroPython's default
 256-byte raw-paste window), not measurements; run this file directly for
 the table quoted in docs/CLI.md, and replace them with numbers from the
-badge once measured (`oreo -v push` with a stopwatch).
+badge once measured (`falera -v push` with a stopwatch).
 """
 
 import os

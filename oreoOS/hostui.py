@@ -1,9 +1,9 @@
 """Host-driven screen: what the badge shows while a computer drives it.
 
-The oreo CLI stops OreoOS and works through the raw REPL (copying files,
+The falera CLI stops FaleraOS and works through the raw REPL (copying files,
 installing apps). Nothing on the badge runs between its commands, so the
-screen would freeze on the last OreoOS frame. The CLI calls this module
-instead, guarded for older OreoOS:
+screen would freeze on the last FaleraOS frame. The CLI calls this module
+instead, guarded for older FaleraOS:
 
     try:
         from oreoOS import hostui
@@ -20,7 +20,7 @@ clear()
     Blank the screen and forget the frame; the next show() draws it whole.
 
 Rules this module keeps:
-- It works without OreoOS running: it sets up the SPI bus and the panel
+- It works without FaleraOS running: it sets up the SPI bus and the panel
   itself (oreoWare._st7789's resume(): no reset, so no blank flash, and a
   panel that lost its setup is configured again), turns the backlight on,
   and draws straight to the panel, without the 153 KB framebuffer.
@@ -31,7 +31,7 @@ Rules this module keeps:
 - It never raises; every error is swallowed.
 - It keeps one 12.8 KB strip buffer while in use (released by clear()).
 
-Do not call it while OreoOS is running: OreoOS owns the display then.
+Do not call it while FaleraOS is running: FaleraOS owns the display then.
 """
 
 SW = 320
@@ -45,8 +45,8 @@ def _c(r, g, b):
     return ((v & 0xFF) << 8) | (v >> 8)
 
 
-# The OreoOS theme (oreoOS/theme.py), kept here so drawing needs no other
-# OreoOS module.
+# The FaleraOS theme (oreoOS/theme.py), kept here so drawing needs no other
+# FaleraOS module.
 BG = _c(255, 248, 235)
 HEAD = _c(255, 93, 104)
 WHITE = _c(255, 255, 255)

@@ -279,7 +279,7 @@ class FileCommandsTest(unittest.TestCase):
     def test_rm_guards(self):
         r = run_cli(["rm", "/oreoOS/config.py"], fake=self.fake)
         self.assertEqual(r.rc, 1)
-        self.assertIn("belongs to OreoOS", r.out)
+        self.assertIn("belongs to FaleraOS", r.out)
         self.assertTrue(self.fake.exists("/oreoOS/config.py"))
         self.assertEqual(self.fake.sent, [])
         self.fake.put("/documents/old/a.txt", b"a")
@@ -308,7 +308,7 @@ class FileCommandsTest(unittest.TestCase):
         for argv in (["rm", "/apps/launcher/main.py"], ["rm", "-r", "/assets/fonts"]):
             r = run_cli(argv, fake=self.fake)
             self.assertEqual(r.rc, 1, argv)
-            self.assertIn("belongs to OreoOS", r.out)
+            self.assertIn("belongs to FaleraOS", r.out)
         self.assertTrue(self.fake.exists("/apps/launcher/main.py"))
         self.assertTrue(self.fake.exists("/assets/fonts/a.bin"))
         self.assertEqual(self.fake.sent, [])

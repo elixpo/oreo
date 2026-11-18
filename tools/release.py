@@ -1,4 +1,4 @@
-"""Cut an OreoOS release from your laptop. No CI required.
+"""Cut an FaleraOS release from your laptop. No CI required.
 
 Simplest path:
     python tools/release.py
@@ -274,7 +274,7 @@ def main(argv=None):
     repo, repo_source = resolve_repo(args.repo)
 
     print("──────────────────────────────────────────────")
-    print("Releasing OreoOS %s on channel %s" % (args.version, args.channel))
+    print("Releasing FaleraOS %s on channel %s" % (args.version, args.channel))
     print("Repo: %s (%s)" % (repo, repo_source))
     print("Tag: %s" % tag)
     print("Dry-run: %s" % ("yes" if dry else "no"))
@@ -365,18 +365,18 @@ def main(argv=None):
 
     # 5. Create the GitHub Release.
     prerelease_flag = ["--prerelease"] if args.channel != "stable" else []
-    notes = args.notes or ("OreoOS %s — %s channel." % (args.version, args.channel))
+    notes = args.notes or ("FaleraOS %s — %s channel." % (args.version, args.channel))
 
-    # Title format: "OreoOS v1.3.0 · 2026-05-15" for stable, plus a "(beta)"
+    # Title format: "FaleraOS v1.3.0 · 2026-05-15" for stable, plus a "(beta)"
     # suffix when off-channel. The date is ISO yyyy-mm-dd in UTC so it
     # matches what GitHub renders alongside the release.
     import datetime as _dt
     # tz-aware now() so we don't trip Python 3.12's utcnow() deprecation.
     today = _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%d")
     if args.channel == "stable":
-        title = "OreoOS %s · %s" % (args.version, today)
+        title = "FaleraOS %s · %s" % (args.version, today)
     else:
-        title = "OreoOS %s · %s · %s" % (args.version, today, args.channel)
+        title = "FaleraOS %s · %s · %s" % (args.version, today, args.channel)
 
     # Expand the upload-dir glob in Python — `gh release create` takes the
     # files as positional args, but subprocess.run passes them as literal

@@ -1,4 +1,4 @@
-"""Convert photos, videos and documents into the formats OreoOS reads.
+"""Convert photos, videos and documents into the formats FaleraOS reads.
 
 Copied from tools/media_ingest.py and tools/encode_video_benchmark.py so
 the CLI ships standalone. Keep the formats in step with those tools:
@@ -246,8 +246,8 @@ def check_space(stored, free, reserve=DEFAULT_RESERVE):
         from .ui import human
         raise OreoError("the badge has %s free; %s plus a %s reserve will not fit"
                         % (human(free), human(stored), human(reserve)),
-                        hint="remove something first (`oreo ls /apps/gallery/assets/optimized`, "
-                             "`oreo rm`)")
+                        hint="remove something first (`falera ls /apps/gallery/assets/optimized`, "
+                             "`falera rm`)")
 
 
 def convert(source, kind=None, seconds=10.0, fps=24, width=180, height=135,

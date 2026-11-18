@@ -1,6 +1,6 @@
-# Install the `oreo` CLI (Elixpo Oreo Badge) from a GitHub release.
+# Install the `falera` CLI (Elixpo Falera Badge) from a GitHub release.
 #
-#   irm https://raw.githubusercontent.com/elixpo/oreo/main/cli/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/elixpo/falera/main/cli/install.ps1 | iex
 #
 # Downloads the release wheel and its .sha256, checks the SHA-256, and
 # installs it with pipx or uv (whichever is present) as an isolated tool.
@@ -9,7 +9,7 @@
 #   OREO_CLI_VERSION        release to install: latest (default), cli-v0.1.0,
 #                           v0.1.0 or 0.1.0
 #   OREO_CLI_INSTALLER      pipx or uv (default: pipx if present, else uv)
-#   OREO_CLI_REPOSITORY     GitHub repository (default: elixpo/oreo)
+#   OREO_CLI_REPOSITORY     GitHub repository (default: elixpo/falera)
 #   OREO_CLI_DOWNLOAD_BASE  fetch the files from here instead of the
 #                           release (for testing); needs a pinned version
 param(
@@ -19,7 +19,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"   # Invoke-WebRequest is much faster without it
-$Repository = if ($env:OREO_CLI_REPOSITORY) { $env:OREO_CLI_REPOSITORY } else { "elixpo/oreo" }
+$Repository = if ($env:OREO_CLI_REPOSITORY) { $env:OREO_CLI_REPOSITORY } else { "elixpo/falera" }
 $DownloadBaseOverride = $env:OREO_CLI_DOWNLOAD_BASE
 $VersionPattern = '^[0-9]+\.[0-9]+\.[0-9]+((a|b|rc)[0-9]+)?$'
 
@@ -38,7 +38,7 @@ if (-not $Installer) {
     elseif (Test-Command "uv") { $Installer = "uv" }
     else {
         throw @"
-the oreo CLI installs with pipx or uv, and neither was found.
+the falera CLI installs with pipx or uv, and neither was found.
 
 Install one of them, then run this installer again:
   uv:    winget install --id=astral-sh.uv -e
@@ -67,7 +67,7 @@ function ConvertTo-CliVersion([string]$Value) {
 
 if ($Version -eq "latest") {
     if ($DownloadBaseOverride) { throw "OREO_CLI_DOWNLOAD_BASE needs OREO_CLI_VERSION set to a version" }
-    # The repository's "latest" release is OreoOS itself, so the CLI's
+    # The repository's "latest" release is FaleraOS itself, so the CLI's
     # newest release is found from its tags (cli-vX.Y.Z), newest first.
     # Pre-releases are only installed when asked for by name.
     try {
@@ -80,24 +80,32 @@ if ($Version -eq "latest") {
         ForEach-Object { $_.ref -replace '^refs/tags/cli-v', '' } |
         Where-Object { $_ -match '^[0-9]+\.[0-9]+\.[0-9]+$' } |
         Sort-Object { [Version]$_ } -Descending)
-    if ($Candidates.Count -eq 0) { throw "no oreo CLI release found in $Repository" }
+    if ($Candidates.Count -eq 0) { throw "no falera CLI release found in $Repository" }
 } else {
     $Candidates = @(ConvertTo-CliVersion $Version)
 }
 
-$Temporary = Join-Path ([System.IO.Path]::GetTempPath()) ("oreo-cli-install-" + [Guid]::NewGuid())
+$Temporary = Join-Path ([System.IO.Path]::GetTempPath()) ("falera-cli-install-" + [Guid]::NewGuid())
 New-Item -ItemType Directory -Path $Temporary | Out-Null
 
 try {
     # ── download and verify ──────────────────────────────────────────
     $Chosen = $null
     foreach ($Candidate in $Candidates) {
-        $Asset = "oreo_cli-$Candidate-py3-none-any.whl"
         if ($DownloadBaseOverride) {
             $Base = $DownloadBaseOverride.TrimEnd("/")
         } else {
             $Base = "https://github.com/$Repository/releases/download/cli-v$Candidate"
         }
+        # Releases since the rename ship falera_cli wheels; older ones, oreo_cli.
+        $Asset = "falera_cli-$Candidate-py3-none-any.whl"
+        $Checksum = Join-Path $Temporary "$Asset.sha256"
+        try {
+            Invoke-WebRequest -UseBasicParsing -Uri "$Base/$Asset.sha256" -OutFile $Checksum
+            $Chosen = $Candidate
+            break
+        } catch { }
+        $Asset = "oreo_cli-$Candidate-py3-none-any.whl"
         $Checksum = Join-Path $Temporary "$Asset.sha256"
         try {
             Invoke-WebRequest -UseBasicParsing -Uri "$Base/$Asset.sha256" -OutFile $Checksum
@@ -106,13 +114,13 @@ try {
         } catch {
             # A tag can exist before its release is published; for
             # "latest", fall back to the next older version.
-            if ($Version -ne "latest") { throw "oreo CLI $Candidate has no release at $Base" }
+            if ($Version -ne "latest") { throw "falera CLI $Candidate has no release at $Base" }
             Write-Host "note: cli-v$Candidate has no published release yet; trying an older one"
         }
     }
     if (-not $Chosen) { throw "none of the CLI tags in $Repository has a published release" }
 
-    Write-Host "Downloading oreo CLI $Chosen"
+    Write-Host "Downloading falera CLI $Chosen"
     $Wheel = Join-Path $Temporary $Asset
     Invoke-WebRequest -UseBasicParsing -Uri "$Base/$Asset" -OutFile $Wheel
 
@@ -125,7 +133,7 @@ try {
     Write-Host "Checksum OK (SHA-256 $Actual)"
 
     # ── install ──────────────────────────────────────────────────────
-    # --force replaces an older oreo-cli, so this also upgrades.
+    # --force replaces an older falera-cli, so this also upgrades.
     Write-Host "Installing with $Installer"
     if ($Installer -eq "pipx") {
         & pipx install --force $Wheel
@@ -135,19 +143,19 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "$Installer could not install $Asset" }
 
     Write-Host ""
-    Write-Host "  oreo CLI $Chosen is installed." -ForegroundColor Green
-    if (-not (Test-Command "oreo")) {
+    Write-Host "  falera CLI $Chosen is installed." -ForegroundColor Green
+    if (-not (Test-Command "falera")) {
         Write-Host ""
         if ($Installer -eq "pipx") {
-            Write-Host "  'oreo' is not on your PATH yet: run 'pipx ensurepath' and open a new terminal."
+            Write-Host "  'falera' is not on your PATH yet: run 'pipx ensurepath' and open a new terminal."
         } else {
-            Write-Host "  'oreo' is not on your PATH yet: run 'uv tool update-shell' and open a new terminal."
+            Write-Host "  'falera' is not on your PATH yet: run 'uv tool update-shell' and open a new terminal."
         }
     }
     Write-Host ""
-    Write-Host "  Plug in the badge and run:  oreo" -ForegroundColor Cyan
-    Write-Host "  Check the setup:            oreo doctor"
-    Write-Host "  Docs: https://oreo.elixpo.com/docs/cli/"
+    Write-Host "  Plug in the badge and run:  falera" -ForegroundColor Cyan
+    Write-Host "  Check the setup:            falera doctor"
+    Write-Host "  Docs: https://falera.elixpo.com/docs/cli/"
 } finally {
     Remove-Item -Recurse -Force $Temporary -ErrorAction SilentlyContinue
 }

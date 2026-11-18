@@ -166,7 +166,7 @@ jobs:
           # The PAT must have `contents:write` for the repo.
           token: ${{ secrets.CI_AGENT_TOKEN }}
           tag_name: ${{ steps.meta.outputs.tag }}
-          name: "OreoOS ${{ steps.meta.outputs.version }} (${{ steps.meta.outputs.channel }})"
+          name: "FaleraOS ${{ steps.meta.outputs.version }} (${{ steps.meta.outputs.channel }})"
           prerelease: ${{ steps.meta.outputs.channel != 'stable' }}
           body: |
             Auto-built by `tools/build_release.py`.

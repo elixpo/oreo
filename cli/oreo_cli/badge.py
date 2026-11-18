@@ -2,11 +2,11 @@
 
 Every operation sends a short MicroPython 1.28 snippet that reports back
 with `@OREO:<json>` lines (events) and, for downloads, `@B:<base64>` lines
-(data). Anything else the badge prints (OreoOS log lines such as
+(data). Anything else the badge prints (FaleraOS log lines such as
 "[wifi] connecting") is passed through as chatter.
 
 Snippets only use what the badge firmware has: os.ilistdir/stat/statvfs,
-json, binascii, hashlib, time.sleep_ms, and the OreoOS modules
+json, binascii, hashlib, time.sleep_ms, and the FaleraOS modules
 (oreoOS.config, oreoOS.storage, oreoOS.store, oreoWare.wifi,
 oreoWare.battery).
 """
@@ -36,13 +36,13 @@ B64 = (
     " import ubinascii as _b\n"
 )
 
-# Paths `oreo rm` refuses without --force: removing them stops OreoOS booting.
+# Paths `falera rm` refuses without --force: removing them stops FaleraOS booting.
 PROTECTED = ("/", "/main.py", "/boot.py", "/oreoOS", "/oreoWare", "/apps",
              "/apps/launcher", "/assets")
 
 # Raw bytes per exec while pushing: about 11 KB of base64 code. The badge
 # holds the pasted code, the decoded literal and the chunk at once (~30 KB
-# for a moment, on a heap of several MB of PSRAM with OreoOS stopped).
+# for a moment, on a heap of several MB of PSRAM with FaleraOS stopped).
 # Doubling it from 4 KiB halves the execs, but the model in
 # tests/test_push_speed.py says that gains only a few percent: raw-paste
 # flow control and flash writes dominate. The bigger win is fewer execs per
@@ -51,13 +51,13 @@ PUSH_CHUNK = 8192
 PULL_CHUNK = 3072        # raw bytes per @B: line
 FREE_RESERVE = 64 * 1024  # keep this much flash free after a push
 
-NO_OREOOS_HINT = ("install OreoOS: `oreo flash --repo <checkout>` (firmware and OreoOS) "
-                  "or `oreo update --repo <checkout>`; see `oreo doctor`")
+NO_OREOOS_HINT = ("install FaleraOS: `falera flash --repo <checkout>` (firmware and FaleraOS) "
+                  "or `falera update --repo <checkout>`; see `falera doctor`")
 
 
 # The badge's progress screen while the computer drives it (oreoOS/hostui.py:
 # show(title, detail="", progress=None) and clear(), callable over the raw
-# REPL while OreoOS is paused; progress is 0.0-1.0 or None). An OreoOS
+# REPL while FaleraOS is paused; progress is 0.0-1.0 or None). An FaleraOS
 # without it, or any error inside it, is ignored: the screen is a courtesy
 # and must never break the operation. The module is imported once per raw
 # REPL session (its globals survive between execs until the next soft
@@ -110,7 +110,7 @@ def norm(path):
     """Badge path -> absolute, normalised ('/a/b'). Accepts ':a/b' too.
 
     A path that looks like a Windows path (`C:/Program Files/Git/documents`)
-    is refused: Git Bash rewrites `/documents` into that before oreo sees
+    is refused: Git Bash rewrites `/documents` into that before falera sees
     it, and copying there would be a surprise."""
     p = (path or "/").strip()
     if len(p) > 2 and p[1] == ":" and p[0].isalpha() and p[2] in "/\\":
@@ -175,7 +175,7 @@ class OutputParser:
 
 
 def _missing_oreoos(text):
-    """A badge traceback that means OreoOS (or part of it) is not there."""
+    """A badge traceback that means FaleraOS (or part of it) is not there."""
     if "ImportError" not in text and "AttributeError" not in text:
         return False
     low = text.lower()
@@ -202,7 +202,7 @@ class Badge:
         return self
 
     def finish(self, mode="soft"):
-        """Leave OreoOS running again (unless mode == 'none')."""
+        """Leave FaleraOS running again (unless mode == 'none')."""
         if self.entered or getattr(self.link, "t", None) is not None:
             self.link.restart(mode)
         self.entered = False
@@ -215,8 +215,8 @@ class Badge:
 
     def screen(self, title, detail="", progress=None):
         """Show what the computer is doing on the badge's screen. Best
-        effort: nothing happens unless OreoOS is already paused, and an
-        OreoOS without hostui, or any failure, is ignored."""
+        effort: nothing happens unless FaleraOS is already paused, and an
+        FaleraOS without hostui, or any failure, is ignored."""
         if not self.entered:
             return
         try:
@@ -238,7 +238,7 @@ class Badge:
     def showing(self):
         """Clear the badge's screen when the block ends, also after an
         error (but not when the link is gone, or on Ctrl-C: the restart
-        that follows brings OreoOS's own screen back anyway)."""
+        that follows brings FaleraOS's own screen back anyway)."""
         try:
             yield self
         except LinkError:
@@ -257,7 +257,7 @@ class Badge:
         except BadgeError as e:
             message, detail = redact(e.message, secrets), redact(e.detail, secrets)
             if _missing_oreoos(message + "\n" + (detail or "")):
-                raise NoOreoOS("this needs OreoOS, and the badge does not have it "
+                raise NoOreoOS("this needs FaleraOS, and the badge does not have it "
                                "(or has a version too old for this command)",
                                detail=detail, hint=NO_OREOOS_HINT)
             raise BadgeError(message, detail, hint=e.hint)
@@ -448,7 +448,7 @@ class Badge:
                 from .ui import human
                 raise OreoError("not enough space on the badge: %s needed, %s free"
                                 % (human(len(data)), human(max(0, free - reserve))),
-                                hint="free some space (`oreo info`, `oreo rm`)")
+                                hint="free some space (`falera info`, `falera rm`)")
         parent = posixpath.dirname(dest)
         if parent and parent != "/":
             self.mkdirs(parent)
@@ -555,7 +555,7 @@ class Badge:
         if st is None:
             raise OreoError("%s: not found on the badge" % src)
         if st["dir"]:
-            raise OreoError("%s is a directory" % src, hint="use `oreo pull -r`")
+            raise OreoError("%s is a directory" % src, hint="use `falera pull -r`")
         total = st["size"]
         buf = bytearray()
 
@@ -616,7 +616,7 @@ class Badge:
             raise OreoError("%s: not found on the badge" % p)
         if "err" in r:
             if r["err"] == 21:
-                raise OreoError("%s is a directory" % p, hint="use `oreo rm -r`")
+                raise OreoError("%s is a directory" % p, hint="use `falera rm -r`")
             raise OreoError("could not remove %s (errno %s)" % (p, r["err"]))
         return p
 
@@ -792,7 +792,7 @@ class Badge:
             "_e({'ok':bool(ok),'msg':msg})\n" % lit(app_id), timeout=60)
         return r["ok"], r["msg"]
 
-    # ── OreoOS updates (oreoOS.ota) ──────────────────────────────────
+    # ── FaleraOS updates (oreoOS.ota) ──────────────────────────────────
     # These drive the badge's own OTA client, the same functions its
     # Updates page calls: latest_version/check -> peek -> download into
     # /_ota -> apply_pending. The badge downloads from GitHub over its own
@@ -841,7 +841,7 @@ class Badge:
     def ota_peek(self):
         """Which files the release changes. Needs ota_check() first.
 
-        Hashes every OreoOS file on the badge, so it can take a while."""
+        Hashes every FaleraOS file on the badge, so it can take a while."""
         r = self.result(
             "_pk=O.peek(_rel)\n"
             "if not _pk:\n"

@@ -1,8 +1,8 @@
-"""`oreo update` / `oreo flash`: wrappers around an OreoOS checkout.
+"""`falera update` / `falera flash`: wrappers around an FaleraOS checkout.
 
 Today these call the repository's own scripts (./deploy, ./build-firmware),
-so they need `--repo <path to an oreo checkout>`. Release-based updates
-(download a signed OreoOS bundle from GitHub and install it over USB) are
+so they need `--repo <path to an falera checkout>`. Release-based updates
+(download a signed FaleraOS bundle from GitHub and install it over USB) are
 future work, tracked in issue #117.
 """
 
@@ -16,14 +16,14 @@ from .errors import OreoError
 
 def check_repo(path):
     if not path:
-        raise OreoError("this command needs an OreoOS checkout",
-                        hint="pass --repo <path to a clone of github.com/elixpo/oreo>; "
+        raise OreoError("this command needs an FaleraOS checkout",
+                        hint="pass --repo <path to a clone of github.com/elixpo/falera>; "
                              "updating from GitHub releases is not available yet")
     root = Path(path).expanduser().resolve()
     for need in ("deploy", "deploy.sh", "build-firmware", "oreoOS/config.py"):
         if not (root / need).exists():
-            raise OreoError("%s does not look like an OreoOS checkout (missing %s)" % (root, need),
-                            hint="clone it: git clone https://github.com/elixpo/oreo")
+            raise OreoError("%s does not look like an FaleraOS checkout (missing %s)" % (root, need),
+                            hint="clone it: git clone https://github.com/elixpo/falera")
     return root
 
 
@@ -32,7 +32,7 @@ def _bash():
         return None
     found = shutil.which("bash")
     if not found:
-        raise OreoError("these scripts need bash", hint="on Windows, run oreo from Git Bash or WSL")
+        raise OreoError("these scripts need bash", hint="on Windows, run falera from Git Bash or WSL")
     return found
 
 

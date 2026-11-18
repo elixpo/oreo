@@ -1,4 +1,4 @@
-# OreoOS as a distributable Python package.
+# FaleraOS as a distributable Python package.
 #
 # This file exists so the OS can be uploaded as a GitHub Package (visible
 # on the repo's "Packages" sidebar). The badge does NOT pip-install from
@@ -21,7 +21,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name            = "oreoos"
 dynamic         = ["version"]
-description     = "OreoOS — the friendly MicroPython operating system for the Elixpo Oreo Badge."
+description     = "FaleraOS — the friendly MicroPython operating system for the Elixpo Falera Badge."
 readme          = "README.md"
 requires-python = ">=3.9"
 license         = { text = "MIT" }
@@ -48,9 +48,9 @@ classifiers     = [
 
 [project.urls]
 Homepage       = "https://elixpo.com"
-Repository     = "https://github.com/elixpo/oreo"
-Issues         = "https://github.com/elixpo/oreo/issues"
-Documentation  = "https://github.com/elixpo/oreo/blob/main/docs/HARDWARE.md"
+Repository     = "https://github.com/elixpo/falera"
+Issues         = "https://github.com/elixpo/falera/issues"
+Documentation  = "https://github.com/elixpo/falera/blob/main/docs/HARDWARE.md"
 
 
 # ── setuptools layout ─────────────────────────────────────────────────────────

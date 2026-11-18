@@ -58,7 +58,7 @@ class CKeyRuleTest(unittest.TestCase):
     def test_folders_found(self):
         names = [d.name for d in _app_dirs()]
         self.assertIn("gamepad", names)
-        self.assertIn("Oreo Pet", names)          # folder names with spaces
+        self.assertIn("Lumi", names)          # folder names with spaces
 
     def test_apps_that_use_c_capture_it(self):
         offenders = []

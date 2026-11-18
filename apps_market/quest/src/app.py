@@ -14,7 +14,7 @@ Four tabs cycled with B:
   DIAG    receiver diagnostics in full: backend (native RMT or the pin-IRQ
           fallback), RMT channel, DMA, glitch filter, driver state and the
           complete error text when something failed (UP/DOWN scroll it).
-          RIGHT toggles serial lifecycle logging (`oreo logs` shows it).
+          RIGHT toggles serial lifecycle logging (`falera logs` shows it).
 
 RX lifecycle: the receiver starts once in on_enter and stops in on_exit
 (which also releases the TX channel). Tabs only change the mode hint, they

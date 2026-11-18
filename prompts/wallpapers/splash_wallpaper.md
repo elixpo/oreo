@@ -1,4 +1,4 @@
-# splash_wallpaper — OreoOS boot splash wallpaper (dark)
+# splash_wallpaper — FaleraOS boot splash wallpaper (dark)
 
 **Asset name:** `splash_bg` (replaces `assets/sprites/raw/splash_bg.jpg`)
 **Source size:** landscape 1536×1024 (3:2) → cropped to 320×240, dimmed in `tools/build_splash.py`
@@ -9,4 +9,4 @@ The splash draws light cream text in a band across the middle and a gold loader 
 
 ## Prompt
 
-abstract dark wallpaper: deep midnight indigo and navy background with a few large, smooth, softly glowing gradient ribbons and glassy waves flowing diagonally from the lower left to the upper right, their glow in muted Oreo theme colours — dusky pink #FF5D68, teal #00B4A5 and a hint of warm gold #FFBE1E — with fine soft light bloom and gentle depth, the horizontal middle third darker and calm so light text stays readable, rich but understated, smooth vector-like rendering, no pixel art, no text, no letters, no logos, no watermark, landscape composition
+abstract dark wallpaper: deep midnight indigo and navy background with a few large, smooth, softly glowing gradient ribbons and glassy waves flowing diagonally from the lower left to the upper right, their glow in muted Falera theme colours — dusky pink #FF5D68, teal #00B4A5 and a hint of warm gold #FFBE1E — with fine soft light bloom and gentle depth, the horizontal middle third darker and calm so light text stays readable, rich but understated, smooth vector-like rendering, no pixel art, no text, no letters, no logos, no watermark, landscape composition

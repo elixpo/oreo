@@ -1,6 +1,6 @@
-# Oreo badge hardware
+# Falera badge hardware
 
-The Oreo Badge is certified open source hardware by the Open Source Hardware
+The Falera Badge is certified open source hardware by the Open Source Hardware
 Association, UID [IN000107](https://certification.oshwa.org/in000107.html). The design is licensed under
 CERN-OHL-P-2.0 (see `LICENSE` in this directory).
 
@@ -105,7 +105,7 @@ this board.
   charge current (#156).
 - Review the ESP32-S3 RF layout against Espressif's current hardware guide;
   tune the antenna network on assembled boards with a VNA.
-- Replace the MPU-6050 only if its successor driver is added to OreoOS first.
+- Replace the MPU-6050 only if its successor driver is added to FaleraOS first.
 - Treat this as an engineering prototype, not a production-certified charger
   or RF design, until bring-up and compliance testing complete.
 
@@ -161,7 +161,7 @@ those. `BOM_ORDER.csv` lists everything a badge needs: what JLCPCB can fit,
 the SMD and through-hole parts to solder by hand, and the off-board parts,
 with LCSC numbers and prices.
 
-OreoOS and its firmware are flashed over USB-C once a board is assembled;
+FaleraOS and its firmware are flashed over USB-C once a board is assembled;
 the OS first needs this board's pin map, an ILI9341 driver, a touch driver
 and the expander button driver (#154).
 
@@ -179,9 +179,9 @@ the frame oreoWare/imu.py and oreoWare/pins.py assume.
 ## Contributing
 
 Open work is labelled
-[hardware](https://github.com/elixpo/oreo/issues?q=is%3Aopen+label%3Ahardware),
+[hardware](https://github.com/elixpo/falera/issues?q=is%3Aopen+label%3Ahardware),
 and new ideas go in the
-[hardware issue form](https://github.com/elixpo/oreo/issues/new?template=hardware.yml).
+[hardware issue form](https://github.com/elixpo/falera/issues/new?template=hardware.yml).
 In short:
 
 - Change the schematic by changing `generate_badge_schematic.py`, then run
@@ -213,7 +213,7 @@ The first boards are paid for out of pocket. To help build them, chip in at
 
 ## Credits
 
-The Oreo badge is designed by Ayushman Bhattacharya
+The Falera badge is designed by Ayushman Bhattacharya
 ([@Circuit-Overtime](https://github.com/Circuit-Overtime)) with Anwesha
 Chakraborty ([@anwe-ch](https://github.com/anwe-ch)), Elixpo core maintainer,
 who co-authored the JLCPCB order files (#173) and the RV565 video format the

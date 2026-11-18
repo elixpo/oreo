@@ -14,7 +14,7 @@ from . import game as g
 SW, SH = api.SCREEN_W, api.SCREEN_H
 FP = g.FP
 
-# ── colours (Oreo festive palette on a Diwali night sky) ─────────────────
+# ── colours (Falera festive palette on a Diwali night sky) ─────────────────
 # The backdrop is kept dim (about half brightness) so the launcher, the
 # falling targets and the fireworks are what the eye follows.
 SKY = (api.rgb(8, 6, 22), api.rgb(11, 8, 28), api.rgb(15, 10, 34),

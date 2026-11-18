@@ -1,4 +1,4 @@
-"""Build an OreoOS OTA release manifest + bundle for GitHub Releases.
+"""Build an FaleraOS OTA release manifest + bundle for GitHub Releases.
 
 Usage:
     python tools/build_release.py                  # builds the current VERSION
@@ -6,7 +6,7 @@ Usage:
 
 Output (default into ./dist/<version>/):
     manifest.json     - listing of every shipped file, with sha256 + size
-                        (plain .py; what every OreoOS release can install)
+                        (plain .py; what every FaleraOS release can install)
     manifest-mpy.json - the same release with the modules tools/mpy_build.py
                         selects precompiled to .mpy, and a "remove" list of
                         the .py files they replace (manifest_format 2; only
@@ -31,7 +31,7 @@ Everything `tools/deploy.py` would push to a badge EXCEPT:
   * pycache, .deploy_hashes.json, raw assets
   * NEVER_SHIP: personal files a checkout may still hold, such as the
     avatar module older tools/fetch_avatar.py wrote (the owner's avatar
-    is /avatar.bin on the badge, made by `oreo setup`, #133)
+    is /avatar.bin on the badge, made by `falera setup`, #133)
 
 i.e. exactly what the runtime needs to boot the next version cleanly.
 """
@@ -53,7 +53,7 @@ MPY_MANIFEST_NAME = "manifest-mpy.json"
 
 
 # Mirrors tools/deploy.py's DEPLOY list — these are the files that
-# constitute a full OreoOS install. Kept in sync by hand for now; in a
+# constitute a full FaleraOS install. Kept in sync by hand for now; in a
 # future tidy we can have deploy.py import this module.
 SHIP_PATTERNS = [
     # OS + drivers

@@ -1,11 +1,11 @@
 # Theme the OS in your colours
 
-Most of OreoOS's colours come from one file, `oreoOS/theme.py`: the cream
+Most of FaleraOS's colours come from one file, `oreoOS/theme.py`: the cream
 background, the pink accent, the cards, the text and the status bar.
 Change a few numbers there and the apps that use the theme follow.
 
 - **Difficulty:** beginner, about 10 minutes
-- **You need:** a badge, a USB-C cable, [oreo-cli](../CLI.md#install) and
+- **You need:** a badge, a USB-C cable, [falera-cli](../CLI.md#install) and
   a checkout of this repository (or just a copy of `oreoOS/theme.py`)
 
 ## What is in `theme.py`
@@ -32,7 +32,7 @@ example the home screen's green header, `HEADER_HOME_BG` in
 ## 1. Back up the badge's copy
 
 ```bash
-oreo pull /oreoOS/theme.py theme.py.orig
+falera pull /oreoOS/theme.py theme.py.orig
 ```
 
 ## 2. Edit the colours
@@ -54,25 +54,25 @@ angle.
 
 ## 3. Put it on the badge
 
-For a quick try, copy just this file; `oreo push` restarts OreoOS when it
+For a quick try, copy just this file; `falera push` restarts FaleraOS when it
 finishes:
 
 ```bash
-oreo push oreoOS/theme.py /oreoOS/theme.py
+falera push oreoOS/theme.py /oreoOS/theme.py
 ```
 
-If you build OreoOS from a checkout, `./deploy --board` pushes it with the
+If you build FaleraOS from a checkout, `./deploy --board` pushes it with the
 rest of your changes.
 
 ## 4. Undo
 
 ```bash
-oreo push theme.py.orig /oreoOS/theme.py
+falera push theme.py.orig /oreoOS/theme.py
 ```
 
 ## Things to know
 
-- **Updates overwrite it.** `oreo update` and the badge's own updates
+- **Updates overwrite it.** `falera update` and the badge's own updates
   replace every OS file whose checksum differs from the release, including
   `oreoOS/theme.py`. Push your theme again after an update, or ship it from
   your own fork ([Self-host OTA updates](ota-fork.md)).
@@ -80,4 +80,4 @@ oreo push theme.py.orig /oreoOS/theme.py
   screen wallpaper and sprite art keep their own colours.
 - **A theme for everyone** (a setting to pick a palette at runtime) is an
   OS change; propose it with the
-  [OS improvement form](https://github.com/elixpo/oreo/issues/new?template=os_improvement.yml).
+  [OS improvement form](https://github.com/elixpo/falera/issues/new?template=os_improvement.yml).

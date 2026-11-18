@@ -1,6 +1,6 @@
-"""`oreo setup`: the owner profile in /profile.json, against the FakeTransport.
+"""`falera setup`: the owner profile in /profile.json, against the FakeTransport.
 
-Inside an OreoOS checkout the file the CLI writes is read back with the
+Inside an FaleraOS checkout the file the CLI writes is read back with the
 real oreoOS/profile.py, so the CLI and the badge agree on its format.
 """
 
@@ -76,7 +76,7 @@ class ValidateTest(unittest.TestCase):
 
     def test_keys_match_the_badge(self):
         if not PROFILE.exists():
-            self.skipTest("not inside an OreoOS checkout")
+            self.skipTest("not inside an FaleraOS checkout")
         src = PROFILE.read_text()
         import ast
         tree = ast.parse(src)
@@ -110,7 +110,7 @@ class SetupCommandTest(unittest.TestCase):
             "GITHUB_USER": "octocat", "DISPLAY_NAME": "Mona Lisa", "TIMEZONE_OFFSET": 5.5,
             "WEATHER_LAT": 12.97, "WEATHER_LON": 77.59, "WEATHER_NAME": "Bengaluru"})
         self.assertIn("saved /profile.json", r.out)
-        self.assertIn("OreoOS is restarting", r.out)
+        self.assertIn("FaleraOS is restarting", r.out)
         self.assertIn("UTC+5:30", r.out)
         self.assertEqual(self.fake.restarts, ["soft"])
         self.assertFalse(self.fake.exists("/profile.json.tmp"))
@@ -304,7 +304,7 @@ class SetupCommandTest(unittest.TestCase):
         self.assertEqual(self.profile(), {"GITHUB_USER": "old", "DISPLAY_NAME": "Me"})
         self.assertFalse(self.fake.exists("/profile.json.tmp"))
 
-    @unittest.skipUnless(PROFILE.exists(), "not inside an OreoOS checkout")
+    @unittest.skipUnless(PROFILE.exists(), "not inside an FaleraOS checkout")
     def test_power_cut_between_remove_and_rename_keeps_the_profile(self):
         self.fake.put("/profile.json", json.dumps({"GITHUB_USER": "old"}).encode())
         real_rename = self.fat_rename(cut=True)
@@ -315,7 +315,7 @@ class SetupCommandTest(unittest.TestCase):
         profile = self.badge_profile()
         self.assertEqual(profile.get("GITHUB_USER"), "octocat")
         self.assertEqual(profile.get("DISPLAY_NAME"), "Me")
-        # and the next `oreo setup` sees the backup and repairs it
+        # and the next `falera setup` sees the backup and repairs it
         self.fake.os.rename = real_rename
         r = self.run_setup("--designation", "Firmware")
         self.assertEqual(r.rc, 0, r.out)
@@ -324,7 +324,7 @@ class SetupCommandTest(unittest.TestCase):
                                           "DISPLAY_DESIGNATION": "Firmware"})
         self.assertFalse(self.fake.exists("/profile.json.tmp"))
 
-    @unittest.skipUnless(PROFILE.exists(), "not inside an OreoOS checkout")
+    @unittest.skipUnless(PROFILE.exists(), "not inside an FaleraOS checkout")
     def test_badge_profile_module_reads_what_was_written(self):
         r = self.run_setup("--github-user", "octocat", "--timezone", "5.75", "--lat", "-33.9",
                            "--lon", "151.2", "--owm-key", KEY)

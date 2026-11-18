@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare and optionally transfer media into OreoOS.
+"""Prepare and optionally transfer media into FaleraOS.
 
 Every path follows the same contract: detect -> convert -> validate the final
 artifact -> check storage -> transfer. Source size is never used as a proxy for

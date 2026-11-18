@@ -1,6 +1,6 @@
 """The owner's avatar (#133): converted on the computer, copied to
-/avatar.bin by `oreo setup`, and read back with the real oreoOS/profile.py
-inside an OreoOS checkout. No test reaches the network: fake.py replaces
+/avatar.bin by `falera setup`, and read back with the real oreoOS/profile.py
+inside an FaleraOS checkout. No test reaches the network: fake.py replaces
 avatar._open, and the tests here put a local picture in its place."""
 
 import ast
@@ -120,7 +120,7 @@ class ConvertTest(unittest.TestCase):
             avatar.download("octocat")
 
 
-@unittest.skipUnless(PROFILE.exists(), "not inside an OreoOS checkout")
+@unittest.skipUnless(PROFILE.exists(), "not inside an FaleraOS checkout")
 class BadgeContractTest(unittest.TestCase):
     """The file the CLI writes is the file oreoOS/profile.py reads."""
 
@@ -198,7 +198,7 @@ class SetupAvatarTest(unittest.TestCase):
         r, urls = self.setup("--name", "Mona")
         self.assertEqual(r.rc, 0, r.out)
         self.assertEqual(urls, [])
-        self.assertIn("oreo setup --avatar", r.out)
+        self.assertIn("falera setup --avatar", r.out)
         r, urls = self.setup("--avatar")             # alone: no profile prompt
         self.assertEqual(r.rc, 0, r.out)
         self.assertEqual(len(urls), 1)
@@ -270,7 +270,7 @@ class SetupAvatarTest(unittest.TestCase):
         self.assertEqual(self.owner(), "hubot")
 
 
-@unittest.skipUnless(FETCH_TOOL.exists(), "not inside an OreoOS checkout")
+@unittest.skipUnless(FETCH_TOOL.exists(), "not inside an FaleraOS checkout")
 @unittest.skipIf(Image is None, "Pillow is not installed")
 class FetchToolTest(unittest.TestCase):
     """tools/fetch_avatar.py shares this module instead of copying it."""

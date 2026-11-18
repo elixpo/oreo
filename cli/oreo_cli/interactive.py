@@ -1,10 +1,10 @@
-"""`oreo` with no command: find the badge, show its status, then a menu.
+"""`falera` with no command: find the badge, show its status, then a menu.
 
 A simple menu-driven view (status, file browser, apps, Wi-Fi, media,
 Transfer, owner profile, app install, updates). The badge stays in the raw
-REPL while the view is open, so OreoOS is paused; it restarts when you
+REPL while the view is open, so FaleraOS is paused; it restarts when you
 quit. The Transfer entry is the exception: the Transfer app runs inside
-OreoOS, so that entry restarts OreoOS first, and the next entry that needs
+FaleraOS, so that entry restarts FaleraOS first, and the next entry that needs
 the raw REPL pauses it again. Ctrl-C inside a menu action stops that action
 and returns to the menu; Ctrl-C at the menu leaves the view.
 """
@@ -24,7 +24,7 @@ from .ui import esc, human
 MENU = [("1", "status"), ("2", "files"), ("3", "apps"), ("4", "Wi-Fi"),
         ("5", "add a photo, video or document"), ("t", "send files to Transfer"),
         ("p", "owner profile"), ("i", "install an app from a folder"),
-        ("u", "update OreoOS"), ("s", "shell"), ("q", "quit")]
+        ("u", "update FaleraOS"), ("s", "shell"), ("q", "quit")]
 
 
 def _menu(ui, items):
@@ -92,7 +92,7 @@ def files_view(ui, b):
             _guard(ui, _pull)
         elif verb == "d":
             if commands.is_protected(path):
-                ui.error("%s belongs to OreoOS" % esc(path), hint="use `oreo rm --force` outside the view")
+                ui.error("%s belongs to FaleraOS" % esc(path), hint="use `falera rm --force` outside the view")
             elif ui.confirm("Delete %s%s?" % (esc(path), " and everything inside" if e["dir"] else "")):
                 _guard(ui, b.rm, path, e["dir"])
         else:
@@ -168,7 +168,7 @@ def media_view(ui, b):
 
 
 def transfer_view(ctx, b):
-    """`oreo transfer send` from the menu: pick files, restart OreoOS so the
+    """`falera transfer send` from the menu: pick files, restart FaleraOS so the
     Transfer app can run, then send them with the code the badge shows."""
     ui = ctx.ui
     raw = ui.ask("files to send (photos, videos, .md/.txt; separate with spaces)",
@@ -181,7 +181,7 @@ def transfer_view(ctx, b):
         send_to_transfer(ctx, b, files, on_restart=lambda: restarted.append(1))
     finally:
         if restarted:
-            ui.note("OreoOS keeps running; the next menu entry that needs the badge "
+            ui.note("FaleraOS keeps running; the next menu entry that needs the badge "
                     "pauses it again")
 
 
@@ -196,9 +196,9 @@ def split_files(raw):
 
 
 def send_to_transfer(ctx, b, files, code=None, on_restart=None):
-    """Convert `files`, restart OreoOS so the Transfer app can run, then
+    """Convert `files`, restart FaleraOS so the Transfer app can run, then
     send them with the code the badge shows (asked through ctx.ui unless
-    given). Used by the menu and the full-screen UI. OreoOS keeps
+    given). Used by the menu and the full-screen UI. FaleraOS keeps
     running afterwards; the next raw-REPL command pauses it again."""
     ui = ctx.ui
     args = argparse.Namespace(**vars(ctx.args))
@@ -207,32 +207,32 @@ def send_to_transfer(ctx, b, files, code=None, on_restart=None):
     tctx = copy.copy(ctx)
     tctx.args = args
     ui.header("transfer", "%d file(s) over USB to the Transfer app" % len(files))
-    prepared = transfer.prepare(ui, files, args)   # before OreoOS is restarted
+    prepared = transfer.prepare(ui, files, args)   # before FaleraOS is restarted
     from .main import finish_shielded          # main imports this module lazily
-    finish_shielded(b, "soft")                 # Transfer runs inside OreoOS
+    finish_shielded(b, "soft")                 # Transfer runs inside FaleraOS
     if on_restart is not None:
         on_restart()
-    ui.note("OreoOS is starting; open Transfer on the badge (apps drawer -> Tools -> "
+    ui.note("FaleraOS is starting; open Transfer on the badge (apps drawer -> Tools -> "
             "Transfer) and type the code it shows")
     return transfer._session(tctx, lambda c, h: transfer.send_files(tctx, c, h, prepared))
 
 
 def setup_view(ui, b):
     if owner.setup(ui, b):
-        ui.note("apps read the new profile when OreoOS restarts (when you quit this view)")
+        ui.note("apps read the new profile when FaleraOS restarts (when you quit this view)")
 
 
 def run(ctx):
     ui = ctx.ui
-    ui.header("Oreo Badge", "looking for a badge on USB")
+    ui.header("Falera Badge", "looking for a badge on USB")
     with ctx.session() as b:
         with ui.status("reading the badge"):
             info = b.info()
         commands.show_info(ui, info, b.port)
         if not ui.interactive:
-            ui.note("no terminal: showing status only. `oreo help` lists the commands.")
+            ui.note("no terminal: showing status only. `falera help` lists the commands.")
             return 0
-        ui.note("OreoOS is paused while this view is open and restarts when you quit.")
+        ui.note("FaleraOS is paused while this view is open and restarts when you quit.")
         while True:
             ui.print("")
             _menu(ui, MENU)
@@ -259,11 +259,11 @@ def run(ctx):
                 _guard(ui, devtools.install_prompt, ui, b)
             elif choice == "u":
                 from . import update
-                ui.header("update", "OreoOS from GitHub releases, through the badge's Wi-Fi")
+                ui.header("update", "FaleraOS from GitHub releases, through the badge's Wi-Fi")
                 _guard(ui, update.run_update, ctx, b)
                 if getattr(b.link, "t", None) is None and not b.entered:
-                    # the badge restarted into the new OreoOS: nothing to go back to
-                    ui.note("the badge restarted; run `oreo` again to reopen this view")
+                    # the badge restarted into the new FaleraOS: nothing to go back to
+                    ui.note("the badge restarted; run `falera` again to reopen this view")
                     return 0
             elif choice == "s":
                 b.connect()
@@ -274,5 +274,5 @@ def run(ctx):
                 b.link.enter(soft_reset=False)
             else:
                 ui.warn("choose one of: " + ", ".join(k for k, _ in MENU))
-    ui.ok("OreoOS is starting again" if ctx.args.reset != "none" else "done")
+    ui.ok("FaleraOS is starting again" if ctx.args.reset != "none" else "done")
     return 0

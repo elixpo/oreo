@@ -1,4 +1,4 @@
-"""Oreo OS — app loader, generic run loop, crash screen, boot entry point.
+"""FaleraOS — app loader, generic run loop, crash screen, boot entry point.
 
 Apps live in apps/<name>/ with a manifest.json and a main.py that exposes
 an App class subclassing oreoOS.App.  The OS launcher owns the top-level loop;
@@ -38,7 +38,7 @@ APPS_DIR = _find_apps_dir() or "/apps"
 
 # ── app discovery ─────────────────────────────────────────────────────────────
 #
-# Live dev loop: `oreo dev <folder>` mounts a folder from the computer at
+# Live dev loop: `falera dev <folder>` mounts a folder from the computer at
 # /remote. When it holds apps/<name>/ (manifest.json + main.py), the
 # launcher lists that app and imports it from there instead of from
 # /apps/<name>, so an edit on the computer shows up the next time the app
@@ -193,7 +193,7 @@ def load_app(app_dir):
 #
 # When an app exits its modules leave sys.modules, so the next launch
 # imports the files again: an App Store install or update made while
-# OreoOS runs (or an edit under an `oreo dev` mount) runs without a reboot,
+# FaleraOS runs (or an edit under an `falera dev` mount) runs without a reboot,
 # and the heap gets the app's code and module globals back. Only apps.<name> and its
 # submodules are touched; oreoOS, oreoWare and other apps stay.
 #
@@ -1167,8 +1167,8 @@ def open_app(os_obj, target):
     finally:
         _stop_loader(loader)
         # Unload the app's modules (unless it asked to stay), so files the
-        # Store or a dev mount changed load fresh next launch. (`oreo push`
-        # restarts OreoOS anyway.)
+        # Store or a dev mount changed load fresh next launch. (`falera push`
+        # restarts FaleraOS anyway.)
         release_app(target, app)
 
 

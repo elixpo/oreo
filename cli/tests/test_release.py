@@ -26,8 +26,8 @@ INSTALL_PS1 = CLI / "install.ps1"
 CHANGELOG = CLI / "CHANGELOG.md"
 WORKFLOW = REPO / ".github" / "workflows" / "cli-release.yml"
 
-WHEEL = "oreo_cli-%s-py3-none-any.whl" % __version__
-SDIST = "oreo_cli-%s.tar.gz" % __version__
+WHEEL = "falera_cli-%s-py3-none-any.whl" % __version__
+SDIST = "falera_cli-%s.tar.gz" % __version__
 
 # What install.sh needs besides the installer itself.
 TOOLS = ("sh", "curl", "mktemp", "rm", "awk", "grep", "sed", "tr", "sort",
@@ -51,22 +51,24 @@ class Versions(unittest.TestCase):
         text = CHANGELOG.read_text(encoding="utf-8")
         self.assertRegex(text, r"(?m)^## \[%s\] - \d{4}-\d{2}-\d{2}$" % re.escape(__version__))
 
-    @unittest.skipUnless(WORKFLOW.exists(), "not inside the OreoOS repository")
+    @unittest.skipUnless(WORKFLOW.exists(), "not inside the FaleraOS repository")
     def test_workflow_asset_names_match_the_installers(self):
         wf = WORKFLOW.read_text(encoding="utf-8")
         self.assertIn("tags: ['cli-v*']", wf)
-        self.assertIn('WHEEL="oreo_cli-$VERSION-py3-none-any.whl"', wf)
-        self.assertIn('SDIST="oreo_cli-$VERSION.tar.gz"', wf)
+        self.assertIn('WHEEL="falera_cli-$VERSION-py3-none-any.whl"', wf)
+        self.assertIn('SDIST="falera_cli-$VERSION.tar.gz"', wf)
         self.assertIn("--latest=false", wf)
         self.assertIn("actions/attest-build-provenance@", wf)
         sh = INSTALL_SH.read_text(encoding="utf-8")
         ps1 = INSTALL_PS1.read_text(encoding="utf-8")
-        self.assertIn('asset="oreo_cli-${candidate}-py3-none-any.whl"', sh)
+        self.assertIn('asset="falera_cli-${candidate}-py3-none-any.whl"', sh)
+        self.assertIn('asset="oreo_cli-${candidate}-py3-none-any.whl"', sh)   # releases before the rename
         self.assertIn('releases/download/cli-v${candidate}', sh)
-        self.assertIn('$Asset = "oreo_cli-$Candidate-py3-none-any.whl"', ps1)
+        self.assertIn('$Asset = "falera_cli-$Candidate-py3-none-any.whl"', ps1)
+        self.assertIn('$Asset = "oreo_cli-$Candidate-py3-none-any.whl"', ps1)   # releases before the rename
         self.assertIn("releases/download/cli-v$Candidate", ps1)
 
-    @unittest.skipUnless(WORKFLOW.exists(), "not inside the OreoOS repository")
+    @unittest.skipUnless(WORKFLOW.exists(), "not inside the FaleraOS repository")
     def test_workflow_never_runs_on_oreoos_pushes(self):
         wf = WORKFLOW.read_text(encoding="utf-8")
         on = wf.split("\non:\n", 1)[1].split("\npermissions:", 1)[0]

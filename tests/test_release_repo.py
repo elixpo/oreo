@@ -32,9 +32,9 @@ class RepoTest(unittest.TestCase):
 
     def test_reads_ota_repo_from_ota_py(self):
         text = (ROOT / "oreoOS" / "ota.py").read_text()
-        self.assertEqual(self.r.ota_repo(text), "elixpo/oreo")
+        self.assertEqual(self.r.ota_repo(text), "elixpo/falera")
         self.assertEqual(self.r.resolve_repo(),
-                         ("elixpo/oreo", "OTA_REPO in oreoOS/ota.py"))
+                         ("elixpo/falera", "OTA_REPO in oreoOS/ota.py"))
 
     def test_a_fork_needs_only_ota_repo(self):
         text = 'X = 1\nOTA_REPO       = "you/oreo"      # owner/repo on GitHub\n'
@@ -95,7 +95,7 @@ class DryRunTest(unittest.TestCase):
         self.assertIn("--asset-base-url https://github.com/you/oreo/releases/download/"
                       "stable/v9.0.0/", out)
         self.assertIn("gh release create stable/v9.0.0 --repo you/oreo", out)
-        self.assertNotIn("elixpo/oreo", out)
+        self.assertNotIn("elixpo/falera", out)
 
     def test_repo_flag(self):
         out, code = self.dry_run("--repo", "me/staging", "--channel", "beta",
@@ -108,24 +108,24 @@ class DryRunTest(unittest.TestCase):
         self.assertIn("update from you/oreo", out)
 
     def test_origin_elsewhere_is_flagged(self):
-        out, code = self.dry_run(origin="elixpo/oreo")
+        out, code = self.dry_run(origin="elixpo/falera")
         self.assertIsNone(code, out)          # a dry run only warns
-        self.assertIn("`origin` is elixpo/oreo", out)
+        self.assertIn("`origin` is elixpo/falera", out)
 
     def test_origin_elsewhere_stops_a_real_release(self):
         r = load()
-        with mock.patch.object(r, "_origin_repo", lambda: "elixpo/oreo"), \
+        with mock.patch.object(r, "_origin_repo", lambda: "elixpo/falera"), \
                 contextlib.redirect_stdout(io.StringIO()):
             with self.assertRaises(SystemExit):
                 r._check_origin("you/oreo", dry=False)
-            r._check_origin("Elixpo/Oreo", dry=False)  # same repo, other case
-            r._check_origin("elixpo/oreo", dry=False)
+            r._check_origin("Elixpo/Falera", dry=False)  # same repo, other case
+            r._check_origin("elixpo/falera", dry=False)
 
 
 class NoHardcodedRepoTest(unittest.TestCase):
     def test_release_py_names_no_repository(self):
         text = (ROOT / "tools" / "release.py").read_text()
-        self.assertNotIn("elixpo/oreo", text)
+        self.assertNotIn("elixpo/falera", text)
 
 
 if __name__ == "__main__":

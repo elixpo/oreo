@@ -1,4 +1,4 @@
-"""WiFi manager for the Oreo Badge.
+"""WiFi manager for the Falera Badge.
 
 Saved networks live in `/wifi.json` on flash — a user-editable list
 maintained by the WiFi settings app:
@@ -36,7 +36,7 @@ Usage:
     wifi.remove_saved(ssid)
     wifi.is_metered()                 # current link metered?
 
-Non-blocking API (OreoOS 2.0). Nothing below ever waits for the radio;
+Non-blocking API (FaleraOS 2.0). Nothing below ever waits for the radio;
 callers poll from their update()/run-loop tick instead:
 
     wifi.scan_start()                 # background scan (own thread)
@@ -105,7 +105,7 @@ def _apply_power_cap(wlan):
         pass
 
 
-MDNS_HOSTNAME = "oreo"
+MDNS_HOSTNAME = "falera"
 
 
 _hostname_applied        = False     # per-WLAN dhcp_hostname / hostname
@@ -116,7 +116,7 @@ def _apply_global_hostname():
     """Set the global network hostname BEFORE `wlan.active(True)`.
 
     This is the one that actually drives the ESP-IDF mDNS responder
-    — once `network.hostname("oreo")` is set and the interface comes
+    — once `network.hostname("falera")` is set and the interface comes
     up, IDF auto-advertises `oreo.local` to the LAN. Setting it
     AFTER active(True) is a no-op on most builds because the mDNS
     service is already configured by then.
@@ -920,7 +920,7 @@ def get_power_mode():
 
 
 # ═════════════════════════════════════════════════════════════════════════
-# Non-blocking scan / connect / boot auto-connect (OreoOS 2.0)
+# Non-blocking scan / connect / boot auto-connect (FaleraOS 2.0)
 # ═════════════════════════════════════════════════════════════════════════
 #
 # Everything below returns immediately. A scan runs in a short-lived
