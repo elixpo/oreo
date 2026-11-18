@@ -2,12 +2,12 @@
 
 The **Commits** app draws your GitHub contribution graph: the whole year as
 a 53-week grid, your active days, current and longest streaks, your
-busiest week and your yearly total. It is built into OreoOS, so there is
+busiest week and your yearly total. It is built into FaleraOS, so there is
 nothing to install; this hack makes it show *your* year.
 
 - **Difficulty:** beginner, about 10 minutes
 - **You need:** a badge with Wi-Fi, a USB-C cable and
-  [oreo-cli](../CLI.md#install)
+  [falera-cli](../CLI.md#install)
 
 > **About the name.** This page used to promise a "Commits brick-breaker"
 > arcade game. That game does not exist yet; only its icon prompt does
@@ -20,7 +20,7 @@ Commits reads the owner's GitHub login from the profile. Until it is set,
 the app shows a setup hint and fetches nothing.
 
 ```bash
-oreo setup --github-user octocat
+falera setup --github-user octocat
 ```
 
 See [Put your GitHub handle on the badge](github-handle.md) for the rest of
@@ -29,7 +29,7 @@ the profile.
 ## 2. Give it Wi-Fi
 
 ```bash
-oreo wifi connect "Home Net"
+falera wifi connect "Home Net"
 ```
 
 ## 3. Open Commits
@@ -73,4 +73,4 @@ template ([APPS.md](../APPS.md)), draw the bricks with `d.rect`, move the
 paddle with `self.os.buttons.is_pressed(api.BTN_LEFT)` in `update(dt)`, and
 never fetch from the network in `update` or `draw`: read the cached graph
 that Commits saved. When it works, propose it with the
-[app form](https://github.com/elixpo/oreo/issues/new?template=app_proposal.yml).
+[app form](https://github.com/elixpo/falera/issues/new?template=app_proposal.yml).

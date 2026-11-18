@@ -1,4 +1,4 @@
-"""`oreo` (no command) and `oreo ui`: the full-screen Oreo app.
+"""`falera` (no command) and `falera ui`: the full-screen Falera app.
 
 Built on Textual (rich's sibling, by the same authors): it gives a real
 full-screen app on the alternate screen, keyboard and mouse input, thread
@@ -14,11 +14,11 @@ How it is put together:
   owner.py, devtools.py, update.py, transfer.py, interactive.py) with a
   worker.SinkUI, so their messages land in the activity log, their
   progress bars in the activity bar and their questions in dialogs.
-- OreoOS is paused (raw REPL) while the view holds the badge and restarts
+- FaleraOS is paused (raw REPL) while the view holds the badge and restarts
   (soft reset, or --reset) when the view closes: on q, on Ctrl-C, and when
   something fails (see run() below). The Transfer section is the
-  exception, as in the menu: the Transfer app runs inside OreoOS, so that
-  section restarts OreoOS first and the next job pauses it again.
+  exception, as in the menu: the Transfer app runs inside FaleraOS, so that
+  section restarts FaleraOS first and the next job pauses it again.
 """
 
 import argparse
@@ -50,8 +50,8 @@ from .worker import BadgeSession, Job, RenderUI, Sink, SinkUI, explain
 SPINNER = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 
 # Shown under the menu: where the source and the docs live.
-REPO_URL = "https://github.com/elixpo/oreo"
-DOCS_URL = "https://oreo.elixpo.com/docs/cli/"
+REPO_URL = "https://github.com/elixpo/falera"
+DOCS_URL = "https://falera.elixpo.com/docs/cli/"
 
 SECTIONS = (
     ("status", "1", "Status"),
@@ -61,7 +61,7 @@ SECTIONS = (
     ("transfer", "5", "Transfer"),
     ("profile", "6", "Profile"),
     ("install", "7", "Install app"),
-    ("update", "8", "Update OreoOS"),
+    ("update", "8", "Update FaleraOS"),
 )
 
 
@@ -164,10 +164,10 @@ class WaitScreen(Screen):
         yield Header()
         with Vertical(id="wait"):
             yield Static("", id="wait-spin")
-            yield Static("[b]Plug in your Oreo Badge[/b]\n\n"
+            yield Static("[b]Plug in your Falera Badge[/b]\n\n"
                          "Connect it with a USB cable that carries data. It is found by\n"
                          "its USB ID 303a:83ec and opens here as soon as it appears.\n\n"
-                         "[dim]Nothing found for a while? Quit and run `oreo doctor`.[/dim]",
+                         "[dim]Nothing found for a while? Quit and run `falera doctor`.[/dim]",
                          id="wait-text")
         yield Footer()
 
@@ -365,7 +365,7 @@ class FilesPane(Pane):
             return
         e, path = sel
         if commands.is_protected(path):
-            self.app.notify("%s belongs to OreoOS; use `oreo rm --force` outside the view"
+            self.app.notify("%s belongs to FaleraOS; use `falera rm --force` outside the view"
                             % path, severity="error", markup=False)
             return
         cwd = self.cwd
@@ -548,9 +548,9 @@ class TransferPane(Pane):
     def compose(self) -> ComposeResult:
         yield Static(
             "[b]Send photos, videos and documents to the Transfer app[/b]\n\n"
-            "OreoOS restarts so the Transfer app can run. Open it on the badge\n"
+            "FaleraOS restarts so the Transfer app can run. Open it on the badge\n"
             "(apps drawer > Tools > Transfer) and type the code it shows when asked.\n"
-            "Photos and videos are converted first, as with `oreo add`.\n", id="transfer-text")
+            "Photos and videos are converted first, as with `falera add`.\n", id="transfer-text")
         yield Input(placeholder="files to send, e.g. ~/Pictures/cat.jpg notes.md "
                                 "(quote names with spaces)", id="transfer-files")
         yield Button("Send (Enter)", id="transfer-send", variant="primary")
@@ -559,7 +559,7 @@ class TransferPane(Pane):
         return self.query_one("#transfer-files")
 
     def load(self):
-        self.loaded = True      # nothing to fetch: Transfer runs inside OreoOS
+        self.loaded = True      # nothing to fetch: Transfer runs inside FaleraOS
 
     @on(Input.Submitted, "#transfer-files")
     @on(Button.Pressed, "#transfer-send")
@@ -576,7 +576,7 @@ class TransferPane(Pane):
 
         def run(ui, b, c, _):
             rc = interactive.send_to_transfer(c, b, files)
-            ui.note("OreoOS keeps running; the next section that needs the badge pauses "
+            ui.note("FaleraOS keeps running; the next section that needs the badge pauses "
                     "it again")
             return rc
         self.app.start_job("sending %d file(s) to Transfer" % len(files), run)
@@ -608,7 +608,7 @@ class ProfilePane(Pane):
     def _saved(self, data):
         self.show(data)
         if data is not None:
-            self.app.log_line("[dim]apps read the new profile when OreoOS restarts "
+            self.app.log_line("[dim]apps read the new profile when FaleraOS restarts "
                               "(when you quit this view)[/dim]")
 
     def action_edit(self):
@@ -641,8 +641,8 @@ class InstallPane(Pane):
             "[b]Install an app from a folder on this computer[/b]\n\n"
             "The folder is checked with the same rules as tools/validate_app.py, then\n"
             "copied to /apps/<id>/ (each file checked with SHA-256). It appears in the\n"
-            "Apps drawer when OreoOS restarts (when you quit this view). New app:\n"
-            "`oreo new my_game`.\n", id="install-text")
+            "Apps drawer when FaleraOS restarts (when you quit this view). New app:\n"
+            "`falera new my_game`.\n", id="install-text")
         yield Input(placeholder="app folder, e.g. ~/oreo-apps/my_game", id="install-folder")
         yield Checkbox("replace a built-in app (--force)", id="install-force")
         yield Button("Install (Enter)", id="install-go", variant="primary")
@@ -667,21 +667,21 @@ class InstallPane(Pane):
 
         def run(ui, b, c, checked):
             aid, manifest = devtools.install_folder(ui, b, checked, force=force)
-            ui.note("%s appears in the Apps drawer when OreoOS restarts (when you quit "
+            ui.note("%s appears in the Apps drawer when FaleraOS restarts (when you quit "
                     "this view)" % esc(manifest.get("name") or aid))
         self.app.start_job("installing %s" % Path(folder).name, run, prepare=prepare)
 
 
 class UpdatePane(Pane):
     BINDINGS = [Binding("c", "check", "Check"),
-                Binding("u", "update", "Update OreoOS")]
+                Binding("u", "update", "Update FaleraOS")]
 
     def compose(self) -> ComposeResult:
         yield Static("", id="update-text")
         yield Checkbox("beta channel", id="update-beta")
         with Horizontal(id="update-buttons"):
             yield Button("Check for updates (c)", id="update-check")
-            yield Button("Update OreoOS (u)", id="update-go", variant="primary")
+            yield Button("Update FaleraOS (u)", id="update-go", variant="primary")
 
     def main_widget(self):
         return self.query_one("#update-check")
@@ -693,8 +693,8 @@ class UpdatePane(Pane):
     def refresh_text(self):
         info = self.app.info or {}
         self.query_one("#update-text", Static).update(
-            "[b]Update OreoOS[/b]\n\n"
-            "OreoOS on the badge: [b]%s[/b]\n\n"
+            "[b]Update FaleraOS[/b]\n\n"
+            "FaleraOS on the badge: [b]%s[/b]\n\n"
             "The badge downloads the newest release from GitHub over its own Wi-Fi\n"
             "(a saved network, see Wi-Fi), checks every file, installs it and restarts.\n"
             "Your apps, photos, documents and Wi-Fi stay. Once the files start moving\n"
@@ -709,7 +709,7 @@ class UpdatePane(Pane):
 
         def run(ui, b, c, _):
             return update.run_update(c, b, channel=channel, check_only=check_only)
-        self.app.start_job("checking for updates" if check_only else "updating OreoOS", run,
+        self.app.start_job("checking for updates" if check_only else "updating FaleraOS", run,
                            cancellable=check_only, on_done=lambda rc: self.app.after_update())
 
     @on(Button.Pressed, "#update-check")
@@ -729,7 +729,7 @@ PANES = {"status": StatusPane, "files": FilesPane, "apps": AppsPane, "wifi": Wif
 # ── the app ──────────────────────────────────────────────────────────
 
 class OreoApp(App, Sink):
-    TITLE = "Oreo Badge"
+    TITLE = "Falera Badge"
     ENABLE_COMMAND_PALETTE = False
     POLL_S = 1.0              # seconds between looks for a badge while waiting
 
@@ -879,7 +879,7 @@ class OreoApp(App, Sink):
     def connect(self, port):
         self.session.attach(port)
         self.sub_title = "%s · connecting" % port
-        self.log_line("[dim]badge on %s; pausing OreoOS while this view is open[/dim]"
+        self.log_line("[dim]badge on %s; pausing FaleraOS while this view is open[/dim]"
                       % esc(port))
 
         def run(ui, b, c, _):
@@ -902,10 +902,10 @@ class OreoApp(App, Sink):
             self.sub_title = "no badge"
             return
         info = self.info or {}
-        name = "Oreo Badge" + ((" " + s.serial) if s.serial else "")
+        name = "Falera Badge" + ((" " + s.serial) if s.serial else "")
         self.title = name
-        state = "OreoOS paused" if s.paused else "OreoOS running"
-        self.sub_title = "OreoOS %s · %s · %s" % (info.get("os") or "?", s.port, state)
+        state = "FaleraOS paused" if s.paused else "FaleraOS running"
+        self.sub_title = "FaleraOS %s · %s · %s" % (info.get("os") or "?", s.port, state)
 
     def after_update(self):
         """After `update`: if the badge restarted, find it again."""
@@ -1102,8 +1102,8 @@ class OreoApp(App, Sink):
         if s.badge is None:
             msg = "no badge"
         else:
-            msg = "ready · %s" % ("OreoOS paused while this view is open"
-                                  if s.paused else "OreoOS running")
+            msg = "ready · %s" % ("FaleraOS paused while this view is open"
+                                  if s.paused else "FaleraOS running")
         self.query_one("#activity-text", Label).update(Text(msg, style="dim"))
         self.query_one("#activity-hint", Label).update("")
 
@@ -1217,10 +1217,10 @@ def links_text():
 
 
 def run_shell(b):
-    """The REPL, as `oreo shell` and the menu run it (the app is suspended)."""
+    """The REPL, as `falera shell` and the menu run it (the app is suspended)."""
     from .ui import UI
     ui = UI()
-    print("\nMicroPython on %s. Ctrl-] or Ctrl-X goes back to the Oreo view.\n" % b.port)
+    print("\nMicroPython on %s. Ctrl-] or Ctrl-X goes back to the Falera view.\n" % b.port)
     b.connect()
     b.link.friendly()
     try:
@@ -1231,7 +1231,7 @@ def run_shell(b):
 
 
 def run(ctx, _headless=None):
-    """Open the full-screen view. OreoOS restarts when it closes, also on
+    """Open the full-screen view. FaleraOS restarts when it closes, also on
     Ctrl-C and on errors. `_headless` (tests): an auto-pilot coroutine
     function that drives the view without a terminal."""
     app = OreoApp(ctx)
@@ -1247,5 +1247,5 @@ def run(ctx, _headless=None):
         held = session.badge is not None
         session.close(ctx.args.reset)
     if held:
-        ctx.ui.ok("OreoOS is starting again" if ctx.args.reset != "none" else "done")
+        ctx.ui.ok("FaleraOS is starting again" if ctx.args.reset != "none" else "done")
     return 0

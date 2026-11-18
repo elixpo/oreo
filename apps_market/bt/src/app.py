@@ -3,11 +3,11 @@
 What this page shows (all live, polled at 4 Hz, repainted only on change):
 
   Radio      ON / OFF            A toggles (same as the notification panel)
-  Link       off / visible as "Oreo" / connected + peer MAC
+  Link       off / visible as "Falera" / connected + peer MAC
   Paired     bonded devices in /bonds.json
   Receive    idle, or a progress bar while a BLE transfer is arriving
 
-Computers send files over USB with the Transfer app and `oreo send`
+Computers send files over USB with the Transfer app and `falera send`
 (docs/TRANSFER.md), which is much faster. Over BLE the badge accepts .txt / .md (and raw image bytes)
 from tools/bt_send.py on a laptop; see docs/BLUETOOTH.md for what works,
 the limits, and the plan.
@@ -91,7 +91,7 @@ class App(oreoOS.App):
             if not ok:
                 self._flash("Radio did not respond")
             elif want:
-                self._flash('Visible as "Oreo"')
+                self._flash('Visible as "Falera"')
             else:
                 self._flash("Bluetooth off")
         elif btn == api.BTN_C and self._snap.get("conn"):
@@ -154,7 +154,7 @@ class App(oreoOS.App):
         elif s.get("conn"):
             link, col = "connected", GREEN
         else:
-            link, col = 'visible as "Oreo"', theme.TEAL
+            link, col = 'visible as "Falera"', theme.TEAL
         self._row(d, 1, "Link", link, col)
         if s.get("conn") and s.get("peer"):
             d.text(s["peer"], VALUE_X, TOP_Y + ROW_H + 12, theme.TEXT_DIM)
@@ -179,7 +179,7 @@ class App(oreoOS.App):
         d.rect(PAD_X, y + 26, SW - 2 * PAD_X, 1, theme.MUTED2, fill=True)
         lines = (
             ("Computers: Transfer app over USB", theme.TEXT_BRIGHT),
-            ("(`oreo send` on the computer).", theme.TEXT_DIM),
+            ("(`falera send` on the computer).", theme.TEXT_DIM),
             ("BLE receive: .txt / .md from a", theme.TEXT_DIM),
             ("laptop with tools/bt_send.py.", theme.TEXT_DIM),
             ("Pair requests pop up on screen.", theme.TEXT_DIM),

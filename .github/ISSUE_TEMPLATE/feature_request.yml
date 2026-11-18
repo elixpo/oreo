@@ -16,7 +16,7 @@ body:
       multiple: true
       options:
         - Hardware (PCB, schematics, BOM)
-        - Website (oreo.elixpo.com)
+        - Website (falera.elixpo.com)
         - Docs
         - Build and CI
         - Assets (icons, sprites, fonts)
@@ -43,5 +43,5 @@ body:
     attributes:
       label: Code of Conduct
       options:
-        - label: I agree to follow the project's [Code of Conduct](https://github.com/elixpo/oreo/blob/main/CODE_OF_CONDUCT.md).
+        - label: I agree to follow the project's [Code of Conduct](https://github.com/elixpo/falera/blob/main/CODE_OF_CONDUCT.md).
           required: true

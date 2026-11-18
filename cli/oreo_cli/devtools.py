@@ -1,14 +1,14 @@
-"""App development from the computer: `oreo new` and `oreo app`.
+"""App development from the computer: `falera new` and `falera app`.
 
-`oreo new <name>` copies the app template that ships inside this package
-(oreo_cli/app_template, a copy of app_templates/ in the OreoOS repo) into a
+`falera new <name>` copies the app template that ships inside this package
+(oreo_cli/app_template, a copy of app_templates/ in the FaleraOS repo) into a
 new folder and fills in the name, id and author.
 
-`oreo app install <folder>` checks the folder with the same rules as
+`falera app install <folder>` checks the folder with the same rules as
 tools/validate_app.py (vendored in appcheck.py), copies the files that
 belong on the badge to /apps/<id>/ with the verified push (temp file,
 SHA-256, rename), removes files a previous install left that are no
-longer in the folder, and lets OreoOS restart so the drawer lists it.
+longer in the folder, and lets FaleraOS restart so the drawer lists it.
 """
 
 import json
@@ -31,20 +31,20 @@ APPS_DIR = "/apps"
 SYSTEM_APPS = tuple(DEFAULT_APPS) + ("launcher",)
 
 
-# ── oreo new ─────────────────────────────────────────────────────────
+# ── falera new ─────────────────────────────────────────────────────────
 
 def names_for(name, display=None):
     """(app id, display name) from what the person typed: `my_game`,
     `My Game` and `my-game` all give ("my_game", "My Game")."""
     raw = name.strip()
     if not raw:
-        raise UsageError("the app needs a name", hint="oreo new my_game")
+        raise UsageError("the app needs a name", hint="falera new my_game")
     aid = re.sub(r"[^a-z0-9]+", "_", raw.lower()).strip("_")
     aid = re.sub(r"^[0-9_]+", "", aid)
     if not appcheck._ID_RE.match(aid or ""):
         raise UsageError("cannot make an app id from %r" % name,
                          hint="start with a letter; letters, digits and _ only, "
-                              "at most 32 characters (e.g. oreo new my_game)")
+                              "at most 32 characters (e.g. falera new my_game)")
     if display is None:
         if re.match(r"^[a-z0-9_-]+$", raw):
             display = " ".join(w.capitalize() for w in re.split(r"[_-]+", raw) if w)
@@ -74,23 +74,23 @@ def _replace(path, pairs):
     for old, new in pairs:
         if old not in text:
             raise OreoError("the app template changed: %r is missing from %s" % (old, path.name),
-                            hint="this is a bug in oreo; please report it")
+                            hint="this is a bug in falera; please report it")
         text = text.replace(old, new)
     path.write_text(text, encoding="utf-8")
 
 
 README = """# {name}
 
-A new OreoOS app, made with `oreo new`. It starts as the counter example:
+A new FaleraOS app, made with `falera new`. It starts as the counter example:
 **A** adds one, **B** takes one away, **HOME** goes back.
 
 ## Try it on the badge
 
 ```sh
-oreo app install .      # checks the folder, copies it to /apps/{id}/
+falera app install .      # checks the folder, copies it to /apps/{id}/
 ```
 
-OreoOS restarts and **{name}** is in the Apps drawer.
+FaleraOS restarts and **{name}** is in the Apps drawer.
 
 ## Files
 
@@ -98,17 +98,17 @@ OreoOS restarts and **{name}** is in the Apps drawer.
 - `main.py`: entry shim, exposes `App`
 - `src/app.py`: the app itself
 - `assets/optimized/{id}_icon.py`: the drawer icon (from `icon.png`, made
-  with `tools/app_icon.py` in the OreoOS repo)
+  with `tools/app_icon.py` in the FaleraOS repo)
 
-The app guide: https://github.com/elixpo/oreo/blob/main/docs/APPS.md
+The app guide: https://github.com/elixpo/falera/blob/main/docs/APPS.md
 """
 
 
 def scaffold(dest, aid, display, author):
     """Copy the template to `dest` and personalise it."""
     if not TEMPLATE.is_dir():
-        raise OreoError("the app template is missing from this oreo install",
-                        hint="reinstall oreo-cli")
+        raise OreoError("the app template is missing from this falera install",
+                        hint="reinstall falera-cli")
     shutil.copytree(TEMPLATE, dest,
                     ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "README.md"))
     stem = "%s_icon" % aid
@@ -150,7 +150,7 @@ def cmd_new(ctx):
     errors, warnings = appcheck.validate(dest)
     if errors:   # the template itself is broken
         raise OreoError("the new app does not pass the checks: %s" % "; ".join(errors),
-                        hint="this is a bug in oreo; please report it")
+                        hint="this is a bug in falera; please report it")
     ui.ok("created %s" % esc(dest))
     for w in warnings:
         ui.warn(esc(w))
@@ -158,11 +158,11 @@ def cmd_new(ctx):
         ui.note('set "author" in manifest.json to your GitHub handle')
     ui.note("next:")
     ui.step("edit %s" % esc(dest / "src" / "app.py"))
-    ui.step("oreo app install %s" % esc(dest))
+    ui.step("falera app install %s" % esc(dest))
     return 0
 
 
-# ── oreo app install ─────────────────────────────────────────────────
+# ── falera app install ─────────────────────────────────────────────────
 
 def check_folder(ui, folder):
     """(app id, manifest, [(local Path, rel)]) for a folder that passes the
@@ -175,7 +175,7 @@ def check_folder(ui, folder):
         for e in errors:
             ui.error(esc(e))
         raise OreoError("%s cannot be installed: fix the error(s) above" % folder.name,
-                        hint="the same checks as tools/validate_app.py in the OreoOS repo")
+                        hint="the same checks as tools/validate_app.py in the FaleraOS repo")
     for w in warnings:
         ui.warn(esc(w))
     manifest = json.loads((folder / "manifest.json").read_text(encoding="utf-8"))
@@ -190,7 +190,7 @@ def check_folder(ui, folder):
 
 
 def refuse_builtin(aid):
-    raise OreoError("%s is a built-in app; installing over it replaces OreoOS's own copy"
+    raise OreoError("%s is a built-in app; installing over it replaces FaleraOS's own copy"
                     % aid, hint="rename your app (\"slug\" in manifest.json), or add "
                                 "--force if you are working on the built-in app")
 
@@ -217,7 +217,7 @@ def install_folder(ui, b, checked, force=False, verify=True):
     if total + 64 * 1024 > free:
         raise OreoError("not enough space: %s to copy, %s free on the badge"
                         % (human(total), human(free)),
-                        hint="free some space (`oreo info`, `oreo rm`)")
+                        hint="free some space (`falera info`, `falera rm`)")
     ui.header("app install", "%s %s, %d file(s), %s -> %s"
               % (esc(manifest.get("name") or aid), esc(manifest.get("version") or ""),
                  len(blobs), human(total), target))
@@ -242,18 +242,18 @@ def install_folder(ui, b, checked, force=False, verify=True):
 
 def after_install(ui, name, reset):
     if reset == "none":
-        ui.note("the badge is at the MicroPython prompt (--reset none); restart OreoOS "
+        ui.note("the badge is at the MicroPython prompt (--reset none); restart FaleraOS "
                 "(Ctrl-D there, or unplug and replug) to see %s in the Apps drawer" % esc(name))
     else:
-        ui.ok("OreoOS is restarting; open %s from the Apps drawer" % esc(name))
-        ui.note("to try a change, run `oreo app install` again (or `oreo push` the changed "
-                "files); OreoOS restarts afterwards, so the new code is what loads")
+        ui.ok("FaleraOS is restarting; open %s from the Apps drawer" % esc(name))
+        ui.note("to try a change, run `falera app install` again (or `falera push` the changed "
+                "files); FaleraOS restarts afterwards, so the new code is what loads")
 
 
 def _app_target_required(action, target):
     if not target:
-        hint = {"install": "oreo app install ./my_app",
-                "remove": "oreo app remove my_app"}[action]
+        hint = {"install": "falera app install ./my_app",
+                "remove": "falera app remove my_app"}[action]
         raise UsageError("which app?", hint=hint)
 
 
@@ -267,7 +267,7 @@ def cmd_app(ctx):
     _app_target_required(args.action, args.target)
     if args.action == "remove":
         if posixpath.basename(args.target.rstrip("/")) != args.target:
-            raise UsageError("give the app id, not a path", hint="oreo app remove my_app")
+            raise UsageError("give the app id, not a path", hint="falera app remove my_app")
         with ctx.session() as b:
             return apps_action(ui, b, "remove", args.target)
     # install: check the folder before the badge is touched
@@ -287,6 +287,6 @@ def install_prompt(ui, b):
     if not path:
         return
     _, manifest = install_folder(ui, b, check_folder(ui, path))
-    ui.note("%s appears in the Apps drawer when OreoOS restarts (when you quit this view)"
+    ui.note("%s appears in the Apps drawer when FaleraOS restarts (when you quit this view)"
             % esc(manifest.get("name") or ""))
 

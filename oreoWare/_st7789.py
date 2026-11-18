@@ -70,10 +70,10 @@ class ST7789:
 
     def resume(self):
         """Put the panel in the configuration init() sets, without the
-        hardware and software resets, so a panel OreoOS already set up
+        hardware and software resets, so a panel FaleraOS already set up
         keeps its picture (no blank flash) and one that lost it (the
         badge reset) comes back. About 130 ms. oreoOS.hostui uses it to
-        draw while OreoOS is stopped at the raw REPL."""
+        draw while FaleraOS is stopped at the raw REPL."""
         self._configure(120, 10)
 
     def _configure(self, slpout_ms, dispon_ms):

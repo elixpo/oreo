@@ -1,4 +1,4 @@
-"""Updates: the installed OreoOS version, the update check, and installs.
+"""Updates: the installed FaleraOS version, the update check, and installs.
 
 Reached from Settings > Version, About, and the notification panel's
 "Update available" card.
@@ -27,7 +27,7 @@ Nothing here blocks a frame: the check (GitHub tags, then the release
 manifest and the file comparison) and the download run on a worker
 (oreoOS.cache.Refresh). The worker only returns data and writes progress
 numbers; settings and drawing stay on the UI thread. Without threads the
-job runs inside poll() a frame later, as everywhere else in OreoOS.
+job runs inside poll() a frame later, as everywhere else in FaleraOS.
 """
 
 import oreoOS

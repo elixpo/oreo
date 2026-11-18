@@ -2,7 +2,7 @@
 
 Boot splash: the dimmed photo backdrop with the logo top left, "hello"
 rolling through languages in the middle (each word in its own script,
-anti-aliased, light on the dark photo), a small "OreoOS" under it and a
+anti-aliased, light on the dark photo), a small "FaleraOS" under it and a
 loader along the bottom; it hands over to the OS with a chevron swipe
 (swipe_in). tools/build_splash.py renders it all into
 oreoOS/splash.bin: the static frame, plus one 16-level coverage mask per
@@ -557,7 +557,7 @@ class Splash:
         d = self._os.display
         d.clear(api.rgb(12, 18, 32))
         d.text("hello", (SW - 5 * 24) // 2, SH // 2 - 20, api.WHITE, scale=3)
-        d.text("OreoOS", (SW - 6 * 8) // 2, SH // 2 + 12, theme.PRIMARY)
+        d.text("FaleraOS", (SW - 6 * 8) // 2, SH // 2 + 12, theme.PRIMARY)
         d.present()
 
     def _first_frame(self):
@@ -767,7 +767,7 @@ def show_updating(os_obj, target_version, total_files):
     warning_y = version_y + 20
     file_y    = warning_y + 18
 
-    title = "UPDATING OREOOS"
+    title = "UPDATING FALERAOS"
     tw    = len(title) * 16
     d.text(title, (SW - tw) // 2, title_y, api.WHITE, scale=2)
 

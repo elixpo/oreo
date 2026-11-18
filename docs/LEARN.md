@@ -1,12 +1,12 @@
 <div align="center">
 
-# Learn from OreoOS
+# Learn from FaleraOS
 
 **A guided tour of an open-source Python OS for a conference badge.**
 
 [![Built with Pollinations](https://img.shields.io/badge/Built%20with-Pollinations-8a2be2?style=for-the-badge&logoColor=white&labelColor=6a0dad)](https://pollinations.ai)
-[![Docs](https://img.shields.io/badge/docs-oreo.elixpo.com-FF5D68?style=for-the-badge)](https://oreo.elixpo.com)
-[![Contribute](https://img.shields.io/badge/contribute-good_first_issues-00B4A5?style=for-the-badge)](https://github.com/elixpo/oreo/contribute)
+[![Docs](https://img.shields.io/badge/docs-falera.elixpo.com-FF5D68?style=for-the-badge)](https://falera.elixpo.com)
+[![Contribute](https://img.shields.io/badge/contribute-good_first_issues-00B4A5?style=for-the-badge)](https://github.com/elixpo/falera/contribute)
 
 </div>
 
@@ -25,7 +25,7 @@ your changes light up an LCD.
 
 ## 🧠 What you can learn here
 
-OreoOS is small enough to read in a weekend but real enough to teach
+FaleraOS is small enough to read in a weekend but real enough to teach
 patterns you'll use everywhere:
 
 | Topic | Where to look |
@@ -42,7 +42,7 @@ patterns you'll use everywhere:
 | **Caching with TTL** — small disk + memory cache for network responses | [`oreoOS/cache.py`](../oreoOS/cache.py) |
 | **A theme system** — single colour source of truth across the OS | [`oreoOS/theme.py`](../oreoOS/theme.py) |
 | **Game design on tiny screens** — Snake, Flappy, Racer, IR Quest | [`apps_market/snake/`](../apps_market/snake/), [`apps_market/flappy/`](../apps_market/flappy/), [`apps_market/racer/`](../apps_market/racer/), [`apps_market/quest/`](../apps_market/quest/) |
-| **Static-site deployment** — Next.js → Cloudflare Pages, custom domain | [`oreo.elixpo/`](../oreo.elixpo/) |
+| **Static-site deployment** — Next.js → Cloudflare Pages, custom domain | [`falera.elixpo/`](../falera.elixpo/) |
 | **Asset pipelines** — PNG → RGB565 baked Python modules | [`tools/optimize_assets.py`](../tools/optimize_assets.py) |
 | **A custom hardware-design notebook** — pin maps, schematics, BOM thinking | [`docs/`](./) |
 
@@ -51,8 +51,8 @@ patterns you'll use everywhere:
 ## 🚀 Quick start (no badge required)
 
 ```bash
-git clone https://github.com/elixpo/oreo
-cd oreo
+git clone https://github.com/elixpo/falera
+cd falera
 
 # Browse the code
 ls apps/                  # 20 apps, each in its own folder
@@ -127,7 +127,7 @@ Pick **one** of these and read it. Each is self-contained and teaches
 something specific.
 
 - **Transfer protocol** — [`apps/transfer/src/proto.py`](../apps/transfer/src/proto.py).
-  How the badge receives files from `oreo transfer send` over USB:
+  How the badge receives files from `falera transfer send` over USB:
   framed messages, checksums, streaming to disk, a one-time code shown
   on the screen, and a session state machine (see
   [`TRANSFER.md`](TRANSFER.md)).
@@ -157,7 +157,7 @@ cp -r app_templates apps/my_app
 ```
 
 See **[`app_templates/README.md`](../app_templates/README.md)** for the
-walkthrough and **<https://oreo.elixpo.com/docs/apps/>** for the deep
+walkthrough and **<https://falera.elixpo.com/docs/apps/>** for the deep
 reference (lifecycle hooks, drawing API, manifest fields, persistence).
 
 Suggested first apps to build:
@@ -173,7 +173,7 @@ Suggested first apps to build:
 Once you can write apps, the next step is upstreaming improvements to
 the OS itself, or shipping an app to the on-device store.
 
-- Browse [`good first issue`](https://github.com/elixpo/oreo/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
+- Browse [`good first issue`](https://github.com/elixpo/falera/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
   labels.
 - Read [`CONTRIBUTING.md`](../CONTRIBUTING.md).
 - Ship a Market app: drop a folder into [`apps_market/`](../apps_market/).
@@ -200,10 +200,10 @@ require having the hardware on your desk to write correctly.
 
 ## 🔗 Resources
 
-- **Website** — <https://oreo.elixpo.com> (overview, badge, apps, hacks)
-- **App-building docs** — <https://oreo.elixpo.com/docs/apps/>
+- **Website** — <https://falera.elixpo.com> (overview, badge, apps, hacks)
+- **App-building docs** — <https://falera.elixpo.com/docs/apps/>
 - **Contributing guide** — [`CONTRIBUTING.md`](../CONTRIBUTING.md)
-- **Issues** — <https://github.com/elixpo/oreo/issues>
+- **Issues** — <https://github.com/elixpo/falera/issues>
 - **App template** — [`app_templates/`](../app_templates/)
 - **Reference app (fully split)** — [`apps_market/snake/`](../apps_market/snake/)
 
@@ -220,7 +220,7 @@ External:
 
 ## 💬 Stuck? Ask.
 
-Open a [Discussion](https://github.com/elixpo/oreo/discussions) with
+Open a [Discussion](https://github.com/elixpo/falera/discussions) with
 the tag `learning` — questions about why something is the way it is
 are *especially* welcome, because they often reveal docs we should
 have written. There is no such thing as a beginner question here.

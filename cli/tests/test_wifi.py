@@ -1,4 +1,4 @@
-"""`oreo wifi`: scan, connect, saved, forget — and password handling."""
+"""`falera wifi`: scan, connect, saved, forget — and password handling."""
 
 import io
 import unittest

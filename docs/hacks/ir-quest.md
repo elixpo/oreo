@@ -9,12 +9,12 @@ beacon" that sends a code over and over, and has a second badge pick it up.
 - **You need:** two badges with the IR parts fitted (TSOP38238 receiver on
   GPIO 18, IR LED driven by a 2N2222 from GPIO 2; see
   [HARDWARE.md](../HARDWARE.md#pinout)), Wi-Fi on the badges for the App
-  Store, and [oreo-cli](../CLI.md#install). A TV remote is handy for testing.
+  Store, and [falera-cli](../CLI.md#install). A TV remote is handy for testing.
 
 ## Be aware: receiving is not reliable yet
 
 Sending works. Receiving has an open bug,
-[#48](https://github.com/elixpo/oreo/issues/48): on the ESP32-S3 the native
+[#48](https://github.com/elixpo/falera/issues/48): on the ESP32-S3 the native
 RMT receiver could fail to start (`RMT RX ... failed: ESP_ERR_IN...`). The
 cause found in the code is the receiver's glitch filter, which asked for
 more than the ESP32-S3 allows (`ESP_ERR_INVALID_ARG`); firmware with the fix
@@ -26,7 +26,7 @@ self-test below and add its output to #48; that is a useful contribution in
 itself.
 
 ```bash
-oreo run tools/ir_selftest.py      # from an OreoOS checkout; ends in "IR48 RESULT"
+falera run tools/ir_selftest.py      # from a FaleraOS checkout; ends in "IR48 RESULT"
 ```
 
 Despite its store description, IR Quest does not keep or trade tokens
@@ -36,7 +36,7 @@ be written.
 ## 1. Install IR Quest on both badges
 
 ```bash
-oreo apps install quest
+falera apps install quest
 ```
 
 or open **App Store** on the badge.
@@ -53,7 +53,7 @@ backend reads `native RMT` or `pin IRQ (fallback)`, with the RMT channel,
 DMA, glitch filter, driver state and the full error text if the native
 receiver failed (**UP**/**DOWN** scroll it). **A** restarts the receiver
 there, and **RIGHT** turns on a serial log of every receiver step, which
-`oreo logs` shows as `[ir]` lines.
+`falera logs` shows as `[ir]` lines.
 
 ## 3. Send a code from the other badge
 
@@ -89,12 +89,12 @@ while True:
 and run it on the beacon badge:
 
 ```bash
-oreo run beacon.py
+falera run beacon.py
 ```
 
-`oreo run` pauses OreoOS while the script runs and streams its output, so
-the beacon badge stays plugged into the computer running `oreo`.
-**Ctrl-C** stops it and OreoOS starts again. Visitors with IR Quest open on
+`falera run` pauses FaleraOS while the script runs and streams its output, so
+the beacon badge stays plugged into the computer running `falera`.
+**Ctrl-C** stops it and FaleraOS starts again. Visitors with IR Quest open on
 BEACON see `CAFEBABE` arrive once a second.
 
 To add your own named codes to the SEND list, edit `CODES` at the top of
@@ -104,6 +104,6 @@ To add your own named codes to the SEND list, edit `CODES` at the top of
 
 - A real token game: give each booth a code, and have an app remember
   which codes it has seen with `oreoOS.state`. Propose it with the
-  [app form](https://github.com/elixpo/oreo/issues/new?template=app_proposal.yml).
-- Help close [#48](https://github.com/elixpo/oreo/issues/48): its
+  [app form](https://github.com/elixpo/falera/issues/new?template=app_proposal.yml).
+- Help close [#48](https://github.com/elixpo/falera/issues/48): its
   acceptance criteria list what has to be tested.

@@ -1,5 +1,5 @@
 name: Bug report
-description: Something on the badge, in an app or in the oreo CLI does not work as it should.
+description: Something on the badge, in an app or in the falera CLI does not work as it should.
 title: "bug: "
 labels: ["bug"]
 body:
@@ -7,9 +7,9 @@ body:
     attributes:
       value: |
         Thanks for reporting this. The commands below run on the computer the
-        badge is plugged into ([oreo-cli](https://oreo.elixpo.com/docs/cli/)).
+        badge is plugged into ([falera-cli](https://falera.elixpo.com/docs/cli/)).
         A photo of the screen helps. Security problems go to a
-        [private advisory](https://github.com/elixpo/oreo/security/advisories/new), not here.
+        [private advisory](https://github.com/elixpo/falera/security/advisories/new), not here.
 
   - type: dropdown
     id: area
@@ -17,9 +17,9 @@ body:
       label: Where is the bug?
       options:
         - An app on the badge
-        - OreoOS (home screen, drawer, notifications, updates, Wi-Fi)
-        - The oreo CLI
-        - Transfer (oreo transfer / the Transfer app)
+        - FaleraOS (home screen, drawer, notifications, updates, Wi-Fi)
+        - The falera CLI
+        - Transfer (falera transfer / the Transfer app)
         - Firmware or hardware drivers
         - Not sure
     validations:
@@ -28,18 +28,18 @@ body:
   - type: input
     id: version
     attributes:
-      label: OreoOS version
-      description: The first lines of `oreo info` (or the About app on the badge).
-      placeholder: "e.g. OreoOS v2.0.0 (2026-11-01), MicroPython 1.28.0"
+      label: FaleraOS version
+      description: The first lines of `falera info` (or the About app on the badge).
+      placeholder: "e.g. FaleraOS v2.0.0 (2026-11-01), MicroPython 1.28.0"
     validations:
       required: true
 
   - type: input
     id: cli_version
     attributes:
-      label: oreo-cli version and computer
-      description: "`oreo --version`, and your OS (Linux, macOS, Windows/WSL). Skip if the CLI is not involved."
-      placeholder: "e.g. oreo-cli 1.0.0 on Ubuntu 24.04"
+      label: falera-cli version and computer
+      description: "`falera --version`, and your OS (Linux, macOS, Windows/WSL). Skip if the CLI is not involved."
+      placeholder: "e.g. falera-cli 1.0.0 on Ubuntu 24.04"
 
   - type: dropdown
     id: hardware
@@ -47,7 +47,7 @@ body:
       label: Hardware
       options:
         - ESP32-S3-DevKitC-1 N16R8 on a breadboard (reference build)
-        - Oreo PCB
+        - Falera PCB
         - Other or not sure
     validations:
       required: true
@@ -76,7 +76,7 @@ body:
   - type: textarea
     id: doctor
     attributes:
-      label: "`oreo doctor` output"
+      label: "`falera doctor` output"
       description: Checks the cable, port, permissions and firmware. Paste it as is.
       render: shell
 
@@ -84,7 +84,7 @@ body:
     id: logs
     attributes:
       label: Console output (optional)
-      description: "`oreo logs --restart`, then reproduce the bug. For a crash, also `oreo pull /crash.log` and paste the end of it."
+      description: "`falera logs --restart`, then reproduce the bug. For a crash, also `falera pull /crash.log` and paste the end of it."
       render: shell
 
   - type: checkboxes
@@ -92,5 +92,5 @@ body:
     attributes:
       label: Code of Conduct
       options:
-        - label: I agree to follow the project's [Code of Conduct](https://github.com/elixpo/oreo/blob/main/CODE_OF_CONDUCT.md).
+        - label: I agree to follow the project's [Code of Conduct](https://github.com/elixpo/falera/blob/main/CODE_OF_CONDUCT.md).
           required: true

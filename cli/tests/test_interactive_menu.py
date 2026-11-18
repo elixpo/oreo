@@ -36,7 +36,7 @@ class MenuTest(unittest.TestCase):
         self.assertEqual(json.loads(self.fake.get("/profile.json")),
                          {"GITHUB_USER": "octocat", "TIMEZONE_OFFSET": 5.5, "OWM_API_KEY": KEY})
         self.assertNotIn(KEY, r.out)
-        self.assertIn("when OreoOS restarts", r.out)
+        self.assertIn("when FaleraOS restarts", r.out)
         self.assertEqual(self.fake.enters, 1)
         self.assertEqual(self.fake.restarts, ["soft"])
 
@@ -67,7 +67,7 @@ class MenuTest(unittest.TestCase):
         self.assertFalse(self.fake.exists("/apps/junk"))
 
 
-@unittest.skipUnless(PROTO.exists(), "not inside an OreoOS checkout")
+@unittest.skipUnless(PROTO.exists(), "not inside a FaleraOS checkout")
 class TransferEntryTest(unittest.TestCase):
     def setUp(self):
         self.proto = load_proto()
@@ -94,7 +94,7 @@ class TransferEntryTest(unittest.TestCase):
         self.assertEqual(r.rc, 0, r.out)
         self.assertIn("2 file(s) sent", r.out)
         self.assertTrue(Path(self.badge_root, "documents/notes.mdz").exists())
-        # OreoOS was restarted (soft) before the Transfer session, not after
+        # FaleraOS was restarted (soft) before the Transfer session, not after
         self.assertEqual(self.fake.restarts[0], "soft")
         self.assertIn("next menu entry", r.out)
         self.assertEqual(ser.rx.state, self.proto.WAITING)

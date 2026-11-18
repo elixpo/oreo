@@ -25,7 +25,7 @@ except ImportError:  # pragma: no cover - exercised only without rich
     HAVE_RICH = False
 
 
-# Oreo palette: cookie brown for the brand, cream accents, plain status
+# Falera palette: cookie brown for the brand, cream accents, plain status
 # colours so the meaning reads in any terminal theme.
 STYLES = {
     "brand":  "bold #c58b5b",
@@ -49,7 +49,7 @@ MARK_BRAND = "◆"  # black diamond
 # boxes, the Wi-Fi signal bars, separators). If stdout cannot encode these it
 # is not UTF-8: a Windows pipe or redirect uses the ANSI code page (cp1252).
 _PROBE = "✓✗→◆─│╭▂▄▆█·…"
-SEP = "·"         # middle dot, between "oreo" and the command in headers
+SEP = "·"         # middle dot, between "falera" and the command in headers
 BARS = ("▂▄▆█", "·")  # Wi-Fi signal: filled levels, empty level
 _ASCII_MARKS = {"MARK_OK": "+", "MARK_ERR": "x", "MARK_STEP": ">", "MARK_BRAND": "*",
                 "SEP": "-", "BARS": ("||||", ".")}
@@ -68,7 +68,7 @@ def adapt_stdio(streams=None):
     """Make output safe on a terminal or pipe that is not UTF-8.
 
     Without this, printing a mark raises UnicodeEncodeError and the command
-    dies (`oreo devs > out.txt` on Windows). A stream that cannot encode the
+    dies (`falera devs > out.txt` on Windows). A stream that cannot encode the
     marks gets errors="replace", so no character can crash a command, and
     if stdout is one of them the marks switch to ASCII so ok/error lines
     still read. Returns True if it changed anything.
@@ -157,7 +157,7 @@ class UI:
         self.console.print(text)
 
     def header(self, title, subtitle=None):
-        line = "[brand]%s oreo[/] [dim]%s[/] [title]%s[/]" % (MARK_BRAND, SEP, title)
+        line = "[brand]%s falera[/] [dim]%s[/] [title]%s[/]" % (MARK_BRAND, SEP, title)
         if self.rich:
             self.console.rule(line, align="left", style="rule")
         else:

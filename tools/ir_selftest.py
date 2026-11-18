@@ -1,9 +1,9 @@
 """IR receiver self-test for issue #48. Runs ON the badge (MicroPython):
 
-    oreo run tools/ir_selftest.py
+    falera run tools/ir_selftest.py
 
-`oreo run` pauses OreoOS, runs this file and streams what it prints;
-Ctrl-C stops it and OreoOS starts again. Needs firmware with the hardened
+`falera run` pauses FaleraOS, runs this file and streams what it prints;
+Ctrl-C stops it and FaleraOS starts again. Needs firmware with the hardened
 _oreo_ir module (info() returns 13 fields, debug() exists) and IR Quest
 installed from the App Store (it lives in /apps/quest).
 

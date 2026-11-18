@@ -154,7 +154,7 @@ not ship code that sets it.
 ## Testing on a badge
 
 ```bash
-oreo run tools/tls_probe.py
+falera run tools/tls_probe.py
 ```
 
 prints, with verification on: the clock before and after the sync, the
@@ -187,7 +187,7 @@ plain words (`_http.last_error()`, `error_since(mark)`), for example
 To see what a badge gets, and to dry-run an update without installing it:
 
 ```bash
-oreo run tools/ota_probe.py
+falera run tools/ota_probe.py
 ```
 
 It lists, per GitHub host, the resolver's address, every address DNS lists

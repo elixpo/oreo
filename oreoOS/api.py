@@ -47,7 +47,7 @@ BTN_LEFT  = 6
 BTN_RIGHT = 7
 BUTTONS = (BTN_HOME, BTN_A, BTN_B, BTN_C, BTN_UP, BTN_DOWN, BTN_LEFT, BTN_RIGHT)
 
-# Logical names for what the buttons mean across OreoOS. They are the same
+# Logical names for what the buttons mean across FaleraOS. They are the same
 # numbers, so `btn == api.BTN_SELECT` and `btn == api.BTN_A` are equivalent;
 # use whichever reads better. HOME always leaves the app (the OS handles
 # it). C opens the notification panel unless the app sets CAPTURES_C.

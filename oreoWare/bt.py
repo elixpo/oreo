@@ -1,10 +1,10 @@
-"""Bluetooth (BLE) manager for the Oreo Badge.
+"""Bluetooth (BLE) manager for the Falera Badge.
 
-Advertises as **Oreo** (GAP Complete Local Name). Exposes a tiny custom
+Advertises as **Falera** (GAP Complete Local Name). Exposes a tiny custom
 GATT service so a paired phone / laptop can push a single image or text
 document to the badge:
 
-  Service: 6f72-656f-0000-1000-8000-00805f9b34fb   ("oreo" in ASCII)
+  Service: 6f72-656f-0000-1000-8000-00805f9b34fb   ("falera" in ASCII)
   Char RX (write):    ...0001-...   host  → badge   (chunked payload)
   Char TX (notify):   ...0002-...   badge → host    (status codes)
 
@@ -42,7 +42,7 @@ Usage:
     bt.is_active()
 """
 
-DEVICE_NAME = "Oreo"
+DEVICE_NAME = "Falera"
 IMAGE_MAX   = 250 * 1024    # 250 KB hard cap on incoming images.
 
 GALLERY_DIR  = "apps/gallery/assets/raw"
@@ -607,7 +607,7 @@ def _adv_payload(name):
 
 def _scan_resp_payload(name):
     """Scan-response payload returned to active scanners. Carries the
-    full untruncated name (so phones running active scans see "Oreo
+    full untruncated name (so phones running active scans see "Falera
     Badge" cleanly) plus the 128-bit service UUID so apps that filter
     by service can find us."""
     import bluetooth

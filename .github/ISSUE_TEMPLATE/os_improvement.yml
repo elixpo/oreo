@@ -1,13 +1,13 @@
 name: OS improvement
-description: A change to OreoOS itself (launcher, services, drivers, OTA) or to how it works with the oreo CLI.
+description: A change to FaleraOS itself (launcher, services, drivers, OTA) or to how it works with the falera CLI.
 title: "os: "
 labels: ["enhancement"]
 body:
   - type: markdown
     attributes:
       value: |
-        Read [AGENTS.md](https://github.com/elixpo/oreo/blob/main/AGENTS.md) first: it
-        has the rules OreoOS is built by (the badge works on its own, Wi-Fi
+        Read [AGENTS.md](https://github.com/elixpo/falera/blob/main/AGENTS.md) first: it
+        has the rules FaleraOS is built by (the badge works on its own, Wi-Fi
         is for the internet only, a computer reaches the badge over USB,
         Bluetooth comes last) and the contracts the OS and the CLI share.
         For a large change, agree on the shape here before you write it.
@@ -61,7 +61,7 @@ body:
         - App template (app_templates/)
         - Transfer protocol (proto.py VERSION)
         - Connected-to-computer screen (oreoOS/hostui.py)
-        - Launcher loading /remote/apps for oreo dev
+        - Launcher loading /remote/apps for falera dev
         - USB identity 303a:83ec
         - Not sure
     validations:
@@ -89,5 +89,5 @@ body:
     attributes:
       label: Code of Conduct
       options:
-        - label: I agree to follow the project's [Code of Conduct](https://github.com/elixpo/oreo/blob/main/CODE_OF_CONDUCT.md).
+        - label: I agree to follow the project's [Code of Conduct](https://github.com/elixpo/falera/blob/main/CODE_OF_CONDUCT.md).
           required: true

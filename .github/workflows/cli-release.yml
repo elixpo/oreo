@@ -1,13 +1,13 @@
-# Release workflow for the `oreo` command-line tool in cli/ (issue #117).
+# Release workflow for the `falera` command-line tool in cli/ (issue #117).
 #
-# Separate from the OreoOS release (release.yml):
+# Separate from the FaleraOS release (release.yml):
 #   - it runs only for `cli-v*` tags, and for pull requests that change cli/
 #     (tests and a build, never a release). release.yml runs on pushes to
 #     main that change oreoOS/** or oreoWare/**; a tag push never matches it.
 #   - CLI tags (`cli-v1.0.0`) never match the badge's OTA tag prefixes
 #     (`stable/`, `beta/`; oreoOS/ota.py filters /tags by prefix), and the
 #     CLI release is created with `--latest=false`, so the repository's
-#     "Latest" release stays the newest OreoOS release.
+#     "Latest" release stays the newest FaleraOS release.
 #   - no other workflow here runs on tag pushes or release events, and this
 #     one never commits, so it cannot start release.yml or need [skip release].
 #
@@ -18,11 +18,11 @@
 #
 # Assets (fixed names, derived from the version only, so install.sh and
 # install.ps1 can build the URLs without calling the GitHub API):
-#   oreo_cli-<version>-py3-none-any.whl     + .sha256
-#   oreo_cli-<version>.tar.gz               + .sha256
+#   falera_cli-<version>-py3-none-any.whl     + .sha256
+#   falera_cli-<version>.tar.gz               + .sha256
 #   SHA256SUMS                              both checksums in one file
 # Each package also gets a GitHub build-provenance attestation:
-#   gh attestation verify oreo_cli-<version>-py3-none-any.whl -R elixpo/oreo
+#   gh attestation verify falera_cli-<version>-py3-none-any.whl -R elixpo/falera
 name: cli-release
 
 on:
@@ -131,8 +131,8 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
-          WHEEL="oreo_cli-$VERSION-py3-none-any.whl"
-          SDIST="oreo_cli-$VERSION.tar.gz"
+          WHEEL="falera_cli-$VERSION-py3-none-any.whl"
+          SDIST="falera_cli-$VERSION.tar.gz"
           ls -l dist
           [ -f "dist/$WHEEL" ] || { echo "::error::expected dist/$WHEEL"; exit 1; }
           [ -f "dist/$SDIST" ] || { echo "::error::expected dist/$SDIST"; exit 1; }
@@ -149,18 +149,18 @@ jobs:
         run: |
           set -euo pipefail
           python -m venv "$RUNNER_TEMP/oreo-venv"
-          "$RUNNER_TEMP/oreo-venv/bin/pip" install "dist/oreo_cli-$VERSION-py3-none-any.whl"
+          "$RUNNER_TEMP/oreo-venv/bin/pip" install "dist/falera_cli-$VERSION-py3-none-any.whl"
           OREO="$RUNNER_TEMP/oreo-venv/bin/oreo"
           "$OREO" --version | tee "$RUNNER_TEMP/version.txt"
-          grep -qx "oreo-cli $VERSION" "$RUNNER_TEMP/version.txt"
+          grep -qx "falera-cli $VERSION" "$RUNNER_TEMP/version.txt"
           "$OREO" --help > /dev/null
           "$OREO" help wifi > /dev/null
           "$OREO" help update > /dev/null
           # The same command under the package name.
-          "$RUNNER_TEMP/oreo-venv/bin/oreo-cli" --version | grep -qx "oreo-cli $VERSION"
-          # No badge on the runner: `oreo devs` lists nothing and exits 3.
+          "$RUNNER_TEMP/oreo-venv/bin/falera-cli" --version | grep -qx "falera-cli $VERSION"
+          # No badge on the runner: `falera devs` lists nothing and exits 3.
           rc=0; "$OREO" --no-color devs || rc=$?
-          [ "$rc" -eq 3 ] || { echo "::error::oreo devs exited $rc, expected 3"; exit 1; }
+          [ "$rc" -eq 3 ] || { echo "::error::falera devs exited $rc, expected 3"; exit 1; }
 
       - name: Test install.sh against the built wheel
         env:
@@ -175,12 +175,12 @@ jobs:
           export PIPX_HOME="$RUNNER_TEMP/pipx" PIPX_BIN_DIR="$RUNNER_TEMP/pipx-bin"
           OREO_CLI_VERSION="cli-v$VERSION" OREO_CLI_INSTALLER=pipx \
             OREO_CLI_DOWNLOAD_BASE=http://127.0.0.1:8765 sh cli/install.sh
-          "$PIPX_BIN_DIR/oreo" --version | grep -qx "oreo-cli $VERSION"
+          "$PIPX_BIN_DIR/oreo" --version | grep -qx "falera-cli $VERSION"
           # A wrong checksum must stop the install.
           mkdir -p "$RUNNER_TEMP/bad"
-          cp "dist/oreo_cli-$VERSION-py3-none-any.whl" "$RUNNER_TEMP/bad/"
-          echo "0000000000000000000000000000000000000000000000000000000000000000  oreo_cli-$VERSION-py3-none-any.whl" \
-            > "$RUNNER_TEMP/bad/oreo_cli-$VERSION-py3-none-any.whl.sha256"
+          cp "dist/falera_cli-$VERSION-py3-none-any.whl" "$RUNNER_TEMP/bad/"
+          echo "0000000000000000000000000000000000000000000000000000000000000000  falera_cli-$VERSION-py3-none-any.whl" \
+            > "$RUNNER_TEMP/bad/falera_cli-$VERSION-py3-none-any.whl.sha256"
           if OREO_CLI_VERSION="$VERSION" OREO_CLI_INSTALLER=pipx \
                OREO_CLI_DOWNLOAD_BASE="file://$RUNNER_TEMP/bad" sh cli/install.sh; then
             echo "::error::install.sh accepted a wrong checksum"; exit 1
@@ -191,12 +191,12 @@ jobs:
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: |
-            dist/oreo_cli-${{ steps.version.outputs.version }}-py3-none-any.whl
-            dist/oreo_cli-${{ steps.version.outputs.version }}.tar.gz
+            dist/falera_cli-${{ steps.version.outputs.version }}-py3-none-any.whl
+            dist/falera_cli-${{ steps.version.outputs.version }}.tar.gz
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: oreo-cli-dist
+          name: falera-cli-dist
           path: dist/
           if-no-files-found: error
           retention-days: 14
@@ -212,7 +212,7 @@ jobs:
           python-version: '3.12'
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: oreo-cli-dist
+          name: falera-cli-dist
           path: dist
       - name: Install and run the wheel
         shell: pwsh
@@ -221,17 +221,17 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           python -m venv "$env:RUNNER_TEMP\oreo-venv"
-          & "$env:RUNNER_TEMP\oreo-venv\Scripts\pip.exe" install "dist\oreo_cli-$env:VERSION-py3-none-any.whl"
+          & "$env:RUNNER_TEMP\oreo-venv\Scripts\pip.exe" install "dist\falera_cli-$env:VERSION-py3-none-any.whl"
           if ($LASTEXITCODE -ne 0) { throw "pip install failed" }
           $oreo = "$env:RUNNER_TEMP\oreo-venv\Scripts\oreo.exe"
           $v = (& $oreo --version | Out-String).Trim()
-          if ($v -ne "oreo-cli $env:VERSION") { throw "unexpected version: $v" }
-          $alias = (& "$env:RUNNER_TEMP\oreo-venv\Scripts\oreo-cli.exe" --version | Out-String).Trim()
-          if ($alias -ne "oreo-cli $env:VERSION") { throw "unexpected oreo-cli version: $alias" }
+          if ($v -ne "falera-cli $env:VERSION") { throw "unexpected version: $v" }
+          $alias = (& "$env:RUNNER_TEMP\oreo-venv\Scripts\falera-cli.exe" --version | Out-String).Trim()
+          if ($alias -ne "falera-cli $env:VERSION") { throw "unexpected falera-cli version: $alias" }
           & $oreo --help | Out-Null
-          if ($LASTEXITCODE -ne 0) { throw "oreo --help failed" }
+          if ($LASTEXITCODE -ne 0) { throw "falera --help failed" }
           & $oreo --no-color devs
-          if ($LASTEXITCODE -ne 3) { throw "oreo devs exited $LASTEXITCODE, expected 3" }
+          if ($LASTEXITCODE -ne 3) { throw "falera devs exited $LASTEXITCODE, expected 3" }
           exit 0
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -254,7 +254,7 @@ jobs:
             $env:OREO_CLI_DOWNLOAD_BASE = "http://127.0.0.1:8765"
             & .\src\cli\install.ps1
             $v = (& "$env:PIPX_BIN_DIR\oreo.exe" --version | Out-String).Trim()
-            if ($v -ne "oreo-cli $env:VERSION") { throw "unexpected version after install.ps1: $v" }
+            if ($v -ne "falera-cli $env:VERSION") { throw "unexpected version after install.ps1: $v" }
           } finally {
             Stop-Process -Id $server.Id -ErrorAction SilentlyContinue
           }
@@ -276,7 +276,7 @@ jobs:
           persist-credentials: false
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: oreo-cli-dist
+          name: falera-cli-dist
           path: dist
       - name: Verify checksums
         working-directory: dist
@@ -304,10 +304,10 @@ jobs:
             echo "\$env:OREO_CLI_VERSION = \"cli-v$VERSION\"; irm https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/main/cli/install.ps1 | iex"
             echo '```'
             echo
-            echo "Or download the wheel, check it against \`SHA256SUMS\`, and run \`pipx install oreo_cli-$VERSION-py3-none-any.whl\`."
-            echo "Provenance: \`gh attestation verify oreo_cli-$VERSION-py3-none-any.whl -R ${GITHUB_REPOSITORY}\`."
+            echo "Or download the wheel, check it against \`SHA256SUMS\`, and run \`pipx install falera_cli-$VERSION-py3-none-any.whl\`."
+            echo "Provenance: \`gh attestation verify falera_cli-$VERSION-py3-none-any.whl -R ${GITHUB_REPOSITORY}\`."
             echo
-            echo "Docs: https://oreo.elixpo.com/docs/cli/"
+            echo "Docs: https://falera.elixpo.com/docs/cli/"
           } >> "$RUNNER_TEMP/notes.md"
           cat "$RUNNER_TEMP/notes.md"
       - name: Create the release
@@ -323,11 +323,11 @@ jobs:
           gh release create "$TAG" \
             --repo "$GITHUB_REPOSITORY" \
             --verify-tag \
-            --title "oreo CLI $VERSION" \
+            --title "falera CLI $VERSION" \
             --notes-file "$RUNNER_TEMP/notes.md" \
             "${flags[@]}" \
-            "dist/oreo_cli-$VERSION-py3-none-any.whl" \
-            "dist/oreo_cli-$VERSION-py3-none-any.whl.sha256" \
-            "dist/oreo_cli-$VERSION.tar.gz" \
-            "dist/oreo_cli-$VERSION.tar.gz.sha256" \
+            "dist/falera_cli-$VERSION-py3-none-any.whl" \
+            "dist/falera_cli-$VERSION-py3-none-any.whl.sha256" \
+            "dist/falera_cli-$VERSION.tar.gz" \
+            "dist/falera_cli-$VERSION.tar.gz.sha256" \
             dist/SHA256SUMS

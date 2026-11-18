@@ -3,7 +3,7 @@
 It implements the same interface as oreo_cli.transport.SerialLink, but
 `exec()` runs the snippet in CPython against a fake MicroPython world: an
 `os` module rooted in a temporary folder (ilistdir/stat/statvfs/...), a
-`time` module with ticks, and fake OreoOS modules (oreoOS.config/storage/
+`time` module with ticks, and fake FaleraOS modules (oreoOS.config/storage/
 store, oreoWare.wifi/battery) that tests can replace with the real ones.
 Every snippet the CLI sends is recorded in `.sent`, so tests can check
 what would go over the wire (for example that a password is sent once
@@ -31,7 +31,7 @@ from oreo_cli.errors import BadgeError  # noqa: E402
 
 
 def _offline(url):
-    """Tests never reach GitHub: `oreo setup` sees the avatar download fail
+    """Tests never reach GitHub: `falera setup` sees the avatar download fail
     unless a test puts its own avatar._open in place."""
     raise OSError("no network in tests")
 
@@ -138,7 +138,7 @@ def make_os(root, total=8 * 1024 * 1024):
     m.remove = remove
     m.rename = wrap(lambda a, b: _host_os.replace(real(a), real(b)))
     m.uname = lambda: Uname("esp32", "esp32", "1.28.0", "v1.28.0 on 2026-11-10",
-                            "Elixpo Oreo Badge with ESP32S3")
+                            "Elixpo Falera Badge with ESP32S3")
     m._real = real
     return m
 
@@ -491,7 +491,7 @@ class FakePort:
 
 
 def badge_port(device="/dev/ttyACM0", serial="OREO01"):
-    return FakePort(device, 0x303A, 0x83EC, serial, "Elixpo Oreo Badge")
+    return FakePort(device, 0x303A, 0x83EC, serial, "Elixpo Falera Badge")
 
 
 class ScriptedInput:

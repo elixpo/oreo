@@ -162,7 +162,7 @@ class OldOsFallbackTest(_OldOsCase):
         self.assertEqual(p.read_text(), "9,8,7")
 
     def test_pet(self):
-        m = self.mod_file("apps_market/Oreo Pet/src/app.py", "pet_old_os")
+        m = self.mod_file("apps_market/Lumi/src/app.py", "pet_old_os")
         self.assertIsNone(m.state)
         self.assertEqual(m._load_state(), (100, 100, 100))
         p = self.legacy("apps/pet/state.txt", "80,60,40")

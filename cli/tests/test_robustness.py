@@ -190,7 +190,7 @@ class ShieldedRestartTest(unittest.TestCase):
         b = Badge(link)
         b.entered = True
         finish_shielded(b, "soft")
-        self.assertIn(b"\x04", b"".join(ser.written))    # ctrl-D: OreoOS starts again
+        self.assertIn(b"\x04", b"".join(ser.written))    # ctrl-D: FaleraOS starts again
         self.assertIsNone(link.t)
 
     def test_interrupt_in_the_pause_after_ctrl_d_does_not_reboot_twice(self):
@@ -423,7 +423,7 @@ class DoctorStepsTest(unittest.TestCase):
                                lambda dev: (doctor.OK, "ok " + dev, None)):
             r = run_cli(["doctor"], fake=fake, ports=[badge_port()])
         self.assertEqual(r.rc, 1)
-        self.assertIn("oreo flash", r.out)
+        self.assertIn("falera flash", r.out)
 
 
 class InteractiveTest(unittest.TestCase):

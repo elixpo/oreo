@@ -1,6 +1,6 @@
-"""`oreo transfer`: send files to the badge's Transfer app over USB.
+"""`falera transfer`: send files to the badge's Transfer app over USB.
 
-Unlike `oreo add`/`oreo push`, this never stops OreoOS or uses the raw
+Unlike `falera add`/`falera push`, this never stops FaleraOS or uses the raw
 REPL. The Transfer app on the badge reads the USB serial stream while it
 is open; this module speaks its line protocol (apps/transfer/src/proto.py
 is the badge side, and cli/tests/test_transfer.py runs the two together):
@@ -11,7 +11,7 @@ is the badge side, and cli/tests/test_transfer.py runs the two together):
 
 The person types the six-character code the badge shows, which proves
 they can see the badge they are sending to. Every file is converted
-first (the same conversion as `oreo add`), sent in chunks with a few in
+first (the same conversion as `falera add`), sent in chunks with a few in
 flight, checked on the badge against its SHA-256 and its format header,
 and only then renamed into place.
 
@@ -20,10 +20,10 @@ announces itself when it opens) and otherwise explains; it never falls
 back to the raw REPL.
 
 Nothing is written to the badge until the app has announced itself.
-While the app is closed nothing in OreoOS reads the USB serial stream,
+While the app is closed nothing in FaleraOS reads the USB serial stream,
 and MicroPython keeps unread bytes in a 260-byte ring buffer (259 usable)
 that it checks for Ctrl-C only as each byte enters it. A few unanswered
-hellos would fill it, and then the Ctrl-C that `oreo add`, `oreo shell`
+hellos would fill it, and then the Ctrl-C that `falera add`, `falera shell`
 and mpremote send would never arrive until the badge was reset.
 """
 
@@ -49,7 +49,7 @@ CODE_LEN = 6
 CHUNK = 3072
 WINDOW = 4                   # chunks in flight before waiting for an ack
 
-# Files already in a format OreoOS reads: sent as they are.
+# Files already in a format FaleraOS reads: sent as they are.
 READY_EXTS = {".rz565": "image", ".r565": "image", ".rv565": "video",
               ".mdz": "document", ".txtz": "document"}
 
@@ -88,8 +88,8 @@ def _from_reply(reply, what):
         "closed": "the Transfer app was closed; open it and run the command again",
         "timeout": "the badge waited too long; run the command again",
         "locked": "wait %ss; the badge shows a new code after that" % reply.get("retry_s", "?"),
-        "version": "update oreo-cli and OreoOS so they speak the same protocol",
-        "no_space": "free space on the badge first (`oreo transfer list`, `oreo transfer rm`)",
+        "version": "update falera-cli and FaleraOS so they speak the same protocol",
+        "no_space": "free space on the badge first (`falera transfer list`, `falera transfer rm`)",
         "too_big": "shorten the video (--seconds) or shrink it (--width/--height)",
     }
     return TransferError("%s: %s" % (what, msg), code=code, hint=hints.get(code), reply=reply)
@@ -133,7 +133,7 @@ class Client:
                 flush()
         except Exception as e:
             # pyserial's SerialTimeoutException: the badge stopped reading
-            # (the Transfer app closed, or OreoOS is stuck).
+            # (the Transfer app closed, or FaleraOS is stuck).
             if "Timeout" not in e.__class__.__name__:
                 raise
             raise TransferError("the badge stopped reading the USB port", code="no_answer",
@@ -208,8 +208,8 @@ class Client:
 
         A hello is sent only in answer to an announce, which proves the app
         is reading the port; while the app is closed nothing is written, so
-        the badge's stdin buffer never fills and a later Ctrl-C (`oreo add`,
-        `oreo shell`, mpremote) still gets through."""
+        the badge's stdin buffer never fills and a later Ctrl-C (`falera add`,
+        `falera shell`, mpremote) still gets through."""
         hello_id = os.urandom(4).hex()
         start = self.clock()
         deadline = start + max(wait, ANNOUNCE_WAIT_S)
@@ -220,7 +220,7 @@ class Client:
             nonlocal last
             try:
                 self.send("hello", v=PROTOCOL, host=self.host,
-                          client="oreo-cli " + __version__, id=hello_id)
+                          client="falera-cli " + __version__, id=hello_id)
             except TransferError:       # write timeout: the app stopped reading
                 pass
             last = self.clock()
@@ -235,9 +235,9 @@ class Client:
                     return msg
                 if op == "error" and msg.get("code") == "version":
                     raise TransferError(
-                        "the badge speaks Transfer protocol v%s, this oreo-cli v%d"
+                        "the badge speaks Transfer protocol v%s, this falera-cli v%d"
                         % (msg.get("v"), PROTOCOL), code="version",
-                        hint="update oreo-cli and OreoOS to matching versions")
+                        hint="update falera-cli and FaleraOS to matching versions")
                 if op == "announce" and (last is None or now - last >= HELLO_RESEND_S):
                     hello()          # the app is open and reading now
                 continue
@@ -338,7 +338,7 @@ def _common_arguments(p):
 
 
 def add_arguments(p):
-    """Arguments for `oreo transfer`."""
+    """Arguments for `falera transfer`."""
     p.add_argument("action", nargs="?", default="send", choices=("send", "list", "rm"),
                    help="send files (default), list what is on the badge, or remove one")
     p.add_argument("files", nargs="*", metavar="file",
@@ -347,13 +347,13 @@ def add_arguments(p):
 
 
 def add_send_arguments(p):
-    """Arguments for `oreo send` (the same as `oreo transfer send`)."""
+    """Arguments for `falera send` (the same as `falera transfer send`)."""
     p.add_argument("files", nargs="+", metavar="file")
     _common_arguments(p)
 
 
 def prepare(ui, files, args):
-    """[(kind, name, blob)] in the formats OreoOS reads, before the badge
+    """[(kind, name, blob)] in the formats FaleraOS reads, before the badge
     is touched. Files already converted are sent as they are."""
     ready, convert = [], []
     for f in files:
@@ -429,7 +429,7 @@ def _session(ctx, body):
                                         "(apps drawer -> Tools -> Transfer); waiting up "
                                         "to %ds" % ctx.args.wait))
         ui.ok("Transfer is open on the badge%s, %s free"
-              % ((" (OreoOS %s)" % esc(hello["os"])) if hello.get("os") else "",
+              % ((" (FaleraOS %s)" % esc(hello["os"])) if hello.get("os") else "",
                  human(hello.get("free"))))
         _login(ctx, client)
         try:
@@ -441,7 +441,7 @@ def _session(ctx, body):
         client.bye()
         raise
     finally:
-        link.close()       # OreoOS keeps running: no reset, no raw REPL
+        link.close()       # FaleraOS keeps running: no reset, no raw REPL
 
 
 def send_files(ctx, client, hello, prepared):
@@ -490,7 +490,7 @@ def cmd_transfer(ctx):
     action = getattr(args, "action", "send")
     if action == "send":
         if not args.files:
-            raise OreoError("which files?", hint="oreo transfer send photo.jpg notes.md")
+            raise OreoError("which files?", hint="falera transfer send photo.jpg notes.md")
         ui.header("transfer", "%d file(s) over USB to the Transfer app" % len(args.files))
         prepared = prepare(ui, args.files, args)
         return _session(ctx, lambda c, h: send_files(ctx, c, h, prepared))
@@ -499,8 +499,8 @@ def cmd_transfer(ctx):
         return _session(ctx, lambda c, h: show_list(ui, c.list()) or 0)
     # rm
     if not args.files:
-        raise OreoError("which file?", hint="oreo transfer rm photo.rz565 (names: "
-                        "`oreo transfer list`)")
+        raise OreoError("which file?", hint="falera transfer rm photo.rz565 (names: "
+                        "`falera transfer list`)")
     if not ui.confirm("Remove %s from the badge?" % esc(", ".join(args.files))):
         raise Cancelled("nothing removed")
 

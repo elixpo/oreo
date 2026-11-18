@@ -1,6 +1,6 @@
 """Transfer — receive photos, videos and documents from a computer over USB.
 
-Open the app, run `oreo send <files>` (the same as `oreo transfer send`)
+Open the app, run `falera send <files>` (the same as `falera transfer send`)
 on the computer and type the six-character code shown here. Files are
 checked (SHA-256 and their format header) before they appear in the
 Gallery or the Reader.
@@ -42,7 +42,7 @@ PROGRESS_MS = 250                # repaint cadence while a file arrives
 ANIM_MS = 400                    # "waiting..." dots
 USB_POLL_MS = 1000               # how often to ask whether a host is there
 UNPLUG_POLLS = 2                 # "no host" this many times ends a session
-SEND_CMD = "oreo send <files>"
+SEND_CMD = "falera send <files>"
 
 GREEN = api.rgb(61, 190, 120)
 

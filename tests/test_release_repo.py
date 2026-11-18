@@ -32,13 +32,13 @@ class RepoTest(unittest.TestCase):
 
     def test_reads_ota_repo_from_ota_py(self):
         text = (ROOT / "oreoOS" / "ota.py").read_text()
-        self.assertEqual(self.r.ota_repo(text), "elixpo/oreo")
+        self.assertEqual(self.r.ota_repo(text), "elixpo/falera")
         self.assertEqual(self.r.resolve_repo(),
-                         ("elixpo/oreo", "OTA_REPO in oreoOS/ota.py"))
+                         ("elixpo/falera", "OTA_REPO in oreoOS/ota.py"))
 
     def test_a_fork_needs_only_ota_repo(self):
-        text = 'X = 1\nOTA_REPO       = "you/oreo"      # owner/repo on GitHub\n'
-        self.assertEqual(self.r.resolve_repo(ota_text=text)[0], "you/oreo")
+        text = 'X = 1\nOTA_REPO       = "you/falera"      # owner/repo on GitHub\n'
+        self.assertEqual(self.r.resolve_repo(ota_text=text)[0], "you/falera")
 
     def test_override_wins(self):
         self.assertEqual(self.r.resolve_repo("me/badge-os", ota_text='OTA_REPO = "a/b"\n'),
@@ -54,23 +54,23 @@ class RepoTest(unittest.TestCase):
                 self.r.resolve_repo(bad)
 
     def test_asset_base_url(self):
-        self.assertEqual(self.r.asset_base_url("you/oreo", "beta/v9.1.0"),
-                         "https://github.com/you/oreo/releases/download/beta/v9.1.0/")
+        self.assertEqual(self.r.asset_base_url("you/falera", "beta/v9.1.0"),
+                         "https://github.com/you/falera/releases/download/beta/v9.1.0/")
 
     def test_origin_url_forms(self):
-        for url in ("https://github.com/you/oreo.git", "https://github.com/you/oreo",
-                    "git@github.com:you/oreo.git", "ssh://git@github.com/you/oreo.git\n",
-                    "https://github.com/you/oreo/"):
+        for url in ("https://github.com/you/falera.git", "https://github.com/you/falera",
+                    "git@github.com:you/falera.git", "ssh://git@github.com/you/falera.git\n",
+                    "https://github.com/you/falera/"):
             with self.subTest(url=url):
-                self.assertEqual(self.r.repo_from_url(url), "you/oreo")
-        self.assertIsNone(self.r.repo_from_url("https://gitlab.com/you/oreo.git"))
+                self.assertEqual(self.r.repo_from_url(url), "you/falera")
+        self.assertIsNone(self.r.repo_from_url("https://gitlab.com/you/falera.git"))
         self.assertIsNone(self.r.repo_from_url(""))
 
 
 class DryRunTest(unittest.TestCase):
     """--dry-run shows the derived repository and uses it everywhere."""
 
-    def dry_run(self, *argv, origin="you/oreo", ota='OTA_REPO = "you/oreo"\n'):
+    def dry_run(self, *argv, origin="you/falera", ota='OTA_REPO = "you/falera"\n'):
         r = load()
         d = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, d, True)
@@ -91,11 +91,11 @@ class DryRunTest(unittest.TestCase):
     def test_fork_release_never_mentions_upstream(self):
         out, code = self.dry_run()
         self.assertIsNone(code, out)
-        self.assertIn("Repo: you/oreo (OTA_REPO in oreoOS/ota.py)", out)
-        self.assertIn("--asset-base-url https://github.com/you/oreo/releases/download/"
+        self.assertIn("Repo: you/falera (OTA_REPO in oreoOS/ota.py)", out)
+        self.assertIn("--asset-base-url https://github.com/you/falera/releases/download/"
                       "stable/v9.0.0/", out)
-        self.assertIn("gh release create stable/v9.0.0 --repo you/oreo", out)
-        self.assertNotIn("elixpo/oreo", out)
+        self.assertIn("gh release create stable/v9.0.0 --repo you/falera", out)
+        self.assertNotIn("elixpo/falera", out)
 
     def test_repo_flag(self):
         out, code = self.dry_run("--repo", "me/staging", "--channel", "beta",
@@ -105,27 +105,27 @@ class DryRunTest(unittest.TestCase):
         self.assertIn("https://github.com/me/staging/releases/download/beta/v9.0.0/", out)
         self.assertIn("--repo me/staging", out)
         # badges from this checkout would not see it: say so
-        self.assertIn("update from you/oreo", out)
+        self.assertIn("update from you/falera", out)
 
     def test_origin_elsewhere_is_flagged(self):
-        out, code = self.dry_run(origin="elixpo/oreo")
+        out, code = self.dry_run(origin="elixpo/falera")
         self.assertIsNone(code, out)          # a dry run only warns
-        self.assertIn("`origin` is elixpo/oreo", out)
+        self.assertIn("`origin` is elixpo/falera", out)
 
     def test_origin_elsewhere_stops_a_real_release(self):
         r = load()
-        with mock.patch.object(r, "_origin_repo", lambda: "elixpo/oreo"), \
+        with mock.patch.object(r, "_origin_repo", lambda: "elixpo/falera"), \
                 contextlib.redirect_stdout(io.StringIO()):
             with self.assertRaises(SystemExit):
-                r._check_origin("you/oreo", dry=False)
-            r._check_origin("Elixpo/Oreo", dry=False)  # same repo, other case
-            r._check_origin("elixpo/oreo", dry=False)
+                r._check_origin("you/falera", dry=False)
+            r._check_origin("Elixpo/Falera", dry=False)  # same repo, other case
+            r._check_origin("elixpo/falera", dry=False)
 
 
 class NoHardcodedRepoTest(unittest.TestCase):
     def test_release_py_names_no_repository(self):
         text = (ROOT / "tools" / "release.py").read_text()
-        self.assertNotIn("elixpo/oreo", text)
+        self.assertNotIn("elixpo/falera", text)
 
 
 if __name__ == "__main__":

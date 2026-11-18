@@ -2,8 +2,8 @@
 
 Wi-Fi on the badge is for the internet only (App Store, OTA, GitHub
 data, weather, time). Files arrive over USB through the Transfer app
-(apps/transfer) and `oreo transfer send`; new networks with a password
-are added from a computer with `oreo wifi connect`.
+(apps/transfer) and `falera transfer send`; new networks with a password
+are added from a computer with `falera wifi connect`.
 
 Pages (self._mode):
 
@@ -21,7 +21,7 @@ Pages (self._mode):
              success (with IP) or failure message. B cancels.
   pwhelp   : an unknown secured network was picked. The badge has no
              keyboard, so it explains how to add it over USB with
-             `oreo wifi connect`.
+             `falera wifi connect`.
 
 Nothing here waits in a frame: scans run in oreoWare.wifi's background
 worker and joins use connect_begin()/connect_poll(), polled from update().
@@ -941,7 +941,7 @@ class App(oreoOS.App):
                    NET_TOP_Y + 6, theme.TEXT_DIM)
             d.text("from a computer over USB:", ROW_PAD_X,
                    NET_TOP_Y + 20, theme.TEXT_DIM)
-            d.text("oreo wifi connect \"name\"", ROW_PAD_X,
+            d.text("falera wifi connect \"name\"", ROW_PAD_X,
                    NET_TOP_Y + 34, theme.TEAL)
             widgets.draw_hint(d, "B=back")
             return
@@ -1051,7 +1051,7 @@ class App(oreoOS.App):
             "it from a computer over USB:",
             "",
             "1. Plug the badge in",
-            "2. Run: oreo wifi connect",
+            "2. Run: falera wifi connect",
             "   \"" + _clip(self._pw_ssid, 22) + "\"",
             "3. Type the password there",
             "",

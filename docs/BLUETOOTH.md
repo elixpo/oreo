@@ -1,6 +1,6 @@
-# Bluetooth on the Oreo Badge
+# Bluetooth on the Falera Badge
 
-This page describes what Bluetooth does on the badge as of OreoOS 2.0 (code in
+This page describes what Bluetooth does on the badge as of FaleraOS 2.0 (code in
 `oreoWare/bt.py`, `apps/bt/`, `oreoOS/pair_prompt.py`, `oreoOS/bonds.py` and
 `tools/bt_send.py`), what it does not do, and what to build next.
 
@@ -26,14 +26,14 @@ phone app for BLE transfer.
 ### Advertising and connections
 
 - While on, the badge advertises as a connectable BLE peripheral named
-  **"Oreo"**. The scan response carries the service UUID below. The interval
+  **"Falera"**. The scan response carries the service UUID below. The interval
   comes from `BT_ADV_INTERVAL_MS` (500 ms in `config.py`; 200 ms if the setting
   is missing).
 - One peer at a time. A second central is disconnected straight away, and
   advertising stops while a peer is connected. When the peer leaves,
   advertising restarts, and a watchdog in the run loop re-issues it every 30 s
   in case it stopped silently.
-- Phones see "Oreo" in generic BLE apps (nRF Connect, LightBlue) and can
+- Phones see "Falera" in generic BLE apps (nRF Connect, LightBlue) and can
   connect to it there. Whether it also appears in the phone's system Bluetooth
   settings depends on the phone.
 
@@ -52,7 +52,7 @@ phone app for BLE transfer.
 
 ### Receiving a file over BLE
 
-GATT service `6f72656f-0000-1000-8000-00805f9b34fb` ("oreo" in ASCII):
+GATT service `6f72656f-0000-1000-8000-00805f9b34fb` ("falera" in ASCII):
 
 | Characteristic | UUID | Properties | Direction |
 |---|---|---|---|
@@ -84,7 +84,7 @@ python3 tools/bt_send.py notes.md
 python3 tools/bt_send.py notes.txt
 ```
 
-It scans for "Oreo", writes 180-byte chunks without response, and waits up to
+It scans for "Falera", writes 180-byte chunks without response, and waits up to
 15 s for `02`.
 
 ## Issue #23: "Bluetooth file transfer stuck from phone"
@@ -153,7 +153,7 @@ Concrete, in rough priority order:
 3. **Require encryption on RX** (`bluetooth.FLAG_WRITE_ENCRYPTED`, or
    authenticated writes) once pairing has been checked with iOS and Android
    phones.
-4. **Web Bluetooth sender** on oreo.elixpo.com: the same framing from a
+4. **Web Bluetooth sender** on falera.elixpo.com: the same framing from a
    browser page (Chrome on Android and desktop; iOS Safari does not support Web
    Bluetooth). Reuse the WiFi page's in-browser image conversion, and add an
    `R` type for `.rz565` routed to `assets/optimized/`, so images work over

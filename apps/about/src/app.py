@@ -1,4 +1,4 @@
-"""About — Oreo OS info, build metadata, and credits.
+"""About — FaleraOS info, build metadata, and credits.
 
 Opens instantly with the values cached on flash (apps/about/cache.txt via
 oreoOS.cache), then refreshes them one step per frame after the first
@@ -6,7 +6,7 @@ paint: OS/runtime, then hardware/flash, then network. The cache is
 rewritten only when something changed. Memory and uptime are live and
 repaint in place once a second without redrawing the screen.
 
-Layout: a fixed hero card (mascot, OREO OS, version pill, update state)
+Layout: a fixed hero card (mascot, FALERA OS, version pill, update state)
 above a scrollable details card with SYSTEM / NETWORK / CREDITS sections.
 
 Controls:
@@ -111,7 +111,7 @@ class App(oreoOS.App):
             ("h", "CREDITS", None),
             ("c", "Crafted by @Circuit-Overtime", theme.PRIMARY),
             ("c", "Co-maintained by @anwe-ch", theme.PURPLE),
-            ("c", "github.com/elixpo/oreo", theme.TEAL),
+            ("c", "github.com/elixpo/falera", theme.TEAL),
             ("c", "Released " + str(v.get("released", "-")), theme.MUTED),
         )
 
@@ -206,7 +206,7 @@ class App(oreoOS.App):
             d.blit(data, HX + 8, HY + (HH - mh) // 2, mw, mh)
             tx = HX + 8 + mw + 10
 
-        title = "OREO OS"
+        title = "FALERA OS"
         if self._pf_title:
             self._pf_title.text(d, title, tx, HY + 8, theme.PRIMARY)
         else:

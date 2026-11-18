@@ -12,7 +12,7 @@
       "author": "Circuit-Overtime",
       "version": "0.2",
       "icon": "patakha_icon.png",
-      "size": 52377,
+      "size": 52381,
       "files": [
         ["__init__.py", 0],
         ["assets/__init__.py", 0],
@@ -21,9 +21,9 @@
         ["main.py", 243],
         ["manifest.json", 224],
         ["src/__init__.py", 0],
-        ["src/app.py", 11954],
+        ["src/app.py", 11956],
         ["src/game.py", 18691],
-        ["src/render.py", 12458]
+        ["src/render.py", 12460]
       ]
     },
     {
@@ -57,14 +57,14 @@
     {
       "id": "flappy",
       "path": "apps_market/flappy",
-      "name": "Flappy Oreo",
+      "name": "Flappy Lumi",
       "tagline": "Flap through the pipes",
       "description": "Tap A to flap the panda through the pipes. Your high score is kept on the badge.",
       "category": "Games",
       "author": "Circuit-Overtime",
       "version": "0.2",
       "icon": "flappy_icon.png",
-      "size": 164907,
+      "size": 164909,
       "files": [
         ["__init__.py", 0],
         ["assets/__init__.py", 0],
@@ -82,7 +82,7 @@
         ["main.py", 242],
         ["manifest.json", 186],
         ["src/__init__.py", 0],
-        ["src/app.py", 23913]
+        ["src/app.py", 23915]
       ]
     },
     {
@@ -113,15 +113,15 @@
     },
     {
       "id": "pet",
-      "path": "apps_market/Oreo Pet",
-      "name": "Elixpo Pet",
-      "tagline": "Your pocket panda pet",
-      "description": "A pocket panda to look after: feed it, play with it and put it to sleep. Check in every day.",
+      "path": "apps_market/Lumi",
+      "name": "Lumi",
+      "tagline": "Lumi, our panda",
+      "description": "Lumi, the panda. Feed her, play, put her to bed. Care for her daily.",
       "category": "Games",
       "author": "Circuit-Overtime",
       "version": "0.2",
       "icon": "elixpo_pet_icon.png",
-      "size": 199791,
+      "size": 199782,
       "files": [
         ["__init__.py", 0],
         ["assets/__init__.py", 0],
@@ -133,10 +133,10 @@
         ["assets/optimized/panda_hungry.py", 34919],
         ["assets/optimized/panda_sad.py", 34919],
         ["assets/optimized/panda_sleep.py", 34919],
-        ["main.py", 244],
-        ["manifest.json", 205],
+        ["main.py", 240],
+        ["manifest.json", 212],
         ["src/__init__.py", 0],
-        ["src/app.py", 13661]
+        ["src/app.py", 13649]
       ]
     },
     {
@@ -149,7 +149,7 @@
       "author": "Circuit-Overtime",
       "version": "0.2",
       "icon": "IR_Quest_icon.png",
-      "size": 24689,
+      "size": 24691,
       "files": [
         ["__init__.py", 0],
         ["assets/__init__.py", 0],
@@ -157,7 +157,7 @@
         ["main.py", 241],
         ["manifest.json", 180],
         ["src/__init__.py", 0],
-        ["src/app.py", 22947],
+        ["src/app.py", 22949],
         ["src/text.py", 1321]
       ]
     },
@@ -171,13 +171,13 @@
       "author": "Circuit-Overtime",
       "version": "0.2",
       "icon": "bluetooth_icon.png",
-      "size": 7593,
+      "size": 7603,
       "files": [
         ["__init__.py", 0],
         ["main.py", 238],
         ["manifest.json", 181],
         ["src/__init__.py", 0],
-        ["src/app.py", 7174]
+        ["src/app.py", 7184]
       ]
     },
     {
@@ -190,7 +190,7 @@
       "author": "Circuit-Overtime",
       "version": "0.4",
       "icon": "wallpaper_icon.png",
-      "size": 330443,
+      "size": 330447,
       "files": [
         ["__init__.py", 0],
         ["assets/__init__.py", 0],
@@ -204,7 +204,7 @@
         ["main.py", 243],
         ["manifest.json", 186],
         ["src/__init__.py", 0],
-        ["src/app.py", 16596]
+        ["src/app.py", 16600]
       ]
     },
     {

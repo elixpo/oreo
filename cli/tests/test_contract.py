@@ -1,6 +1,6 @@
-"""Contract tests: the CLI's badge snippets against the real OreoOS modules.
+"""Contract tests: the CLI's badge snippets against the real FaleraOS modules.
 
-When the CLI runs inside an OreoOS checkout, load the real oreoWare/wifi.py
+When the CLI runs inside a FaleraOS checkout, load the real oreoWare/wifi.py
 (with a fake `network` driver, as tests/test_wifi_logic.py does) and the
 real oreoOS/storage.py into the FakeTransport, so a renamed or changed
 badge API breaks these tests instead of the badge. Skipped when the CLI is
@@ -80,7 +80,7 @@ def load_module(path, name, **patch):
     return mod
 
 
-@unittest.skipUnless(WIFI.exists(), "not inside an OreoOS checkout")
+@unittest.skipUnless(WIFI.exists(), "not inside a FaleraOS checkout")
 class RealWifiContractTest(unittest.TestCase):
     def setUp(self):
         self.fake = FakeTransport()
@@ -138,14 +138,14 @@ class RealWifiContractTest(unittest.TestCase):
 
     def test_forgetting_a_deploy_network_is_flagged(self):
         # Networks from the deploy-time .env are merged back into the saved
-        # list by the badge, so `oreo wifi forget` warns about them.
+        # list by the badge, so `falera wifi forget` warns about them.
         self.wifi._secrets_networks = lambda: [{"ssid": "Office", "password": "pw"}]
         self.assertTrue(self.badge.wifi_save("Cafe", ""))
         self.assertEqual(self.badge.wifi_forget("Office"), (True, True))
         self.assertEqual(self.badge.wifi_forget("Cafe"), (True, False))
 
 
-@unittest.skipUnless(STORAGE.exists(), "not inside an OreoOS checkout")
+@unittest.skipUnless(STORAGE.exists(), "not inside a FaleraOS checkout")
 class RealStorageContractTest(unittest.TestCase):
     def test_info_uses_storage_usage(self):
         fake = FakeTransport()
@@ -161,7 +161,7 @@ class RealStorageContractTest(unittest.TestCase):
         self.assertGreater(info["storage"]["stats"]["free"], 0)
 
 
-@unittest.skipUnless(STORE.exists(), "not inside an OreoOS checkout")
+@unittest.skipUnless(STORE.exists(), "not inside a FaleraOS checkout")
 class DefaultAppsContractTest(unittest.TestCase):
     def test_rm_protects_exactly_the_built_in_apps(self):
         import ast

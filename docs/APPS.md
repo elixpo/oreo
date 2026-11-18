@@ -1,9 +1,9 @@
-# Writing apps for OreoOS
+# Writing apps for FaleraOS
 
-This is the in-repo guide to building an app for the Oreo badge: the
+This is the in-repo guide to building an app for the Falera badge: the
 folder layout, the lifecycle, input, drawing, saving state, the network,
 and how to check and ship an app. The website page
-(<https://oreo.elixpo.com/docs/apps/>) covers the same ground with more
+(<https://falera.elixpo.com/docs/apps/>) covers the same ground with more
 pictures; when the two disagree, this file and the code win.
 
 ## The shortest path
@@ -16,7 +16,7 @@ python3 tools/app_icon.py apps_market/my_app  # icon.png -> the badge's icon mod
 python3 tools/validate_app.py apps_market/my_app
 ```
 
-Then put it on a badge over USB (see [CLI.md](CLI.md) for the `oreo`
+Then put it on a badge over USB (see [CLI.md](CLI.md) for the `falera`
 tool, or `python tools/deploy.py` for the whole OS) and open it from the
 Apps drawer. For the App Store, also run `python3 tools/build_store_index.py`
 (see [`apps_market/README.md`](../apps_market/README.md)).
@@ -42,7 +42,7 @@ The launcher imports `apps.<id>.main` and reads `App` from it. The app
 id is the manifest `"slug"` if there is one, else the folder name, and
 it must be an importable name: lower-case ASCII letters, digits and `_`,
 starting with a letter. A folder name with a space (like
-`apps_market/Oreo Pet`) needs a `"slug"`.
+`apps_market/Lumi`) needs a `"slug"`.
 
 Only these files go to the badge: `__init__.py`, `main.py`,
 `manifest.json`, `src/**/*.py` (and `.mpy`), and `assets/optimized/*.py`.
@@ -130,7 +130,7 @@ frame. Rules that keep the badge responsive:
 | Attribute | Default | Meaning |
 |---|---|---|
 | `name` | `"unnamed"` | Shown in headers and crash screens. |
-| `SHOW_LOADING` | `False` | Only read by OreoOS releases before the open feedback below: show the loading slide while `on_enter` runs. Keep it if `on_enter` is slow, for badges that have not updated; newer releases cover every slow open by themselves. |
+| `SHOW_LOADING` | `False` | Only read by FaleraOS releases before the open feedback below: show the loading slide while `on_enter` runs. Keep it if `on_enter` is slow, for badges that have not updated; newer releases cover every slow open by themselves. |
 | `CAPTURES_C` | `False` | Deliver C to the app instead of opening the notification panel. A double-tap of C still opens the panel. May be changed on the instance at runtime, for example only during play. See [The C key](#the-c-key). |
 | `BLOCK_IDLE` | `False` | Keep the badge from auto-sleeping while the app is open (video, a timer). |
 | `realtime_mode()` | `False` | Return True only while playing media or capturing; the OS then defers its housekeeping for lower latency. |
@@ -165,7 +165,7 @@ open still matters. To keep yours fast:
   Every kilobyte of `.py` source is compiled on each open.
 - Split a very large `app.py` only if parts of it are rarely used; the
   compile cost is per byte of source the open imports.
-- Measure on a badge with `oreo run tools/app_open_probe.py` (below).
+- Measure on a badge with `falera run tools/app_open_probe.py` (below).
 
 The launcher prints one line per open on the USB console, for example
 `[open] store: 840 ms (import 610, on_enter 150, first frame 80)`.
@@ -176,11 +176,11 @@ the source), the modules the import pulled in, `on_enter`, the first
 `update` + `draw`, the flush, and the heap used:
 
 ```bash
-oreo run tools/app_open_probe.py
+falera run tools/app_open_probe.py
 ```
 
 It closes each app with `on_exit` and unloads it again, writes nothing to
-flash, and OreoOS restarts when the CLI finishes. Edit `ONLY` or `SKIP`
+flash, and FaleraOS restarts when the CLI finishes. Edit `ONLY` or `SKIP`
 at the top of the script to choose apps.
 
 ## Input
@@ -315,7 +315,7 @@ takes long.
 
 ### The screen while a computer drives the badge
 
-While the `oreo` CLI works over the raw REPL (OreoOS is stopped), it can
+While the `falera` CLI works over the raw REPL (FaleraOS is stopped), it can
 show progress with `oreoOS.hostui`: `hostui.show(title, detail="",
 progress=None)` draws a "Connected to computer" frame (title, detail, a
 bar for 0.0-1.0 or a static busy glyph for None) and `hostui.clear()`
@@ -393,10 +393,10 @@ shows the crash screen with the error and the innermost `file:line`,
 then returns to the drawer. Before that, the launcher records the full
 traceback with `oreoOS.crashlog`:
 
-- it prints on the USB console (`oreo logs` shows it), and
+- it prints on the USB console (`falera logs` shows it), and
 - it is appended to `/crash.log` on the badge, capped at 8 KB (the
   oldest entries go first). Copy it to the computer with
-  `oreo pull /crash.log`.
+  `falera pull /crash.log`.
 
 A single bad frame does not crash the app: the OS prints the traceback
 of the first bad frame in a run on the console only (no flash write; later
@@ -411,9 +411,9 @@ same from your own `except` blocks.
 When an app exits, the launcher removes `apps.<name>` and its submodules
 from `sys.modules` and runs `gc.collect()`. The next launch imports the
 files again, so an app installed or updated from the App Store while
-OreoOS runs, or a file you edit under a running `oreo dev` mount, runs the
-next time you open the app, without a reboot. (`oreo push` and
-`oreo app install` already restart OreoOS when they finish, so their files
+FaleraOS runs, or a file you edit under a running `falera dev` mount, runs the
+next time you open the app, without a reboot. (`falera push` and
+`falera app install` already restart FaleraOS when they finish, so their files
 are loaded fresh either way.) OS modules (`oreoOS`, `oreoWare`) and other apps are never
 unloaded; the drawer (`apps/launcher`) stays loaded because it opens on
 every HOME press. A copy of `oreoOS/` itself still needs a reboot.
@@ -434,16 +434,16 @@ Unloading an app with a live thread does not crash anything (the thread
 keeps its module alive), but the next launch would get a second copy
 with its own globals.
 
-### Live editing with `oreo dev`
+### Live editing with `falera dev`
 
-`oreo dev <folder>` mounts a folder from the computer at `/remote` and
-opens the REPL; OreoOS is not running then. If the folder contains
-`apps/<name>/` with `manifest.json` and `main.py`, start OreoOS from the
+`falera dev <folder>` mounts a folder from the computer at `/remote` and
+opens the REPL; FaleraOS is not running then. If the folder contains
+`apps/<name>/` with `manifest.json` and `main.py`, start FaleraOS from the
 REPL and that app loads from the computer instead of `/apps/<name>`:
 
 ```bash
 mkdir -p ~/work/apps && cp -r apps_market/my_app ~/work/apps/my_app
-oreo dev ~/work
+falera dev ~/work
 ```
 
 ```python
@@ -456,7 +456,7 @@ is not found. Mounted apps appear in the drawer (one that is also
 installed is replaced by the mounted copy), the console prints
 `[dev] my_app from /remote/apps`, and each launch reads the files again,
 so save on the computer, press HOME, and open the app. Loading over USB
-is slower than from flash. Leaving `oreo dev` resets the badge, and the
+is slower than from flash. Leaving `falera dev` resets the badge, and the
 installed apps are used again. Without a mount, the launcher's only cost
 is one failed `stat` per listing and per launch.
 

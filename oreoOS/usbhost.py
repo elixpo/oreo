@@ -30,7 +30,7 @@ What it does not tell, and its limits:
 - A charger or a power-only cable reads as unplugged (no host at all).
 - The badge has no VBUS sense pin, so unplugging is seen as the bus
   going idle (suspend), which the controller flags within 3 ms.
-- Only on an ESP32-S3 running the TinyUSB console (the Oreo Badge
+- Only on an ESP32-S3 running the TinyUSB console (the Falera Badge
   firmware and ESP32_GENERIC_S3). Elsewhere connected() returns None:
   unknown, and callers keep their old behaviour.
 

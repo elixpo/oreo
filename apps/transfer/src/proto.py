@@ -13,7 +13,7 @@ or a stray Ctrl-C can never be mistaken for data.
                       @OTD <seq> <base64>\\n    one chunk of the file being sent
   badge -> computer   @OTB {json}\\n            a reply or an event
 
-Lines without one of these prefixes are ignored (OreoOS log lines go to
+Lines without one of these prefixes are ignored (FaleraOS log lines go to
 the same stream, and a REPL would echo the computer's own lines back).
 
 Session:
@@ -64,7 +64,7 @@ CODE_LEN     = 6
 CHUNK     = 3072                  # file bytes per data line (4096 base64 chars)
 MAX_LINE  = 4400                  # longest line accepted (a data line plus slack)
 MAX_FILE  = 8 * 1024 * 1024       # largest single file
-RESERVE   = 256 * 1024            # flash kept free for OreoOS (matches oreo add)
+RESERVE   = 256 * 1024            # flash kept free for FaleraOS (matches falera add)
 MAX_TRIES = 5                     # wrong codes before a lockout
 LOCK_MS   = 60 * 1000
 ANNOUNCE_MS = 2000                # re-announce while nobody is connected
@@ -78,8 +78,8 @@ IDLE_PUT_MS = 20 * 1000
 GALLERY_DIR = "apps/gallery/assets/optimized"
 DOCS_DIR    = "documents"
 
-# extension -> (folder, kind). The converted formats `oreo add` and
-# `oreo transfer send` produce, plus plain text the Reader opens as is.
+# extension -> (folder, kind). The converted formats `falera add` and
+# `falera transfer send` produce, plus plain text the Reader opens as is.
 ROUTES = (
     (".rz565", GALLERY_DIR, "image"),
     (".r565",  GALLERY_DIR, "image"),
@@ -280,7 +280,7 @@ class Receiver:
     `out(text)` writes one line (without the newline) to the computer.
     `root` prefixes every path (the host tests point it at a temp folder;
     on the badge it is "" and paths are relative to /, like the rest of
-    OreoOS). `notify(kind, name, size)` is called after a file lands.
+    FaleraOS). `notify(kind, name, size)` is called after a file lands.
     """
 
     def __init__(self, out, root="", urandom=None, clock=None, free=None,
@@ -421,7 +421,7 @@ class Receiver:
         # A computer that went quiet (the CLI was killed) holds the session
         # until it times out. The CLI says hello only after an announce, so
         # keep announcing while the session is idle and no file is on its
-        # way: a new `oreo transfer` can then take over.
+        # way: a new `falera transfer` can then take over.
         if self.state != RECEIVING and idle >= ANNOUNCE_MS:
             if self._announce_at is None or _diff(now, self._announce_at) >= ANNOUNCE_MS:
                 self.announce(now)

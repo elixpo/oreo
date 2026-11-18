@@ -1,4 +1,4 @@
-"""Host tests for the OreoOS 2.0 shell UI helpers: the splash greeting
+"""Host tests for the FaleraOS 2.0 shell UI helpers: the splash greeting
 timeline and word-mask renderer, the eased Scroller, and a full splash
 run against a fake display and clock.
 
