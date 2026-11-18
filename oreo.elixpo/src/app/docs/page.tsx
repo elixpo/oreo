@@ -3,7 +3,7 @@ import { ArrowRight, BookOpen, Boxes, Code2, FileText, Send, Terminal, Usb } fro
 import { pageMetadata } from "@/lib/seo";
 
 export const metadata = pageMetadata({
-  title: "Technical Documentation",
+  title: "OreoOS Documentation",
   description: "Developer guides and engineering deep dives for OreoOS and the Oreo Badge.",
   path: "/docs/",
   keywords: ["OreoOS documentation", "ESP32-S3 development", "MicroPython documentation"],

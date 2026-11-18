@@ -5,7 +5,7 @@ import { pageMetadata } from "@/lib/seo";
 // Rendered from docs/TRANSFER.md at build time; edit that file, not this page.
 
 export const metadata = pageMetadata({
-  title: "Transfer: files from a computer to the badge",
+  title: "OreoOS Transfer: files from a computer to the badge",
   description: "Send photos, videos and documents to the Oreo Badge over USB with oreo transfer and the six-character code the badge shows; how the code, the safety checks and the line protocol work.",
   path: "/docs/transfer/",
   keywords: ["Oreo Badge Transfer", "oreo transfer send", "USB file transfer MicroPython", "device code pairing"],

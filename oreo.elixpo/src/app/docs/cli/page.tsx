@@ -5,7 +5,7 @@ import { pageMetadata } from "@/lib/seo";
 // Rendered from docs/CLI.md at build time; edit that file, not this page.
 
 export const metadata = pageMetadata({
-  title: "oreo CLI: control the badge over USB",
+  title: "oreo CLI: control the OreoOS badge over USB",
   description: "Install oreo-cli and use the oreo command: the full-screen view, Transfer with the badge's code, files, apps, Wi-Fi, owner profile setup, OreoOS updates, doctor, exit codes and troubleshooting.",
   path: "/docs/cli/",
   keywords: ["oreo CLI", "oreo-cli", "Oreo Badge USB", "OreoOS update", "MicroPython badge CLI", "mpremote"],

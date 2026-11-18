@@ -4,9 +4,9 @@
 
 <img src="assets/sprites/raw/mascot.png" alt="Oreo, the panda mascot" width="60">
 
-# Oreo Badge
+# OreoOS and the Oreo Badge
 
-**A handheld panda-themed conference badge that runs a real operating system.**
+**OreoOS by Elixpo: an open-source MicroPython operating system for the Oreo Badge, a panda-themed ESP32-S3 conference badge.**
 
 [![License: MIT · CERN-OHL-P · CC-BY-4.0](https://img.shields.io/badge/license-MIT_·_CERN--OHL--P_·_CC--BY--4.0-FF5D68?style=for-the-badge)](LICENSES/README.md)
 [![MicroPython 1.28](https://img.shields.io/badge/MicroPython-1.28-00B4A5?style=for-the-badge&logo=python&logoColor=white)](https://micropython.org)
@@ -618,6 +618,9 @@ Everyone is welcome. See **[CONTRIBUTING.md](CONTRIBUTING.md)** and our
 - **RV565 library**: [Arduino Library Manager](https://www.arduinolibraries.info/libraries/rv565), [Espressif component registry](https://components.espressif.com/components/elixpo/rv565), [PyPI](https://pypi.org/project/rv565/), [CircuitPython](https://github.com/elixpo/CircuitPython_RV565).
 - **Wikidata**: OreoOS is [Q141968869](https://www.wikidata.org/wiki/Q141968869).
 - **MicroPython community**: [OreoOS announcement](https://github.com/orgs/micropython/discussions/19847).
+
+> OreoOS is an open-source MicroPython operating system for the Elixpo Oreo Badge. It is not
+> related to Android 8.0 Oreo or to OREO® cookies, a trademark of Mondelēz International.
 
 ## Recognition & programs
 

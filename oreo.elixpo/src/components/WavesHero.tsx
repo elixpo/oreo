@@ -324,7 +324,7 @@ export default function WavesHero() {
                        backdrop-blur"
           >
             <Sparkles className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
-            v2.0 · MicroPython · open source
+            OreoOS by Elixpo · v2.0 · MicroPython · open source
           </motion.div>
 
           <motion.h1
@@ -332,6 +332,7 @@ export default function WavesHero() {
             className="mb-6 font-display text-4xl font-semibold leading-[1.05]
                        tracking-tight text-foreground md:text-6xl lg:text-7xl"
           >
+            <span className="sr-only">OreoOS: </span>
             A python operating system,{" "}
             {/* Gradient stops are now warm-on-warm — primary →
                 gold → lilac, all on the bright side of the palette
@@ -348,7 +349,7 @@ export default function WavesHero() {
             className="mx-auto mb-10 max-w-3xl text-lg leading-relaxed
                        text-text-dim md:text-xl"
           >
-            OreoOS runs 20+ apps on a breadboard ESP32-S3 — a launcher,
+            OreoOS runs 20+ apps on the ESP32-S3 Oreo Badge — a launcher,
             an on-device app store, OTA updates over WiFi, file transfer
             over USB, IR-quest peer-pairing, and a Tamagotchi panda
             that judges you for skipping meals.

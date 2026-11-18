@@ -1,7 +1,13 @@
 import type { Metadata } from "next";
 
 export const SITE_URL = "https://oreo.elixpo.com";
-export const SITE_NAME = "OreoOS";
+export const SITE_NAME = "OreoOS by Elixpo";
+// "Oreo" alone means the cookie or Android 8.0 to search engines, so pages
+// always pair the name with Elixpo, MicroPython, ESP32-S3 or "badge", and
+// the structured data links OreoOS to its Wikidata entry and coverage.
+export const DISAMBIGUATION =
+  "OreoOS is an open-source MicroPython operating system for the Elixpo Oreo Badge, an ESP32-S3 conference badge. It is not related to Android 8.0 Oreo or to OREO cookies.";
+export const WIKIDATA = "https://www.wikidata.org/wiki/Q141968869";
 export const OG_IMAGE = "/og-banner.png";
 
 type PageMetadataOptions = {
