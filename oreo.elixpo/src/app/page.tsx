@@ -3,6 +3,7 @@ import { Cpu, Usb, Bluetooth, Code2, Film } from "lucide-react";
 import { Reveal } from "@/components/MotionWrap";
 import AppCard from "@/components/AppCard";
 import WavesHero from "@/components/WavesHero";
+import PressStrip from "@/components/PressStrip";
 import { PRELOADED } from "@/data/apps";
 
 const FEATURES = [
@@ -95,6 +96,11 @@ export default function Home() {
             <AppCard key={app.slug} app={app} index={i} />
           ))}
         </div>
+      </section>
+
+      {/* ── IN THE PRESS ─────────────────────────────────────────────── */}
+      <section className="container-page py-16">
+        <PressStrip />
       </section>
 
       {/* ── CTA ──────────────────────────────────────────────────────── */}

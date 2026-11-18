@@ -3,6 +3,7 @@
 # Manual deploy:
 #     npm run build
 #     npx wrangler pages deploy out --project-name=oreo
+#   (run from oreo.elixpo/, so functions/ deploys too: /api/supporters)
 #
 # CI deploy: connect this repo to Pages → set the build command to
 # `cd oreo.elixpo && npm install && npm run build` and the output

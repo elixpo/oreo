@@ -10,6 +10,7 @@ const COLUMNS: FooterColumn[] = [
     links: [
       { label: "Get Started", href: "/get-started/" },
       { label: "Badge",       href: "/badge/" },
+      { label: "Supporters",  href: "/supporters/" },
       { label: "Apps",        href: "/apps/" },
       { label: "Docs",        href: "/docs/" },
       { label: "oreo CLI",    href: "/docs/cli/" },
@@ -86,6 +87,10 @@ export default function Footer() {
         <p>© 2026 Elixpo · MIT (code) + trademark carve-out</p>
         <p>Built on MicroPython and ESP-IDF.</p>
       </div>
+      <p className="container-page pb-6 text-xs text-muted">
+        OreoOS is an open-source MicroPython operating system for the Elixpo Oreo Badge. It is not
+        related to Android 8.0 Oreo or to OREO® cookies, a trademark of Mondelēz International.
+      </p>
     </footer>
   );
 }

@@ -4,7 +4,8 @@ import Header         from "@/components/Header";
 import Footer         from "@/components/Footer";
 import PageTransition from "@/components/PageTransition";
 import JsonLd         from "@/components/JsonLd";
-import { OG_IMAGE, SITE_NAME, SITE_URL } from "@/lib/seo";
+import { DISAMBIGUATION, OG_IMAGE, SITE_NAME, SITE_URL, WIKIDATA } from "@/lib/seo";
+import { COVERAGE } from "@/data/press";
 
 // SEO + social-card metadata. The og-banner.png referenced here is the
 // same artwork used as the README banner on the main repo — generated
@@ -12,17 +13,17 @@ import { OG_IMAGE, SITE_NAME, SITE_URL } from "@/lib/seo";
 // Keeping a single image for both surfaces means a contributor only
 // has to refresh one file when the brand shifts.
 
-const SITE_TITLE       = "OreoOS — an open-source OS in a pocket-sized badge";
+const SITE_TITLE       = "OreoOS by Elixpo: an open-source MicroPython OS for the ESP32-S3 Oreo Badge";
 const SITE_DESCRIPTION =
-    "OreoOS is an open-source operating system for the Elixpo Badge, bringing MicroPython, wireless connectivity, file sharing, apps, games, hardware integrations, and developer tools into a pocket-sized programmable device built for makers, hackers, students, and communities.";
+    "OreoOS by Elixpo is an open-source MicroPython operating system for the Oreo Badge, an ESP32-S3 conference badge: apps, games, an on-device App Store, OTA updates, IR, RV565 video and USB file transfer. Featured on Adafruit; OSHWA-certified open hardware.";
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
     default:  SITE_TITLE,
-    template: "%s | OreoOS",
+    template: "%s | OreoOS by Elixpo",
   },
   description: SITE_DESCRIPTION,
-  applicationName: "OreoOS",
+  applicationName: "OreoOS by Elixpo",
   category: "technology",
   authors: [{ name: "Elixpo", url: "https://github.com/elixpo" }],
   creator: "Elixpo",
@@ -33,6 +34,14 @@ export const metadata: Metadata = {
   alternates: { canonical: "/" },
   keywords: [
   "OreoOS",
+  "OreoOS Elixpo",
+  "Oreo badge",
+  "Elixpo Oreo Badge",
+  "OreoOS MicroPython",
+  "MicroPython operating system",
+  "ESP32-S3 badge",
+  "ESP32-S3 operating system",
+  "RV565",
   "Elixpo Badge",
   "Open Source",
   "Open Source OS",
@@ -145,20 +154,74 @@ export default function RootLayout({
               "@id": `${SITE_URL}/#website`,
               url: SITE_URL,
               name: SITE_NAME,
+              alternateName: ["OreoOS", "Oreo Badge"],
               description: SITE_DESCRIPTION,
               publisher: { "@id": `${SITE_URL}/#organization` },
               inLanguage: "en",
             },
             {
-              "@type": "SoftwareSourceCode",
+              "@type": ["SoftwareApplication", "SoftwareSourceCode"],
               "@id": `${SITE_URL}/#software`,
               name: "OreoOS",
+              alternateName: ["OreoOS by Elixpo", "Elixpo OreoOS", "Oreo OS"],
               description: SITE_DESCRIPTION,
+              disambiguatingDescription: DISAMBIGUATION,
+              url: SITE_URL,
+              applicationCategory: "OperatingSystem",
+              operatingSystem: "MicroPython 1.28 on ESP32-S3",
               codeRepository: "https://github.com/elixpo/oreo",
               license: "https://github.com/elixpo/oreo/blob/main/LICENSE",
               programmingLanguage: ["Python", "C", "TypeScript"],
               runtimePlatform: "MicroPython on ESP32-S3",
               author: { "@id": `${SITE_URL}/#organization` },
+              publisher: { "@id": `${SITE_URL}/#organization` },
+              image: `${SITE_URL}/og-banner.png`,
+              sameAs: [
+                WIKIDATA,
+                "https://github.com/elixpo/oreo",
+                "https://github.com/orgs/micropython/discussions/19847",
+              ],
+              subjectOf: COVERAGE.filter((c) => c.date).map((c) => ({
+                "@type": "NewsArticle",
+                headline: c.what,
+                url: c.href,
+                publisher: { "@type": "Organization", name: c.who },
+              })),
+              offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+            },
+            {
+              "@type": "Product",
+              "@id": `${SITE_URL}/badge/#product`,
+              name: "Oreo Badge",
+              alternateName: "Elixpo Oreo Badge",
+              description:
+                "An open-source ESP32-S3 conference badge with a 2.8-inch touch screen, eight buttons, IR, a motion sensor, a speaker and microSD, running OreoOS. Certified open source hardware by OSHWA (IN000107).",
+              brand: { "@type": "Brand", name: "Elixpo" },
+              manufacturer: { "@id": `${SITE_URL}/#organization` },
+              url: `${SITE_URL}/badge/`,
+              image: [
+                "https://raw.githubusercontent.com/elixpo/oreo/main/circuit/elixpo/renders/top-angle.jpg",
+                `${SITE_URL}/pcb_front.jpg`,
+              ],
+              sameAs: [
+                "https://certification.oshwa.org/in000107.html",
+                "https://www.hardlabs.io/boards/elixpo--oreo",
+              ],
+            },
+            {
+              "@type": "SoftwareSourceCode",
+              "@id": `${SITE_URL}/rv565/#software`,
+              name: "RV565",
+              description:
+                "Frame-independent RGB565 video for ESP32-S3 and RP2350 SPI displays, by Elixpo. Plays OreoOS's Gallery videos.",
+              codeRepository: "https://github.com/elixpo/rv565",
+              author: { "@id": `${SITE_URL}/#organization` },
+              citation: "https://arxiv.org/abs/2610.35935",
+              sameAs: [
+                "https://arxiv.org/abs/2610.35935",
+                "https://pypi.org/project/rv565/",
+                "https://components.espressif.com/components/elixpo/rv565",
+              ],
             },
           ],
         }} />
