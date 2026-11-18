@@ -147,7 +147,7 @@ What it does:
 ## 3. Check it and install it
 
 ```bash
-python3 tools/validate_app.py ./tilt_scroll   # from an FaleraOS checkout
+python3 tools/validate_app.py ./tilt_scroll   # from a FaleraOS checkout
 falera app install ./tilt_scroll
 ```
 

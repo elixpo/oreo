@@ -1,4 +1,4 @@
-"""Cut an FaleraOS release from your laptop. No CI required.
+"""Cut a FaleraOS release from your laptop. No CI required.
 
 Simplest path:
     python tools/release.py
@@ -10,7 +10,7 @@ Overrides:
     python tools/release.py v1.3.0           # explicit version
     python tools/release.py --channel beta   # prerelease
     python tools/release.py --dry-run        # preview every command
-    python tools/release.py --repo you/oreo  # publish to another repository
+    python tools/release.py --repo you/falera  # publish to another repository
 
 The GitHub repository comes from OTA_REPO in oreoOS/ota.py, the one
 badges built from this checkout update from, so a fork that points

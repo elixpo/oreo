@@ -266,7 +266,7 @@ def load_module(path, name, **patch):
     return mod
 
 
-@unittest.skipUnless(OTA.exists(), "not inside an FaleraOS checkout")
+@unittest.skipUnless(OTA.exists(), "not inside a FaleraOS checkout")
 class RealOtaContractTest(unittest.TestCase):
     """The CLI's OTA snippets against the real oreoOS/ota.py."""
 
@@ -352,7 +352,7 @@ class RealOtaContractTest(unittest.TestCase):
         self.assertFalse(self.badge.ota_status()["pending"])
 
     def test_precompiled_release_replaces_py_with_mpy(self):
-        # An FaleraOS with .mpy support installs manifest-mpy.json: the .mpy
+        # A FaleraOS with .mpy support installs manifest-mpy.json: the .mpy
         # lands and the .py it replaces is removed (MicroPython would
         # import the old .py first). The CLI only steers; this is the
         # contract it relies on.

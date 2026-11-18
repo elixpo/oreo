@@ -53,7 +53,7 @@ CACHE_PATH  = "/store_index.json"
 ICONS_DIR   = "/store_icons"
 TMP_DIR     = "/store_tmp"
 APPS_DIR    = "apps"
-USER_AGENT  = "OreoBadge-AppStore"
+USER_AGENT  = "FaleraBadge-AppStore"
 T_API       = 8           # seconds, catalogue / icon requests
 
 # Apps that ship on every badge and cannot be uninstalled from the Store.

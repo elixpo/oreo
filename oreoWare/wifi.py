@@ -746,7 +746,7 @@ def speed_test(bytes_=200_000, timeout_s=10, pump_cb=None):
         try: s.settimeout(PER_READ_S)
         except Exception: pass
         req = ("GET %s HTTP/1.1\r\nHost: %s\r\n"
-               "User-Agent: OreoBadge-Speed\r\n"
+               "User-Agent: FaleraBadge-Speed\r\n"
                "Accept-Encoding: identity\r\n"
                "Connection: close\r\n\r\n") % (path, host)
         s.write(req.encode())

@@ -57,7 +57,7 @@ NO_OREOOS_HINT = ("install FaleraOS: `falera flash --repo <checkout>` (firmware 
 
 # The badge's progress screen while the computer drives it (oreoOS/hostui.py:
 # show(title, detail="", progress=None) and clear(), callable over the raw
-# REPL while FaleraOS is paused; progress is 0.0-1.0 or None). An FaleraOS
+# REPL while FaleraOS is paused; progress is 0.0-1.0 or None). A FaleraOS
 # without it, or any error inside it, is ignored: the screen is a courtesy
 # and must never break the operation. The module is imported once per raw
 # REPL session (its globals survive between execs until the next soft

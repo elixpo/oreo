@@ -333,7 +333,7 @@ class TuiTest(unittest.IsolatedAsyncioTestCase):
         import types
         from test_transfer import PROTO, FakeSerial, load_proto, odz
         if not PROTO.exists():
-            self.skipTest("not inside an FaleraOS checkout")
+            self.skipTest("not inside a FaleraOS checkout")
         root = self.tmp / "badge"
         root.mkdir()
         ser = FakeSerial(load_proto(), str(root) + "/")

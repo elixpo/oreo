@@ -1,6 +1,6 @@
 # ESP32-S3 24 FPS DMA video benchmark
 
-This is a standalone ESP-IDF firmware, not an FaleraOS app. It boots directly
+This is a standalone ESP-IDF firmware, not a FaleraOS app. It boots directly
 into a full-screen video loop and leaves Wi-Fi, Bluetooth, MicroPython, the app
 launcher, and the normal framebuffer out of the measurement.
 

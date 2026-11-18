@@ -1,6 +1,6 @@
 """`falera setup`: the owner profile in /profile.json, against the FakeTransport.
 
-Inside an FaleraOS checkout the file the CLI writes is read back with the
+Inside a FaleraOS checkout the file the CLI writes is read back with the
 real oreoOS/profile.py, so the CLI and the badge agree on its format.
 """
 
@@ -76,7 +76,7 @@ class ValidateTest(unittest.TestCase):
 
     def test_keys_match_the_badge(self):
         if not PROFILE.exists():
-            self.skipTest("not inside an FaleraOS checkout")
+            self.skipTest("not inside a FaleraOS checkout")
         src = PROFILE.read_text()
         import ast
         tree = ast.parse(src)
@@ -304,7 +304,7 @@ class SetupCommandTest(unittest.TestCase):
         self.assertEqual(self.profile(), {"GITHUB_USER": "old", "DISPLAY_NAME": "Me"})
         self.assertFalse(self.fake.exists("/profile.json.tmp"))
 
-    @unittest.skipUnless(PROFILE.exists(), "not inside an FaleraOS checkout")
+    @unittest.skipUnless(PROFILE.exists(), "not inside a FaleraOS checkout")
     def test_power_cut_between_remove_and_rename_keeps_the_profile(self):
         self.fake.put("/profile.json", json.dumps({"GITHUB_USER": "old"}).encode())
         real_rename = self.fat_rename(cut=True)
@@ -324,7 +324,7 @@ class SetupCommandTest(unittest.TestCase):
                                           "DISPLAY_DESIGNATION": "Firmware"})
         self.assertFalse(self.fake.exists("/profile.json.tmp"))
 
-    @unittest.skipUnless(PROFILE.exists(), "not inside an FaleraOS checkout")
+    @unittest.skipUnless(PROFILE.exists(), "not inside a FaleraOS checkout")
     def test_badge_profile_module_reads_what_was_written(self):
         r = self.run_setup("--github-user", "octocat", "--timezone", "5.75", "--lat", "-33.9",
                            "--lon", "151.2", "--owm-key", KEY)

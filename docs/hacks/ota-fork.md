@@ -29,11 +29,11 @@ Apps, photos, documents, saved Wi-Fi and your profile are kept.
 
 ## 1. Point the code at your fork
 
-In your clone, change one line in `oreoOS/ota.py` (`you/oreo` is your
+In your clone, change one line in `oreoOS/ota.py` (`you/falera` is your
 fork):
 
 ```python
-OTA_REPO       = "you/oreo"      # owner/repo on GitHub
+OTA_REPO       = "you/falera"      # owner/repo on GitHub
 ```
 
 That is the only edit. `tools/release.py` reads the same `OTA_REPO`, so
@@ -69,7 +69,7 @@ python3 tools/release.py v9.0.0                # stable channel
 python3 tools/release.py v9.1.0 --channel beta # or a prerelease
 ```
 
-The dry run starts with `Repo: you/oreo (OTA_REPO in oreoOS/ota.py)`, and
+The dry run starts with `Repo: you/falera (OTA_REPO in oreoOS/ota.py)`, and
 every download URL and `gh release` command in it names your fork. It
 warns when `origin` is another repository; a real release stops there.
 
@@ -82,7 +82,7 @@ again: it resumes from the tag or the upload.
 Check that your tag is among the ten the badge reads:
 
 ```bash
-gh api "repos/you/oreo/tags?per_page=10" --jq '.[].name'
+gh api "repos/you/falera/tags?per_page=10" --jq '.[].name'
 ```
 
 ## 4. Update the badge

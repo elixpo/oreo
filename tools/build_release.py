@@ -1,4 +1,4 @@
-"""Build an FaleraOS OTA release manifest + bundle for GitHub Releases.
+"""Build a FaleraOS OTA release manifest + bundle for GitHub Releases.
 
 Usage:
     python tools/build_release.py                  # builds the current VERSION

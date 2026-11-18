@@ -85,7 +85,7 @@ MANIFEST_NAME  = "manifest.json"
 MPY_MANIFEST_NAME = "manifest-mpy.json"
 PREFER_MPY     = True
 DEFAULT_CHANNEL = "stable"
-USER_AGENT     = "OreoBadge-OTA"
+USER_AGENT     = "FaleraBadge-OTA"
 
 # Chunk size for download writes. Big enough to amortise FS overhead but
 # small enough not to OOM the heap when downloading a 100 KB sprite.

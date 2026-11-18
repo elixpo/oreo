@@ -34,7 +34,7 @@ except ImportError:  # pragma: no cover - rich is a dependency
 
 class Job:
     """One operation on the badge. `cancellable=False` for steps that must
-    not stop half way (installing an FaleraOS update)."""
+    not stop half way (installing a FaleraOS update)."""
 
     def __init__(self, title, cancellable=True, interrupt=False):
         self.title = title

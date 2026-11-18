@@ -23,7 +23,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: oreo-release-${{ github.ref }}
+  group: falera-release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:

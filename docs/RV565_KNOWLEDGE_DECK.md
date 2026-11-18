@@ -118,7 +118,7 @@ Host-side conversion performs the expensive visual preparation once:
 
 # 6. What RV565 actually is
 
-RV565 is an FaleraOS-oriented **frame container and playback contract**. It is not a newly invented entropy codec.
+RV565 is a FaleraOS-oriented **frame container and playback contract**. It is not a newly invented entropy codec.
 
 In the current v6 format:
 

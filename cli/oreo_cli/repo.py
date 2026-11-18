@@ -1,4 +1,4 @@
-"""`falera update` / `falera flash`: wrappers around an FaleraOS checkout.
+"""`falera update` / `falera flash`: wrappers around a FaleraOS checkout.
 
 Today these call the repository's own scripts (./deploy, ./build-firmware),
 so they need `--repo <path to an falera checkout>`. Release-based updates
@@ -16,13 +16,13 @@ from .errors import OreoError
 
 def check_repo(path):
     if not path:
-        raise OreoError("this command needs an FaleraOS checkout",
+        raise OreoError("this command needs a FaleraOS checkout",
                         hint="pass --repo <path to a clone of github.com/elixpo/falera>; "
                              "updating from GitHub releases is not available yet")
     root = Path(path).expanduser().resolve()
     for need in ("deploy", "deploy.sh", "build-firmware", "oreoOS/config.py"):
         if not (root / need).exists():
-            raise OreoError("%s does not look like an FaleraOS checkout (missing %s)" % (root, need),
+            raise OreoError("%s does not look like a FaleraOS checkout (missing %s)" % (root, need),
                             hint="clone it: git clone https://github.com/elixpo/falera")
     return root
 

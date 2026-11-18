@@ -109,7 +109,7 @@ HELP = {
                "  falera update                  newest stable release\n"
                "  falera update --check          only say whether there is one\n"
                "  falera update --channel beta   newest beta release\n\n"
-               "Developers: --repo deploys from an FaleraOS checkout (./deploy --board)\n"
+               "Developers: --repo deploys from a FaleraOS checkout (./deploy --board)\n"
                "instead; --clean wipes the badge's files first and asks.\n\n"
                "  falera update --repo ~/src/oreo\n"
                "  falera update --repo ~/src/oreo --clean"),
@@ -329,7 +329,7 @@ def build_parser():
     s.add_argument("--override", metavar="APPS", help="with --repo: replace these app folders")
 
     s = _sub(subs, "flash")
-    s.add_argument("--repo", help="path to an FaleraOS checkout (required)")
+    s.add_argument("--repo", help="path to a FaleraOS checkout (required)")
     s.add_argument("--build", action="store_true", help="build the firmware first")
 
     _sub(subs, "doctor")

@@ -262,7 +262,7 @@ How it behaves:
 - **Questions are dialogs.** Confirmations, the Transfer code and passwords
   appear in a box; Esc cancels the operation that asked.
 - **FaleraOS is paused while the view is open**, so the badge's screen shows
-  what the computer is doing during long operations (with an FaleraOS that has
+  what the computer is doing during long operations (with a FaleraOS that has
   `oreoOS/hostui.py`). It restarts when you quit: with **q**, with Ctrl-C,
   and if anything fails. `--reset hard|none` works as for the commands. The
   Transfer section is the exception: the Transfer app runs inside FaleraOS, so
@@ -331,7 +331,7 @@ instead (see [`falera transfer`](#oreo-transfer-send-files-to-the-transfer-app))
   `update`, the badge shows what is happening and how far it has got
   (through `oreoOS/hostui.py`, in FaleraOS versions that have it), and clears
   the screen at the end. The updates ride along with the commands the CLI
-  sends anyway, so they cost no extra time; an FaleraOS without it works as
+  sends anyway, so they cost no extra time; a FaleraOS without it works as
   before. (`falera transfer` needs none: the Transfer app shows its own
   progress.)
 - **Destructive actions ask first.** These are `rm -r`, `apps remove`, `app remove`,
@@ -732,7 +732,7 @@ Apps, photos, documents, saved Wi-Fi and your profile are kept.
 - **GitHub limit:** the badge asks GitHub without a token, which allows 60
   requests an hour per network.
 
-**Developers:** `--repo` deploys from an FaleraOS checkout instead of a
+**Developers:** `--repo` deploys from a FaleraOS checkout instead of a
 release:
 
 ```sh
@@ -818,7 +818,7 @@ falera flash --repo ~/src/oreo            # erase, write firmware, install Faler
 falera flash --repo ~/src/oreo --build    # run ./build-firmware first
 ```
 
-Needs an FaleraOS checkout. Erasing always asks first, and it removes
+Needs a FaleraOS checkout. Erasing always asks first, and it removes
 everything on the badge, including photos, documents and Store apps.
 
 ### `falera doctor`: diagnose the connection
@@ -1116,7 +1116,7 @@ the output when you report a problem.
     replaces it; offline, `falera setup --github-user <someone>` keeps the
     profile, warns, and Badge shows initials (never the previous face).
     `falera setup --avatar` fetches it again; `--show` names its user.
-13. With an FaleraOS that has `oreoOS/hostui.py`: the badge's screen shows the
+13. With a FaleraOS that has `oreoOS/hostui.py`: the badge's screen shows the
     progress of `falera push`/`pull` of a large file, `falera add`,
     `falera app install`, `falera apps install` and `falera update`, and is cleared
     when each finishes; with an older FaleraOS, the same commands work as

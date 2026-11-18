@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check that an FaleraOS app folder will load on the badge.
+"""Check that a FaleraOS app folder will load on the badge.
 
     python3 tools/validate_app.py                     # every app in the repo
     python3 tools/validate_app.py apps_market/my_app  # one or more folders

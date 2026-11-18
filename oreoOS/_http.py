@@ -36,7 +36,7 @@ except ImportError:
     _OK = False
 
 
-USER_AGENT = "OreoBadge"
+USER_AGENT = "FaleraBadge"
 
 
 # ═════════════════════════════════════════════════════════════════════════

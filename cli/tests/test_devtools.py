@@ -1,6 +1,6 @@
 """`falera new`, `falera app` and `falera dev`'s notes, against the FakeTransport.
 
-Inside an FaleraOS checkout this also checks that the vendored validator
+Inside a FaleraOS checkout this also checks that the vendored validator
 (oreo_cli/appcheck.py) and the packaged template (oreo_cli/app_template)
 match tools/validate_app.py and app_templates/, so they cannot drift.
 """
@@ -51,7 +51,7 @@ class TmpDir(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.tmp, True)
 
 
-@unittest.skipUnless(IN_REPO, "not inside an FaleraOS checkout")
+@unittest.skipUnless(IN_REPO, "not inside a FaleraOS checkout")
 class NoDriftTest(TmpDir):
     def test_vendored_rules_match_tools_validate_app(self):
         tool = top_level(TOOL)

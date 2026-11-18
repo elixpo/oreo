@@ -4,7 +4,7 @@ The badge side (apps/transfer/src/proto.py) is loaded from the checkout and
 wired to the client through FakeSerial, an in-memory USB serial line that
 can echo, inject FaleraOS log lines, deliver bytes in small pieces, damage a
 chunk, or play a badge whose Transfer app is closed. Skipped when the CLI
-is tested outside an FaleraOS checkout.
+is tested outside a FaleraOS checkout.
 """
 
 import contextlib
@@ -176,7 +176,7 @@ class FakeLink:
     enter = restart = exec
 
 
-@unittest.skipUnless(PROTO.exists(), "not inside an FaleraOS checkout")
+@unittest.skipUnless(PROTO.exists(), "not inside a FaleraOS checkout")
 class TransferTestBase(unittest.TestCase):
     def setUp(self):
         self.proto = load_proto()
@@ -415,7 +415,7 @@ class ClientProtocolTest(TransferTestBase):
         self.assertEqual(ser.rx.host, "laptop")
 
 
-@unittest.skipUnless(PROTO.exists(), "not inside an FaleraOS checkout")
+@unittest.skipUnless(PROTO.exists(), "not inside a FaleraOS checkout")
 class TransferCommandTest(TransferTestBase):
     def write(self, name, data):
         p = Path(self.tmp) / "src"

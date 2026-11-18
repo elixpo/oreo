@@ -67,7 +67,7 @@ class MenuTest(unittest.TestCase):
         self.assertFalse(self.fake.exists("/apps/junk"))
 
 
-@unittest.skipUnless(PROTO.exists(), "not inside an FaleraOS checkout")
+@unittest.skipUnless(PROTO.exists(), "not inside a FaleraOS checkout")
 class TransferEntryTest(unittest.TestCase):
     def setUp(self):
         self.proto = load_proto()

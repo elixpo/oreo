@@ -169,7 +169,7 @@ ls -l /dev/serial/by-id/        # Linux: names that include "Elixpo_Oreo_Badge"
 | Windows | `COM3`, `COM4`, … |
 
 The name is assigned by the computer, and it can change after a reset, a
-replug or an FaleraOS update. To pick a port:
+replug or a FaleraOS update. To pick a port:
 
 ```sh
 falera --port /dev/ttyACM1 info

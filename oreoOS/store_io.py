@@ -19,7 +19,7 @@ except ImportError:
     _NET = False
 
 
-USER_AGENT = "OreoBadge-AppStore"
+USER_AGENT = "FaleraBadge-AppStore"
 MAX_REDIRECTS = 4
 CHUNK = 4096
 

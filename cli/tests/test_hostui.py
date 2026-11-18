@@ -4,7 +4,7 @@ FaleraOS gains `oreoOS/hostui.py` with show(title, detail="", progress=None)
 and clear(), callable over the raw REPL while FaleraOS is paused. The CLI
 calls it during push, pull, add, app install, App Store installs and
 updates, piggybacked on execs it sends anyway, and clears it at the end.
-These tests check the calls arrive, that an FaleraOS without hostui (or a
+These tests check the calls arrive, that a FaleraOS without hostui (or a
 hostui that fails) changes nothing, and that it costs no extra round trips.
 """
 

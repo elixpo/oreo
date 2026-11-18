@@ -26,7 +26,7 @@ self-test below and add its output to #48; that is a useful contribution in
 itself.
 
 ```bash
-falera run tools/ir_selftest.py      # from an FaleraOS checkout; ends in "IR48 RESULT"
+falera run tools/ir_selftest.py      # from a FaleraOS checkout; ends in "IR48 RESULT"
 ```
 
 Despite its store description, IR Quest does not keep or trade tokens

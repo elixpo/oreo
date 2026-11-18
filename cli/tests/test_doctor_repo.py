@@ -78,7 +78,7 @@ class RepoTest(unittest.TestCase):
         self.assertEqual(r.rc, 2)                 # dev flags need --repo
         self.assertIn("--repo", r.out)
         r = run_cli(["update", "--repo", str(self.root / "oreoOS")], runner=self.runner)
-        self.assertIn("does not look like an FaleraOS checkout", r.out)
+        self.assertIn("does not look like a FaleraOS checkout", r.out)
         self.assertEqual(self.calls, [])
 
     def test_update_runs_deploy(self):

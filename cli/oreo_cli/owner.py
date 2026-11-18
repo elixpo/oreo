@@ -34,7 +34,7 @@ from .ui import esc
 PATH = "/profile.json"
 
 # Same keys, in the same order, as KEYS in oreoOS/profile.py (a contract
-# test checks this inside an FaleraOS checkout).
+# test checks this inside a FaleraOS checkout).
 KEYS = ("GITHUB_USER", "DISPLAY_NAME", "DISPLAY_DESIGNATION", "TIMEZONE_OFFSET",
         "WEATHER_LAT", "WEATHER_LON", "WEATHER_NAME", "OWM_API_KEY")
 NUMERIC = ("TIMEZONE_OFFSET", "WEATHER_LAT", "WEATHER_LON")
