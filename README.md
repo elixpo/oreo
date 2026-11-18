@@ -20,7 +20,7 @@
 [![arXiv](https://img.shields.io/badge/arXiv-2610.35935-b31b1b?style=flat-square)](https://arxiv.org/abs/2610.35935)
 [![OSHWA certified: IN000107](https://img.shields.io/badge/OSHWA-IN000107-333333?style=flat-square)](https://certification.oshwa.org/in000107.html)
 
-**Featured on** [Adafruit](https://blog.adafruit.com/2026/11/04/oreoos-a-micropython-based-operating-system/) · [HardLabs](https://www.hardlabs.io/boards/elixpo--oreo) · [more](#-in-the-press)
+**Featured on** [Adafruit](https://blog.adafruit.com/2026/11/04/oreoos-a-micropython-based-operating-system/) · [MA-NO](https://www.ma-no.org/en/software/operating-systems/oreoos-turns-an-esp32-s3-board-into-a-badge-with-apps-and-video) · [HardLabs](https://www.hardlabs.io/boards/elixpo--oreo) · [USB ID from Espressif](https://github.com/espressif/usb-pids/pull/425) · [more](#-in-the-press)
 
 </div>
 
@@ -596,9 +596,28 @@ Everyone is welcome. See **[CONTRIBUTING.md](CONTRIBUTING.md)** and our
 
 ## 📰 In the press
 
+**Coverage**
+
 - **Adafruit**, 4 November 2026: [OreoOS, a MicroPython-based operating system](https://blog.adafruit.com/2026/11/04/oreoos-a-micropython-based-operating-system/)
+- **MA-NO**, 4 November 2026: [OreoOS turns an ESP32-S3 board into a badge with apps and video](https://www.ma-no.org/en/software/operating-systems/oreoos-turns-an-esp32-s3-board-into-a-badge-with-apps-and-video)
 - **Adafruit**, 10 November 2026: [RV565, frame-independent RGB565 video for ESP32-S3 and RP2350 SPI displays](https://blog.adafruit.com/2026/11/10/rv565-frame-independent-rgb565-video-for-esp32-s3-and-rp2350-spi-displays/)
 - **HardLabs**: [Oreo by elixpo, open source PCB, KiCad files and BOM](https://www.hardlabs.io/boards/elixpo--oreo)
+
+**Recognised upstream**
+
+- **Espressif** assigned the badge its own USB ID, `303a:83ec` "Elixpo Oreo Badge" ([espressif/usb-pids#425](https://github.com/espressif/usb-pids/pull/425), 10 November 2026).
+- **OSHWA** certified the badge as open source hardware, [UID IN000107](https://certification.oshwa.org/in000107.html).
+- **The Unix `file` command** recognises RV565 videos: the magic was committed upstream on 12 November 2026 ([file bug 822](https://bugs.astron.com/view.php?id=822)).
+- **Adafruit's CircuitPython Community Bundle** ships the RV565 library, so `circup install circuitpython_rv565` works ([CircuitPython_Community_Bundle#292](https://github.com/adafruit/CircuitPython_Community_Bundle/pull/292), 11 November 2026).
+- **Arduino_GFX**, the Arduino display library, includes an RV565 video example ([Arduino_GFX#823](https://github.com/moononournation/Arduino_GFX/pull/823), 14 November 2026).
+- **Awesome lists**: RV565 is listed in [Awesome CircuitPython](https://github.com/adafruit/awesome-circuitpython/pull/63) and [Awesome Raspberry Pi](https://github.com/thibmaek/awesome-raspberry-pi/pull/371).
+
+**Published**
+
+- **Paper**: [RV565: Cross-Layer Co-Design for Frame-Independent Video Playback on MicroPython-Class ESP32-S3 Systems](https://arxiv.org/abs/2610.35935), arXiv:2610.35935.
+- **RV565 library**: [Arduino Library Manager](https://www.arduinolibraries.info/libraries/rv565), [Espressif component registry](https://components.espressif.com/components/elixpo/rv565), [PyPI](https://pypi.org/project/rv565/), [CircuitPython](https://github.com/elixpo/CircuitPython_RV565).
+- **Wikidata**: OreoOS is [Q141968869](https://www.wikidata.org/wiki/Q141968869).
+- **MicroPython community**: [OreoOS announcement](https://github.com/orgs/micropython/discussions/19847).
 
 ## Recognition & programs
 
