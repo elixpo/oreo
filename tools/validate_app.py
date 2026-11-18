@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check that an OreoOS app folder will load on the badge.
+"""Check that a FaleraOS app folder will load on the badge.
 
     python3 tools/validate_app.py                     # every app in the repo
     python3 tools/validate_app.py apps_market/my_app  # one or more folders
@@ -22,7 +22,7 @@ maintain: no icon module (the tile shows a letter), no README.md, direct
 oreoWare / machine imports instead of the os object (#67), calling
 display.present() from the app, a very long description.
 
-Standard library only, so it runs in CI and inside `oreo` without extras.
+Standard library only, so it runs in CI and inside `falera` without extras.
 """
 
 import argparse
@@ -220,7 +220,7 @@ def all_apps(repo=REPO):
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description="Check OreoOS app folders.")
+    ap = argparse.ArgumentParser(description="Check FaleraOS app folders.")
     ap.add_argument("folders", nargs="*",
                     help="app folders (default: apps/* and apps_market/*)")
     ap.add_argument("--strict", action="store_true",

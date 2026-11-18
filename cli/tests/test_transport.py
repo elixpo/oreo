@@ -157,7 +157,7 @@ class HelpersTest(unittest.TestCase):
     def test_missing_port_explained(self):
         msg, hint = explain_open_failure("/dev/oreo-does-not-exist")
         if msg.endswith("does not exist"):
-            self.assertIn("oreo devs", hint)
+            self.assertIn("falera devs", hint)
 
 
 if __name__ == "__main__":

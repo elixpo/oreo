@@ -1,10 +1,10 @@
 """The badge's progress screen (oreoOS/hostui.py) during long commands.
 
-OreoOS gains `oreoOS/hostui.py` with show(title, detail="", progress=None)
-and clear(), callable over the raw REPL while OreoOS is paused. The CLI
+FaleraOS gains `oreoOS/hostui.py` with show(title, detail="", progress=None)
+and clear(), callable over the raw REPL while FaleraOS is paused. The CLI
 calls it during push, pull, add, app install, App Store installs and
 updates, piggybacked on execs it sends anyway, and clears it at the end.
-These tests check the calls arrive, that an OreoOS without hostui (or a
+These tests check the calls arrive, that a FaleraOS without hostui (or a
 hostui that fails) changes nothing, and that it costs no extra round trips.
 """
 
@@ -193,10 +193,10 @@ class HostUITest(unittest.TestCase):
         r = run_cli(["update"], fake=self.fake, interactive=True, inputs=["y"])
         self.assertEqual(r.rc, 0, r.out)
         titles = [s[1] for s in rec.shows()]
-        self.assertIn("Updating OreoOS", titles)
-        self.assertIn("Downloading OreoOS v2.1.0", titles)
-        self.assertIn("Installing OreoOS v2.1.0", titles)
-        files = [s for s in rec.shows("Downloading OreoOS v2.1.0")]
+        self.assertIn("Updating FaleraOS", titles)
+        self.assertIn("Downloading FaleraOS v2.1.0", titles)
+        self.assertIn("Installing FaleraOS v2.1.0", titles)
+        files = [s for s in rec.shows("Downloading FaleraOS v2.1.0")]
         self.assertEqual(len(files), 3)
         self.assertEqual(files[-1][3], 1.0)
 

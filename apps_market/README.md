@@ -3,7 +3,7 @@
 Every folder here is an app the badge's **App Store** can install. The
 Store does not walk this tree on the badge; it downloads one file,
 [`index.json`](index.json), from
-`raw.githubusercontent.com/elixpo/oreo/main/apps_market/index.json`, caches
+`raw.githubusercontent.com/elixpo/falera/main/apps_market/index.json`, caches
 it on flash and installs each app's files from the paths listed there.
 
 ## Adding or changing an app

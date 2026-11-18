@@ -1,6 +1,6 @@
 """Host tests for the Transfer app (apps/transfer): the USB protocol
 (src/proto.py), the non-blocking line reader (src/link.py) and the app's
-screens (src/app.py) against stub OreoOS modules.
+screens (src/app.py) against stub FaleraOS modules.
 
 The CLI side of the same protocol is tested end to end in
 cli/tests/test_transfer.py.
@@ -542,7 +542,7 @@ class AppTest(unittest.TestCase):
         self.assertEqual(self.stream.data, b"")          # stale input drained
         screen = self.frame()
         self.assertIn(self.app._rx.code, screen)
-        self.assertIn("oreo send <files>", screen)
+        self.assertIn("falera send <files>", screen)
         self.assertIn("Waiting for a computer", screen)   # no usbhost here
         self.assertFalse(self.app.realtime_mode())
         self.say("hello", v=self.proto.VERSION, host="studio-mac")
@@ -593,7 +593,7 @@ class AppTest(unittest.TestCase):
         screen = self.frame()
         self.assertIn("Computer connected over USB", screen)
         self.assertNotIn("Waiting for a computer", screen)
-        self.assertIn("oreo send <files>", screen)
+        self.assertIn("falera send <files>", screen)
         self.assertIn(self.app._rx.code, screen)         # still the code
         probe.state = False                               # cable pulled
         screen = self.frame()

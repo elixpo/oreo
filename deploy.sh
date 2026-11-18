@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# OreoOS deployment entry point.
+# FaleraOS deployment entry point.
 #
 #   ./deploy --pages [--preview]
 #   ./deploy --board [board options]
@@ -34,8 +34,8 @@ Usage:
   ./deploy --full [--port <device>]
 
 Targets:
-  --pages                 Build and deploy oreo.elixpo to Cloudflare Pages
-  --board                 Upload OreoOS to the connected badge
+  --pages                 Build and deploy falera.elixpo to Cloudflare Pages
+  --board                 Upload FaleraOS to the connected badge
 
 Pages options:
   --preview               Deploy a Cloudflare preview instead of production
@@ -43,11 +43,11 @@ Pages options:
 Board options:
   --port <device>         Serial port (default: /dev/ttyACM0)
   --flash-baud <rate>     Firmware flash baud (default: 921600; auto-fallback)
-  --full                  Reflash MicroPython + clean-install OreoOS (board target)
+  --full                  Reflash MicroPython + clean-install FaleraOS (board target)
   --override <apps>       Replace comma-separated app trees, e.g. gallery,reader
   --clean                 Wipe and fully reinstall the badge filesystem
   --force                 Ignore the local hash cache and upload every OS file
-  --no-bump               Do not increment the OreoOS patch version
+  --no-bump               Do not increment the FaleraOS patch version
   --free-floor <bytes>    Minimum free flash required after deployment
   --no-free-guard         Disable the post-deployment free-space guard
   --py                    Upload modules as plain .py (development; default:
@@ -168,7 +168,7 @@ $PREVIEW && fail "--preview is only valid with --pages"
 
 # The device-native video is generated, not committed. Recreate it when a
 # clean checkout lacks the artifact or the tracked source video is newer.
-VIDEO_SOURCE="$SCRIPT_DIR/oreo.elixpo/public/video_assn.mp4"
+VIDEO_SOURCE="$SCRIPT_DIR/falera.elixpo/public/video_assn.mp4"
 VIDEO_ASSET="$SCRIPT_DIR/apps/gallery/assets/optimized/video_assn.rv565"
 if [[ -f "$VIDEO_SOURCE" && (! -f "$VIDEO_ASSET" || "$VIDEO_SOURCE" -nt "$VIDEO_ASSET") ]]; then
   printf 'Preparing Gallery video (RV565 v6, 180x135 @ 24 FPS)...\n'
@@ -184,11 +184,11 @@ if $FULL_BOARD; then
   shopt -s nullglob
   firmware_images=(
     "$SCRIPT_DIR"/oreoWare/firmware/OREO_BADGE-*.bin
-    "$SCRIPT_DIR"/oreoWare/firmware/ESP32_GENERIC_S3-SPIRAM_OCT-*.bin  # before the Oreo Badge board
+    "$SCRIPT_DIR"/oreoWare/firmware/ESP32_GENERIC_S3-SPIRAM_OCT-*.bin  # before the Falera Badge board
   )
   shopt -u nullglob
   ((${#firmware_images[@]} > 0)) || \
-    fail "no Oreo Badge firmware found in oreoWare/firmware/ (run ./build-firmware)"
+    fail "no Falera Badge firmware found in oreoWare/firmware/ (run ./build-firmware)"
   ((${#firmware_images[@]} == 1)) || \
     fail "multiple firmware images in oreoWare/firmware/; keep exactly one"
   FIRMWARE="${firmware_images[0]}"

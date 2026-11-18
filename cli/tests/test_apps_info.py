@@ -1,4 +1,4 @@
-"""`oreo apps`, `oreo info` and the interactive view."""
+"""`falera apps`, `falera info` and the interactive view."""
 
 import json
 import unittest
@@ -21,13 +21,13 @@ class AppsTest(unittest.TestCase):
         self.assertIn("Settings", r.out)
         self.assertIn("built in", r.out)
         self.assertNotIn("launcher", r.out)
-        self.assertIn("oreo apps refresh", r.out)
+        self.assertIn("falera apps refresh", r.out)
 
     def test_install_needs_wifi(self):
         r = run_cli(["apps", "install", "snake"], fake=self.fake)
         self.assertEqual(r.rc, 1)
         self.assertIn("could not get online", r.out)
-        self.assertIn("oreo wifi", r.out)
+        self.assertIn("falera wifi", r.out)
 
     def test_install_update_remove(self):
         self.online()
@@ -69,7 +69,7 @@ class InfoTest(unittest.TestCase):
         self.addCleanup(fake.cleanup)
         r = run_cli(["info"], fake=fake)
         self.assertEqual(r.rc, 0, r.out)
-        for text in ("v2.0.0", "MicroPython 1.28.0", "Elixpo Oreo Badge", "87%",
+        for text in ("v2.0.0", "MicroPython 1.28.0", "Elixpo Falera Badge", "87%",
                      "not connected", "gallery", "documents", "free"):
             self.assertIn(text, r.out)
         self.assertEqual(fake.restarts, ["soft"])
@@ -109,7 +109,7 @@ class InteractiveTest(unittest.TestCase):
     def test_no_badge(self):
         r = run_cli([], ports=[])
         self.assertEqual(r.rc, 3)
-        self.assertIn("no Oreo Badge found", r.out)
+        self.assertIn("no Falera Badge found", r.out)
         self.assertEqual(r.links, [])
 
 

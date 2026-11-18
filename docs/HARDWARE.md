@@ -1,4 +1,4 @@
-# Oreo Badge — Hardware
+# Falera Badge — Hardware
 
 <!-- TODO: pinout / breadboard / final PCB photos -->
 <div align="center">
@@ -8,7 +8,7 @@
 There are two designs:
 
 - **The breadboard badge** (this page): an **ESP32-S3-DevKitC-1-N16R8**
-  (16 MB flash + 8 MB PSRAM) with breakout boards. OreoOS runs on it
+  (16 MB flash + 8 MB PSRAM) with breakout boards. FaleraOS runs on it
   today, and its pins are the ones in
   [`oreoWare/pins.py`](../oreoWare/pins.py).
 - **The PCB badge** ([`circuit/elixpo/`](../circuit/elixpo/), KiCad 10): a
@@ -20,7 +20,7 @@ There are two designs:
   November 2026. Its design notes, pin map and ordering steps are in
   [`circuit/elixpo/README.md`](../circuit/elixpo/README.md), and the parts
   and cost of one badge in
-  [`circuit/elixpo/BOM_COST.md`](../circuit/elixpo/BOM_COST.md). OreoOS
+  [`circuit/elixpo/BOM_COST.md`](../circuit/elixpo/BOM_COST.md). FaleraOS
   detects the board at boot and has its pin map, display driver and
   expander buttons (touch is still to come); it is flashed once a board is
   assembled.
@@ -153,7 +153,7 @@ costs ~30 mA vs ~80 mA in the run loop.
 
 ## OTA update partition
 
-OreoOS doesn't use ESP-IDF OTA partitions. Updates write into a
+FaleraOS doesn't use ESP-IDF OTA partitions. Updates write into a
 `/_ota/` directory on the LittleFS filesystem, validate SHA-256 per
 file, and the boot path atomically copies them into their final
 locations. The MicroPython firmware itself doesn't change at OTA time

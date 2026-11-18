@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Reproducible OreoOS MicroPython firmware builder for ESP32-S3 N16R8.
+# Reproducible FaleraOS MicroPython firmware builder for ESP32-S3 N16R8.
 # The normal path is intentionally non-destructive. Flash erase only happens
 # when the caller explicitly supplies --flash.
 
@@ -11,7 +11,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 IDF_VERSION="5.5.1"
 MICROPY_VERSION="1.28.0"
 # Out-of-tree MicroPython board: ESP32_GENERIC_S3 + SPIRAM_OCT configuration
-# with the Oreo Badge identity (USB names, board name, hostname).
+# with the Falera Badge identity (USB names, board name, hostname).
 BOARD_DIR="$REPO_ROOT/firmware/boards/OREO_BADGE"
 BUILD_NAME="build-oreo-badge-v55"
 
@@ -32,7 +32,7 @@ usage() {
   cat <<'EOF'
 Usage: ./build-firmware [options]
 
-Build OreoOS MicroPython v1.28.0 with the native ESP32-S3 modules.
+Build FaleraOS MicroPython v1.28.0 with the native ESP32-S3 modules.
 Missing ESP-IDF/MicroPython sources and the matching IDF Python environment
 are installed automatically. A normal invocation never touches the badge.
 
@@ -221,7 +221,7 @@ if $CLEAN && [[ -f "$MICROPY_DIR/ports/esp32/$BUILD_NAME/CMakeCache.txt" ]]; the
     BUILD="$BUILD_NAME"
 fi
 
-printf 'Building OreoOS firmware...\n'
+printf 'Building FaleraOS firmware...\n'
 make -C "$MICROPY_DIR/ports/esp32" \
   BOARD_DIR="$BOARD_DIR" \
   BUILD="$BUILD_NAME" \
@@ -237,8 +237,8 @@ strings "$MICROPY_IMAGE" | grep '_oreo_ir' >/dev/null || fail \
   "native _oreo_ir module is missing from the image"
 strings "$MICROPY_IMAGE" | grep '_oreo_rv565' >/dev/null || fail \
   "native _oreo_rv565 module is missing from the image"
-strings "$MICROPY_IMAGE" | grep -F 'Oreo Badge' >/dev/null || fail \
-  "Oreo Badge board identity is missing from the image"
+strings "$MICROPY_IMAGE" | grep -F 'Falera Badge' >/dev/null || fail \
+  "Falera Badge board identity is missing from the image"
 # A build directory configured before the 16 MiB layout keeps its old
 # sdkconfig; rebuild with --clean if this fails.
 # The table is 32-byte entries (magic bytes AA 50, type, subtype, offset,
@@ -258,7 +258,7 @@ PY
 printf 'Verified native module: _oreo_ir\n'
 printf 'Verified native module: _oreo_rv565\n'
 printf 'Verified partition table: 16 MiB layout with vfs partition\n'
-printf 'Verified board identity: Oreo Badge (USB: Elixpo / Oreo Badge)\n'
+printf 'Verified board identity: Falera Badge (USB: Elixpo / Falera Badge)\n'
 printf 'Built: %s\n' "$FIRMWARE_IMAGE"
 
 if $COPY_IMAGE; then
@@ -281,7 +281,7 @@ if $COPY_IMAGE; then
 fi
 
 if $FLASH; then
-  printf '\nClean-flashing firmware and OreoOS to %s...\n' "$PORT"
+  printf '\nClean-flashing firmware and FaleraOS to %s...\n' "$PORT"
   exec "$REPO_ROOT/deploy" --full --port "$PORT" --flash-baud "$FLASH_BAUD"
 fi
 

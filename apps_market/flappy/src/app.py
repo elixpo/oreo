@@ -1,4 +1,4 @@
-"""Flappy Panda — Oreo Badge edition.
+"""Flappy Panda — Falera Badge edition.
 
 Landscape 320×240. Mona-style physics (gravity + flap impulse), parallax
 scenery (distant hills + clouds + grass), pipe-with-spike obstacles, three
@@ -469,7 +469,7 @@ class Scenery:
 INTRO, PLAY, OVER, PAUSE = 1, 2, 3, 4
 
 class App(oreoOS.App):
-    name          = "Flappy Oreo"
+    name          = "Flappy Lumi"
     SHOW_LOADING  = True   # scenery + dim-bg build can take ~150 ms on hardware
 
     def on_enter(self, os):
@@ -587,7 +587,7 @@ class App(oreoOS.App):
             font.text(d, s, x, y, color, scale=scale)
 
     def _draw_intro(self, d):
-        self._center_text(d, "FLAPPY OREO", 50, scale=3, color=C_TITLE)
+        self._center_text(d, "FLAPPY LUMI", 50, scale=3, color=C_TITLE)
         if self._hiscore > 0:
             self._center_text(d, "HIGH SCORE %d" % self._hiscore, 95, scale=2, color=C_HI)
         if int(self._blink_t * 2) % 2 == 0:

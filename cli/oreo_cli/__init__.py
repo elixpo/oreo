@@ -1,6 +1,6 @@
-"""oreo: the command-line tool for the Elixpo Oreo Badge.
+"""falera: the command-line tool for the Elixpo Falera Badge.
 
-Finds the badge by its USB ID (303a:83ec) and drives OreoOS over
+Finds the badge by its USB ID (303a:83ec) and drives FaleraOS over
 MicroPython's raw REPL, using mpremote's serial transport as a library.
 """
 

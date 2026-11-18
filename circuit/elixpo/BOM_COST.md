@@ -1,4 +1,4 @@
-# Oreo badge: one-unit BOM and cost
+# Falera badge: one-unit BOM and cost
 
 The cost of the parts in **one** badge, from the prices actually paid on 17 November 2026. Both orders were charged at ₹93.96 to the dollar (JLCPCB ₹4,122 for $43.87; LCSC ₹4,063 for $43.24), so every LCSC price below is converted at that rate. Each LCSC line is the quantity one badge uses multiplied by that part's one-unit price in the cart; the packs and spare chips bought are not counted.
 

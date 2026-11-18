@@ -1,7 +1,7 @@
 """Make a badge avatar file (/avatar.bin) for a GitHub user on this computer.
 
-`oreo setup` does this for you: it fetches the avatar of the profile's
-GITHUB_USER and copies it to the badge over USB (`oreo setup --avatar`
+`falera setup` does this for you: it fetches the avatar of the profile's
+GITHUB_USER and copies it to the badge over USB (`falera setup --avatar`
 fetches it again). This script is the same conversion without a badge,
 for checking the result or copying it by hand. The code is shared with
 the CLI: cli/oreo_cli/avatar.py, loaded by path, so the two never drift.
@@ -16,9 +16,9 @@ Usage:
     python3 tools/fetch_avatar.py --user octocat              # ./avatar.bin
     python3 tools/fetch_avatar.py --user octocat --out a.bin
     python3 tools/fetch_avatar.py --from-image me.png --user octocat
-    oreo push avatar.bin /avatar.bin
+    falera push avatar.bin /avatar.bin
 
-Needs Pillow (pip install Pillow; oreo-cli already depends on it).
+Needs Pillow (pip install Pillow; falera-cli already depends on it).
 """
 
 import argparse
@@ -62,7 +62,7 @@ def main(argv=None):
     out = Path(args.out)
     out.write_bytes(data)
     print("Wrote %s (%d bytes, %dx%d, for @%s)" % (out, len(data), av.SIZE, av.SIZE, user))
-    print("Copy it to the badge with: oreo push %s %s" % (out, av.PATH))
+    print("Copy it to the badge with: falera push %s %s" % (out, av.PATH))
     return 0
 
 

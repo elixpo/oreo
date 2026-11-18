@@ -1,4 +1,4 @@
-"""Patakha - a Diwali night shooter for the Oreo Badge.
+"""Patakha - a Diwali night shooter for the Falera Badge.
 
 Pop the matchboxes, anars and chakris falling over the city with
 firecrackers from your launcher. Every 100 points the sky gets busier;

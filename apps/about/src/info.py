@@ -93,7 +93,7 @@ def step_hw():
     try:
         from oreoWare import pins
         if getattr(pins, "BOARD", "") == "pcb":
-            out["board"] = "Oreo PCB, ESP32-S3"
+            out["board"] = "Falera PCB, ESP32-S3"
         if getattr(pins, "DISPLAY_DRIVER", "") == "ili9341":
             out["display"] = "ILI9341 320x240"
     except Exception:

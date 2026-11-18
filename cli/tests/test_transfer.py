@@ -1,10 +1,10 @@
-"""`oreo transfer`: the CLI client against the badge's real Transfer protocol.
+"""`falera transfer`: the CLI client against the badge's real Transfer protocol.
 
 The badge side (apps/transfer/src/proto.py) is loaded from the checkout and
 wired to the client through FakeSerial, an in-memory USB serial line that
-can echo, inject OreoOS log lines, deliver bytes in small pieces, damage a
+can echo, inject FaleraOS log lines, deliver bytes in small pieces, damage a
 chunk, or play a badge whose Transfer app is closed. Skipped when the CLI
-is tested outside an OreoOS checkout.
+is tested outside a FaleraOS checkout.
 """
 
 import contextlib
@@ -176,7 +176,7 @@ class FakeLink:
     enter = restart = exec
 
 
-@unittest.skipUnless(PROTO.exists(), "not inside an OreoOS checkout")
+@unittest.skipUnless(PROTO.exists(), "not inside a FaleraOS checkout")
 class TransferTestBase(unittest.TestCase):
     def setUp(self):
         self.proto = load_proto()
@@ -348,7 +348,7 @@ class ClientProtocolTest(TransferTestBase):
 
     def test_app_not_open_leaves_ctrl_c_working(self):
         # Failed runs with the longest host name the CLI sends, then what
-        # `oreo add` / mpremote do next: Ctrl-C must still reach MicroPython.
+        # `falera add` / mpremote do next: Ctrl-C must still reach MicroPython.
         clock = Clock()
         ser = FakeSerial(self.proto, self.root, app_open=False, clock=clock)
         for _ in range(5):
@@ -362,9 +362,9 @@ class ClientProtocolTest(TransferTestBase):
 
     def test_ring_model_blocks_ctrl_c_when_full(self):
         # The model itself: three of the old unprompted hellos (102 bytes
-        # each with a 24-character host) fill the ring and Ctrl-C is lost.
+        # each with a 22-character host) fill the ring and Ctrl-C is lost.
         ser = FakeSerial(self.proto, self.root, app_open=False)
-        hello = (b'@OTH {"v":1,"host":"' + b"h" * 24 + b'","client":"oreo-cli 0.1.0",'
+        hello = (b'@OTH {"v":1,"host":"' + b"h" * 22 + b'","client":"falera-cli 0.1.0",'
                  b'"id":"01234567","op":"hello"}\n')
         self.assertEqual(len(hello), 102)
         for _ in range(3):
@@ -415,7 +415,7 @@ class ClientProtocolTest(TransferTestBase):
         self.assertEqual(ser.rx.host, "laptop")
 
 
-@unittest.skipUnless(PROTO.exists(), "not inside an OreoOS checkout")
+@unittest.skipUnless(PROTO.exists(), "not inside a FaleraOS checkout")
 class TransferCommandTest(TransferTestBase):
     def write(self, name, data):
         p = Path(self.tmp) / "src"

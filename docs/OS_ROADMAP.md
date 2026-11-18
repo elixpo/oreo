@@ -1,6 +1,6 @@
-# OreoOS status roadmap
+# FaleraOS status roadmap
 
-Goal: OreoOS is recognised as *the* operating system of the Oreo Badge, by
+Goal: FaleraOS is recognised as *the* operating system of the Falera Badge, by
 the computers it is plugged into and by the places the ESP32 and MicroPython
 communities trust, not only on our own site.
 
@@ -19,21 +19,21 @@ hardware, build/flash, or a decision).
 
 ## Level 1: identity and installation
 
-### 1.1 The badge introduces itself as "Oreo Badge"
+### 1.1 The badge introduces itself as "Falera Badge"
 
 - [x] 🤖 MicroPython board definition `firmware/boards/OREO_BADGE`: the exact
       ESP32_GENERIC_S3 + SPIRAM_OCT configuration (flash layout and behaviour
-      unchanged) plus USB manufacturer "Elixpo", product "Oreo Badge", board
-      name "Oreo Badge" (boot banner, `os.uname()`) and hostname `oreo`.
+      unchanged) plus USB manufacturer "Elixpo", product "Falera Badge", board
+      name "Falera Badge" (boot banner, `os.uname()`) and hostname `falera`.
 - [x] 🤖 `./build-firmware` builds it and checks the identity is in the image;
       the deployable image is now `oreoWare/firmware/OREO_BADGE-v1.28.0.bin`.
 - [ ] 🙋 Build (`./build-firmware --clean`), flash (`./deploy --full`), and
       confirm: `ls /dev/serial/by-id/` shows `usb-Elixpo_Oreo_Badge_…`, and the
-      REPL banner ends `Oreo Badge with ESP32S3`. Commit the new image.
+      REPL banner ends `Falera Badge with ESP32S3`. Commit the new image.
 
 ### 1.2 One-click install from the browser
 
-- [ ] 🤖 "Install OreoOS" button on oreo.elixpo.com using ESP Web Tools (Chrome
+- [ ] 🤖 "Install FaleraOS" button on falera.elixpo.com using ESP Web Tools (Chrome
       and Edge, Web Serial): flashes the firmware, then the OS files.
 - [ ] 🤖 Decide the image: a full flash image with the filesystem included, or
       firmware plus first-boot download of the OS through the existing OTA path.
@@ -56,7 +56,7 @@ WiFi, and fun to hack. These items close the gap.
 - [x] 🤖 **Offline-first GitHub apps:** Badge and Commits open instantly from
       flash and sync in the background only when WiFi is up; Commits' graph
       now matches GitHub's calendar
-      ([oreo#71](https://github.com/elixpo/oreo/pull/71)).
+      ([falera#71](https://github.com/elixpo/falera/pull/71)).
 - [ ] 🙋 Test #71 on the badge (open both apps with and without WiFi).
 - [ ] 🤖 **Prefill at deploy:** `./deploy` fetches the profile and graph on
       the laptop and writes the caches, so the very first open at a venue
@@ -72,7 +72,7 @@ WiFi, and fun to hack. These items close the gap.
 - [ ] 🤖 **Set up without a laptop:** enter GitHub username and WiFi from the
       on-badge web page, not only `.env` + deploy.
 - [ ] 🤖 **"Hack your badge" guide:** a 10-minute first-app walkthrough on
-      oreo.elixpo.com using `app_templates/`.
+      falera.elixpo.com using `app_templates/`.
 
 ## Level 2: listed where people look
 
@@ -81,7 +81,7 @@ WiFi, and fun to hack. These items close the gap.
       and **awesome-micropython**, *Frameworks* section next to micrOS
       ([mcauser/awesome-micropython#233](https://github.com/mcauser/awesome-micropython/pull/233)).
       One-line PRs, disclosed as our own (2026-11-02).
-- [x] 🙋 **Wikidata** item [OreoOS (Q141968869)](https://www.wikidata.org/wiki/Q141968869),
+- [x] 🙋 **Wikidata** item [FaleraOS (Q141968869)](https://www.wikidata.org/wiki/Q141968869),
       created by hand (new accounts can't run QuickStatements): embedded
       operating system and free software, based on MicroPython, platform
       ESP32-S3, Python, MIT, inception, version, website, repository, and
@@ -96,8 +96,8 @@ WiFi, and fun to hack. These items close the gap.
 - [x] 🤖 Set `MICROPY_HW_USB_VID 0x303A` and `MICROPY_HW_USB_PID 0x83EC` in
       `firmware/boards/OREO_BADGE/mpconfigboard.h`.
 - [x] 🙋 Rebuild and flash the firmware; check `lsusb` shows `303a:83ec`
-      (done 2026-11-10: "Elixpo Oreo Badge" on the native port).
-- [ ] 🤖 Submit "Elixpo Oreo Badge" to the Linux USB ID database (`usb.ids`,
+      (done 2026-11-10: "Elixpo Falera Badge" on the native port).
+- [ ] 🤖 Submit "Elixpo Falera Badge" to the Linux USB ID database (`usb.ids`,
       linux-usb.org), so plain `lsusb` and systemd's hwdb name the badge.
       Submitted 2026-11-10 by email to the usb.ids robot, with Espressif's
       vendor entry (303a is not in the file yet); waiting for approval.
@@ -115,25 +115,25 @@ WiFi, and fun to hack. These items close the gap.
 
 - [x] 🤖 Hardware design files licensed **CERN-OHL-P-2.0**; README "Exclusive"
       clarified (names and look reserved, design open)
-      ([oreo#73](https://github.com/elixpo/oreo/pull/73)).
+      ([falera#73](https://github.com/elixpo/falera/pull/73)).
 - [x] 🙋 **OSHWA Open Source Hardware certification**: certified
       2026-11-06, UID [IN000107](https://certification.oshwa.org/in000107.html); mark in the README and on the
       badge page.
 - [x] 🤖 **Verified HTTPS on the badge** (#110): certificate chain, host
       name and dates checked against bundled root CAs, clock synced first,
       no fallback to unverified connections ([docs/TLS.md](TLS.md)).
-- [ ] 🙋 Run `oreo run tools/tls_probe.py` on a badge (handshake time and
+- [ ] 🙋 Run `falera run tools/tls_probe.py` on a badge (handshake time and
       heap with verification on), then test Updates and the App Store with
       Wi-Fi, after a power cycle (clock unset) and on a network that
       blocks NTP.
 - [ ] 🤖 Sign OTA bundles, so an update is trusted even if TLS is bypassed
       (#110 follow-up).
 - [x] 🤖 **OpenSSF Scorecard** workflow and badge
-      ([oreo#74](https://github.com/elixpo/oreo/pull/74)).
+      ([falera#74](https://github.com/elixpo/falera/pull/74)).
 - [x] 🙋 **OpenSSF Best Practices** badge: **passing**
       ([project 16187](https://www.bestpractices.dev/projects/16187), 2026-11-02).
       Answering it surfaced and fixed predictable Send Files codes
-      ([oreo#78](https://github.com/elixpo/oreo/pull/78)).
+      ([falera#78](https://github.com/elixpo/falera/pull/78)).
 - [x] 🤖 **MicroPython upstream board** opened
       ([micropython#19846](https://github.com/micropython/micropython/pull/19846)),
       now out of draft.
@@ -147,9 +147,9 @@ WiFi, and fun to hack. These items close the gap.
 
 ## Level 3: adoption
 
-- [ ] 🙋 Ship OreoOS on badges at an event (the way EMF Camp's Tildagon and
+- [ ] 🙋 Ship FaleraOS on badges at an event (the way EMF Camp's Tildagon and
       the Hackaday Supercon badges became known).
-- [ ] 🤖 Systems paper on OreoOS (app model, OTA, on-badge security, RV565
+- [ ] 🤖 Systems paper on FaleraOS (app model, OTA, on-badge security, RV565
       integration), cross-cited with the RV565 paper.
 - [ ] 🙋 Talks: MicroPython meetups, Hackaday Supercon, PyCon.
 
@@ -157,7 +157,7 @@ WiFi, and fun to hack. These items close the gap.
 
 ## What does not apply
 
-- **A Linux kernel or "OS registry" PR.** OreoOS runs on MicroPython over
+- **A Linux kernel or "OS registry" PR.** FaleraOS runs on MicroPython over
   ESP-IDF/FreeRTOS on the ESP32-S3, not on Linux, and there is no central
   list of operating systems for microcontrollers. The upstream that matters
   is MicroPython (board definition) and Espressif's programmes (USB PID).

@@ -1,8 +1,8 @@
 #!/bin/sh
-# Install the `oreo` CLI (Elixpo Oreo Badge) from a GitHub release.
+# Install the `falera` CLI (Elixpo Falera Badge) from a GitHub release.
 #
 #   curl --proto '=https' --tlsv1.2 -LsSf \
-#     https://raw.githubusercontent.com/elixpo/oreo/main/cli/install.sh | sh
+#     https://raw.githubusercontent.com/elixpo/falera/main/cli/install.sh | sh
 #
 # Downloads the release wheel and its .sha256, checks the SHA-256, and
 # installs it with pipx or uv (whichever is present) as an isolated tool.
@@ -11,13 +11,13 @@
 #   OREO_CLI_VERSION        release to install: latest (default), cli-v0.1.0,
 #                           v0.1.0 or 0.1.0
 #   OREO_CLI_INSTALLER      pipx or uv (default: pipx if present, else uv)
-#   OREO_CLI_REPOSITORY     GitHub repository (default: elixpo/oreo)
+#   OREO_CLI_REPOSITORY     GitHub repository (default: elixpo/falera)
 #   OREO_CLI_DOWNLOAD_BASE  fetch the files from here instead of the
 #                           release (for testing); needs a pinned version
 
 set -eu
 
-repository=${OREO_CLI_REPOSITORY:-elixpo/oreo}
+repository=${OREO_CLI_REPOSITORY:-elixpo/falera}
 requested=${OREO_CLI_VERSION:-latest}
 installer=${OREO_CLI_INSTALLER:-}
 
@@ -26,7 +26,7 @@ fail() {
   exit 1
 }
 
-command -v curl >/dev/null 2>&1 || fail "curl is required to install the oreo CLI"
+command -v curl >/dev/null 2>&1 || fail "curl is required to install the falera CLI"
 
 # ── installer: pipx or uv ────────────────────────────────────────────
 if [ -z "$installer" ]; then
@@ -36,7 +36,7 @@ if [ -z "$installer" ]; then
     installer=uv
   else
     cat >&2 <<'EOF'
-error: the oreo CLI installs with pipx or uv, and neither was found.
+error: the falera CLI installs with pipx or uv, and neither was found.
 
 Install one of them, then run this installer again:
   uv:    curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -71,12 +71,12 @@ else
   curl_flags=$https_flags
 fi
 
-temporary=$(mktemp -d "${TMPDIR:-/tmp}/oreo-cli-install.XXXXXX")
+temporary=$(mktemp -d "${TMPDIR:-/tmp}/falera-cli-install.XXXXXX")
 trap 'rm -rf "$temporary"' EXIT HUP INT TERM
 
 if [ "$requested" = latest ]; then
   [ -z "${OREO_CLI_DOWNLOAD_BASE:-}" ] || fail "OREO_CLI_DOWNLOAD_BASE needs OREO_CLI_VERSION set to a version"
-  # The repository's "latest" release is OreoOS itself, so the CLI's
+  # The repository's "latest" release is FaleraOS itself, so the CLI's
   # newest release is found from its tags (cli-vX.Y.Z), newest first.
   # Pre-releases are only installed when asked for by name.
   # shellcheck disable=SC2086
@@ -86,7 +86,7 @@ if [ "$requested" = latest ]; then
   candidates=$(tr ',{}' '\n\n\n' <"$temporary/tags.json" |
     sed -n 's|^ *"ref": *"refs/tags/cli-v\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\)" *$|\1|p' |
     sort -t . -k 1,1nr -k 2,2nr -k 3,3nr)
-  [ -n "$candidates" ] || fail "no oreo CLI release found in ${repository}"
+  [ -n "$candidates" ] || fail "no falera CLI release found in ${repository}"
 else
   candidates=$(normalise "$requested") ||
     fail "OREO_CLI_VERSION must look like cli-v0.1.0, v0.1.0 or 0.1.0 (got: $requested)"
@@ -95,12 +95,19 @@ fi
 # ── download and verify ──────────────────────────────────────────────
 version=
 for candidate in $candidates; do
-  asset="oreo_cli-${candidate}-py3-none-any.whl"
   if [ -n "${OREO_CLI_DOWNLOAD_BASE:-}" ]; then
     base=${OREO_CLI_DOWNLOAD_BASE%/}
   else
     base="https://github.com/${repository}/releases/download/cli-v${candidate}"
   fi
+  # Releases since the rename ship falera_cli wheels; older ones, oreo_cli.
+  asset="falera_cli-${candidate}-py3-none-any.whl"
+  # shellcheck disable=SC2086
+  if curl $curl_flags --output "$temporary/$asset.sha256" "$base/$asset.sha256" 2>/dev/null; then
+    version=$candidate
+    break
+  fi
+  asset="oreo_cli-${candidate}-py3-none-any.whl"
   # shellcheck disable=SC2086
   if curl $curl_flags --output "$temporary/$asset.sha256" "$base/$asset.sha256" 2>/dev/null; then
     version=$candidate
@@ -108,12 +115,12 @@ for candidate in $candidates; do
   fi
   # A tag can exist before its release is published (or after a failed
   # release run); for "latest", fall back to the next older version.
-  [ "$requested" = latest ] || fail "oreo CLI ${candidate} has no release at $base"
+  [ "$requested" = latest ] || fail "falera CLI ${candidate} has no release at $base"
   echo "note: cli-v${candidate} has no published release yet; trying an older one" >&2
 done
 [ -n "$version" ] || fail "none of the CLI tags in ${repository} has a published release"
 
-echo "Downloading oreo CLI ${version}"
+echo "Downloading falera CLI ${version}"
 # shellcheck disable=SC2086
 curl $curl_flags --output "$temporary/$asset" "$base/$asset" ||
   fail "could not download $base/$asset"
@@ -131,7 +138,7 @@ printf '%s\n' "$expected" | grep -Eq '^[0-9a-f]{64}$' || fail "the release's che
 echo "Checksum OK (SHA-256 $actual)"
 
 # ── install ──────────────────────────────────────────────────────────
-# --force replaces an older oreo-cli, so this also upgrades.
+# --force replaces an older falera-cli, so this also upgrades.
 echo "Installing with $installer"
 case "$installer" in
   pipx) pipx install --force "$temporary/$asset" ;;
@@ -139,12 +146,12 @@ case "$installer" in
 esac
 
 echo
-echo "  oreo CLI ${version} is installed."
-if ! command -v oreo >/dev/null 2>&1; then
+echo "  falera CLI ${version} is installed."
+if ! command -v falera >/dev/null 2>&1; then
   echo
   case "$installer" in
-    pipx) echo "  'oreo' is not on your PATH yet: run 'pipx ensurepath' and open a new terminal." ;;
-    uv) echo "  'oreo' is not on your PATH yet: run 'uv tool update-shell' and open a new terminal." ;;
+    pipx) echo "  'falera' is not on your PATH yet: run 'pipx ensurepath' and open a new terminal." ;;
+    uv) echo "  'falera' is not on your PATH yet: run 'uv tool update-shell' and open a new terminal." ;;
   esac
 fi
 if [ "$(uname -s)" = Linux ]; then
@@ -153,6 +160,6 @@ if [ "$(uname -s)" = Linux ]; then
   echo "    sudo usermod -aG dialout \$USER   # then log out and back in"
 fi
 echo
-echo "  Plug in the badge and run:  oreo"
-echo "  Check the setup:            oreo doctor"
-echo "  Docs: https://oreo.elixpo.com/docs/cli/"
+echo "  Plug in the badge and run:  falera"
+echo "  Check the setup:            falera doctor"
+echo "  Docs: https://falera.elixpo.com/docs/cli/"

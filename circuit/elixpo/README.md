@@ -1,6 +1,6 @@
-# Oreo badge hardware
+# Falera badge hardware
 
-The Oreo Badge is certified open source hardware by the Open Source Hardware
+The Falera Badge is certified open source hardware by the Open Source Hardware
 Association, UID [IN000107](https://certification.oshwa.org/in000107.html). The design is licensed under
 CERN-OHL-P-2.0 (see `LICENSE` in this directory).
 
@@ -55,7 +55,7 @@ I2C devices: MPU-6050 0x69 (AD0 tied to its VLOGIC pin;
 
 This differs from the breadboard (buttons on GPIOs, I2C on 42/47, the amp
 on 41/21/46): the expander freed the button pins, so the PCB regroups them.
-OreoOS finds out which board it runs on at boot (`oreoWare/board.py` reads
+FaleraOS finds out which board it runs on at boot (`oreoWare/board.py` reads
 the AW9523B's chip ID; a `/board.txt` holding `pcb` or `breadboard`
 overrides it), and `oreoWare/pins.py` holds both pin maps. On the PCB it
 uses the ILI9341 panel driver (`oreoWare/_ili9341.py`), reads the buttons
@@ -109,7 +109,7 @@ isn't read yet.
   charge current (#156).
 - Review the ESP32-S3 RF layout against Espressif's current hardware guide;
   tune the antenna network on assembled boards with a VNA.
-- Replace the MPU-6050 only if its successor driver is added to OreoOS first.
+- Replace the MPU-6050 only if its successor driver is added to FaleraOS first.
 - Treat this as an engineering prototype, not a production-certified charger
   or RF design, until bring-up and compliance testing complete.
 
@@ -165,7 +165,7 @@ those. `BOM_ORDER.csv` lists everything a badge needs: what JLCPCB can fit,
 the SMD and through-hole parts to solder by hand, and the off-board parts,
 with LCSC numbers and prices.
 
-OreoOS and its firmware are flashed over USB-C once a board is assembled.
+FaleraOS and its firmware are flashed over USB-C once a board is assembled.
 The OS supports this board (see the pin map above), apart from touch; check
 the picture's orientation and the buttons on the first board.
 
@@ -183,9 +183,9 @@ the frame oreoWare/imu.py and oreoWare/pins.py assume.
 ## Contributing
 
 Open work is labelled
-[hardware](https://github.com/elixpo/oreo/issues?q=is%3Aopen+label%3Ahardware),
+[hardware](https://github.com/elixpo/falera/issues?q=is%3Aopen+label%3Ahardware),
 and new ideas go in the
-[hardware issue form](https://github.com/elixpo/oreo/issues/new?template=hardware.yml).
+[hardware issue form](https://github.com/elixpo/falera/issues/new?template=hardware.yml).
 In short:
 
 - Change the schematic by changing `generate_badge_schematic.py`, then run
@@ -213,11 +213,11 @@ The full guide is the
 ## Fund the badge
 
 The first boards are paid for out of pocket. To help build them, chip in at
-[payouts.elixpo.com/f/oreo-badge](https://payouts.elixpo.com/f/oreo-badge).
+[payouts.elixpo.com/f/falera-badge](https://payouts.elixpo.com/f/falera-badge).
 
 ## Credits
 
-The Oreo badge is designed by Ayushman Bhattacharya
+The Falera badge is designed by Ayushman Bhattacharya
 ([@Circuit-Overtime](https://github.com/Circuit-Overtime)) with Anwesha
 Chakraborty ([@anwe-ch](https://github.com/anwe-ch)), Elixpo core maintainer,
 who co-authored the JLCPCB order files (#173) and the RV565 video format the
@@ -228,6 +228,6 @@ badge plays.
 The hardware design files in this directory are Open Hardware, licensed under
 the [CERN Open Hardware Licence v2 - Permissive](../../LICENSES/preferred/CERN-OHL-P-2.0)
 (CERN-OHL-P-2.0); see [`LICENSE`](LICENSE) for the notice. You may make,
-modify and sell boards from them; the Elixpo and Oreo names and mascot are
+modify and sell boards from them; the Elixpo and Falera names and the Lumi mascot are
 trademarks, so derived boards need their own names (see
 [`TRADEMARKS.md`](../../TRADEMARKS.md)).

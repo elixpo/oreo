@@ -1,12 +1,12 @@
 """On-badge timing of opening each app. Runs ON the badge:
 
-    oreo run tools/app_open_probe.py
+    falera run tools/app_open_probe.py
 
 For every installed app (or the ones in ONLY) it does what the launcher
 does when you press A, one step at a time, and prints:
 
   import     ms to import apps.<name>.main the first time this run,
-             with the OreoOS modules it pulled in that were not loaded
+             with the FaleraOS modules it pulled in that were not loaded
              yet (those stay loaded afterwards, as on the badge)
   again      ms for a second import with those modules already loaded:
              the app's own cost on every later open
@@ -20,7 +20,7 @@ does when you press A, one step at a time, and prints:
 then the time of a full gc.collect(), which the launcher runs between
 two apps. Each app is closed with on_exit() and unloaded again; nothing
 is written to flash by this script (an app's own on_enter may still save
-its state, as it does on every open). OreoOS starts again when the CLI
+its state, as it does on every open). FaleraOS starts again when the CLI
 finishes. Paste the whole output into the pull request.
 """
 
@@ -192,7 +192,7 @@ def main():
             os_obj.display.present_rect(*rect)
         print("open chip: %d ms" % ms(t0))
     except ImportError:
-        print("open chip: this OreoOS has no oreoOS.opening")
+        print("open chip: this FaleraOS has no oreoOS.opening")
 
 
 main()

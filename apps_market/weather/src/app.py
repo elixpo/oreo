@@ -181,7 +181,7 @@ def _tls_mark():
 
 def _tls_failed(mark):
     """True when a certificate check (or the clock it needs) failed since
-    `mark` (OreoOS with verified TLS, #110)."""
+    `mark` (FaleraOS with verified TLS, #110)."""
     if mark is None:
         return False
     try:
@@ -436,7 +436,7 @@ class App(oreoOS.App):
         for i, ln in enumerate([
                 "Set your OpenWeatherMap key",
                 "  OWM_API_KEY",
-                "with oreo setup or .env.local.",
+                "with falera setup or .env.local.",
                 "",
                 "Location: found from the",
                 "badge's network, or pin it",

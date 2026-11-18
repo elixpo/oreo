@@ -1,4 +1,4 @@
-# OreoOS: preamble
+# FaleraOS: preamble
 
 <p>
   <a href="LICENSE"><img alt="Code: MIT" src="https://img.shields.io/badge/code-MIT-blue?style=flat-square"></a>
@@ -7,7 +7,7 @@
   <a href="https://certification.oshwa.org/in000107.html"><img alt="OSHWA certified: IN000107" src="https://img.shields.io/badge/OSHWA-IN000107-333333?style=flat-square"></a>
 </p>
 
-OreoOS, the operating system of the Oreo Badge, is provided under:
+FaleraOS, the operating system of the Falera Badge, is provided under:
 
     SPDX-License-Identifier: MIT
 
@@ -38,8 +38,8 @@ Association, UID IN000107:
 
 <a href="https://certification.oshwa.org/in000107.html">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="oreo.elixpo/public/oshw_mark_card.png">
-    <img src="oreo.elixpo/public/oshw_mark.png" alt="Certified open source hardware, OSHWA UID IN000107" width="220">
+    <source media="(prefers-color-scheme: dark)" srcset="falera.elixpo/public/oshw_mark_card.png">
+    <img src="falera.elixpo/public/oshw_mark.png" alt="Certified open source hardware, OSHWA UID IN000107" width="220">
   </picture>
 </a>
 
@@ -58,13 +58,13 @@ firmware must retain; see:
     LICENSES/preferred/Apache-2.0
     LICENSES/notices/notice-board
 
-The Elixpo and Oreo names, the Oreo mascot, the chest E-badge and the
+The Elixpo and Falera names, the Lumi mascot, the chest E-badge and the
 elixpo.com domains are not licensed by any of the above; see:
 
     TRADEMARKS.md
     LICENSES/NOTICE
 
-All contributions to OreoOS are subject to this preamble, and to the rules
+All contributions to FaleraOS are subject to this preamble, and to the rules
 below.
 
 ---
@@ -117,7 +117,7 @@ loading state (`oreoOS.busy`, `oreoOS.cache.Refresh`).
 2.2. **Wi-Fi is for the internet only:** the App Store, OTA updates, GitHub
 data, weather and time. Nothing listens on the local network.
 
-2.3. **A computer reaches the badge over USB,** through the `oreo` CLI. Files
+2.3. **A computer reaches the badge over USB,** through the `falera` CLI. Files
 go through the Transfer app, guarded by a code shown on the badge; setup is a
 CLI command.
 
@@ -184,9 +184,9 @@ before they merge.
 How decisions are made is in [`docs/GOVERNANCE.md`](docs/GOVERNANCE.md); how
 contributors behave, in [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md).
 
-## 5. What OreoOS is
+## 5. What FaleraOS is
 
-OreoOS is written in MicroPython 1.28 for an ESP32-S3 with 16 MiB of flash and
+FaleraOS is written in MicroPython 1.28 for an ESP32-S3 with 16 MiB of flash and
 8 MiB of PSRAM, a 2.0" 320x240 ST7789 screen, eight buttons, an IMU, an
 infrared transceiver, Wi-Fi and Bluetooth. It owns the screen, the buttons, the
 network, storage and power, and runs applications it loads at runtime. About
@@ -198,7 +198,7 @@ network, storage and power, and runs applications it loads at runtime. About
 | Drivers | [`oreoWare/`](oreoWare/) | Display, buttons, Wi-Fi, Bluetooth, IMU, infrared, and `os.py`, the object handed to apps |
 | OS | [`oreoOS/`](oreoOS/) | Launcher and run loop, home screen, notification panel, App Store, OTA updates, network service, and the helpers apps use |
 | Apps | [`apps/`](apps/), [`apps_market/`](apps_market/) | The apps every badge has, and the optional ones the App Store installs |
-| Host tools | [`cli/`](cli/), [`tools/`](tools/) | The `oreo` CLI, deploy and release tools, the app validator |
+| Host tools | [`cli/`](cli/), [`tools/`](tools/) | The `falera` CLI, deploy and release tools, the app validator |
 
 The Gallery plays RV565, a video format made for this badge: frames are stored
 in the panel's own pixel format, so the device only inflates and transfers,

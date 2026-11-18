@@ -1,6 +1,6 @@
 """On-badge check of verified TLS (#110). Runs ON the badge:
 
-    oreo run tools/tls_probe.py
+    falera run tools/tls_probe.py
 
 With certificate verification on, it reports for every host the badge
 uses: handshake time, free Python heap (gc) and free ESP-IDF heap (where
@@ -9,7 +9,7 @@ a wrong server name is refused, and fetches the OTA tag list through
 oreoOS._http.get_url. Nothing is written to flash; the clock is synced
 over NTP only if it is not set yet.
 
-Needs a Wi-Fi network saved on the badge (`oreo wifi`). Paste the whole
+Needs a Wi-Fi network saved on the badge (`falera wifi`). Paste the whole
 output into the pull request for #110.
 """
 
@@ -90,7 +90,7 @@ def handshake(host, name=None):
 
 
 def main():
-    print("== OreoOS TLS probe (#110) ==")
+    print("== FaleraOS TLS probe (#110) ==")
     print("verification:", "OFF (INSECURE_DEBUG)" if _http.INSECURE_DEBUG
           else "on")
     if not wifi_up():
@@ -142,7 +142,7 @@ def main():
 
     # A full request through the OS helper (the Updates app's first call).
     t0 = time.ticks_ms()
-    body = _http.get_url("https://api.github.com/repos/elixpo/oreo/tags"
+    body = _http.get_url("https://api.github.com/repos/elixpo/falera/tags"
                          "?per_page=1", accept="application/vnd.github+json",
                          timeout_s=10)
     print("get_url api.github.com tags: %s, %d ms"

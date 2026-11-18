@@ -2,20 +2,22 @@
 
 
 
-<img src="assets/sprites/raw/mascot.png" alt="Oreo, the panda mascot" width="60">
+<img src="assets/sprites/raw/mascot.png" alt="Lumi, the panda mascot" width="60">
 
-# OreoOS and the Oreo Badge
+# FaleraOS and the Falera Badge
 
-**OreoOS by Elixpo: an open-source MicroPython operating system for the Oreo Badge, a panda-themed ESP32-S3 conference badge.**
+**FaleraOS by Elixpo: an open-source MicroPython operating system for the Falera Badge, a panda-themed ESP32-S3 conference badge.**
+
+*Formerly OreoOS (until November 2026). Our panda is Lumi.*
 
 [![License: MIT · CERN-OHL-P · CC-BY-4.0](https://img.shields.io/badge/license-MIT_·_CERN--OHL--P_·_CC--BY--4.0-FF5D68?style=for-the-badge)](LICENSES/README.md)
 [![MicroPython 1.28](https://img.shields.io/badge/MicroPython-1.28-00B4A5?style=for-the-badge&logo=python&logoColor=white)](https://micropython.org)
 [![ESP32-S3](https://img.shields.io/badge/ESP32--S3-N16R8-2E2E2E?style=for-the-badge&logo=espressif&logoColor=white)](https://www.espressif.com/en/products/socs/esp32-s3)
 [![OTA Updates](https://img.shields.io/badge/OTA-yes-FFBE1E?style=for-the-badge)](#-updates)
-[![Fund the badge](https://img.shields.io/badge/Fund_the_badge-%E2%82%B98%2C000_goal-FF5D68?style=for-the-badge&logo=githubsponsors&logoColor=white)](https://payouts.elixpo.com/f/oreo-badge)
+[![Fund the badge](https://img.shields.io/badge/Fund_the_badge-%E2%82%B98%2C000_goal-FF5D68?style=for-the-badge&logo=githubsponsors&logoColor=white)](https://payouts.elixpo.com/f/falera-badge)
 
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/16187/badge)](https://www.bestpractices.dev/projects/16187)
-[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/elixpo/oreo/badge)](https://scorecard.dev/viewer/?uri=github.com/elixpo/oreo)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/elixpo/falera/badge)](https://scorecard.dev/viewer/?uri=github.com/elixpo/falera)
 [![Wikidata](https://img.shields.io/badge/Wikidata-Q141968869-006699?style=flat-square&logo=wikidata&logoColor=white)](https://www.wikidata.org/wiki/Q141968869)
 [![arXiv](https://img.shields.io/badge/arXiv-2610.35935-b31b1b?style=flat-square)](https://arxiv.org/abs/2610.35935)
 [![OSHWA certified: IN000107](https://img.shields.io/badge/OSHWA-IN000107-333333?style=flat-square)](https://certification.oshwa.org/in000107.html)
@@ -30,21 +32,21 @@
 
 > *Hang it on your lanyard. Hand it to a stranger.*
 > *Swap quests over IR. Watch your commits scroll past.*
-> *Oreo is what happens when a conference name-tag grows up.*
+> *Falera is what happens when a conference name-tag grows up.*
 
 </div>
 
-<img src="assets/og-banner.png" alt="Oreo, the panda banner" width="100%">
+<img src="assets/og-banner.png" alt="Lumi, the panda banner" width="100%">
 
 <div align="center">
 
-### 💛 Help build the first Oreo badges
+### 💛 Help build the first Falera badges
 
 The first five PCBs are being made now, paid for out of pocket. If you'd like
-to see Oreo built, chip in whatever you can, from ₹100. Every rupee goes into
+to see Falera built, chip in whatever you can, from ₹100. Every rupee goes into
 boards and parts, and everything stays open.
 
-**[Fund the badge → payouts.elixpo.com/f/oreo-badge](https://payouts.elixpo.com/f/oreo-badge)**
+**[Fund the badge → payouts.elixpo.com/f/falera-badge](https://payouts.elixpo.com/f/falera-badge)**
 
 </div>
 
@@ -56,7 +58,7 @@ boards and parts, and everything stays open.
 
 [![Built with Pollinations](https://img.shields.io/badge/Built%20with-Pollinations-8a2be2?style=for-the-badge&logoColor=white&labelColor=6a0dad)](https://pollinations.ai)
 
-> Every sprite, banner, and mascot of the  project &dash; Oreo, the
+> Every sprite, banner, and mascot of the  project &dash; Lumi, the
 > badges, the in-app artwork, the website hero &dash; was generated with
 > [**Pollinations.ai**](https://pollinations.ai).
 
@@ -134,7 +136,7 @@ Bluetooth and WiFi don't get their own drawer tiles — they live inside **Setti
 
 ### 📦 App Store — install, update and remove apps on-device
 
-The badge ships a small default set (About, Badge, Commits, Gallery, Gamepad, Reader, Settings, Storage, Transfer and the App Store, plus the system apps Apps, Updates and WiFi). Everything else lives under [`apps_market/`](apps_market/) and installs from the **App Store** tile: Racer, Flappy Oreo, Snake, Elixpo Pet, IR Quest, Bluetooth, Weather, Color, Gestures and the Diwali special, Patakha.
+The badge ships a small default set (About, Badge, Commits, Gallery, Gamepad, Reader, Settings, Storage, Transfer and the App Store, plus the system apps Apps, Updates and WiFi). Everything else lives under [`apps_market/`](apps_market/) and installs from the **App Store** tile: Racer, Flappy Lumi, Snake, Lumi (the panda pet), IR Quest, Bluetooth, Weather, Color, Gestures and the Diwali special, Patakha.
 
 - **Discover** (first page): a featured card plus every app with its icon, tagline, category, size and an **INSTALL / OPEN / UPDATE** button. **A** opens the app's page (author, version, size, description) where you install it, with a progress bar.
 - **Installed** (press **B**): every app on the badge. Built-in apps can only be opened; others can be updated or uninstalled behind a confirm dialog, and reinstalled from Discover any time.
@@ -156,7 +158,7 @@ Want yours to be **always-installed**? Drop it in `apps/` instead. Copy [`app_te
 
 ### Doom edition
 
-Doom is not part of OreoOS 2.0: dropping its 7 MB game-data partition gives the filesystem about 13.7 MB. The complete Doom build stays on the [`doom-edition`](https://github.com/elixpo/oreo/tree/doom-edition) branch: the engine (doomgeneric / Chocolate Doom, GPL), the Doom app, the Freedoom tooling, the partition layout with the `doom` partition and a prebuilt firmware image. To put it on a badge (this erases it):
+Doom is not part of FaleraOS 2.0: dropping its 7 MB game-data partition gives the filesystem about 13.7 MB. The complete Doom build stays on the [`doom-edition`](https://github.com/elixpo/falera/tree/doom-edition) branch: the engine (doomgeneric / Chocolate Doom, GPL), the Doom app, the Freedoom tooling, the partition layout with the `doom` partition and a prebuilt firmware image. To put it on a badge (this erases it):
 
 ```bash
 git fetch origin doom-edition && git switch doom-edition
@@ -166,39 +168,39 @@ git fetch origin doom-edition && git switch doom-edition
 
 ## 💻 Use your badge from a computer
 
-Plug the badge in over USB and install **oreo-cli**, which gives you the
-`oreo` command. It finds the badge by itself, so you never need to look up a
+Plug the badge in over USB and install **falera-cli**, which gives you the
+`falera` command. It finds the badge by itself, so you never need to look up a
 port name.
 
 ```sh
-# Linux, macOS (Windows: irm https://raw.githubusercontent.com/elixpo/oreo/main/cli/install.ps1 | iex)
-curl --proto '=https' --tlsv1.2 -LsSf https://raw.githubusercontent.com/elixpo/oreo/main/cli/install.sh | sh
+# Linux, macOS (Windows: irm https://raw.githubusercontent.com/elixpo/falera/main/cli/install.ps1 | iex)
+curl --proto '=https' --tlsv1.2 -LsSf https://raw.githubusercontent.com/elixpo/falera/main/cli/install.sh | sh
 
-oreo                                   # the full-screen Oreo view
-oreo transfer send photo.jpg notes.md  # with Tools > Transfer open on the badge; type the code it shows
-oreo wifi connect "Home Net"           # Wi-Fi is for the internet: App Store, updates, GitHub, weather, time
-oreo update                            # newest OreoOS, downloaded by the badge
+falera                                   # the full-screen Falera view
+falera transfer send photo.jpg notes.md  # with Tools > Transfer open on the badge; type the code it shows
+falera wifi connect "Home Net"           # Wi-Fi is for the internet: App Store, updates, GitHub, weather, time
+falera update                            # newest FaleraOS, downloaded by the badge
 ```
 
-- [`docs/CLI.md`](docs/CLI.md): the oreo-cli manual (every command, exit
+- [`docs/CLI.md`](docs/CLI.md): the falera-cli manual (every command, exit
   codes, troubleshooting, FAQ); on the website at
-  [oreo.elixpo.com/docs/cli](https://oreo.elixpo.com/docs/cli/).
+  [falera.elixpo.com/docs/cli](https://falera.elixpo.com/docs/cli/).
 - [`docs/USB.md`](docs/USB.md): ports, drivers, permissions, and raw
-  `mpremote` ([/docs/usb](https://oreo.elixpo.com/docs/usb/)).
+  `mpremote` ([/docs/usb](https://falera.elixpo.com/docs/usb/)).
 - [`docs/TRANSFER.md`](docs/TRANSFER.md): how the Transfer app and its code
-  exchange work ([/docs/transfer](https://oreo.elixpo.com/docs/transfer/)).
+  exchange work ([/docs/transfer](https://falera.elixpo.com/docs/transfer/)).
 
 ## 🚀 Get going
 
 ```bash
-git clone https://github.com/elixpo/oreo
-cd oreo
+git clone https://github.com/elixpo/falera
+cd falera
 python -m venv .venv && source .venv/bin/activate
 pip install -r oreoOS/requirements.txt
 python tools/deploy.py /dev/ttyACM0      # flash to a connected board
 ```
 
-Connecting over USB (which port, the oreo CLI, the Transfer app, flashing) is covered in [`docs/USB.md`](docs/USB.md).
+Connecting over USB (which port, the falera CLI, the Transfer app, flashing) is covered in [`docs/USB.md`](docs/USB.md).
 
 To set your GitHub user, name, timezone and weather location, see
 [`docs/PROFILE.md`](docs/PROFILE.md). For writing apps, see
@@ -212,15 +214,15 @@ badge itself runs MicroPython 1.28.
 <!-- Command matches .github/workflows/tests.yml (Python 3.11, standard library only). -->
 
 ```bash
-git clone https://github.com/elixpo/oreo
-cd oreo
+git clone https://github.com/elixpo/falera
+cd falera
 python3 -m unittest discover -s tests -v
 ```
 
 **What works:** the hardware-free unit tests for pure helpers (colour packing in
 `oreoOS/api.py`, `.env` parsing in `oreoOS/config.py`). They use only the
 Python standard library, so no `pip install`, badge or key is needed.
-**What is skipped:** running OreoOS apps needs an ESP32-S3 badge; there is no
+**What is skipped:** running FaleraOS apps needs an ESP32-S3 badge; there is no
 desktop simulator yet. With a badge, `tools/deploy.py` runs without keys and writes blank
 WiFi and weather values when `.env.local` is missing. **Expected result:**
 `OK` at the end of the run. If something asks you for a secret, open an issue
@@ -254,7 +256,7 @@ Press **C** (or **HOME**) again to dismiss — the underlying app keeps its stat
 
 ## 🧰 Built-in libraries
 
-OreoOS ships a small batteries-included SDK that every app imports
+FaleraOS ships a small batteries-included SDK that every app imports
 from `oreoOS`. Three of those are worth a quick tour:
 
 ### Drawing — `d.rect`, `d.pixel`, `d.text`, `d.blit`, `d.clear`
@@ -364,27 +366,27 @@ small enough to ship to flash, big enough for README-style notes. New files appe
 
 ### Wireless networking and Bluetooth
 
-OreoOS leans on MicroPython's stock networking stack; the OreoOS
+FaleraOS leans on MicroPython's stock networking stack; the FaleraOS
 wrappers (`oreoWare.wifi`, `oreoWare.bt`) add config handling and
 power capping on top.
 
 - **WiFi** — [`network.WLAN`](https://docs.micropython.org/en/latest/library/network.WLAN.html).
   Wi-Fi is for the internet only (App Store, updates, GitHub data,
-  weather, the clock). Networks are added over USB with the `oreo` CLI
+  weather, the clock). Networks are added over USB with the `falera` CLI
   (see [`docs/CLI.md`](docs/CLI.md)) or at deploy time from `.env.local`
   (`WIFI_SSID`, `WIFI_PASSWORD`; see [`.env.example`](.env.example)); the OS
   applies `wlan.config(txpower=…)` and `pm=PM_POWERSAVE` from
   `oreoOS/config.py` so a sealed badge doesn't melt its LDO.
 - **Bluetooth** — [`bluetooth`](https://docs.micropython.org/en/latest/library/bluetooth.html).
   Bluetooth is the last feature on the roadmap (#124); files go over USB
-  for now. The current build advertises as **Oreo** and exposes a tiny GATT "transfer"
+  for now. The current build advertises as **Falera** and exposes a tiny GATT "transfer"
   service so a paired device can push **one image (max 250 KB)** or
   **one text document (deflate-compressed)** at a time. Images land in
   `apps/gallery/assets/raw/`, text in `documents/`. BLE adv interval is
   capped by `BT_ADV_INTERVAL_MS` to keep average current draw down.
 
 ```python
-# WiFi via the OreoOS wrapper — auto-applies power caps from config
+# WiFi via the FaleraOS wrapper — auto-applies power caps from config
 from oreoWare import wifi
 wifi.connect_from_config()
 print(wifi.ip())
@@ -404,7 +406,7 @@ ble.active(True)
 ble.gap_advertise(500_000, b"\x02\x01\x06\x05\x09Oreo")
 ```
 
-**Pushing files to the badge.** Connect to "Oreo", then write to the
+**Pushing files to the badge.** Connect to "Falera", then write to the
 RX characteristic in chunks. Frame format:
 
 ```
@@ -432,7 +434,7 @@ step. The ones you'll actually reach for on badge work:
 `framebuf`, `vfs`, `ntptime`, `requests`, `urequests`, `asyncio`,
 `aioble`, `websocket`, `umqtt`, `webrepl`.
 
-On top of those, OreoOS ships its own helper packages: `oreoOS.*`
+On top of those, FaleraOS ships its own helper packages: `oreoOS.*`
 (font, sprite, cache, theme, widgets, ota, power…) and `oreoWare.*`
 (display, buttons, wifi, bt, imu, ir, battery, pins). Import them from
 any app — they're on the device boot path.
@@ -465,14 +467,14 @@ user through this exact workflow.
 
 ## 🛠 Hardware
 
-OreoOS runs today on a breadboard badge built from an ESP32-S3 DevKitC. The
+FaleraOS runs today on a breadboard badge built from an ESP32-S3 DevKitC. The
 PCB badge, designed in KiCad under [`circuit/elixpo/`](circuit/elixpo/), is
-finished: the first five boards were ordered in November 2026, and OreoOS is
+finished: the first five boards were ordered in November 2026, and FaleraOS is
 flashed onto it once a board is assembled.
 
 <div align="center">
-<img src="circuit/elixpo/renders/front.jpg" alt="Oreo badge PCB, front" width="300">
-<img src="circuit/elixpo/renders/back.jpg" alt="Oreo badge PCB, back" width="300">
+<img src="circuit/elixpo/renders/front.jpg" alt="Falera badge PCB, front" width="300">
+<img src="circuit/elixpo/renders/back.jpg" alt="Falera badge PCB, back" width="300">
 </div>
 
 | | Breadboard badge (runs today) | PCB badge (first boards ordered) |
@@ -523,7 +525,7 @@ The Gallery's video playback grew into **RV565**, a standalone library and file 
 | Python (desktop) | `pip install rv565` — [on PyPI](https://pypi.org/project/rv565/), with a Pillow plugin via `pip install "rv565[pillow]"` |
 | ESP-IDF | `idf.py add-dependency "elixpo/rv565"` — [ESP Component Registry](https://components.espressif.com/components/elixpo/rv565) |
 | CircuitPython | `circup install circuitpython_rv565` — [elixpo/CircuitPython_RV565](https://github.com/elixpo/CircuitPython_RV565), [docs](https://circuitpython-rv565.readthedocs.io) |
-| Browser | [oreo.elixpo.com/rv565/convert](https://oreo.elixpo.com/rv565/convert/) — convert a video with no install and no upload |
+| Browser | [falera.elixpo.com/rv565/convert](https://falera.elixpo.com/rv565/convert/) — convert a video with no install and no upload |
 
 ---
 
@@ -532,12 +534,12 @@ The Gallery's video playback grew into **RV565**, a standalone library and file 
 | | |
 |---|---|
 | 👋 **Just want to use it?** | this README + [`docs/HARDWARE.md`](docs/HARDWARE.md) |
-| 🔌 **Connecting it to a computer?** | [`docs/USB.md`](docs/USB.md) + [`docs/CLI.md`](docs/CLI.md): the oreo CLI, Transfer, flashing |
+| 🔌 **Connecting it to a computer?** | [`docs/USB.md`](docs/USB.md) + [`docs/CLI.md`](docs/CLI.md): the falera CLI, Transfer, flashing |
 | 🧑‍💻 **Want to write an app?** | [`docs/APPS.md`](docs/APPS.md) + [`app_templates/`](app_templates/) |
 | 🔌 **Building your own PCB?** | [`docs/DATASHEET.md`](docs/DATASHEET.md) + [`oreoWare/pins.py`](oreoWare/pins.py) |
 | 🤝 **Joining the community?** | [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) + [`SUPPORT.md`](SUPPORT.md) |
 | 🛡 **Found a vulnerability?** | [`docs/SECURITY.md`](docs/SECURITY.md) |
-| 📖 **Citing OreoOS or RV565?** | [`CITATION.cff`](CITATION.cff) + [`paper/`](paper/) |
+| 📖 **Citing FaleraOS or RV565?** | [`CITATION.cff`](CITATION.cff) + [`paper/`](paper/) |
 
 A docs index lives at [`docs/README.md`](docs/README.md).
 
@@ -547,19 +549,19 @@ A docs index lives at [`docs/README.md`](docs/README.md).
 
 We love new contributors. The bar is low; the welcome is warm.
 
-- 🐛 Bugs / ideas: open an [issue](https://github.com/elixpo/oreo/issues/new/choose)
+- 🐛 Bugs / ideas: open an [issue](https://github.com/elixpo/falera/issues/new/choose)
 - 🔧 Code: read [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - 🧑‍🤝‍🧑 Community: read the [`Code of Conduct`](CODE_OF_CONDUCT.md)
 - 🔐 Security disclosures: read [`docs/SECURITY.md`](docs/SECURITY.md)
 
 ---
 
-## The Oreo family
+## The Falera family
 
 One project in three repositories, grouped under the
 [`oreo-badge`](https://github.com/orgs/elixpo/repositories?q=topic%3Aoreo-badge) topic:
 
-- [elixpo/oreo](https://github.com/elixpo/oreo): the Oreo Badge hardware, OreoOS and the `oreo` CLI
+- [elixpo/falera](https://github.com/elixpo/falera): the Falera Badge hardware, FaleraOS and the `falera` CLI
 - [elixpo/rv565](https://github.com/elixpo/rv565): RV565, the badge's video format (C library, encoder, Arduino, ESP-IDF and Pico SDK)
 - [elixpo/CircuitPython_RV565](https://github.com/elixpo/CircuitPython_RV565): RV565 playback for CircuitPython
 
@@ -567,7 +569,7 @@ One project in three repositories, grouped under the
 
 ## The ecosystem
 
-Oreo Badge is part of **Elixpo** - an open, ethical, and accessible ecosystem
+Falera Badge is part of **Elixpo** - an open, ethical, and accessible ecosystem
 of AI and developer tools, built by a global community of 45+ contributors.
 
 | Tool | What it does | Link |
@@ -580,7 +582,7 @@ of AI and developer tools, built by a global community of 45+ contributors.
 | 👤 **Elixpo Accounts** | One identity (SSO) across the ecosystem | [accounts.elixpo.com](https://accounts.elixpo.com) |
 | 🔗 **lixrl** | Our flagship URL shortener | [lixrl.com](https://lixrl.com) |
 | 🪪 **Portfolios** | Personal pages to showcase your work | [me.elixpo.com](https://me.elixpo.com) |
-| 🐼 **Oreo** | The mascot's home | [oreo.elixpo.com](https://oreo.elixpo.com) |
+| 🐼 **Lumi** | The mascot's home | [falera.elixpo.com](https://falera.elixpo.com) |
 
 ## Built by the community
 
@@ -605,7 +607,7 @@ Everyone is welcome. See **[CONTRIBUTING.md](CONTRIBUTING.md)** and our
 
 **Recognised upstream**
 
-- **Espressif** assigned the badge its own USB ID, `303a:83ec` "Elixpo Oreo Badge" ([espressif/usb-pids#425](https://github.com/espressif/usb-pids/pull/425), 10 November 2026).
+- **Espressif** assigned the badge its own USB ID, `303a:83ec` "Elixpo Falera Badge" ([espressif/usb-pids#425](https://github.com/espressif/usb-pids/pull/425), 10 November 2026).
 - **OSHWA** certified the badge as open source hardware, [UID IN000107](https://certification.oshwa.org/in000107.html).
 - **The Unix `file` command** recognises RV565 videos: the magic was committed upstream on 12 November 2026 ([file bug 822](https://bugs.astron.com/view.php?id=822)).
 - **Adafruit's CircuitPython Community Bundle** ships the RV565 library, so `circup install circuitpython_rv565` works ([CircuitPython_Community_Bundle#292](https://github.com/adafruit/CircuitPython_Community_Bundle/pull/292), 11 November 2026).
@@ -616,10 +618,10 @@ Everyone is welcome. See **[CONTRIBUTING.md](CONTRIBUTING.md)** and our
 
 - **Paper**: [RV565: Cross-Layer Co-Design for Frame-Independent Video Playback on MicroPython-Class ESP32-S3 Systems](https://arxiv.org/abs/2610.35935), arXiv:2610.35935.
 - **RV565 library**: [Arduino Library Manager](https://www.arduinolibraries.info/libraries/rv565), [Espressif component registry](https://components.espressif.com/components/elixpo/rv565), [PyPI](https://pypi.org/project/rv565/), [CircuitPython](https://github.com/elixpo/CircuitPython_RV565).
-- **Wikidata**: OreoOS is [Q141968869](https://www.wikidata.org/wiki/Q141968869).
-- **MicroPython community**: [OreoOS announcement](https://github.com/orgs/micropython/discussions/19847).
+- **Wikidata**: FaleraOS is [Q141968869](https://www.wikidata.org/wiki/Q141968869).
+- **MicroPython community**: [FaleraOS announcement](https://github.com/orgs/micropython/discussions/19847).
 
-> OreoOS is an open-source MicroPython operating system for the Elixpo Oreo Badge. It is not
+> FaleraOS is an open-source MicroPython operating system for the Elixpo Falera Badge. It is not
 > related to Android 8.0 Oreo or to OREO® cookies, a trademark of Mondelēz International.
 
 ## Recognition & programs
@@ -627,8 +629,8 @@ Everyone is welcome. See **[CONTRIBUTING.md](CONTRIBUTING.md)** and our
 Elixpo has taken part in and been supported by **GSSOC**, **Hacktoberfest**,
 **Pollinations.AI**, **MS Startup Foundations**, and **OSCI**.
 
-OreoOS is recorded on Wikidata as
-[OreoOS (Q141968869)](https://www.wikidata.org/wiki/Q141968869), an embedded
+FaleraOS is recorded on Wikidata as
+[FaleraOS (Q141968869)](https://www.wikidata.org/wiki/Q141968869), an embedded
 operating system based on MicroPython. Its video pipeline is described in the
 paper [RV565 (arXiv:2610.35935)](https://arxiv.org/abs/2610.35935), and the
 playback library is published separately as
@@ -638,14 +640,14 @@ Registry, PyPI, CircuitPython).
 **Written about**
 
 - Adafruit blog: [RV565: frame-independent RGB565 video for ESP32-S3 and RP2350 SPI displays](https://blog.adafruit.com/2026/11/10/rv565-frame-independent-rgb565-video-for-esp32-s3-and-rp2350-spi-displays/) (10 Nov 2026)
-- Elixpo blog: [From 0.5 FPS to native video: building OreoOS Gallery playback](https://blogs.elixpo.com/elixpohere/esp32s3-spiderman)
+- Elixpo blog: [From 0.5 FPS to native video: building FaleraOS Gallery playback](https://blogs.elixpo.com/elixpohere/esp32s3-spiderman)
 - Elixpo blog: [The Screen Was Blank](https://blogs.elixpo.com/elixpohere/rv565-pico-2-tweak), porting RV565 to the Raspberry Pi Pico 2
 - Paper: [arXiv:2610.35935](https://arxiv.org/abs/2610.35935), archived on [Zenodo](https://doi.org/10.5281/zenodo.23543367)
 
 **Submitted, under review**
 
 - The board image for MicroPython's board list: [micropython-media #132](https://github.com/micropython/micropython-media/pull/132)
-- OreoOS in [awesome-esp #68](https://github.com/agucova/awesome-esp/pull/68)
+- FaleraOS in [awesome-esp #68](https://github.com/agucova/awesome-esp/pull/68)
 - RV565's own submissions (FFmpeg, file(1), PRONOM, Kaitai and others) are
   listed in [its README](https://github.com/elixpo/rv565#where-rv565-is).
 
@@ -653,24 +655,24 @@ Registry, PyPI, CircuitPython).
 
 Elixpo is applying to be a mentoring organisation for Google Summer of Code
 2027. Google has not announced the 2027 programme yet, and Elixpo has not been
-accepted. Oreo hosts one proposed project idea:
+accepted. Falera hosts one proposed project idea:
 
 | Idea | Size | Difficulty | Mentors (primary / backup) |
 | --- | --- | --- | --- |
-| [Oreo badge simulator and CLI test bench](https://gsoc.elixpo.com/ideas/oreo-badge-simulator/) | 175 h | Intermediate | [Ayushman Bhattacharya](https://github.com/Circuit-Overtime) / [Vivek Yadav](https://github.com/ez-vivek) |
+| [Falera badge simulator and CLI test bench](https://gsoc.elixpo.com/ideas/oreo-badge-simulator/) | 175 h | Intermediate | [Ayushman Bhattacharya](https://github.com/Circuit-Overtime) / [Vivek Yadav](https://github.com/ez-vivek) |
 
 **How to start** (no badge hardware needed)
 
 1. Read the idea page and the programme site at [gsoc.elixpo.com](https://gsoc.elixpo.com).
 2. Run the tests (`python3 -m unittest discover -s tests` and
    `python3 tools/validate_app.py`, standard library only), install the CLI
-   from the checkout (`pip install -e cli/`) and try `oreo new my_app`. Read
-   [docs/LEARN.md](docs/LEARN.md) for a guided tour of OreoOS.
+   from the checkout (`pip install -e cli/`) and try `falera new my_app`. Read
+   [docs/LEARN.md](docs/LEARN.md) for a guided tour of FaleraOS.
 3. Read [`docs/CLI.md`](docs/CLI.md), [`docs/README.md`](docs/README.md) and
    [`docs/HARDWARE.md`](docs/HARDWARE.md): the simulator stands in for the
-   display and buttons, and answers the `oreo` CLI like a badge.
+   display and buttons, and answers the `falera` CLI like a badge.
 4. Read [CONTRIBUTING.md](CONTRIBUTING.md), then pick a small issue from the
-   [issue tracker](https://github.com/elixpo/oreo/issues).
+   [issue tracker](https://github.com/elixpo/falera/issues).
 
 **Configuration and access**
 
@@ -694,31 +696,31 @@ mentoring organisation and is not affiliated with or endorsed by Google._
 
 ## Brand assets
 
-The Oreo mascot, badge sprites, and app icons live under
-[`assets/`](assets/). They are CC-BY-4.0, but the Oreo mascot, the chest
-E-badge, and the "Elixpo"/"Oreo" names are trademarks - see
+The Lumi mascot, badge sprites, and app icons live under
+[`assets/`](assets/). They are CC-BY-4.0, but the Lumi mascot, the chest
+E-badge, and the "Elixpo"/"Falera" names are trademarks - see
 [`TRADEMARKS.md`](TRADEMARKS.md). A browsable
 brand kit is at **[elixpo.com/assets](https://elixpo.com/assets)**.
 
 ## License
 
-The Oreo Badge is **certified open source hardware** by the Open Source
+The Falera Badge is **certified open source hardware** by the Open Source
 Hardware Association, UID [IN000107](https://certification.oshwa.org/in000107.html).
 
 <a href="https://certification.oshwa.org/in000107.html">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="oreo.elixpo/public/oshw_mark_card.png">
-    <img src="oreo.elixpo/public/oshw_mark.png" alt="Certified open source hardware, OSHWA UID IN000107" width="260">
+    <source media="(prefers-color-scheme: dark)" srcset="falera.elixpo/public/oshw_mark_card.png">
+    <img src="falera.elixpo/public/oshw_mark.png" alt="Certified open source hardware, OSHWA UID IN000107" width="260">
   </picture>
 </a>
 
-> **Dedication.** OreoOS is dedicated to [@anwe-ch](https://github.com/anwe-ch),
+> **Dedication.** FaleraOS is dedicated to [@anwe-ch](https://github.com/anwe-ch),
 > for its full runtime. Read why in the [preamble](PREAMBLE.md).
 >
 > _Psst: she is the co-author of [RV565](https://arxiv.org/abs/2610.35935),
 > the video format the Gallery plays._
 
-- **Code** (OreoOS, oreoWare, apps, tooling) - [MIT](LICENSE).
+- **Code** (FaleraOS, oreoWare, apps, tooling) - [MIT](LICENSE).
 - **Hardware** (KiCad schematics, PCB, symbols, BOMs and generated files under
   [`circuit/`](circuit/)) -
   [CERN-OHL-P-2.0](LICENSES/preferred/CERN-OHL-P-2.0), the permissive CERN Open
@@ -731,8 +733,8 @@ Hardware Association, UID [IN000107](https://certification.oshwa.org/in000107.ht
   compiled firmware must retain those licenses. See
   [`LICENSES/notices/notice-board`](LICENSES/notices/notice-board).
 
-The Oreo mascot, the chest E-badge, the "Elixpo", "Oreo", "Oreo Badge", and
-"OreoOS" names, and the elixpo.com domains are trademarks of the Elixpo project
+The Lumi mascot, the chest E-badge, the "Elixpo", "Falera", "Falera Badge", and
+"FaleraOS" names, and the elixpo.com domains are trademarks of the Elixpo project
 and are not licensed by MIT, CERN-OHL-P-2.0 or CC-BY-4.0. See [`TRADEMARKS.md`](TRADEMARKS.md)
 and the per-product notice board, [`LICENSES/NOTICE`](LICENSES/NOTICE).
 
@@ -742,14 +744,14 @@ This repository ships firmware and hardware. The files are open (MIT,
 CERN-OHL-P-2.0, CC-BY-4.0); what Elixpo reserves is identity, not the design
 (full text in [`LICENSES/NOTICE`](LICENSES/NOTICE)):
 
-- The **`oreoos`** published package name.
+- The **`faleraos`** and **`oreoos`** published package names.
 - The official **firmware / OTA release bundles** distributed from GitHub
-  Releases and the "Oreo" OTA identity.
-- The **Oreo Badge name and look**: the "Oreo Badge" product name, the panda
+  Releases and the "Falera" OTA identity.
+- The **Falera Badge name and look**: the "Falera Badge" product name, the panda
   mascot and the chest E-badge.
 
 You may build, modify, sell and redistribute boards and firmware made from the
-open design files - just not under the reserved Elixpo / Oreo names or mascot.
+open design files - just not under the reserved Elixpo / Falera names or mascot.
 
 ---
 

@@ -43,7 +43,7 @@ def _crash_message(err, info=None):
         from oreoOS import api
         d = Display()
         d.clear(api.rgb(220, 40, 60))
-        d.text("OREO CRASHED",   16, 40,  api.WHITE, scale=2)
+        d.text("FALERA CRASHED",   16, 40,  api.WHITE, scale=2)
         d.text("rebooting...",   16, 70,  api.WHITE, scale=1)
         # Truncate so a long traceback line doesn't blow past 36 chars
         # at scale=1 (≈8 px/glyph on a 320 px-wide screen).

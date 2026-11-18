@@ -7,9 +7,9 @@ body:
     attributes:
       value: |
         Apps are MicroPython packages the OS loads at runtime. Before you
-        start, skim [docs/APPS.md](https://github.com/elixpo/oreo/blob/main/docs/APPS.md):
+        start, skim [docs/APPS.md](https://github.com/elixpo/falera/blob/main/docs/APPS.md):
         a 320x240 screen, eight buttons, a small heap, and nothing in
-        `update()` or `draw()` may block. `oreo new my_app` gives you a
+        `update()` or `draw()` may block. `falera new my_app` gives you a
         working starting point.
 
   - type: input
@@ -88,5 +88,5 @@ body:
     attributes:
       label: Code of Conduct
       options:
-        - label: I agree to follow the project's [Code of Conduct](https://github.com/elixpo/oreo/blob/main/CODE_OF_CONDUCT.md).
+        - label: I agree to follow the project's [Code of Conduct](https://github.com/elixpo/falera/blob/main/CODE_OF_CONDUCT.md).
           required: true

@@ -1,4 +1,4 @@
-"""The `oreo` commands. Each handler takes a main.Ctx and returns an exit code."""
+"""The `falera` commands. Each handler takes a main.Ctx and returns an exit code."""
 
 import os
 import posixpath
@@ -39,14 +39,14 @@ def cmd_devs(ctx):
                  [[esc(p.device), p.usb_id, esc(p.known or p.description or "-")] for p in rest],
                  title="other USB serial devices", empty="no other USB serial devices")
     elif not badges:
-        ui.note("`oreo devs --all` lists other USB serial devices; `oreo doctor` explains.")
+        ui.note("`falera devs --all` lists other USB serial devices; `falera doctor` explains.")
     return 0 if badges else 3
 
 
 # ── info ─────────────────────────────────────────────────────────────
 
 def show_info(ui, info, port):
-    rows = [("OreoOS", "%s%s" % (info.get("os") or "[err]not installed[/]",
+    rows = [("FaleraOS", "%s%s" % (info.get("os") or "[err]not installed[/]",
                                  (" [dim](%s)[/]" % info["date"]) if info.get("date") else "")),
             ("firmware", "MicroPython %s" % (info.get("mpy") or "?")),
             ("board", esc(info.get("machine") or "?")),
@@ -57,7 +57,7 @@ def show_info(ui, info, port):
     elif wifi.get("up"):
         rows.append(("Wi-Fi", "[ok]connected[/] %s, %d saved" % (wifi.get("ip") or "", wifi.get("saved", 0))))
     else:
-        rows.append(("Wi-Fi", "not connected, %d saved [dim](`oreo wifi`)[/]" % wifi.get("saved", 0)))
+        rows.append(("Wi-Fi", "not connected, %d saved [dim](`falera wifi`)[/]" % wifi.get("saved", 0)))
     rows.append(("Bluetooth", ("on at boot" if info.get("bt_auto") else "off at boot")
                  + " [dim](file transfer over Bluetooth arrives with #103)[/]"))
     bat = info.get("battery")
@@ -67,7 +67,7 @@ def show_info(ui, info, port):
         rows.append(("battery", "[dim]no reading (USB power)[/]"))
     if info.get("mem_free") is not None:
         rows.append(("RAM free", human(info["mem_free"])))
-    ui.kv(rows, title="Oreo Badge")
+    ui.kv(rows, title="Falera Badge")
 
     st = (info.get("storage") or {}).get("stats") or {}
     buckets = (info.get("storage") or {}).get("buckets")
@@ -118,9 +118,9 @@ def _repl(link, ui):
 
 def need_terminal(ui, what):
     if not ui.interactive:
-        raise UsageError("`oreo %s` needs a terminal (standard input is not one)" % what,
+        raise UsageError("`falera %s` needs a terminal (standard input is not one)" % what,
                          hint="run it in a terminal window; to run a script without one, "
-                              "use `oreo run <file>`")
+                              "use `falera run <file>`")
 
 
 @command("shell")
@@ -129,38 +129,38 @@ def cmd_shell(ctx):
     need_terminal(ui, "shell")
     with ctx.session() as b:
         b.connect()
-        ui.header("shell", "MicroPython on %s. Ctrl-] or Ctrl-X to leave; OreoOS restarts after."
+        ui.header("shell", "MicroPython on %s. Ctrl-] or Ctrl-X to leave; FaleraOS restarts after."
                   % esc(b.port))
         b.link.friendly()
         _repl(b.link, ui)
     ui.print("")
-    ui.ok("left the shell; OreoOS is starting" if ctx.args.reset != "none" else "left the shell")
+    ui.ok("left the shell; FaleraOS is starting" if ctx.args.reset != "none" else "left the shell")
 
 
 def dev_notes(folder):
-    """What `oreo dev` can and cannot do, true to how OreoOS loads apps:
-    OreoOS does not run while the REPL is open, but started from the REPL
+    """What `falera dev` can and cannot do, true to how FaleraOS loads apps:
+    FaleraOS does not run while the REPL is open, but started from the REPL
     it loads any app found under /remote/apps/<id>/ from the mount instead
     of /apps/<id>, and re-reads its files on every launch (apps are
     unloaded when they exit). See docs/APPS.md, "Live editing"."""
     notes = ["The REPL starts in /remote, so `import mymodule` loads your local copy. "
              "A module is imported once: after an edit, "
              "import sys; del sys.modules['mymodule'] and import it again.",
-             "Ctrl-D here soft-resets the badge, which starts OreoOS (main.py) and ends "
+             "Ctrl-D here soft-resets the badge, which starts FaleraOS (main.py) and ends "
              "live editing; leave with Ctrl-] or Ctrl-X instead.",
-             "OreoOS is stopped while you are here. To reach its modules: "
+             "FaleraOS is stopped while you are here. To reach its modules: "
              "import sys; sys.path.append('/')"]
     root = Path(folder)
     if (root / "apps").is_dir() and any((p / "manifest.json").is_file()
                                          for p in (root / "apps").iterdir() if p.is_dir()):
-        notes.append("This folder has apps/<id>/: start OreoOS with "
+        notes.append("This folder has apps/<id>/: start FaleraOS with "
                      "import os; os.chdir('/'); exec(open('/main.py').read()) "
                      "and those apps load from the computer (the console prints "
                      "[dev] <id> from /remote/apps). Save, press HOME, reopen the app.")
     elif (root / "manifest.json").is_file():
         notes.append("This is an app folder. For live editing, mount its parent with the "
-                     "app under apps/%s/ and start OreoOS from the REPL "
-                     "(see docs/APPS.md, \"Live editing\"); or run `oreo app install %s` "
+                     "app under apps/%s/ and start FaleraOS from the REPL "
+                     "(see docs/APPS.md, \"Live editing\"); or run `falera app install %s` "
                      "to copy it to the badge." % (esc(root.name), esc(folder)))
     return notes
 
@@ -185,7 +185,7 @@ def cmd_dev(ctx):
             b.link.t.serial.write(("exec(open(%r).read())\r" % ctx.args.run).encode())
         _repl(b.link, ui)
     ui.print("")
-    ui.ok("unmounted; OreoOS is starting" if ctx.args.reset != "none" else "unmounted")
+    ui.ok("unmounted; FaleraOS is starting" if ctx.args.reset != "none" else "unmounted")
 
 
 @command("run")
@@ -275,8 +275,8 @@ def follow_console(ctx, port, restart=False, out=None, idle=None):
                 except Exception:
                     pass
                 if restart:
-                    ser.write(b"\r\x03\x03")   # stop OreoOS (friendly REPL)
-                    ser.write(b"\x04")         # soft reboot: main.py starts OreoOS again
+                    ser.write(b"\r\x03\x03")   # stop FaleraOS (friendly REPL)
+                    ser.write(b"\x04")         # soft reboot: main.py starts FaleraOS again
                     restart = False
                 while True:
                     data = ser.read(max(1, ser.inWaiting()))
@@ -308,7 +308,7 @@ def follow_console(ctx, port, restart=False, out=None, idle=None):
 def cmd_logs(ctx):
     ui = ctx.ui
     port = ctx.port()
-    ui.header("logs", "following %s; Ctrl-C to stop (OreoOS keeps running)" % esc(port))
+    ui.header("logs", "following %s; Ctrl-C to stop (FaleraOS keeps running)" % esc(port))
     try:
         follow_console(ctx, port, restart=ctx.args.restart)
     except KeyboardInterrupt:
@@ -349,7 +349,7 @@ def _local_files(sources, recursive):
         p = Path(src).expanduser()
         if p.is_dir():
             if not recursive:
-                raise OreoError("%s is a folder" % p, hint="use `oreo push -r`")
+                raise OreoError("%s is a folder" % p, hint="use `falera push -r`")
             name = "" if _unnamed(src) else p.name
             for f in sorted(p.rglob("*")):
                 if f.is_file() and "__pycache__" not in f.parts:
@@ -446,7 +446,7 @@ def cmd_pull(ctx):
             raise OreoError("%s: not found on the badge" % src)
         if st["dir"]:
             if not args.recursive:
-                raise OreoError("%s is a folder" % src, hint="use `oreo pull -r`")
+                raise OreoError("%s is a folder" % src, hint="use `falera pull -r`")
             items = list(b.walk(src))
             base = local if not local.exists() else local / posixpath.basename(src.rstrip("/") or "badge")
             jobs = [(p, base / posixpath.relpath(p, src)) for p, _ in items]
@@ -458,12 +458,12 @@ def cmd_pull(ctx):
         ui.ok("saved %d file(s) under %s" % (len(jobs), esc(local)))
 
 
-# Folders whose whole contents belong to OreoOS: removing anything inside
+# Folders whose whole contents belong to FaleraOS: removing anything inside
 # them can stop the badge booting. "/" and "/apps" themselves are protected
-# (see badge.PROTECTED) but not everything under them, so `oreo rm -r
-# /apps/myapp` or `oreo rm /documents/x` still works without --force.
+# (see badge.PROTECTED) but not everything under them, so `falera rm -r
+# /apps/myapp` or `falera rm /documents/x` still works without --force.
 SYSTEM_TREES = ("/oreoOS", "/oreoWare", "/assets")
-# Single files OreoOS needs or keeps the owner's settings in.
+# Single files FaleraOS needs or keeps the owner's settings in.
 SYSTEM_FILES = ("/secrets.py", "/wifi.json")
 
 # Built-in apps: must equal DEFAULT_APPS in oreoOS/store.py (a contract
@@ -492,7 +492,7 @@ def cmd_rm(ctx):
     args = ctx.args
     for p in args.paths:
         if is_protected(p) and not args.force:
-            raise OreoError("%s belongs to OreoOS; removing it can stop the badge booting" % norm(p),
+            raise OreoError("%s belongs to FaleraOS; removing it can stop the badge booting" % norm(p),
                             hint="add --force if you really mean it")
     if args.recursive or any(is_protected(p) for p in args.paths):
         what = ", ".join(norm(p) for p in args.paths)
@@ -508,7 +508,7 @@ def cmd_rm(ctx):
 # ── add (media) ──────────────────────────────────────────────────────
 
 class MediaOptions:
-    """Conversion settings for `oreo add` (defaults match media_ingest)."""
+    """Conversion settings for `falera add` (defaults match media_ingest)."""
 
     def __init__(self, kind=None, seconds=10.0, fps=24, width=180, height=135,
                  photo_max=240, save=None):
@@ -587,7 +587,7 @@ def show_apps(ui, data):
     ui.table(["App", "Name", "Version", ">Size", "", "About"],
              [[esc(e["id"]), esc(e["name"]), esc(e["version"]), human(e.get("size") or 0),
                label.get(e.get("state"), ""), esc((e.get("tagline") or "")[:48])] for e in cat],
-             title="App Store", empty="catalogue not downloaded yet: `oreo apps refresh`")
+             title="App Store", empty="catalogue not downloaded yet: `falera apps refresh`")
 
 
 def _online(ui, b):
@@ -595,13 +595,13 @@ def _online(ui, b):
         r = b.wifi_online()
     if not r.get("online"):
         raise OreoError("the badge could not get online",
-                        hint="add a network: `oreo wifi scan`, then `oreo wifi connect <name>`")
+                        hint="add a network: `falera wifi scan`, then `falera wifi connect <name>`")
     ui.ok("badge online (%s)" % (r.get("ip") or "?"))
 
 
 def check_app_args(action, app):
     if action in ("install", "remove") and not app:
-        raise UsageError("which app?", hint="oreo apps %s <app id>  (ids: `oreo apps`)" % action)
+        raise UsageError("which app?", hint="falera apps %s <app id>  (ids: `falera apps`)" % action)
 
 
 def apps_action(ui, b, action, app=None):
@@ -633,7 +633,7 @@ def apps_action(ui, b, action, app=None):
     cat = {e["id"]: e for e in data.get("catalogue") or []}
     if action == "install":
         if app not in cat:
-            raise OreoError("%s is not in the App Store" % app, hint="see `oreo apps`")
+            raise OreoError("%s is not in the App Store" % app, hint="see `falera apps`")
         targets = [app]
     else:
         targets = [app] if app else [i for i, e in cat.items() if e["state"] == "update"]
@@ -675,7 +675,7 @@ def bars(rssi):
 CONNECT_RESULTS = {
     "bad_password": ("wrong password for %s", "check it and try again"),
     "not_found": ("%s is not in range", "the badge only sees 2.4 GHz networks; "
-                                        "run `oreo wifi scan`"),
+                                        "run `falera wifi scan`"),
     "timeout": ("%s did not answer in time", "move closer, or try --timeout 30"),
     "failed": ("could not join %s", "try again; run with -v to see the badge's log"),
 }
@@ -685,7 +685,7 @@ def check_ssid(ssid):
     n = len(ssid.encode("utf-8"))
     if not 1 <= n <= 32:
         raise UsageError("a Wi-Fi network name is 1 to 32 bytes; this one is %d" % n,
-                         hint="copy the name from `oreo wifi scan`")
+                         hint="copy the name from `falera wifi scan`")
 
 
 def check_password(password):
@@ -728,7 +728,7 @@ def wifi_scan(ui, b, timeout_s=15):
                "secured" if n.get("secure") else "[warn]open[/]",
                "[ok]saved[/]" if n.get("saved") else ""] for n in nets],
              empty="no networks found")
-    ui.note("join one with `oreo wifi connect <name>`")
+    ui.note("join one with `falera wifi connect <name>`")
     return nets
 
 
@@ -740,18 +740,18 @@ def wifi_saved(ui, b):
                " ".join(x for x in ("[ok]last used[/]" if n.get("last") else "",
                                     "open" if n.get("open") else "",
                                     "metered" if n.get("metered") else "") if x)]
-              for n in nets], empty="no saved networks: `oreo wifi scan`")
+              for n in nets], empty="no saved networks: `falera wifi scan`")
     return nets
 
 
 def wifi_forget(ui, b, ssid):
     removed, deploy = b.wifi_forget(ssid)
     if not removed:
-        raise OreoError("%s is not saved on the badge" % ssid, hint="see `oreo wifi saved`")
+        raise OreoError("%s is not saved on the badge" % ssid, hint="see `falera wifi saved`")
     ui.ok("forgot %s" % esc(ssid))
     if deploy:
         ui.warn("it is also in the badge's deploy-time settings (.env), so it comes back "
-                "at the next boot until it is removed there and OreoOS is redeployed")
+                "at the next boot until it is removed there and FaleraOS is redeployed")
 
 
 def wifi_connect(ui, b, ssid, password, save=True, save_only=False, timeout_s=15.0):
@@ -767,7 +767,7 @@ def wifi_connect(ui, b, ssid, password, save=True, save_only=False, timeout_s=15
         raise OreoError(msg % ssid, hint=hint)
     ui.ok("connected to %s (%s)" % (esc(ssid), r.get("ip") or "?"))
     if r.get("saved"):
-        ui.ok("saved: OreoOS joins it automatically for the App Store, updates and time")
+        ui.ok("saved: FaleraOS joins it automatically for the App Store, updates and time")
     elif save:
         ui.warn("connected, but the network could not be saved on the badge")
 
@@ -778,7 +778,7 @@ def cmd_wifi(ctx):
     action = args.action
     if action in ("connect", "forget") and not args.ssid:
         raise UsageError("which network?",
-                         hint="oreo wifi %s <name>  (see `oreo wifi scan`)" % action)
+                         hint="falera wifi %s <name>  (see `falera wifi scan`)" % action)
     if args.ssid is not None and action in ("connect", "forget"):
         check_ssid(args.ssid)
     password = None
@@ -811,9 +811,9 @@ def cmd_update(ctx):
                  if on]
     if dev_flags:
         raise UsageError("%s only work with --repo <checkout>" % ", ".join(dev_flags),
-                         hint="`oreo update` alone installs the newest release from GitHub")
+                         hint="`falera update` alone installs the newest release from GitHub")
     from . import update
-    ui.header("update", "OreoOS from GitHub releases (%s channel), through the badge's Wi-Fi"
+    ui.header("update", "FaleraOS from GitHub releases (%s channel), through the badge's Wi-Fi"
               % args.channel)
     with ctx.session() as b:
         return update.run_update(ctx, b, channel=args.channel, check_only=args.check)
@@ -827,14 +827,14 @@ def update_from_repo(ctx):
                          hint="drop --repo to update from GitHub releases")
     root = repo.check_repo(args.repo)
     port = ctx.port()
-    ui.header("update", "deploying OreoOS from %s to %s" % (esc(root), esc(port)))
+    ui.header("update", "deploying FaleraOS from %s to %s" % (esc(root), esc(port)))
     if args.clean and not ui.confirm(
             "--clean erases every file on the badge (apps, photos, documents, saved Wi-Fi) "
-            "before installing OreoOS. Continue?"):
+            "before installing FaleraOS. Continue?"):
         raise Cancelled("nothing changed")
     repo.run(repo.deploy_cmd(root, port, clean=args.clean, force=args.force,
                              no_bump=args.no_bump, override=args.override), root, ctx.runner)
-    ui.ok("OreoOS deployed")
+    ui.ok("FaleraOS deployed")
 
 
 @command("flash")
@@ -843,15 +843,15 @@ def cmd_flash(ctx):
     args = ctx.args
     root = repo.check_repo(args.repo)
     port = ctx.port()
-    ui.header("flash", "firmware and OreoOS from %s to %s" % (esc(root), esc(port)))
+    ui.header("flash", "firmware and FaleraOS from %s to %s" % (esc(root), esc(port)))
     if args.build:
         ui.step("building the firmware (does not touch the badge)")
         repo.run(repo.build_cmd(root), root, ctx.runner)
-    if not ui.confirm("This ERASES the whole badge (firmware, OreoOS, apps, photos, saved "
+    if not ui.confirm("This ERASES the whole badge (firmware, FaleraOS, apps, photos, saved "
                       "Wi-Fi) and reinstalls it. Continue?"):
         raise Cancelled("nothing changed")
     repo.run(repo.flash_cmd(root, port), root, ctx.runner)
-    ui.ok("firmware flashed and OreoOS installed")
+    ui.ok("firmware flashed and FaleraOS installed")
 
 
 @command("doctor")
@@ -878,7 +878,7 @@ def cmd_doctor(ctx):
         for i, (status, title, hint) in enumerate(steps, 1):
             ui.print("  %d. [key]%s:[/] %s" % (i, title, esc(hint)))
     if worst == doctor_mod.OK:
-        ui.ok("all good: try `oreo info`, or just `oreo`")
+        ui.ok("all good: try `falera info`, or just `falera`")
     elif worst == doctor_mod.WARN:
         ui.ok("the badge works; the warnings above are optional")
     return 1 if worst == doctor_mod.FAIL else 0

@@ -1,4 +1,4 @@
-"""`oreo add`: conversion, validation, space checks, and ffmpeg handling."""
+"""`falera add`: conversion, validation, space checks, and ffmpeg handling."""
 
 import struct
 import tempfile
@@ -111,7 +111,7 @@ class AddCommandTest(unittest.TestCase):
 
     def test_add_document_to_reader(self):
         f = self.dir / "talk notes.md"
-        f.write_text("hello oreo")
+        f.write_text("hello falera")
         save = self.dir / "out"
         r = run_cli(["add", str(f), "--save", str(save)], fake=self.fake)
         self.assertEqual(r.rc, 0, r.out)

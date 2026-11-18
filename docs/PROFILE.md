@@ -18,7 +18,7 @@ set them, the next deploy writes them blank: Badge loses your name and title,
 Weather loses its location and the clock drops to UTC. Before you
 deploy, add `GITHUB_USER`, `DISPLAY_NAME`, `DISPLAY_DESIGNATION` and
 `TIMEZONE_OFFSET` (and `OWM_API_KEY` for Weather) to `.env.local`, or put
-them on the badge with `oreo setup`. `tools/deploy.py` prints one
+them on the badge with `falera setup`. `tools/deploy.py` prints one
 note listing every key that is still blank.
 
 ## The keys
@@ -36,22 +36,22 @@ note listing every key that is still blank.
 ## Your avatar
 
 The Badge app draws your GitHub avatar in its ring. It is not a profile
-key and the badge never downloads it: `oreo setup` fetches the avatar of
+key and the badge never downloads it: `falera setup` fetches the avatar of
 `GITHUB_USER` on your computer, converts it to a 72x72 circle and copies it
 over USB to **`/avatar.bin`**, next to `/profile.json` and outside every
-app folder, so OreoOS updates and deploys never replace it. The file
+app folder, so FaleraOS updates and deploys never replace it. The file
 records the GitHub user it was made for, and Badge shows it only while
 that user is your `GITHUB_USER` (case does not matter); otherwise, or
-without the file, it draws your initials. No avatar ships with OreoOS.
+without the file, it draws your initials. No avatar ships with FaleraOS.
 
 ```bash
-oreo setup --avatar          # fetch it again, e.g. after changing your GitHub picture
+falera setup --avatar          # fetch it again, e.g. after changing your GitHub picture
 ```
 
-Changing `GITHUB_USER` with `oreo setup` replaces the avatar, and removing
-it removes the file. Details: [CLI.md](CLI.md#oreo-setup-owner-profile).
+Changing `GITHUB_USER` with `falera setup` replaces the avatar, and removing
+it removes the file. Details: [CLI.md](CLI.md#falera-setup-owner-profile).
 Without the CLI, `python3 tools/fetch_avatar.py --user <you>` makes the
-same file from a checkout; copy it with `oreo push avatar.bin /avatar.bin`.
+same file from a checkout; copy it with `falera push avatar.bin /avatar.bin`.
 
 ## Weather's location
 
@@ -77,13 +77,13 @@ per boot (so a badge that travels follows you). Set `WEATHER_LAT` and
 
 ### Set it over USB
 
-With the `oreo` CLI ([CLI.md](CLI.md#oreo-setup-owner-profile)), using the
+With the `falera` CLI ([CLI.md](CLI.md#falera-setup-owner-profile)), using the
 same key names as `.env.local`:
 
 ```bash
-oreo setup                                   # asks for each value
-oreo setup --from-file .env.local            # the profile keys from your file
-oreo setup --set DISPLAY_NAME="Mona Lisa" --set TIMEZONE_OFFSET=5.5
+falera setup                                   # asks for each value
+falera setup --from-file .env.local            # the profile keys from your file
+falera setup --set DISPLAY_NAME="Mona Lisa" --set TIMEZONE_OFFSET=5.5
 ```
 
 `--from-file` takes only the keys above and leaves everything else in the

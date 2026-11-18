@@ -6,7 +6,7 @@ and unreachable badges never disturb the hardware.
 
 Interface used by `badge.Badge` (and implemented by the test FakeTransport):
 
-    enter()                              stop OreoOS, raw REPL, soft reset
+    enter()                              stop FaleraOS, raw REPL, soft reset
     exec(code, timeout, consumer) -> b   run code, stream stdout to consumer
     restart(mode)                        "soft" | "hard" | "none"; then close
     close()
@@ -27,11 +27,11 @@ RAW_BANNER = b"raw REPL; CTRL-B to exit\r\n"
 # badge stops answering half way.
 SEND_READ_TIMEOUT = 10
 
-BUSY_HINT = ("OreoOS may be busy (a download, or an app that blocks Ctrl-C). "
+BUSY_HINT = ("FaleraOS may be busy (a download, or an app that blocks Ctrl-C). "
              "Wait a few seconds and try again; if it stays stuck, press RESET "
-             "or unplug and replug the badge, then run `oreo doctor`")
+             "or unplug and replug the badge, then run `falera doctor`")
 LOST_HINT = ("the badge was unplugged or rebooted. Plug it back in, "
-             "check with `oreo devs`, and run the command again")
+             "check with `falera devs`, and run the command again")
 
 
 def _import_mpremote():
@@ -40,7 +40,7 @@ def _import_mpremote():
         from mpremote.transport_serial import SerialTransport
     except ImportError:
         raise OreoError("mpremote is not installed",
-                        hint="pip install 'mpremote>=1.28,<1.29' (or reinstall oreo-cli)")
+                        hint="pip install 'mpremote>=1.28,<1.29' (or reinstall falera-cli)")
     return SerialTransport, TransportError
 
 
@@ -48,16 +48,16 @@ def explain_open_failure(device):
     """Why a port would not open, as (message, hint)."""
     if os.name != "nt" and not os.path.exists(device):
         return ("%s does not exist" % device,
-                "the badge was unplugged or renumbered; run `oreo devs`")
+                "the badge was unplugged or renumbered; run `falera devs`")
     if os.name != "nt" and not os.access(device, os.R_OK | os.W_OK):
         if sys.platform.startswith("linux"):
             return ("no permission to open %s" % device,
                     "add yourself to the serial group, then log out and back in: "
                     "sudo usermod -aG dialout $USER  (Arch: uucp)")
-        return ("no permission to open %s" % device, "run `oreo doctor`")
+        return ("no permission to open %s" % device, "run `falera doctor`")
     return ("could not open %s" % device,
             "another program has it open (Thonny, mpremote, a serial monitor, "
-            "another `oreo`); close it and try again")
+            "another `falera`); close it and try again")
 
 
 def struct_error():
@@ -88,10 +88,10 @@ class SerialLink:
         return self
 
     def enter(self, soft_reset=True, attempts=2):
-        """Interrupt OreoOS and enter the raw REPL (soft reset: clean heap,
+        """Interrupt FaleraOS and enter the raw REPL (soft reset: clean heap,
         main.py does not run while we are in the raw REPL).
 
-        OreoOS can take a moment to notice Ctrl-C (a network call, a frame
+        FaleraOS can take a moment to notice Ctrl-C (a network call, a frame
         being drawn), so a failed attempt is retried once after a burst of
         Ctrl-C and a short wait before the badge is reported as busy."""
         self.open()
@@ -145,13 +145,13 @@ class SerialLink:
         self.t = None
 
     def restart(self, mode="soft"):
-        """Leave OreoOS running again, then close the port.
+        """Leave FaleraOS running again, then close the port.
 
         Shielded against Ctrl-C: an interrupt while the sequence is being
-        sent (the person pressing Ctrl-C again while oreo cleans up) makes
+        sent (the person pressing Ctrl-C again while falera cleans up) makes
         it start over, and the port is closed only afterwards. Every step
         is safe to repeat, so a repeat cannot leave the badge at the
-        MicroPython prompt with OreoOS stopped. The interrupt is raised
+        MicroPython prompt with FaleraOS stopped. The interrupt is raised
         again once the badge has been restarted."""
         if self.t is None:
             return
@@ -180,7 +180,7 @@ class SerialLink:
             try:
                 if self.t.in_raw_repl:
                     self._resync()
-                else:   # leaving `oreo dev`'s REPL: same as mpremote's disconnect
+                else:   # leaving `falera dev`'s REPL: same as mpremote's disconnect
                     self.t.enter_raw_repl(soft_reset=False)
                     self._have_prompt = False
                 self.t.umount_local()

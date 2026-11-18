@@ -1,4 +1,4 @@
-"""GPIO assignments for the Oreo badge: the breadboard prototype, then the PCB.
+"""GPIO assignments for the Falera Badge: the breadboard prototype, then the PCB.
 
 Single source of truth. Every hardware module imports from here — never hardcode a
 GPIO number anywhere else. When the PCB swaps pins, this is the only file to edit.

@@ -7,7 +7,7 @@ turns a forward or backward tilt into scrolling, alongside **UP / DOWN**.
 - **Difficulty:** intermediate, about 25 minutes
 - **You need:** a badge with the MPU-6050 fitted (I2C on GPIO 42/47, see
   [HARDWARE.md](../HARDWARE.md#pinout)), a USB-C cable,
-  [oreo-cli](../CLI.md#install), and the basics from [APPS.md](../APPS.md)
+  [falera-cli](../CLI.md#install), and the basics from [APPS.md](../APPS.md)
 
 There is no OS-wide "tilt scrolls every app" switch: each app decides what
 tilt means. This page adds it to one app you write.
@@ -31,7 +31,7 @@ frame.
 ## 1. Start an app
 
 ```bash
-oreo new tilt_scroll
+falera new tilt_scroll
 ```
 
 ## 2. Write `tilt_scroll/src/app.py`
@@ -147,14 +147,14 @@ What it does:
 ## 3. Check it and install it
 
 ```bash
-python3 tools/validate_app.py ./tilt_scroll   # from an OreoOS checkout
-oreo app install ./tilt_scroll
+python3 tools/validate_app.py ./tilt_scroll   # from a FaleraOS checkout
+falera app install ./tilt_scroll
 ```
 
 `validate_app.py` warns that the app imports `oreoWare` directly: apps
 should use the `os` object, but it has no IMU accessor yet
-([#67](https://github.com/elixpo/oreo/issues/67)). Racer has the same
-warning. For quicker edits, `oreo dev` loads the app from your computer
+([#67](https://github.com/elixpo/falera/issues/67)). Racer has the same
+warning. For quicker edits, `falera dev` loads the app from your computer
 ([APPS.md](../APPS.md#live-editing-with-oreo-dev)).
 
 ## Things to know
@@ -166,7 +166,7 @@ warning. For quicker edits, `oreo dev` loads the app from your computer
   OS keeps the IMU in a low-rate mode (about 5 readings a second) and
   re-applies it every couple of seconds, so tilt feels steppy. Turn
   gestures off for smooth scrolling.
-- **No IMU found:** `imu.i2c_scan()` in `oreo shell` lists the addresses on
+- **No IMU found:** `imu.i2c_scan()` in `falera shell` lists the addresses on
   the bus; an empty list means wiring or power.
 - `tilt_speed` is pure Python: test it on your computer like the tests in
   `tests/`.

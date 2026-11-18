@@ -6,32 +6,32 @@ follower and following counts. Nothing is set by default, so a fresh badge
 shows a setup card instead of someone else's profile. This hack fills it in.
 
 - **Difficulty:** beginner, about 5 minutes
-- **You need:** a badge, a USB-C cable, [oreo-cli](../CLI.md#install), and
+- **You need:** a badge, a USB-C cable, [falera-cli](../CLI.md#install), and
   Wi-Fi on the badge for the GitHub card (your name and title work without it)
 
 ## 1. Connect the badge
 
-Plug the badge into your computer and check that `oreo` finds it:
+Plug the badge into your computer and check that `falera` finds it:
 
 ```bash
-oreo doctor
+falera doctor
 ```
 
 If it does not, [USB.md](../USB.md) covers ports and Linux permissions.
 
 ## 2. Set your profile
 
-The profile is a small file on the badge, `/profile.json`. `oreo setup`
+The profile is a small file on the badge, `/profile.json`. `falera setup`
 writes it for you. Either answer the questions:
 
 ```bash
-oreo setup
+falera setup
 ```
 
 or give the values directly:
 
 ```bash
-oreo setup --github-user octocat --name "Mona Lisa" --designation "Firmware @ Example"
+falera setup --github-user octocat --name "Mona Lisa" --designation "Firmware @ Example"
 ```
 
 The keys behind these options are the same names you would put in
@@ -43,11 +43,11 @@ The keys behind these options are the same names you would put in
 | `DISPLAY_NAME` | Your name, in the large font (falls back to your GitHub name, then the login) |
 | `DISPLAY_DESIGNATION` | The line under your name (`DESIGNATION` is accepted as the older name) |
 
-If you keep them in an `.env`-style file, `oreo setup --from-file .env.local`
+If you keep them in an `.env`-style file, `falera setup --from-file .env.local`
 takes only the profile keys and leaves everything else in the file alone.
 Names must be short plain ASCII: the badge font has no other characters.
 
-`oreo setup` restarts OreoOS when it is done, so the apps read the new
+`falera setup` restarts FaleraOS when it is done, so the apps read the new
 profile.
 
 ## 3. Give it Wi-Fi
@@ -56,7 +56,7 @@ The GitHub card comes from GitHub's public API, fetched by the badge
 itself. Add a network once:
 
 ```bash
-oreo wifi connect "Home Net"
+falera wifi connect "Home Net"
 ```
 
 The badge only uses Wi-Fi for the internet; everything from your computer
@@ -72,17 +72,17 @@ press **A**.
 
 ## 5. Your avatar
 
-`oreo setup` also puts your GitHub avatar in the round frame. Your computer
+`falera setup` also puts your GitHub avatar in the round frame. Your computer
 downloads it, shrinks it to a 56x56 circle and copies it over USB to
 `/avatar.bin` on the badge, so the badge needs no Wi-Fi for it. The file
 remembers which GitHub user it belongs to: Badge shows it only for your
-`GITHUB_USER`, and draws your initials otherwise. It is kept through OreoOS
+`GITHUB_USER`, and draws your initials otherwise. It is kept through FaleraOS
 updates and deploys.
 
 Changed your picture on GitHub? Fetch it again:
 
 ```bash
-oreo setup --avatar
+falera setup --avatar
 ```
 
 If setup printed "no avatar" (offline, or a typo in the user name), fix
@@ -91,10 +91,10 @@ that and run the same command. `--no-avatar` skips the download.
 ## Troubleshooting
 
 - **Only a setup card:** neither `GITHUB_USER` nor `DISPLAY_NAME` is set.
-  `oreo setup --show` prints what the badge has and where each value came
+  `falera setup --show` prints what the badge has and where each value came
   from.
-- **Initials instead of your photo:** `oreo setup --show` names whose
-  avatar is on the badge; `oreo setup --avatar` fetches yours.
+- **Initials instead of your photo:** `falera setup --show` names whose
+  avatar is on the badge; `falera setup --avatar` fetches yours.
 - **No GitHub card:** the badge is offline, or GitHub's limit of 60
   unauthenticated requests an hour per network was reached. The card
   appears after the next successful refresh.
@@ -105,4 +105,4 @@ that and run the same command. `--no-avatar` skips the download.
 
 - [PROFILE.md](../PROFILE.md): every profile key and where the badge looks
   for it
-- [CLI.md: oreo setup](../CLI.md#oreo-setup-owner-profile)
+- [CLI.md: falera setup](../CLI.md#falera-setup-owner-profile)

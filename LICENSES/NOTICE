@@ -13,9 +13,9 @@ This notice adds no copyright restriction on top of those licences.
 REPOSITORY
 ----------
 
-  Name:        oreoOS ("Oreo Badge")
+  Name:        oreoOS ("Falera Badge")
   What it is:  A handheld, panda-themed conference badge that runs a MicroPython
-               operating system on ESP32-S3 hardware - the OreoOS firmware, the
+               operating system on ESP32-S3 hardware - the FaleraOS firmware, the
                oreoWare drivers, the on-device apps, and the host-side
                flashing/OTA tooling.
 
@@ -25,11 +25,11 @@ OFFICIAL NAMES AND LISTINGS
 The following identify official Elixpo releases and are covered by
 `../TRADEMARKS.md`, not by an extra copyright term:
 
-  - the "Oreo", "Oreo Badge", and "OreoOS" names
+  - the "Falera", "Falera Badge", and "FaleraOS" names
   - the oreoos package name (PyPI)
   - the official firmware/OTA release channel on this repository's GitHub
     Releases
-  - the Oreo Badge product identity (you may build and redistribute boards
+  - the Falera Badge product identity (you may build and redistribute boards
     from the open design files under your own name)
 
 Forks are welcome under MIT; please use your own product, package, listing
@@ -38,7 +38,7 @@ and domain names and do not imply Elixpo endorsement.
 REGISTERED COPYRIGHT
 --------------------
 
-  Copyright in the OreoOS firmware and operating-system source is registered
+  Copyright in the FaleraOS firmware and operating-system source is registered
   with the Copyright Office under Registration No. LD-26455/2026-CO, held by
   Elixpo (Ayushman Bhattacharya). The registration records authorship only; it
   does not narrow the MIT licence for those files.
@@ -48,7 +48,7 @@ VISUAL ASSETS
 
   The brand and visual asset files listed in `README.md` (in this
   directory) are CC-BY-4.0. Reusing them as files only
-  requires the attribution CC-BY-4.0 asks for; using the Elixpo or Oreo names
+  requires the attribution CC-BY-4.0 asks for; using the Elixpo or Falera names
   or mascot as your own branding is covered by `../TRADEMARKS.md`.
 
 THIRD-PARTY MATERIAL

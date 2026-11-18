@@ -1,4 +1,4 @@
-"""Which Oreo hardware this is: the breadboard badge or the PCB badge.
+"""Which Falera hardware this is: the breadboard badge or the PCB badge.
 
 The PCB badge (circuit/elixpo/) has an AW9523B I2C expander at 0x58 on
 GPIO6 (SDA) / GPIO7 (SCL); the breadboard badge has buttons on those pins.

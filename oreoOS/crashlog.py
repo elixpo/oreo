@@ -7,7 +7,7 @@
         info = crashlog.record(e, "app racer")
         # info["where"] is "apps/racer/src/app.py:212" for the crash screen
 
-record() prints the traceback over USB serial (what `oreo logs` and
+record() prints the traceback over USB serial (what `falera logs` and
 `mpremote repl` show), appends it to /crash.log with the context string,
 and returns a short summary for drawing. /crash.log is capped at
 MAX_BYTES; older entries are dropped from the front. Never raises.
@@ -15,7 +15,7 @@ MAX_BYTES; older entries are dropped from the front. Never raises.
 The launcher calls it for every app that crashes (the crash screen) and,
 with save=False, for the first frame error of a run of them (console
 only, so a flaky frame does not write flash every time). Read the log
-from a computer with `oreo pull /crash.log`.
+from a computer with `falera pull /crash.log`.
 """
 
 import sys

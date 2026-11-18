@@ -98,7 +98,7 @@ class ILI9341:
     def resume(self):
         """Put the panel in init()'s configuration without the resets, so
         a panel that is already set up keeps its picture. Used by
-        oreoOS.hostui while OreoOS is stopped at the raw REPL."""
+        oreoOS.hostui while FaleraOS is stopped at the raw REPL."""
         self._configure(120, 10)
 
     def _configure(self, slpout_ms, dispon_ms):

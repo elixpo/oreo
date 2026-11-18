@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MIT
 """On-badge dry run of an OTA update. Runs ON the badge:
 
-    oreo run tools/ota_probe.py
+    falera run tools/ota_probe.py
 
 It does what the Updates app does, without installing anything:
 
@@ -20,7 +20,7 @@ flash and heap are printed before and after. The installed OS, and any
 update already staged in /_ota, are never touched; /_ota_probe is removed
 at the end.
 
-Needs a Wi-Fi network saved on the badge (`oreo wifi`). Paste the whole
+Needs a Wi-Fi network saved on the badge (`falera wifi`). Paste the whole
 output into the issue or pull request.
 """
 
@@ -157,7 +157,7 @@ def fetch(entry):
 
 
 def main():
-    print("== OreoOS OTA probe (dry run: nothing is installed) ==")
+    print("== FaleraOS OTA probe (dry run: nothing is installed) ==")
     try:
         from oreoOS.config import VERSION
     except Exception:

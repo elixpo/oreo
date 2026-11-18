@@ -4,13 +4,13 @@ Guide for coding agents, and for people, working in this repository. Read it
 before changing anything. The binding rules every contribution follows,
 licensing included, are in [PREAMBLE.md](PREAMBLE.md).
 
-## What Oreo is
+## What Falera is
 
-Oreo is an open conference badge, and OreoOS is its operating system: a
+The Falera Badge is an open conference badge, and FaleraOS is its operating system: a
 MicroPython 1.28 OS for an ESP32-S3 with a 320x240 ST7789 screen, eight
 buttons, an IMU, IR, Wi-Fi and Bluetooth. Apps are Python packages the OS
-loads at runtime. A computer talks to the badge through **oreo-cli**, the
-`oreo` command in `cli/`. Video on the badge uses **RV565**, a separate
+loads at runtime. A computer talks to the badge through **falera-cli**, the
+`falera` command in `cli/`. Video on the badge uses **RV565**, a separate
 library and file format (github.com/elixpo/rv565).
 
 ## How we build it
@@ -20,7 +20,7 @@ library and file format (github.com/elixpo/rv565).
    sees a loading state (`oreoOS.busy`, `oreoOS.cache.Refresh`).
 2. **Wi-Fi is for the internet only:** App Store, OTA updates, GitHub data,
    weather and time. Nothing listens on the LAN.
-3. **A computer reaches the badge over USB, through the `oreo` CLI:**
+3. **A computer reaches the badge over USB, through the `falera` CLI:**
    files go through the Transfer app (a code on the badge, typed on the
    computer), and setup (Wi-Fi, profile, apps, updates) is a CLI command.
 4. **Bluetooth comes last,** with the mobile app (#101, #103, #124). Don't
@@ -30,8 +30,8 @@ library and file format (github.com/elixpo/rv565).
    the same pull request.
 6. **No personal data in the code.** The owner's name, GitHub user and
    location come from `oreoOS.profile` (`.env.local` at deploy, or
-   `/profile.json` written by `oreo setup`), and their avatar from
-   `/avatar.bin` (also `oreo setup`). Nothing personal is committed or
+   `/profile.json` written by `falera setup`), and their avatar from
+   `/avatar.bin` (also `falera setup`). Nothing personal is committed or
    shipped in a release.
 7. **Every change is tested without hardware.** Host tests stand in for the
    badge; anything that can only be checked on a real badge is written down
@@ -45,13 +45,13 @@ library and file format (github.com/elixpo/rv565).
 | `oreoWare/` | Hardware drivers (display, buttons, Wi-Fi, BT, IMU, IR) and `os.py`, the object passed to apps. |
 | `apps/` | Built-in apps, installed on every badge (listed in `oreoOS/store.py` `DEFAULT_APPS`). |
 | `apps_market/` | Optional apps the on-device App Store installs; `index.json` is the catalogue. |
-| `app_templates/` | The starting point for a new app (also shipped inside the CLI for `oreo new`). |
-| `cli/` | oreo-cli: the `oreo` command, released on its own (`cli-v*` tags). |
+| `app_templates/` | The starting point for a new app (also shipped inside the CLI for `falera new`). |
+| `cli/` | falera-cli: the `falera` command, released on its own (`cli-v*` tags). |
 | `tools/` | Host scripts: deploy, release, asset conversion, `validate_app.py`, `app_icon.py`, `build_store_index.py`. |
 | `tests/` | Hardware-free OS and app tests (standard library only). |
 | `firmware/` | The MicroPython firmware build for the `OREO_BADGE` board. |
 | `docs/` | [APPS](docs/APPS.md), [CLI](docs/CLI.md), [USB](docs/USB.md), [TRANSFER](docs/TRANSFER.md), [PROFILE](docs/PROFILE.md), [HARDWARE](docs/HARDWARE.md), [TLS](docs/TLS.md). |
-| `oreo.elixpo/` | The website (static Next.js on Cloudflare Pages), including the CLI docs pages. |
+| `falera.elixpo/` | The website (static Next.js on Cloudflare Pages), including the CLI docs pages. |
 
 ## Contracts between the OS and the CLI
 
@@ -60,16 +60,16 @@ Keep both sides, their tests and their docs in step:
 | Contract | Badge side | CLI side | Guard |
 |---|---|---|---|
 | Owner profile keys (`GITHUB_USER`, `DISPLAY_NAME`, `DISPLAY_DESIGNATION`, `TIMEZONE_OFFSET`, `WEATHER_*`, `OWM_API_KEY`) and the `DESIGNATION` alias | `oreoOS/profile.py` | `cli/oreo_cli/owner.py` | CLI contract test against `profile.py` |
-| Owner avatar `/avatar.bin`: `OAV1`, size, the GitHub user it was made for, RGB565 pixels | `oreoOS/profile.py` `avatar()` (Badge app) | `cli/oreo_cli/avatar.py`, written by `oreo setup` (`tools/fetch_avatar.py` loads the same module) | CLI contract and round-trip test against `profile.py` |
+| Owner avatar `/avatar.bin`: `OAV1`, size, the GitHub user it was made for, RGB565 pixels | `oreoOS/profile.py` `avatar()` (Badge app) | `cli/oreo_cli/avatar.py`, written by `falera setup` (`tools/fetch_avatar.py` loads the same module) | CLI contract and round-trip test against `profile.py` |
 | Built-in app list | `oreoOS/store.py` `DEFAULT_APPS` | `cli/oreo_cli/commands.py` `DEFAULT_APPS` | CLI contract test |
 | App checks | `tools/validate_app.py` | `cli/oreo_cli/appcheck.py` | drift test |
 | App template | `app_templates/` | `cli/oreo_cli/app_template/` | CLI test |
 | Transfer protocol (`VERSION`) | `apps/transfer/src/proto.py` | `cli/oreo_cli/transfer.py` | protocol tests on both sides; bump `VERSION` on any wire change |
 | "Connected to computer" screen: `show(title, detail, progress)`, `clear()` | `oreoOS/hostui.py` | `cli/oreo_cli/badge.py` and callers | CLI hostui tests; the CLI must keep working on an OS without it |
-| Launcher loading `/remote/apps` for `oreo dev` | `oreoOS/launcher.py` | `cli/oreo_cli/commands.py` `dev_notes` | CLI test |
-| USB identity `303a:83ec` "Elixpo Oreo Badge" | `firmware/boards/OREO_BADGE` | CLI discovery and `doctor` | CLI tests |
+| Launcher loading `/remote/apps` for `falera dev` | `oreoOS/launcher.py` | `cli/oreo_cli/commands.py` `dev_notes` | CLI test |
+| USB identity `303a:83ec` "Elixpo Falera Badge" | `firmware/boards/OREO_BADGE` | CLI discovery and `doctor` | CLI tests |
 
-A newer CLI must still work with the previous OreoOS release: feature-check
+A newer CLI must still work with the previous FaleraOS release: feature-check
 on the badge (`try: from oreoOS import x`) instead of assuming.
 
 ## Building an app
@@ -77,7 +77,7 @@ on the badge (`try: from oreoOS import x`) instead of assuming.
 Read [docs/APPS.md](docs/APPS.md). In short:
 
 ```bash
-oreo new my_app                 # or: cp -r app_templates apps_market/my_app
+falera new my_app                 # or: cp -r app_templates apps_market/my_app
 python3 tools/app_icon.py apps_market/my_app
 python3 tools/validate_app.py apps_market/my_app
 python3 tools/build_store_index.py   # App Store apps only
@@ -112,7 +112,7 @@ Rules that matter on the badge:
 
 ```bash
 python3 -m unittest discover -s tests          # OS and apps
-python3 -m unittest discover -s cli/tests      # oreo-cli (pip install ./cli for the full-screen view tests)
+python3 -m unittest discover -s cli/tests      # falera-cli (pip install ./cli for the full-screen view tests)
 python3 tools/validate_app.py                  # every app
 ```
 

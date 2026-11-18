@@ -1,4 +1,4 @@
-"""Minimal counter app — demonstrates the OreoOS app lifecycle.
+"""Minimal counter app — demonstrates the FaleraOS app lifecycle.
 
 Buttons:
     A (SELECT)  increment the counter

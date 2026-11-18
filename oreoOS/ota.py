@@ -1,9 +1,9 @@
-"""Over-the-air update client for OreoOS.
+"""Over-the-air update client for FaleraOS.
 
 Update model
 ============
 A "release" is a versioned manifest file pinned to a GitHub release of
-the OreoOS repo. The manifest lists every file in the OS tree along
+the FaleraOS repo. The manifest lists every file in the OS tree along
 with its size and SHA-256, plus URLs to download each file.
 
 CI publishes the release. The badge:
@@ -76,7 +76,7 @@ except ImportError:
 
 # ── tunables ────────────────────────────────────────────────────────────────
 
-OTA_REPO       = "elixpo/oreo"      # owner/repo on GitHub
+OTA_REPO       = "elixpo/falera"      # owner/repo on GitHub
 STAGE_DIR      = "/_ota"
 MANIFEST_NAME  = "manifest.json"
 # The same release with modules precompiled to .mpy (tools/mpy_build.py)
@@ -85,7 +85,7 @@ MANIFEST_NAME  = "manifest.json"
 MPY_MANIFEST_NAME = "manifest-mpy.json"
 PREFER_MPY     = True
 DEFAULT_CHANNEL = "stable"
-USER_AGENT     = "OreoBadge-OTA"
+USER_AGENT     = "FaleraBadge-OTA"
 
 # Chunk size for download writes. Big enough to amortise FS overhead but
 # small enough not to OOM the heap when downloading a 100 KB sprite.
@@ -114,7 +114,7 @@ MIN_RATE_BPS   = 4096      # a file's whole-request budget is
                            # T_FILE + size / MIN_RATE_BPS: the 400-490 KB
                            # assets needed 16-20 KB/s within a flat 25 s
 FILE_TRIES     = 3         # attempts per file before the update gives up
-SPACE_RESERVE  = 128 * 1024  # flash left free after staging (as oreo-cli)
+SPACE_RESERVE  = 128 * 1024  # flash left free after staging (as falera-cli)
 
 # Don't auto-probe in the first minute of boot — gives the UI time to
 # settle, lets the user open the home screen / press a button without
@@ -130,7 +130,7 @@ _OTA_BOOT_GRACE_S = 15 * 60   # 15 min — boot finishes in seconds, but
 
 # ── errors in plain words ───────────────────────────────────────────────────
 #
-# The Updates app (and oreo-cli) used to say only "download failed". Every
+# The Updates app (and falera-cli) used to say only "download failed". Every
 # failing step now records what it was doing, on which file, and why (the
 # host and reason come from oreoOS._http): last_error() for code,
 # error_text() for a screen.
@@ -476,7 +476,7 @@ def peek(release, on_progress=None):
     manifest = None
     # The precompiled (.mpy) variant first, when this firmware loads it;
     # a release without one (or an unreadable one) falls back to the
-    # plain .py manifest every OreoOS can install.
+    # plain .py manifest every FaleraOS can install.
     if PREFER_MPY and url.endswith("/" + MANIFEST_NAME) and _mpy_ok("6"):
         murl = url[:-len(MANIFEST_NAME)] + MPY_MANIFEST_NAME
         manifest, _r = _get_manifest(_httpx, murl, on_progress)

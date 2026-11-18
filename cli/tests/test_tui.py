@@ -1,6 +1,6 @@
-"""The full-screen view (`oreo`, `oreo ui`), driven headless with Textual's
+"""The full-screen view (`falera`, `falera ui`), driven headless with Textual's
 pilot against the fake badge. Skipped when Textual is not installed (the
-release workflow installs it with oreo-cli, so CI runs these)."""
+release workflow installs it with falera-cli, so CI runs these)."""
 
 import io
 import logging
@@ -122,7 +122,7 @@ class TuiTest(unittest.IsolatedAsyncioTestCase):
             status = plain(app.query_one("#status-body", Static).content)
             self.assertIn("MicroPython 1.28.0", status)
             self.assertIn("battery", status)
-            self.assertEqual(self.fake.enters, 1)      # OreoOS paused once
+            self.assertEqual(self.fake.enters, 1)      # FaleraOS paused once
             self.assertEqual(self.fake.restarts, [])   # and not restarted while open
 
     async def test_waits_for_a_badge_to_be_plugged_in(self):
@@ -333,7 +333,7 @@ class TuiTest(unittest.IsolatedAsyncioTestCase):
         import types
         from test_transfer import PROTO, FakeSerial, load_proto, odz
         if not PROTO.exists():
-            self.skipTest("not inside an OreoOS checkout")
+            self.skipTest("not inside a FaleraOS checkout")
         root = self.tmp / "badge"
         root.mkdir()
         ser = FakeSerial(load_proto(), str(root) + "/")
@@ -353,9 +353,9 @@ class TuiTest(unittest.IsolatedAsyncioTestCase):
             await self.until(pilot, lambda: not app.jobs)
             self.assertIn("1 file(s) sent", self.log_text(app))
             self.assertTrue((root / "documents" / "notes.mdz").exists())
-            self.assertEqual(self.fake.restarts, ["soft"])     # OreoOS runs Transfer
-            self.assertIn("OreoOS running", app.sub_title)
-            # the next section that needs the badge pauses OreoOS again
+            self.assertEqual(self.fake.restarts, ["soft"])     # FaleraOS runs Transfer
+            self.assertIn("FaleraOS running", app.sub_title)
+            # the next section that needs the badge pauses FaleraOS again
             await pilot.press("escape", "2")   # out of the text field, then Files
             await self.until(pilot, lambda: not app.jobs and app.query_one(tui.FilesPane).entries)
             self.assertEqual(self.fake.enters, 2)
@@ -397,7 +397,7 @@ class TuiTest(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(log.content_region.height, 3)
             # one line in it: no scrollbar
             self.assertFalse(log.show_vertical_scrollbar)
-            self.assertIn("pausing OreoOS", self.log_text(app))
+            self.assertIn("pausing FaleraOS", self.log_text(app))
             self.assertIn("ready", str(app.query_one("#activity-text").content))
             self.assertIn("l", app.active_bindings)              # shown in the footer
             self.assertEqual(app.active_bindings["l"].binding.description, "Log")
@@ -431,8 +431,8 @@ class TuiTest(unittest.IsolatedAsyncioTestCase):
             await self.connected(pilot)
             links = app.query_one("#links", Static)
             text = plain(links.content)
-            self.assertIn("github.com/elixpo/oreo", text)
-            self.assertIn("oreo.elixpo.com/docs/cli", text)
+            self.assertIn("github.com/elixpo/falera", text)
+            self.assertIn("falera.elixpo.com/docs/cli", text)
             urls = {span.style.link for span in tui.links_text().spans
                     if getattr(span.style, "link", None)}
             self.assertEqual(urls, {tui.REPO_URL, tui.DOCS_URL})
@@ -481,7 +481,7 @@ class TuiTest(unittest.IsolatedAsyncioTestCase):
 
 @unittest.skipUnless(HAVE_TEXTUAL, "textual is not installed")
 class LifecycleTest(unittest.TestCase):
-    """tui.run(): OreoOS restarts when the view closes, however it closes."""
+    """tui.run(): FaleraOS restarts when the view closes, however it closes."""
 
     def setUp(self):
         self.fake = FakeTransport()
@@ -507,7 +507,7 @@ class LifecycleTest(unittest.TestCase):
         rc, out = self.run_view(drive)
         self.assertEqual(rc, 0)
         self.assertEqual(self.fake.restarts, ["soft"])
-        self.assertIn("OreoOS is starting again", out)
+        self.assertIn("FaleraOS is starting again", out)
 
     def test_ctrl_c_restarts_oreoos(self):
         async def drive(pilot):
@@ -543,7 +543,7 @@ class LifecycleTest(unittest.TestCase):
 
 
 class FallbackTest(unittest.TestCase):
-    """Where the full-screen view cannot run, `oreo` keeps the menu."""
+    """Where the full-screen view cannot run, `falera` keeps the menu."""
 
     class Stream:
         def __init__(self, tty):
@@ -586,7 +586,7 @@ class FallbackTest(unittest.TestCase):
         r = run_cli(["ui"])
         self.assertEqual(r.rc, 2)
         self.assertIn("cannot run here", r.out)
-        self.assertIn("oreo menu", r.out)
+        self.assertIn("falera menu", r.out)
         self.assertEqual(r.links, [])
 
 

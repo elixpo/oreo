@@ -1,4 +1,4 @@
-"""`oreo update` without a checkout: the badge's own OTA, steered over USB.
+"""`falera update` without a checkout: the badge's own OTA, steered over USB.
 
 A FakeOta stands in for oreoOS.ota with the functions the CLI calls; a
 contract test at the end runs the same flow against the real oreoOS/ota.py
@@ -114,10 +114,10 @@ class UpdateTest(unittest.TestCase):
         self.assertIn("v2.0.0", r.out)
         self.assertIn("v2.1.0", r.out)
         self.assertIn("3 file(s) change", r.out)
-        self.assertIn("OreoOS v2.1.0 is installed and running", r.out)
+        self.assertIn("FaleraOS v2.1.0 is installed and running", r.out)
         self.assertEqual([c[0] for c in self.ota.calls],
                          ["latest", "peek", "download", "apply"])
-        self.assertIn("hard", self.fake.restarts)      # reset into the new OreoOS
+        self.assertIn("hard", self.fake.restarts)      # reset into the new FaleraOS
         self.assertEqual(self.fake.restarts[-1], "soft")  # after reading the new version
         self.assertGreaterEqual(self.fake.enters, 2)    # reconnected after the reset
 
@@ -155,7 +155,7 @@ class UpdateTest(unittest.TestCase):
         self.fake.wifi.saved = []
         r = self.run_update()
         self.assertEqual(r.rc, 1)
-        self.assertIn("oreo wifi connect", r.out)
+        self.assertIn("falera wifi connect", r.out)
         self.assertEqual(self.ota.calls, [])
 
     def test_github_unreachable(self):
@@ -266,7 +266,7 @@ def load_module(path, name, **patch):
     return mod
 
 
-@unittest.skipUnless(OTA.exists(), "not inside an OreoOS checkout")
+@unittest.skipUnless(OTA.exists(), "not inside a FaleraOS checkout")
 class RealOtaContractTest(unittest.TestCase):
     """The CLI's OTA snippets against the real oreoOS/ota.py."""
 
@@ -352,7 +352,7 @@ class RealOtaContractTest(unittest.TestCase):
         self.assertFalse(self.badge.ota_status()["pending"])
 
     def test_precompiled_release_replaces_py_with_mpy(self):
-        # An OreoOS with .mpy support installs manifest-mpy.json: the .mpy
+        # A FaleraOS with .mpy support installs manifest-mpy.json: the .mpy
         # lands and the .py it replaces is removed (MicroPython would
         # import the old .py first). The CLI only steers; this is the
         # contract it relies on.

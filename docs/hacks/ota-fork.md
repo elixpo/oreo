@@ -1,14 +1,14 @@
 # Self-host OTA updates from your fork
 
-Badges update OreoOS over the air from GitHub releases of `elixpo/oreo`.
+Badges update FaleraOS over the air from GitHub releases of `elixpo/falera`.
 Point your badge at your own fork instead, and every release you publish
-there reaches your badge through **Settings > Updates** or `oreo update`,
+there reaches your badge through **Settings > Updates** or `falera update`,
 with the same checks as an official update.
 
 - **Difficulty:** advanced, about an hour
-- **You need:** a GitHub fork of `elixpo/oreo` and a clone of it, the
+- **You need:** a GitHub fork of `elixpo/falera` and a clone of it, the
   [`gh`](https://cli.github.com) CLI logged in (`gh auth status`), a badge
-  with Wi-Fi, a USB-C cable and [oreo-cli](../CLI.md#install)
+  with Wi-Fi, a USB-C cable and [falera-cli](../CLI.md#install)
 
 ## How OTA works
 
@@ -29,11 +29,11 @@ Apps, photos, documents, saved Wi-Fi and your profile are kept.
 
 ## 1. Point the code at your fork
 
-In your clone, change one line in `oreoOS/ota.py` (`you/oreo` is your
+In your clone, change one line in `oreoOS/ota.py` (`you/falera` is your
 fork):
 
 ```python
-OTA_REPO       = "you/oreo"      # owner/repo on GitHub
+OTA_REPO       = "you/falera"      # owner/repo on GitHub
 ```
 
 That is the only edit. `tools/release.py` reads the same `OTA_REPO`, so
@@ -49,11 +49,11 @@ git remote get-url origin
 
 ## 2. Put your build on the badge once, over USB
 
-The badge still asks `elixpo/oreo` until it runs your `ota.py`. Install
+The badge still asks `elixpo/falera` until it runs your `ota.py`. Install
 your checkout over USB:
 
 ```bash
-oreo update --repo .        # runs ./deploy --board from this checkout
+falera update --repo .        # runs ./deploy --board from this checkout
 ```
 
 (or `./deploy --board` directly).
@@ -69,7 +69,7 @@ python3 tools/release.py v9.0.0                # stable channel
 python3 tools/release.py v9.1.0 --channel beta # or a prerelease
 ```
 
-The dry run starts with `Repo: you/oreo (OTA_REPO in oreoOS/ota.py)`, and
+The dry run starts with `Repo: you/falera (OTA_REPO in oreoOS/ota.py)`, and
 every download URL and `gh release` command in it names your fork. It
 warns when `origin` is another repository; a real release stops there.
 
@@ -82,7 +82,7 @@ again: it resumes from the tag or the upload.
 Check that your tag is among the ten the badge reads:
 
 ```bash
-gh api "repos/you/oreo/tags?per_page=10" --jq '.[].name'
+gh api "repos/you/falera/tags?per_page=10" --jq '.[].name'
 ```
 
 ## 4. Update the badge
@@ -91,9 +91,9 @@ On the badge, **Settings > Updates** checks the stable channel. From a
 computer, with the badge on USB:
 
 ```bash
-oreo update --check            # is there a newer release?
-oreo update                    # stable
-oreo update --channel beta     # beta
+falera update --check            # is there a newer release?
+falera update                    # stable
+falera update --channel beta     # beta
 ```
 
 The badge also checks by itself in the background, but not in the first
@@ -104,10 +104,10 @@ The badge also checks by itself in the background, but not in the first
 - **Your fork controls your badge.** Anyone who can push tags and releases
   to the fork can change the code it runs. Protect the fork like a deploy
   key.
-- **Firmware is not updated.** OTA only replaces OreoOS's Python files and
-  assets. A firmware change needs `oreo flash` over USB.
+- **Firmware is not updated.** OTA only replaces FaleraOS's Python files and
+  assets. A firmware change needs `falera flash` over USB.
 - **Going back to official updates:** set `OTA_REPO` back to
-  `elixpo/oreo` and install that over USB, or run `oreo update --repo`
+  `elixpo/falera` and install that over USB, or run `falera update --repo`
   from an upstream checkout.
 - **GitHub rate limit:** the badge asks without a token, which allows 60
   requests an hour per network.
@@ -116,5 +116,5 @@ The badge also checks by itself in the background, but not in the first
 
 ## See also
 
-- [CLI.md: oreo update](../CLI.md#oreo-update-update-oreoos)
+- [CLI.md: falera update](../CLI.md#falera-update-update-faleraos)
 - [HARDWARE.md: OTA update partition](../HARDWARE.md#ota-update-partition)

@@ -12,7 +12,7 @@
 
 ## Checklist
 
-- [ ] I read [CONTRIBUTING.md](https://github.com/elixpo/oreo/blob/main/CONTRIBUTING.md) and the rules in [PREAMBLE.md](https://github.com/elixpo/oreo/blob/main/PREAMBLE.md).
+- [ ] I read [CONTRIBUTING.md](https://github.com/elixpo/falera/blob/main/CONTRIBUTING.md) and the rules in [PREAMBLE.md](https://github.com/elixpo/falera/blob/main/PREAMBLE.md).
 - [ ] `python3 -m unittest discover -s tests` and `python3 tools/validate_app.py` pass (and `cli/tests` for changes under `cli/`).
 - [ ] A change to a contract between the OS and the CLI updates both sides, their tests and the docs.
 - [ ] A schematic change was made in `generate_badge_schematic.py` and `circuit/elixpo/build.sh` was run; a pin change also updates `oreoWare/pins.py` and `docs/HARDWARE.md`.
@@ -21,5 +21,5 @@
 ---
 
 <sub>By submitting this pull request I confirm my contribution is licensed under
-the licence its path gives it, as [PREAMBLE.md](https://github.com/elixpo/oreo/blob/main/PREAMBLE.md)
+the licence its path gives it, as [PREAMBLE.md](https://github.com/elixpo/falera/blob/main/PREAMBLE.md)
 says: MIT for code and docs, CERN-OHL-P-2.0 for `circuit/`, CC-BY-4.0 for assets.</sub>

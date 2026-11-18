@@ -1,4 +1,4 @@
-"""`oreo setup`: the badge owner's profile, written over USB.
+"""`falera setup`: the badge owner's profile, written over USB.
 
 Badge, Commits, Weather and the clock read the owner's details
 through oreoOS/profile.py, which takes the first non-empty value from
@@ -34,7 +34,7 @@ from .ui import esc
 PATH = "/profile.json"
 
 # Same keys, in the same order, as KEYS in oreoOS/profile.py (a contract
-# test checks this inside an OreoOS checkout).
+# test checks this inside a FaleraOS checkout).
 KEYS = ("GITHUB_USER", "DISPLAY_NAME", "DISPLAY_DESIGNATION", "TIMEZONE_OFFSET",
         "WEATHER_LAT", "WEATHER_LON", "WEATHER_NAME", "OWM_API_KEY")
 NUMERIC = ("TIMEZONE_OFFSET", "WEATHER_LAT", "WEATHER_LON")
@@ -260,7 +260,7 @@ def write(b, updates):
                      secrets=(secret,) if secret else ())
     except BadgeError as e:
         raise OreoError("could not write %s on the badge: %s" % (PATH, e.message),
-                        hint="check free space with `oreo info`, then try again")
+                        hint="check free space with `falera info`, then try again")
     return r.get("keys") or []
 
 
@@ -396,7 +396,7 @@ def updates_from_set(items):
         if "=" not in item:
             raise UsageError("--set needs KEY=VALUE, not %r" % item,
                              hint="e.g. --set DISPLAY_NAME=\"Mona Lisa\"; keys are listed "
-                                  "in `oreo help setup`")
+                                  "in `falera help setup`")
         name, value = item.split("=", 1)
         k = canonical_key(name)
         if k is None:
@@ -517,7 +517,7 @@ def sync_avatar(ui, b, user, mode=AVATAR_AUTO):
             ui.note("removed %s: no GitHub user is set" % avatar.PATH)
         return exists
     if mode == AVATAR_AUTO and _same(have, user):
-        ui.note("the avatar for @%s is on the badge (`oreo setup --avatar` fetches it again)"
+        ui.note("the avatar for @%s is on the badge (`falera setup --avatar` fetches it again)"
                 % esc(user))
         return False
     try:
@@ -528,7 +528,7 @@ def sync_avatar(ui, b, user, mode=AVATAR_AUTO):
         if stale:
             _remove_avatar(b)       # never leave another user's face behind
         ui.warn("no avatar: %s. The Badge app shows your initials; run "
-                "`oreo setup --avatar` to try again." % esc(str(e)))
+                "`falera setup --avatar` to try again." % esc(str(e)))
         return stale
     with ui.status("copying the avatar to %s" % avatar.PATH):
         b.write_file(data, avatar.PATH)
@@ -562,8 +562,8 @@ def setup(ui, b, updates=None, show_only=False, avatar_mode=AVATAR_AUTO):
     if prompted:
         if not ui.interactive:
             raise UsageError("no terminal to ask for the profile",
-                             hint="pass values as options, e.g. oreo setup --github-user "
-                                  "octocat --timezone 5.5 (see `oreo help setup`)")
+                             hint="pass values as options, e.g. falera setup --github-user "
+                                  "octocat --timezone 5.5 (see `falera help setup`)")
         updates = ask_updates(ui, data)
     if not updates:
         ui.ok("nothing changed")
@@ -592,11 +592,11 @@ def setup(ui, b, updates=None, show_only=False, avatar_mode=AVATAR_AUTO):
 
 def after_save(ui, reset):
     if reset == "none":
-        ui.note("the badge is at the MicroPython prompt (--reset none); restart OreoOS "
+        ui.note("the badge is at the MicroPython prompt (--reset none); restart FaleraOS "
                 "(Ctrl-D there, or unplug and replug) so the apps read the new profile")
     else:
-        ui.ok("OreoOS is restarting, so the apps read the new profile")
-        ui.note("the timezone applies at the next time sync, which happens as OreoOS "
+        ui.ok("FaleraOS is restarting, so the apps read the new profile")
+        ui.note("the timezone applies at the next time sync, which happens as FaleraOS "
                 "starts (or Sync Time in Settings)")
 
 
@@ -620,11 +620,11 @@ def cmd_setup(ctx):
         raise UsageError("--show only prints the profile; leave out the other options")
     if args.owm_key is not None and args.owm_key.strip():
         ui.warn("a key given as --owm-key can end up in your shell history; "
-                "--owm-key-stdin or the prompt (oreo setup) avoids that")
+                "--owm-key-stdin or the prompt (falera setup) avoids that")
     if not updates and not args.show and not refresh and not ui.interactive:
         raise UsageError("no terminal to ask for the profile",
-                         hint="pass values as options, e.g. oreo setup --github-user "
-                              "octocat --timezone 5.5 (see `oreo help setup`)")
+                         hint="pass values as options, e.g. falera setup --github-user "
+                              "octocat --timezone 5.5 (see `falera help setup`)")
     mode = AVATAR_REFRESH if refresh else AVATAR_SKIP if skip else AVATAR_AUTO
     ui.header("setup", "owner profile in %s (docs/PROFILE.md)" % PATH)
     with ctx.session() as b:

@@ -1,8 +1,8 @@
-# Contributing to Oreo
+# Contributing to Falera
 
-Thank you for your interest in Oreo! Oreo is an open conference badge:
-the hardware, **OreoOS** (the MicroPython operating system that runs on
-it), its apps, and **oreo-cli** (the `oreo` command that connects a
+Thank you for your interest in Falera! The Falera Badge is an open conference badge:
+the hardware, **FaleraOS** (the MicroPython operating system that runs on
+it), its apps, and **falera-cli** (the `falera` command that connects a
 computer to the badge). You can contribute **without owning a badge**:
 most of the code is tested on an ordinary computer.
 
@@ -13,14 +13,14 @@ everywhere in the project.
 
 | Part | Where | Language |
 |---|---|---|
-| OreoOS: launcher, home screen, App Store, OTA, network service, helpers | `oreoOS/` | MicroPython 1.28 |
+| FaleraOS: launcher, home screen, App Store, OTA, network service, helpers | `oreoOS/` | MicroPython 1.28 |
 | Hardware drivers | `oreoWare/` | MicroPython |
 | Built-in apps (19) and App Store apps (10) | `apps/`, `apps_market/` | MicroPython |
-| oreo-cli, the `oreo` command (full-screen view, files, Transfer, apps, Wi-Fi, setup, updates) | `cli/` | Python 3.9+ |
+| falera-cli, the `falera` command (full-screen view, files, Transfer, apps, Wi-Fi, setup, updates) | `cli/` | Python 3.9+ |
 | Host tools: deploy, release, asset conversion, app checks | `tools/` | Python |
 | Tests that need no hardware | `tests/`, `cli/tests/` | Python, standard library |
 | Firmware build for the `OREO_BADGE` board | `firmware/` | C / CMake |
-| Website, including the CLI docs | `oreo.elixpo/` | Next.js |
+| Website, including the CLI docs | `falera.elixpo/` | Next.js |
 
 The badge plays video with **RV565**, a separate library and file format
 ([elixpo/rv565](https://github.com/elixpo/rv565)) with its own contributing
@@ -28,7 +28,7 @@ guide.
 
 How the pieces fit, and the rules we build by, are in
 [AGENTS.md](AGENTS.md): Wi-Fi is only for the internet, a computer reaches
-the badge over USB through the `oreo` CLI, Bluetooth comes last, and the OS
+the badge over USB through the `falera` CLI, Bluetooth comes last, and the OS
 and the CLI must agree on a handful of contracts.
 
 ### How the pieces connect
@@ -36,11 +36,11 @@ and the CLI must agree on a handful of contracts.
 ```mermaid
 flowchart LR
     subgraph computer["Your computer"]
-        checkout["OreoOS checkout:<br/>./deploy, tests"]
-        cli["oreo CLI"]
+        checkout["FaleraOS checkout:<br/>./deploy, tests"]
+        cli["falera CLI"]
     end
-    subgraph badge["Oreo badge"]
-        oreoos["OreoOS and apps"]
+    subgraph badge["Falera badge"]
+        oreoos["FaleraOS and apps"]
         firmware["MicroPython firmware<br/>with the RV565 decoder"]
     end
     checkout -->|"USB: deploy"| oreoos
@@ -50,9 +50,9 @@ flowchart LR
     rv565 -.->|"video format"| firmware
 ```
 
-A computer reaches the badge only over USB, through the `oreo` CLI or a
+A computer reaches the badge only over USB, through the `falera` CLI or a
 deploy from a checkout. The badge uses Wi-Fi only for the internet: the App
-Store, OreoOS updates, GitHub data and the weather. Videos are RV565 files:
+Store, FaleraOS updates, GitHub data and the weather. Videos are RV565 files:
 the CLI encodes them and the firmware decodes them.
 
 ## How a contribution goes
@@ -71,7 +71,7 @@ flowchart TD
     hw --> form
     form --> badge{"Have a badge?"}
     badge -->|"no"| host["Host tests, validate_app.py,<br/>CLI tests with the fake badge"]
-    badge -->|"yes"| device["./deploy --board,<br/>then try it with oreo"]
+    badge -->|"yes"| device["./deploy --board,<br/>then try it with falera"]
     host --> branch["Branch from main"]
     device --> branch
     branch --> checks["Run the checks"]
@@ -87,14 +87,14 @@ it:
 
 | Path | Issue form | Start from |
 |---|---|---|
-| Write an app | [App proposal](https://github.com/elixpo/oreo/issues/new?template=app_proposal.yml) | [docs/APPS.md](docs/APPS.md), `oreo new` |
-| Fix a bug | [Bug report](https://github.com/elixpo/oreo/issues/new?template=bug_report.yml) | `oreo info`, `oreo doctor`, [good first issues](https://github.com/elixpo/oreo/issues?q=is%3Aopen+label%3A%22good+first+issue%22) |
-| Write a hack | [Hack proposal](https://github.com/elixpo/oreo/issues/new?template=hack_proposal.yml) | [docs/hacks/](docs/hacks/README.md) |
-| Improve the OS | [OS improvement](https://github.com/elixpo/oreo/issues/new?template=os_improvement.yml) | [AGENTS.md](AGENTS.md), [docs/OS_ROADMAP.md](docs/OS_ROADMAP.md) |
-| Work on the hardware | [Hardware](https://github.com/elixpo/oreo/issues/new?template=hardware.yml) | [Work on the hardware](#work-on-the-hardware), [`circuit/elixpo/`](circuit/elixpo/) |
+| Write an app | [App proposal](https://github.com/elixpo/falera/issues/new?template=app_proposal.yml) | [docs/APPS.md](docs/APPS.md), `falera new` |
+| Fix a bug | [Bug report](https://github.com/elixpo/falera/issues/new?template=bug_report.yml) | `falera info`, `falera doctor`, [good first issues](https://github.com/elixpo/falera/issues?q=is%3Aopen+label%3A%22good+first+issue%22) |
+| Write a hack | [Hack proposal](https://github.com/elixpo/falera/issues/new?template=hack_proposal.yml) | [docs/hacks/](docs/hacks/README.md) |
+| Improve the OS | [OS improvement](https://github.com/elixpo/falera/issues/new?template=os_improvement.yml) | [AGENTS.md](AGENTS.md), [docs/OS_ROADMAP.md](docs/OS_ROADMAP.md) |
+| Work on the hardware | [Hardware](https://github.com/elixpo/falera/issues/new?template=hardware.yml) | [Work on the hardware](#work-on-the-hardware), [`circuit/elixpo/`](circuit/elixpo/) |
 
 Anything else (the website, tooling) goes in the
-[other idea form](https://github.com/elixpo/oreo/issues/new?template=feature_request.yml).
+[other idea form](https://github.com/elixpo/falera/issues/new?template=feature_request.yml).
 A typo or a one-line fix can go straight to a pull request.
 
 ## Start without a badge
@@ -103,25 +103,25 @@ Everything here runs on Linux, macOS or Windows (WSL) with Python 3.9 or
 newer:
 
 ```bash
-git clone https://github.com/elixpo/oreo && cd oreo
+git clone https://github.com/elixpo/falera && cd falera
 python3 -m unittest discover -s tests            # about 400 OS and app tests
 python3 tools/validate_app.py                     # checks every app
 python3 -m venv .venv && . .venv/bin/activate
-pip install ./cli                                 # the oreo CLI
+pip install ./cli                                 # the falera CLI
 python -m unittest discover -s cli/tests          # about 300 CLI tests (fake badge)
-oreo --help
+falera --help
 ```
 
 Good first contributions without hardware:
 
 - An issue labelled
-  [good first issue](https://github.com/elixpo/oreo/issues?q=is%3Aopen+label%3A%22good+first+issue%22).
-- A new App Store app: start with `oreo new my_app` or copy
+  [good first issue](https://github.com/elixpo/falera/issues?q=is%3Aopen+label%3A%22good+first+issue%22).
+- A new App Store app: start with `falera new my_app` or copy
   [`app_templates/`](app_templates/), and follow [docs/APPS.md](docs/APPS.md).
   The tests and `validate_app.py` check most of what the badge would.
 - Tests for code that has none, and documentation fixes.
 - Finding a module that imports hardware directly instead of going through
-  the OS layer ([#67](https://github.com/elixpo/oreo/issues/67)).
+  the OS layer ([#67](https://github.com/elixpo/falera/issues/67)).
 
 ## With a badge
 
@@ -131,16 +131,16 @@ N16R8 on a breadboard works), then:
 
 ```bash
 cp .env.example .env.local      # your Wi-Fi and profile; git-ignored
-./deploy --full                 # first time: the prebuilt firmware, then OreoOS
-./deploy --board                # later: OreoOS only, changed files
-oreo doctor && oreo             # the CLI's checks, then its full-screen view
+./deploy --full                 # first time: the prebuilt firmware, then FaleraOS
+./deploy --board                # later: FaleraOS only, changed files
+falera doctor && falera             # the CLI's checks, then its full-screen view
 ```
 
 Building the firmware from source (`./build-firmware`) needs ESP-IDF; see
 [`firmware/`](firmware/).
 
 [docs/USB.md](docs/USB.md) explains the USB ports and the REPL;
-[docs/CLI.md](docs/CLI.md) every `oreo` command.
+[docs/CLI.md](docs/CLI.md) every `falera` command.
 
 ## Work on the hardware
 
@@ -149,7 +149,7 @@ The badge is certified open source hardware
 KiCad 10 design is in [`circuit/elixpo/`](circuit/elixpo/): a schematic
 for a bare ESP32-S3R8 board, a sourcing BOM, and a PCB that is not laid
 out yet. Open work is labelled
-[hardware](https://github.com/elixpo/oreo/issues?q=is%3Aopen+label%3Ahardware);
+[hardware](https://github.com/elixpo/falera/issues?q=is%3Aopen+label%3Ahardware);
 the ones marked help wanted are ready to pick up. You don't need a badge to
 review a schematic or lay out a board, and you need only a breakout board
 to write a driver.
@@ -238,22 +238,22 @@ decisions and what has to be settled before layout.
 
 ## Releases
 
-- **OreoOS:** maintainers run `python tools/release.py`. It tags
+- **FaleraOS:** maintainers run `python tools/release.py`. It tags
   `stable/vX.Y.Z` (or `beta/...`) and publishes the GitHub release that
   badges update from over the air, in the repository named by `OTA_REPO`
   in `oreoOS/ota.py` (or `--repo owner/name`); `--dry-run` shows it.
   Forks publish to themselves this way
   ([docs/hacks/ota-fork.md](docs/hacks/ota-fork.md)).
-- **oreo-cli:** a `cli-v<version>` tag runs
+- **falera-cli:** a `cli-v<version>` tag runs
   `.github/workflows/cli-release.yml`, which tests, builds, attests and
   publishes the release with its installers.
 
 ## Google Summer of Code 2027
 
 Elixpo is applying to be a mentoring organisation for Google Summer of Code
-2027; Google has not announced the 2027 programme yet. Oreo's proposed idea
-is the [Oreo badge desktop simulator](https://gsoc.elixpo.com/ideas/oreo-badge-simulator/)
-(175 hours, intermediate): running OreoOS apps on an ordinary computer, with a
+2027; Google has not announced the 2027 programme yet. Falera's proposed idea
+is the [Falera badge desktop simulator](https://gsoc.elixpo.com/ideas/oreo-badge-simulator/)
+(175 hours, intermediate): running FaleraOS apps on an ordinary computer, with a
 headless mode for automated tests.
 
 If you're interested:
@@ -279,7 +279,7 @@ you have the right to submit it. The
 [Developer Certificate of Origin](https://developercertificate.org) applies
 to every commit; sign off with `git commit -s`. We don't require a CLA. See
 [LICENSE](LICENSE) and [NOTICE](LICENSES/NOTICE), including the reserved
-Elixpo and Oreo names and marks.
+Elixpo and Falera names and marks.
 
 ## Questions
 

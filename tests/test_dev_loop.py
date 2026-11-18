@@ -1,6 +1,6 @@
 """Host tests for the badge dev loop: crash tracebacks on the crash
 screen and in /crash.log, unloading an app's modules when it exits, apps
-loaded from an `oreo dev` mount (/remote/apps), the App Store's icon
+loaded from an `falera dev` mount (/remote/apps), the App Store's icon
 worker and the header Wi-Fi bars.
 
 Modules load from their files behind a stub `oreoOS` package, so no
@@ -221,7 +221,7 @@ class LauncherTest(_Stubbed):
         self.assertEqual(app.v(), 1)
         self.assertEqual(app.author, "me")
         # A Store update (or a dev-mount edit) replaces the file while
-        # OreoOS runs. (`oreo push` restarts OreoOS, so it never needs
+        # FaleraOS runs. (`falera push` restarts FaleraOS, so it never needs
         # this.)
         (d / "src" / "app.py").write_text(
             "class App:\n    name = 'demo'\n\n    def v(self):\n"

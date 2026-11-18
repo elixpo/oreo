@@ -1,6 +1,6 @@
 """USB serial line reader for the Transfer app.
 
-While OreoOS runs nothing else reads sys.stdin (the REPL is not active),
+While FaleraOS runs nothing else reads sys.stdin (the REPL is not active),
 so the app can poll it. Reading never blocks: select.poll() says at least
 one byte is waiting before each one-byte readinto(), and a frame stops
 reading after `budget_ms` so buttons and the screen stay responsive.
@@ -9,7 +9,7 @@ taken one at a time; the USB stack holds the rest back (the computer's
 writes simply wait) until the app catches up, so nothing is lost.
 
 open() turns off Ctrl-C (micropython.kbd_intr(-1)) so no byte on the
-stream can raise KeyboardInterrupt inside OreoOS; close() turns it back
+stream can raise KeyboardInterrupt inside FaleraOS; close() turns it back
 on. The protocol is ASCII-only anyway.
 
 `stream`/`poller`/`writer` are injectable for the host tests.

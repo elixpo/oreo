@@ -1,10 +1,10 @@
-# RV565 on OreoOS
+# RV565 on FaleraOS
 
 ## A firmware-assisted video architecture for an ESP32-S3 badge
 
 **Knowledge deck · engineering and research overview**
 
-RV565 makes full-colour video practical on OreoOS by treating playback as a complete data-path problem: prepare display-native frames on the host, decode each frame through native firmware, reuse bounded buffers, and feed the LCD with DMA-aware scheduling.
+RV565 makes full-colour video practical on FaleraOS by treating playback as a complete data-path problem: prepare display-native frames on the host, decode each frame through native firmware, reuse bounded buffers, and feed the LCD with DMA-aware scheduling.
 
 > **Executive takeaway:** moving frame inflation into firmware removed a costly and unpredictable language-runtime boundary. Reaching 24 FPS, however, requires the entire path—not only decompression—to be pipelined.
 
@@ -20,9 +20,9 @@ Figures in this deck are the final measurements from the RV565 paper ([arXiv:261
 - Why decompression was moved from MicroPython into custom firmware
 - How double-buffered stripes and SPI2 GDMA sustain 24 FPS
 - Why the integrated Gallery measures 12.17 FPS despite looking smooth
-- What remains to bring the complete OreoOS path to a measured 24 FPS
+- What remains to bring the complete FaleraOS path to a measured 24 FPS
 
-**Audience:** OreoOS contributors, embedded engineers, research collaborators, and reviewers.
+**Audience:** FaleraOS contributors, embedded engineers, research collaborators, and reviewers.
 
 ---
 
@@ -54,7 +54,7 @@ The early Gallery path asked MicroPython to perform too much work per frame:
 - decompress through a high-level stream abstraction;
 - scale or copy pixels;
 - update the display synchronously;
-- continue servicing buttons and the OreoOS lifecycle.
+- continue servicing buttons and the FaleraOS lifecycle.
 
 This produced low frame rates, allocation pressure, variable latency, and an unresponsive interface. Large raw RGB565 videos avoided decompression but consumed too much flash and still did not solve display-transfer latency.
 
@@ -79,7 +79,7 @@ flowchart TB
     B --> C[Indexed RV565 v4 and PSRAM preload]
     C --> D[Full-colour RV565 v6 with independent Deflate frames]
     D --> E[Standalone C pipeline with striped SPI2 GDMA]
-    E --> F[Firmware inflater exposed to OreoOS Gallery]
+    E --> F[Firmware inflater exposed to FaleraOS Gallery]
     F --> G[Next: fused native pipeline and asynchronous media input]
 ```
 
@@ -89,7 +89,7 @@ Each revision removed a different bottleneck:
 2. bounded reusable buffers removed per-frame allocation;
 3. independent compression reduced storage without inter-frame state;
 4. DMA stripes overlapped CPU work with LCD transfer;
-5. firmware integration gave Gallery native decompression without giving up OreoOS controls.
+5. firmware integration gave Gallery native decompression without giving up FaleraOS controls.
 
 ---
 
@@ -118,7 +118,7 @@ Host-side conversion performs the expensive visual preparation once:
 
 # 6. What RV565 actually is
 
-RV565 is an OreoOS-oriented **frame container and playback contract**. It is not a newly invented entropy codec.
+RV565 is a FaleraOS-oriented **frame container and playback contract**. It is not a newly invented entropy codec.
 
 In the current v6 format:
 
@@ -175,7 +175,7 @@ The ingestion layer should reject unsuitable media before transfer. The same pol
 
 # 8. The proven standalone 24 FPS path
 
-The isolated ESP-IDF experiment removes MicroPython, the launcher, Wi-Fi, and the normal OreoOS framebuffer so the media path can be measured directly.
+The isolated ESP-IDF experiment removes MicroPython, the launcher, Wi-Fi, and the normal FaleraOS framebuffer so the media path can be measured directly.
 
 ```mermaid
 flowchart LR
@@ -234,7 +234,7 @@ The standalone benchmark uses about **79.9 KiB** of internal allocation for deco
 
 # 11. Why decompression moved into firmware
 
-The ESP32-S3 ROM already contains miniz's `tinfl` implementation. Calling it from a native MicroPython module gives OreoOS a narrow, efficient operation:
+The ESP32-S3 ROM already contains miniz's `tinfl` implementation. Calling it from a native MicroPython module gives FaleraOS a narrow, efficient operation:
 
 ```python
 written = _oreo_rv565.inflate_frame(compressed_view, decoded_buffer)
@@ -258,7 +258,7 @@ There is no temporary Python `bytes` object and no Python loop over pixels.
 
 ```mermaid
 flowchart TB
-    subgraph Python[OreoOS and Gallery in MicroPython]
+    subgraph Python[FaleraOS and Gallery in MicroPython]
         A[Select media]
         B[Read compressed payload into reused buffer]
         C[Pause, seek, exit, and lifecycle policy]
@@ -363,7 +363,7 @@ This avoids making serial logging part of the workload being measured.
 | W90 | Standalone, dual-core | 7,200 across 10 runs | **24.009** | 0 | 0 | 31.322 ms | 31.331 ms | 31.333 ms |
 | W360 | Standalone, serial | 7,200 across 10 runs | 23.905 | 20 | 7,200 | 41.828 ms | 41.869 ms | 41.881 ms |
 | W360 | Standalone, dual-core | 7,200 across 10 runs | **24.009** | 0 | 0 | 31.324 ms | 31.334 ms | 31.335 ms |
-| W90 | OreoOS Gallery, firmware inflation | 720 | **12.170** | n/a | 720 | 80.174 ms | 86.067 ms | 87.117 ms |
+| W90 | FaleraOS Gallery, firmware inflation | 720 | **12.170** | n/a | 720 | 80.174 ms | 86.067 ms | 87.117 ms |
 
 The dual-core standalone pipeline meets every deadline on both windows with 10.3 ms of slack; the serial one only on the lighter window. Gallery does not skip frames when late, so drops do not apply; its p50 work time already exceeds the deadline.
 
@@ -446,14 +446,14 @@ This is the shortest route from the measured 80 ms integrated frame toward the p
 
 # 20. Storage is designed to grow outward
 
-Internal flash should contain the boot-critical firmware, OreoOS, applications, and a bounded amount of media. A later SD card extends the media tier without changing the RV565 frame contract.
+Internal flash should contain the boot-critical firmware, FaleraOS, applications, and a bounded amount of media. A later SD card extends the media tier without changing the RV565 frame contract.
 
 ```mermaid
 flowchart TB
     subgraph Internal[16 MB internal flash]
         A[Bootloader and partition table]
         B[Custom MicroPython firmware]
-        C[OreoOS and applications]
+        C[FaleraOS and applications]
         D[Small local media set]
     end
 
@@ -510,7 +510,7 @@ This framing is both more accurate and stronger than claiming RV565 as a new com
 4. **Overlap CPU and I/O.** Double-buffered DMA stripes are what make the 24 FPS deadline attainable.
 5. **Measure inside the real OS.** A standalone ceiling and an integrated result answer different questions.
 6. **Design ingestion and storage together.** Media must be transformed and validated before it reaches constrained storage.
-7. **Keep claims honest.** OreoOS has a proven 24 FPS native pipeline and a measured 12.17 FPS Gallery path, with a concrete route to converge them.
+7. **Keep claims honest.** FaleraOS has a proven 24 FPS native pipeline and a measured 12.17 FPS Gallery path, with a concrete route to converge them.
 
 ---
 

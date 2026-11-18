@@ -11,7 +11,7 @@ that module for one app folder:
 Source, first that exists:
   1. --png PATH
   2. <app>/icon.png                       (the Universe-badge convention)
-  3. <app>/assets/raw/<manifest icon>     (the OreoOS convention)
+  3. <app>/assets/raw/<manifest icon>     (the FaleraOS convention)
 
 Output: <app>/assets/optimized/<stem>.py, where <stem> is the manifest's
 "icon" name without ".png" (manifest "icon" defaults to "<folder>_icon.png"

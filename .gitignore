@@ -8,7 +8,7 @@ __pycache__/
 *.mp4
 *.rv565
 # RV565 conformance vectors for the browser converter's tests.
-!oreo.elixpo/scripts/fixtures/**/*.rv565
+!falera.elixpo/scripts/fixtures/**/*.rv565
 # The boot splash clip the native player plays (tools/build_splash_clip.py).
 !oreoOS/splash.rv565
 *.pyo
@@ -41,7 +41,7 @@ oreoWare/doom/
 *.WAD
 *.owz
 
-# The owner's avatar belongs to one person (#133): `oreo setup` puts it on
+# The owner's avatar belongs to one person (#133): `falera setup` puts it on
 # the badge as /avatar.bin; never commit or ship one.
 apps/badge/assets/optimized/avatar.py
 avatar.bin

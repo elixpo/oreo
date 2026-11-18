@@ -1,4 +1,4 @@
-"""`oreo doctor`, `oreo update`, `oreo flash`."""
+"""`falera doctor`, `falera update`, `falera flash`."""
 
 import os
 import tempfile
@@ -43,7 +43,7 @@ class DoctorCommandTest(unittest.TestCase):
     def test_wrong_firmware_port(self):
         r = run_cli(["doctor"], ports=[FakePort("/dev/ttyACM0", 0x303A, 0x1001)])
         self.assertIn("303a:1001", r.out)
-        self.assertIn("oreo flash", r.out)
+        self.assertIn("falera flash", r.out)
         self.assertEqual(r.links, [])
 
     def test_healthy_badge(self):
@@ -78,7 +78,7 @@ class RepoTest(unittest.TestCase):
         self.assertEqual(r.rc, 2)                 # dev flags need --repo
         self.assertIn("--repo", r.out)
         r = run_cli(["update", "--repo", str(self.root / "oreoOS")], runner=self.runner)
-        self.assertIn("does not look like an OreoOS checkout", r.out)
+        self.assertIn("does not look like a FaleraOS checkout", r.out)
         self.assertEqual(self.calls, [])
 
     def test_update_runs_deploy(self):

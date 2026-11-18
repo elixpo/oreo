@@ -2,9 +2,9 @@
 
 **Transfer** is a built-in app that receives photos, videos and documents
 from a computer over the USB cable. The computer side is
-[`oreo transfer`](CLI.md#oreo-transfer-send-files-to-the-transfer-app) in
-oreo-cli. Before you send anything, you type a six-character code that only
-the badge shows, much like a device-login code. OreoOS keeps running the
+[`falera transfer`](CLI.md#falera-transfer-send-files-to-the-transfer-app) in
+falera-cli. Before you send anything, you type a six-character code that only
+the badge shows, much like a device-login code. FaleraOS keeps running the
 whole time.
 
 Transfer replaces the old **Send Files** page in Settings > WiFi and the
@@ -27,10 +27,10 @@ updates, GitHub data, weather, time). Bluetooth sharing is planned last
    shows a code such as `K7M2QX`. Once the computer has recognised the
    badge on the cable it says *Computer connected over USB* (otherwise
    *Waiting for a computer...*).
-3. On the computer ([install oreo-cli](CLI.md#install) first):
+3. On the computer ([install falera-cli](CLI.md#install) first):
 
    ```sh
-   oreo send holiday.jpg clip.mp4 talk-notes.md     # the same as: oreo transfer send ...
+   falera send holiday.jpg clip.mp4 talk-notes.md     # the same as: falera transfer send ...
    ```
 
 4. The badge changes to *Connected: \<your computer's name\>*, and the
@@ -46,19 +46,19 @@ updates, GitHub data, weather, time). Bluetooth sharing is planned last
 You can also list and remove what Transfer manages:
 
 ```sh
-oreo transfer list               # photos, videos and documents on the badge, with free space
-oreo transfer rm holiday.rz565   # asks first
+falera transfer list               # photos, videos and documents on the badge, with free space
+falera transfer rm holiday.rz565   # asks first
 ```
 
 Every option, and what is converted to what, is in
-[CLI.md](CLI.md#oreo-transfer-send-files-to-the-transfer-app).
+[CLI.md](CLI.md#falera-transfer-send-files-to-the-transfer-app).
 
 ### On the badge
 
 | Screen | What it means |
 |---|---|
-| Code, *Waiting for a computer...* | Ready, but no computer is on the USB port yet (or this OreoOS cannot tell). Plug the cable into a computer |
-| Code, green dot, *Computer connected over USB* | A computer has recognised the badge. Run `oreo send <files>` on it |
+| Code, *Waiting for a computer...* | Ready, but no computer is on the USB port yet (or this FaleraOS cannot tell). Plug the cable into a computer |
+| Code, green dot, *Computer connected over USB* | A computer has recognised the badge. Run `falera send <files>` on it |
 | *Connected: \<name\>*, *Type this code on the computer* | A computer is there and has not typed the code yet. After a wrong code it shows how many tries are left |
 | Green dot, *Ready. Send files from the computer.* | Code accepted |
 | *Receiving \<file\>*, progress bar | A file is arriving |
@@ -94,16 +94,16 @@ The last few results stay listed at the bottom of the screen (**OK** or
   chunk leaves the old file, if any, untouched.
 - **Only media and documents.** Transfer accepts only photos, videos and
   documents, and only into the Gallery and documents folders. It cannot
-  write apps, OreoOS files or any other path.
+  write apps, FaleraOS files or any other path.
 - **No network.** Transfer uses only the USB cable; it never turns on Wi-Fi
   or Bluetooth.
 
 ### While Transfer is open
 
-While it is open, Transfer reads the USB console, and other `oreo` commands
-cannot pause OreoOS. Leave Transfer (**HOME**) before running `oreo info`,
-`oreo add`, `oreo shell`, `oreo update` and the rest; otherwise they fail with
-"the badge did not answer". `oreo logs` still works, and shows the app's
+While it is open, Transfer reads the USB console, and other `falera` commands
+cannot pause FaleraOS. Leave Transfer (**HOME**) before running `falera info`,
+`falera add`, `falera shell`, `falera update` and the rest; otherwise they fail with
+"the badge did not answer". `falera logs` still works, and shows the app's
 `@OTB` lines.
 
 ## For developers
@@ -116,13 +116,13 @@ cannot pause OreoOS. Leave Transfer (**HOME**) before running `oreo info`,
 | Is a computer on the USB port? | [`oreoOS/usbhost.py`](../oreoOS/usbhost.py) |
 | Reading the USB console without blocking | [`apps/transfer/src/link.py`](../apps/transfer/src/link.py) |
 | The protocol, badge side; no screen or hardware access | [`apps/transfer/src/proto.py`](../apps/transfer/src/proto.py) |
-| The protocol, computer side, and `oreo transfer` | [`cli/oreo_cli/transfer.py`](../cli/oreo_cli/transfer.py) |
+| The protocol, computer side, and `falera transfer` | [`cli/oreo_cli/transfer.py`](../cli/oreo_cli/transfer.py) |
 
 The badge's native USB port is a single serial stream. MicroPython's REPL,
-`print()` output and OreoOS logs all share it. `oreo add` and `oreo push` use
-the stream by sending Ctrl-C to stop OreoOS and then driving the raw REPL.
-Transfer works the other way round: OreoOS keeps running, and the app reads
-`sys.stdin` itself while it is open. (Nothing else reads it while OreoOS
+`print()` output and FaleraOS logs all share it. `falera add` and `falera push` use
+the stream by sending Ctrl-C to stop FaleraOS and then driving the raw REPL.
+Transfer works the other way round: FaleraOS keeps running, and the app reads
+`sys.stdin` itself while it is open. (Nothing else reads it while FaleraOS
 runs.) Each side marks its own lines with a prefix and ignores every other
 line, so log output, a REPL echo or a stray byte cannot be mistaken for
 protocol data.
@@ -168,7 +168,7 @@ Limits:
 - A charger or a charge-only cable reads as unplugged.
 - The badge has no VBUS sense pin; unplugging shows up as the bus going
   idle, which the controller flags within 3 ms.
-- Only on an ESP32-S3 with the TinyUSB console (the Oreo Badge firmware,
+- Only on an ESP32-S3 with the TinyUSB console (the Falera Badge firmware,
   ESP32_GENERIC_S3). Elsewhere `connected()` returns None, and Transfer
   shows *Waiting for a computer...* as before.
 
@@ -211,11 +211,11 @@ Rules:
   stream. MicroPython keeps unread bytes in a 260-byte ring buffer (259
   usable), and it checks for Ctrl-C only as each byte enters that buffer.
   Two or three unanswered hellos (84 to 102 bytes each) would fill it, and
-  the Ctrl-C that `oreo add`, `oreo shell` or `mpremote` sends later would
+  the Ctrl-C that `falera add`, `falera shell` or `mpremote` sends later would
   then never arrive until the badge was reset.
 - **Taking over a stale session.** If a CLI is killed mid-session, the badge
   keeps announcing while the session is idle (no line for 2 s and no file on
-  its way). The next `oreo transfer` therefore gets an announce, says hello,
+  its way). The next `falera transfer` therefore gets an announce, says hello,
   and takes the session over. A new hello always resets the session state
   and drops any half-received file. The CLI ignores announces in the middle
   of its own session.
@@ -270,7 +270,7 @@ Limits (`proto.py`):
 | `CHUNK` | 3072 | File bytes per data line |
 | `MAX_LINE` | 4400 | Longest line accepted; longer lines are dropped |
 | `MAX_FILE` | 8 MiB | Largest single file |
-| `RESERVE` | 256 KiB | Flash kept free for OreoOS (the same as `oreo add`) |
+| `RESERVE` | 256 KiB | Flash kept free for FaleraOS (the same as `falera add`) |
 | `MAX_TRIES` / `LOCK_MS` | 5 / 60 s | Wrong codes before a lockout, and its length |
 | `ANNOUNCE_MS` | 2 s | Announce interval |
 | `IDLE_HELLO_MS` / `IDLE_AUTHED_MS` / `IDLE_PUT_MS` | 5 min / 2 min / 20 s | Silence allowed before the code, after it, and mid-file |
@@ -297,7 +297,7 @@ frame. It has four states: `waiting`, `hello`, `authed` and `receiving`.
 `link.UsbLink`:
 
 - **On open**, it calls `micropython.kbd_intr(-1)`, so no byte on the
-  stream can raise `KeyboardInterrupt` inside OreoOS. It then throws away
+  stream can raise `KeyboardInterrupt` inside FaleraOS. It then throws away
   anything queued before the app opened.
 - **On close**, it turns Ctrl-C back on.
 - **Reading never blocks.** `select.poll()` confirms a byte is waiting before
@@ -320,10 +320,10 @@ Reader. Transfer is listed in the **Tools** category
 ### The computer side
 
 `oreo_cli.transfer.Client` speaks the protocol on an open pyserial port.
-`oreo transfer` works in this order:
+`falera transfer` works in this order:
 
 1. Converts and validates every file first, with the same converters as
-   `oreo add`. Files already in a badge format are only validated.
+   `falera add`. Files already in a badge format are only validated.
 2. Opens the port without resetting the badge and without the raw REPL.
 3. Waits for an announce, says hello, then asks for the code.
 4. Sends the files one by one with a progress bar.

@@ -264,7 +264,7 @@ CASES = {
 
 
 def avatar_bin(login, w=56, h=56, color=0x07E0):
-    """An /avatar.bin as `oreo setup` writes it (cli/oreo_cli/avatar.py):
+    """An /avatar.bin as `falera setup` writes it (cli/oreo_cli/avatar.py):
     a solid disc of `color` with magenta corners."""
     px = bytearray()
     r2 = (w / 2.0 - 0.5) ** 2
@@ -463,7 +463,7 @@ class BadgeRenderTest(_AvatarFiles, unittest.TestCase):
     def test_no_profile_shows_setup(self):
         m, app, d = self.render("no-profile", False)
         shown = " ".join(t[0] for t in d.texts)
-        self.assertIn("oreo setup --from-file .env.local", shown)
+        self.assertIn("falera setup --from-file .env.local", shown)
         self.assertIn("docs/PROFILE.md", shown)
         self.assertIn("GITHUB_USER", shown)
         self.assertIsNone(app._job)
