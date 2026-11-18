@@ -116,5 +116,5 @@ The badge also checks by itself in the background, but not in the first
 
 ## See also
 
-- [CLI.md: falera update](../CLI.md#oreo-update-update-oreoos)
+- [CLI.md: falera update](../CLI.md#falera-update-update-faleraos)
 - [HARDWARE.md: OTA update partition](../HARDWARE.md#ota-update-partition)

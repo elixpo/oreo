@@ -2,7 +2,7 @@
 
 **Transfer** is a built-in app that receives photos, videos and documents
 from a computer over the USB cable. The computer side is
-[`falera transfer`](CLI.md#oreo-transfer-send-files-to-the-transfer-app) in
+[`falera transfer`](CLI.md#falera-transfer-send-files-to-the-transfer-app) in
 falera-cli. Before you send anything, you type a six-character code that only
 the badge shows, much like a device-login code. FaleraOS keeps running the
 whole time.
@@ -51,7 +51,7 @@ falera transfer rm holiday.rz565   # asks first
 ```
 
 Every option, and what is converted to what, is in
-[CLI.md](CLI.md#oreo-transfer-send-files-to-the-transfer-app).
+[CLI.md](CLI.md#falera-transfer-send-files-to-the-transfer-app).
 
 ### On the badge
 

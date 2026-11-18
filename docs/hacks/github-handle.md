@@ -105,4 +105,4 @@ that and run the same command. `--no-avatar` skips the download.
 
 - [PROFILE.md](../PROFILE.md): every profile key and where the badge looks
   for it
-- [CLI.md: falera setup](../CLI.md#oreo-setup-owner-profile)
+- [CLI.md: falera setup](../CLI.md#falera-setup-owner-profile)

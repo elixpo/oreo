@@ -17,7 +17,7 @@ preferred/    Licence texts used in this repository.
               Code is MIT; hardware is CERN-OHL-P-2.0; brand/visual
               assets are CC-BY-4.0.
 
-exceptions/   `exceptions/Falera-trademarks` is legacy, superseded by
+exceptions/   `exceptions/Lumi-trademarks` is legacy, superseded by
               ../TRADEMARKS.md and no longer applied.
 
 notices/      Third-party attributions (the upstream credit list).

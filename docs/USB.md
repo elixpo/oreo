@@ -22,9 +22,9 @@ native USB port.
 |---|---|---|
 | Put photos, videos or documents on the badge | **Transfer** app + `falera transfer send` | [below](#send-photos-videos-and-documents), [TRANSFER.md](TRANSFER.md) |
 | Add a Wi-Fi network with a password | `falera wifi connect` | [CLI.md](CLI.md#wi-fi-setup) |
-| Update FaleraOS | `falera update` (or Settings > Updates on the badge) | [CLI.md](CLI.md#oreo-update-update-oreoos) |
-| Install apps | `falera apps install` (or the App Store on the badge) | [CLI.md](CLI.md#oreo-apps-the-app-store) |
-| See what the badge prints | `falera logs` | [CLI.md](CLI.md#oreo-logs-console-output) |
+| Update FaleraOS | `falera update` (or Settings > Updates on the badge) | [CLI.md](CLI.md#falera-update-update-faleraos) |
+| Install apps | `falera apps install` (or the App Store on the badge) | [CLI.md](CLI.md#falera-apps-the-app-store) |
+| See what the badge prints | `falera logs` | [CLI.md](CLI.md#falera-logs-console-output) |
 | Copy any file, write code, use the REPL | `falera push` / `pull` / `shell` / `dev` | [CLI.md](CLI.md#commands) |
 | Drive it by hand without falera-cli | `mpremote` | [Advanced](#advanced-raw-mpremote) |
 
