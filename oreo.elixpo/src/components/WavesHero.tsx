@@ -404,6 +404,11 @@ export default function WavesHero() {
               <strong className="text-primary">Even $1 or ₹100 helps</strong> build them.
             </span>
           </motion.a>
+          <motion.div variants={itemVariants} className="-mt-7 mb-10 text-sm">
+            <Link href="/supporters/" className="text-text-dim underline-offset-4 hover:text-primary hover:underline">
+              Meet our supporters →
+            </Link>
+          </motion.div>
 
           <motion.ul
             variants={itemVariants}
