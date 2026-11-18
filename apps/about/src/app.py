@@ -100,7 +100,7 @@ class App(oreoOS.App):
             ("r", "Board", "board"),
             ("r", "CPU", "cpu"),
             ("r", "Runtime", "runtime"),
-            ("t", "Display", "ST7789 320x240"),
+            ("r", "Display", "display"),
             ("r", "Flash", "flash"),
             ("l", "Memory", "mem"),
             ("l", "Uptime", "uptime"),

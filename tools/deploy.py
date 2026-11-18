@@ -193,6 +193,9 @@ DEPLOY = [
     # Hardware drivers
     ("oreoWare/__init__.py",    "oreoWare/__init__.py"),
     ("oreoWare/_st7789.py",     "oreoWare/_st7789.py"),
+    ("oreoWare/_ili9341.py",    "oreoWare/_ili9341.py"),
+    ("oreoWare/aw9523.py",      "oreoWare/aw9523.py"),
+    ("oreoWare/board.py",       "oreoWare/board.py"),
     ("oreoWare/buttons.py",     "oreoWare/buttons.py"),
     ("oreoWare/display.py",     "oreoWare/display.py"),
     ("oreoWare/battery.py",     "oreoWare/battery.py"),

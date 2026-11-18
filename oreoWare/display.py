@@ -22,6 +22,14 @@ from oreoWare import pins
 from oreoWare._st7789 import ST7789
 
 
+def _panel_class():
+    """The PCB badge's ILI9341 or the breadboard's ST7789 (pins.DISPLAY_DRIVER)."""
+    if getattr(pins, "DISPLAY_DRIVER", "st7789") == "ili9341":
+        from oreoWare._ili9341 import ILI9341
+        return ILI9341
+    return ST7789
+
+
 def _swap(c):
     return ((c & 0xFF) << 8) | ((c >> 8) & 0xFF)
 
@@ -118,7 +126,7 @@ class Display(api.Display):
             sck=Pin(pins.DISPLAY_SCK),
             mosi=Pin(pins.DISPLAY_MOSI),
         )
-        self._panel = ST7789(
+        self._panel = _panel_class()(
             spi,
             dc =Pin(pins.DISPLAY_DC,    Pin.OUT),
             cs =Pin(pins.DISPLAY_CS,    Pin.OUT, value=1),
