@@ -20,6 +20,8 @@
 [![arXiv](https://img.shields.io/badge/arXiv-2610.35935-b31b1b?style=flat-square)](https://arxiv.org/abs/2610.35935)
 [![OSHWA certified: IN000107](https://img.shields.io/badge/OSHWA-IN000107-333333?style=flat-square)](https://certification.oshwa.org/in000107.html)
 
+**Featured on** [Adafruit](https://blog.adafruit.com/2026/11/04/oreoos-a-micropython-based-operating-system/) · [HardLabs](https://www.hardlabs.io/boards/elixpo--oreo) · [more](#-in-the-press)
+
 </div>
 
 ---
@@ -591,6 +593,12 @@ tools, with a small core team steering the way:
 
 Everyone is welcome. See **[CONTRIBUTING.md](CONTRIBUTING.md)** and our
 **[Code of Conduct](CODE_OF_CONDUCT.md)**.
+
+## 📰 In the press
+
+- **Adafruit**, 4 November 2026: [OreoOS, a MicroPython-based operating system](https://blog.adafruit.com/2026/11/04/oreoos-a-micropython-based-operating-system/)
+- **Adafruit**, 10 November 2026: [RV565, frame-independent RGB565 video for ESP32-S3 and RP2350 SPI displays](https://blog.adafruit.com/2026/11/10/rv565-frame-independent-rgb565-video-for-esp32-s3-and-rp2350-spi-displays/)
+- **HardLabs**: [Oreo by elixpo, open source PCB, KiCad files and BOM](https://www.hardlabs.io/boards/elixpo--oreo)
 
 ## Recognition & programs
 
