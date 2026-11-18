@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Reveal, fadeUp, staggerContainer } from "@/components/MotionWrap";
 import { Heart, Users, Handshake } from "lucide-react";
+import PressStrip from "@/components/PressStrip";
 
 const FUND_URL = "https://payouts.elixpo.com/f/oreo-badge";
 // Same-origin Pages Function first (functions/api/supporters.js); the
@@ -194,6 +195,11 @@ export default function SupportersPage() {
           With thanks to {THANKS.slice(0, -1).join(", ")} and {THANKS[THANKS.length - 1]}, who were
           there from the start.
         </p>
+
+        {/* ── IN THE PRESS ─────────────────────────────────────────── */}
+        <div className="mt-16">
+          <PressStrip />
+        </div>
 
         {/* ── SPONSORS ─────────────────────────────────────────────── */}
         <Reveal>

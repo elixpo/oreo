@@ -10,7 +10,7 @@ const TITLE =
   "RV565: Cross-Layer Co-Design for Frame-Independent Video Playback on MicroPython-Class ESP32-S3 Systems";
 
 export const metadata = pageMetadata({
-  title: "RV565 Research Paper",
+  title: "RV565 Research Paper: frame-independent video on ESP32-S3",
   description:
     "RV565: a decode framework for frame-independent RGB565 video on the ESP32-S3, with a dual-core pipeline that holds 24 FPS with zero deadline misses and a decode-cost model that predicts schedulability from container metadata.",
   path: "/paper/",
