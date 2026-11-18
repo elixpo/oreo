@@ -25,10 +25,10 @@ export default function CliDocsPage() {
         { label: "First run", href: "#first-run" },
         { label: "Full-screen view", href: "#interactive-ui" },
         { label: "Commands", href: "#commands" },
-        { label: "Transfer", href: "#oreo-transfer-send-files-to-the-transfer-app" },
-        { label: "Profile setup", href: "#oreo-setup-owner-profile" },
+        { label: "Transfer", href: "#falera-transfer-send-files-to-the-transfer-app" },
+        { label: "Profile setup", href: "#falera-setup-owner-profile" },
         { label: "Wi-Fi", href: "#wi-fi-setup" },
-        { label: "Update", href: "#oreo-update-update-oreoos" },
+        { label: "Update", href: "#falera-update-update-faleraos" },
         { label: "Exit status", href: "#exit-status" },
         { label: "Troubleshooting", href: "#troubleshooting" },
       ]}

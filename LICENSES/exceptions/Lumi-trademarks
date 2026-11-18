@@ -1,11 +1,11 @@
-Falera-trademarks exception
-=========================
+Lumi-trademarks exception
+=======================
 
-SPDX-Exception-Identifier: Falera-trademarks
+SPDX-Exception-Identifier: Lumi-trademarks
 SPDX-Licenses: MIT, CC-BY-4.0
 
 This exception qualifies the MIT and CC-BY-4.0 grants used across the Elixpo
-ecosystem. It is referenced via `WITH Falera-trademarks` in the
+ecosystem. It is referenced via `WITH Lumi-trademarks` in the
 SPDX-License-Identifier of affected files and in the root LICENSE.
 
 WHAT IS RESERVED
@@ -14,7 +14,7 @@ WHAT IS RESERVED
 The following are reserved trademarks and brand property of the Elixpo project
 and are NOT licensed by the MIT or CC-BY-4.0 grants:
 
-  * The names "Elixpo", "Falera" and "FaleraOS".
+  * The names "Elixpo", "Falera", "FaleraOS" and "Lumi".
   * The Lumi mascot character (the kawaii pixel-art panda) and the mandatory
     chest "E-badge".
   * The Elixpo brand palette and identity rules defined in brand/MASCOT.md.

@@ -92,7 +92,7 @@ would push them back.
 
 ## See also
 
-- [CLI.md: falera transfer](../CLI.md#oreo-transfer-send-files-to-the-transfer-app)
-  and [falera add](../CLI.md#oreo-add-photos-videos-and-documents-without-the-transfer-app)
+- [CLI.md: falera transfer](../CLI.md#falera-transfer-send-files-to-the-transfer-app)
+  and [falera add](../CLI.md#falera-add-photos-videos-and-documents-without-the-transfer-app)
 - [MEDIA_INGESTION.md](../MEDIA_INGESTION.md): how files are converted and
   checked

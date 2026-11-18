@@ -37,8 +37,8 @@ Related guides:
 
 Contents: [Install](#install) · [First run](#first-run) ·
 [Interactive UI](#interactive-ui) ·
-[Commands](#commands) · [Sending files: `falera transfer`](#oreo-transfer-send-files-to-the-transfer-app) ·
-[Wi-Fi setup](#wi-fi-setup) · [Updating FaleraOS](#oreo-update-update-oreoos) ·
+[Commands](#commands) · [Sending files: `falera transfer`](#falera-transfer-send-files-to-the-transfer-app) ·
+[Wi-Fi setup](#wi-fi-setup) · [Updating FaleraOS](#falera-update-update-faleraos) ·
 [Exit status](#exit-status) · [Troubleshooting](#troubleshooting) ·
 [FAQ](#faq) · [Transfer speed](#transfer-speed) ·
 [Testing on a badge](#testing-on-a-badge) · [Releasing](#releasing)
@@ -311,7 +311,7 @@ app installed with **i** take effect when FaleraOS restarts, which happens when
 you quit the menu.
 
 To send photos and documents while FaleraOS keeps running, use the Transfer app
-instead (see [`falera transfer`](#oreo-transfer-send-files-to-the-transfer-app)).
+instead (see [`falera transfer`](#falera-transfer-send-files-to-the-transfer-app)).
 
 ### How `falera` uses the badge
 
@@ -357,21 +357,21 @@ Put these before the command, for example `falera --port /dev/ttyACM1 info`.
 |---|---|---|
 | [`falera`](#interactive-ui) / `falera ui` | The full-screen Falera view | while it is open |
 | [`falera menu`](#the-numbered-menu) | The numbered menu, for simple terminals | while it is open |
-| [`falera devs`](#oreo-devs-list-badges) | List badges | no (never opens a port) |
-| [`falera info`](#oreo-info-status) | Versions, storage, Wi-Fi, battery | briefly |
-| [`falera transfer`](#oreo-transfer-send-files-to-the-transfer-app) / `falera send` | Send files to the Transfer app, using the code on the badge | **no** |
-| [`falera add`](#oreo-add-photos-videos-and-documents-without-the-transfer-app) | Send photos, videos and documents without opening an app | briefly |
-| [`falera ls` / `push` / `pull` / `rm`](#oreo-ls--push--pull--rm-files) | Any file on the badge | briefly |
-| [`falera apps`](#oreo-apps-the-app-store) | App Store: list, install, update, remove | briefly |
-| [`falera setup`](#oreo-setup-owner-profile) | Owner profile: GitHub user, name, timezone, weather | briefly, then restarts |
-| [`falera new`](#oreo-new-start-an-app) | Make a new app folder from the app template | no (never opens a port) |
-| [`falera app`](#oreo-app-install-an-app-from-a-folder) | Install, list or remove an app from a folder on this computer | briefly, then restarts |
+| [`falera devs`](#falera-devs-list-badges) | List badges | no (never opens a port) |
+| [`falera info`](#falera-info-status) | Versions, storage, Wi-Fi, battery | briefly |
+| [`falera transfer`](#falera-transfer-send-files-to-the-transfer-app) / `falera send` | Send files to the Transfer app, using the code on the badge | **no** |
+| [`falera add`](#falera-add-photos-videos-and-documents-without-the-transfer-app) | Send photos, videos and documents without opening an app | briefly |
+| [`falera ls` / `push` / `pull` / `rm`](#falera-ls--push--pull--rm-files) | Any file on the badge | briefly |
+| [`falera apps`](#falera-apps-the-app-store) | App Store: list, install, update, remove | briefly |
+| [`falera setup`](#falera-setup-owner-profile) | Owner profile: GitHub user, name, timezone, weather | briefly, then restarts |
+| [`falera new`](#falera-new-start-an-app) | Make a new app folder from the app template | no (never opens a port) |
+| [`falera app`](#falera-app-install-an-app-from-a-folder) | Install, list or remove an app from a folder on this computer | briefly, then restarts |
 | [`falera wifi`](#wi-fi-setup) | Scan, connect, list and forget networks | briefly |
-| [`falera update`](#oreo-update-update-oreoos) | Update FaleraOS (downloaded by the badge) | yes, then restarts |
-| [`falera logs`](#oreo-logs-console-output) | Follow the console | no |
-| [`falera shell`](#oreo-shell-micropython-repl) / [`run`](#oreo-run-run-a-script) / [`dev`](#oreo-dev-live-editing) | MicroPython prompt, scripts, live editing | while it runs |
-| [`falera flash`](#oreo-flash-firmware) | Reflash the firmware (developers) | yes |
-| [`falera doctor`](#oreo-doctor-diagnose-the-connection) | Diagnose cable, port, permissions, firmware | briefly |
+| [`falera update`](#falera-update-update-faleraos) | Update FaleraOS (downloaded by the badge) | yes, then restarts |
+| [`falera logs`](#falera-logs-console-output) | Follow the console | no |
+| [`falera shell`](#falera-shell-micropython-repl) / [`run`](#falera-run-run-a-script) / [`dev`](#falera-dev-live-editing) | MicroPython prompt, scripts, live editing | while it runs |
+| [`falera flash`](#falera-flash-firmware) | Reflash the firmware (developers) | yes |
+| [`falera doctor`](#falera-doctor-diagnose-the-connection) | Diagnose cable, port, permissions, firmware | briefly |
 
 `falera help <command>` (or `falera <command> --help`) shows each command's
 options and examples.
@@ -805,7 +805,7 @@ console prints `[dev] my_app from /remote/apps`), and FaleraOS re-reads an
 app's files every time it opens, so save on the computer, press HOME and
 reopen the app. Leaving `falera dev` resets the badge and the installed apps
 are used again. To copy an app onto the badge instead, use
-[`falera app install`](#oreo-app-install-an-app-from-a-folder). Details:
+[`falera app install`](#falera-app-install-an-app-from-a-folder). Details:
 [docs/APPS.md](APPS.md#live-editing-with-oreo-dev).
 
 Leave with Ctrl-] or Ctrl-X. Ctrl-D soft-resets the badge, which starts

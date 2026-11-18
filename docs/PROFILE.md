@@ -49,7 +49,7 @@ falera setup --avatar          # fetch it again, e.g. after changing your GitHub
 ```
 
 Changing `GITHUB_USER` with `falera setup` replaces the avatar, and removing
-it removes the file. Details: [CLI.md](CLI.md#oreo-setup-owner-profile).
+it removes the file. Details: [CLI.md](CLI.md#falera-setup-owner-profile).
 Without the CLI, `python3 tools/fetch_avatar.py --user <you>` makes the
 same file from a checkout; copy it with `falera push avatar.bin /avatar.bin`.
 
@@ -77,7 +77,7 @@ per boot (so a badge that travels follows you). Set `WEATHER_LAT` and
 
 ### Set it over USB
 
-With the `falera` CLI ([CLI.md](CLI.md#oreo-setup-owner-profile)), using the
+With the `falera` CLI ([CLI.md](CLI.md#falera-setup-owner-profile)), using the
 same key names as `.env.local`:
 
 ```bash
