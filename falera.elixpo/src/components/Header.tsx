@@ -40,7 +40,7 @@ const MORE: { title: string; links: MoreLink[] }[] = [
     title: "Community",
     links: [
       { href: "/contribute/", label: "Contribute" },
-      { href: "https://payouts.elixpo.com/f/oreo-badge", label: "Fund the badge", external: true },
+      { href: "https://payouts.elixpo.com/f/falera-badge", label: "Fund the badge", external: true },
       { href: "https://github.com/elixpo/falera/discussions", label: "Discussions", external: true },
     ],
   },

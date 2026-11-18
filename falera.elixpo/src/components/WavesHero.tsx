@@ -382,7 +382,7 @@ export default function WavesHero() {
               <Github className="h-4 w-4" /> Source
             </a>
             <a
-              href="https://payouts.elixpo.com/f/oreo-badge"
+              href="https://payouts.elixpo.com/f/falera-badge"
               target="_blank" rel="noreferrer"
               className="btn-ghost rounded-pill border-primary/60 px-7 py-3 text-base uppercase
                          tracking-[0.18em] text-primary backdrop-blur"
@@ -393,7 +393,7 @@ export default function WavesHero() {
 
           <motion.a
             variants={itemVariants}
-            href="https://payouts.elixpo.com/f/oreo-badge"
+            href="https://payouts.elixpo.com/f/falera-badge"
             target="_blank" rel="noreferrer"
             className="mx-auto mb-10 flex max-w-xl items-center justify-center gap-2
                        rounded-lg border border-primary/30 bg-primary/10 px-5 py-3
