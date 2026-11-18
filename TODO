@@ -55,6 +55,21 @@ Send now:
          check the home page in Google's Rich Results Test.
 [you] 7. Wikidata Q141968869: add official website (oreo.elixpo.com), "different from" (P1889) Android 8.0 Oreo
          and the Oreo cookie, and the Adafruit posts as "described by source".
+Send now, batch 2 (drafts: ~/Documents/oreo-launch/EMAILS_BATCH2.md; sources and eligibility: SPONSORS.md):
+[you] 8. NextPCB Accelerator: first ask support@nextpcb.com whether the current campaign covers ESP32-S3,
+         then fill the form (2 free assembled boards, up to $500, plus testing of 10 units).
+[you] 9. Elecrow Sponsorship: make an account, fill the questionnaire (PCBA for 10 badges; replies in ~48 h).
+[you] 10. AISLER: email developer-relations@aisler.net (bare boards for board revision 2).
+[you] 11. Espressif sponsorship form: modules for a PLANNED badge workshop; name a real event and date first.
+[you] 12. IIM Calcutta Innovation Park: email contact@iimcip.org (incubation; help with NIDHI-PRAYAS).
+Grant applications (send after deciding the rename; they keep the name you apply under):
+[you] 13. FOSS United project grant (fossunited.org/grants/apply/new): draft asks Rs 3,00,000 over 4 months
+          with 4 milestones; check the budget against real costs first.
+[you] 14. NIDHI-PRAYAS: find a PRAYAS Centre near West Bengal with an open call; adapt the concept note.
+Later: TI samples (needs a company-domain email, e.g. @elixpo.com), Tindie / Elecrow Partner Seller / Lectronz,
+       IndiaFOSS 2027 and FOSSASIA 2027 as the event badge. Skip: students-only programmes, SparkFun (paused),
+       Sovereign Tech Fund, Prototype Fund, OSHWA funding.
+[you] Decide on the rename (trademark risk with OREO, SEO); Claude checks shortlisted names' availability.
 [claude] When a sponsor replies, draft the answer.
 
 Send when a badge works on video (record 60 s: boot, apps, App Store, IR, video):
