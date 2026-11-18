@@ -64,7 +64,7 @@ export default function BadgePage() {
             </motion.p>
             <motion.div variants={fadeUp} className="mt-8 flex flex-wrap gap-3">
               <a
-                href="https://payouts.elixpo.com/f/oreo-badge"
+                href="https://payouts.elixpo.com/f/falera-badge"
                 target="_blank" rel="noreferrer"
                 className="btn-primary"
               >

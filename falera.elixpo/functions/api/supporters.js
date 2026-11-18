@@ -6,7 +6,7 @@
 // page shows. `wrangler pages deploy out` (npm run deploy) picks up this
 // functions/ directory with the static site.
 
-const SLUG = "oreo-badge";
+const SLUG = "falera-badge";
 const API = `https://payouts.elixpo.com/api/fundraisers/${SLUG}`;
 const PAGE = `https://payouts.elixpo.com/f/${SLUG}`;
 

@@ -14,7 +14,7 @@
 [![MicroPython 1.28](https://img.shields.io/badge/MicroPython-1.28-00B4A5?style=for-the-badge&logo=python&logoColor=white)](https://micropython.org)
 [![ESP32-S3](https://img.shields.io/badge/ESP32--S3-N16R8-2E2E2E?style=for-the-badge&logo=espressif&logoColor=white)](https://www.espressif.com/en/products/socs/esp32-s3)
 [![OTA Updates](https://img.shields.io/badge/OTA-yes-FFBE1E?style=for-the-badge)](#-updates)
-[![Fund the badge](https://img.shields.io/badge/Fund_the_badge-%E2%82%B98%2C000_goal-FF5D68?style=for-the-badge&logo=githubsponsors&logoColor=white)](https://payouts.elixpo.com/f/oreo-badge)
+[![Fund the badge](https://img.shields.io/badge/Fund_the_badge-%E2%82%B98%2C000_goal-FF5D68?style=for-the-badge&logo=githubsponsors&logoColor=white)](https://payouts.elixpo.com/f/falera-badge)
 
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/16187/badge)](https://www.bestpractices.dev/projects/16187)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/elixpo/falera/badge)](https://scorecard.dev/viewer/?uri=github.com/elixpo/falera)
@@ -46,7 +46,7 @@ The first five PCBs are being made now, paid for out of pocket. If you'd like
 to see Falera built, chip in whatever you can, from ₹100. Every rupee goes into
 boards and parts, and everything stays open.
 
-**[Fund the badge → payouts.elixpo.com/f/oreo-badge](https://payouts.elixpo.com/f/oreo-badge)**
+**[Fund the badge → payouts.elixpo.com/f/falera-badge](https://payouts.elixpo.com/f/falera-badge)**
 
 </div>
 

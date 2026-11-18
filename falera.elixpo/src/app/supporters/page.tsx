@@ -6,10 +6,10 @@ import { Reveal, fadeUp, staggerContainer } from "@/components/MotionWrap";
 import { Heart, Users, Handshake } from "lucide-react";
 import PressStrip from "@/components/PressStrip";
 
-const FUND_URL = "https://payouts.elixpo.com/f/oreo-badge";
+const FUND_URL = "https://payouts.elixpo.com/f/falera-badge";
 // Same-origin Pages Function first (functions/api/supporters.js); the
 // payouts API directly as a fallback, which works once it sends CORS.
-const SOURCES = ["/api/supporters", "https://payouts.elixpo.com/api/fundraisers/oreo-badge"];
+const SOURCES = ["/api/supporters", "https://payouts.elixpo.com/api/fundraisers/falera-badge"];
 
 type Money = { amount: number; currency: string };
 type Supporter = {

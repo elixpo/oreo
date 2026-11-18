@@ -209,7 +209,7 @@ The full guide is the
 ## Fund the badge
 
 The first boards are paid for out of pocket. To help build them, chip in at
-[payouts.elixpo.com/f/oreo-badge](https://payouts.elixpo.com/f/oreo-badge).
+[payouts.elixpo.com/f/falera-badge](https://payouts.elixpo.com/f/falera-badge).
 
 ## Credits
 
