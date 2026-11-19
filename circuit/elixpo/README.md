@@ -63,8 +63,8 @@ from the expander (`oreoWare/aw9523.py`), turns the switched 3.3 V supply on
 and wakes from deep sleep on the expander's interrupt. The touch screen
 (XPT2046) is read by `oreoWare/touch.py` while its PENIRQ (GPIO21) is low:
 the bus drops to 2 MHz, the expander selects the chip, and apps get
-`on_touch` events. Its calibration is a typical one for these modules until
-it is measured on the first board.
+`on_touch` events. It starts with a typical calibration for these modules;
+Settings > Touch calibrates it by tapping four targets and saves the result.
 
 ## Electrical decisions
 

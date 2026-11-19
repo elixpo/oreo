@@ -37,6 +37,15 @@ class OS(api.OS):
             self.touch = _touch.create(self.display)
         except Exception:
             self.touch = None
+        # A calibration saved by Settings > Touch replaces the default one.
+        if self.touch is not None:
+            try:
+                from oreoOS import touchcal
+                cal = touchcal.load()
+                if cal:
+                    self.touch.set_calibration(cal)
+            except Exception:
+                pass
         # backends added incrementally — wired up as each peripheral comes online
         self.leds = None
         self.ir   = None

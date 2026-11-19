@@ -22,8 +22,8 @@ There are two designs:
   and cost of one badge in
   [`circuit/elixpo/BOM_COST.md`](../circuit/elixpo/BOM_COST.md). FaleraOS
   detects the board at boot and has its pin map, display driver,
-  expander buttons and touch screen (`oreoWare/touch.py`, still to be
-  calibrated on the first board); it is flashed once a board is assembled.
+  expander buttons and touch screen (`oreoWare/touch.py`, calibrated in
+  Settings > Touch); it is flashed once a board is assembled.
 
 Where the two differ, the parts lists and power section below describe the
 breadboard.

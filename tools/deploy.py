@@ -178,6 +178,7 @@ DEPLOY = [
     ("oreoOS/notif_panel.py",   "oreoOS/notif_panel.py"),
     ("oreoOS/pair_prompt.py",   "oreoOS/pair_prompt.py"),
     ("oreoOS/gestures.py",      "oreoOS/gestures.py"),
+    ("oreoOS/touchcal.py",      "oreoOS/touchcal.py"),
     ("oreoOS/netsvc.py",        "oreoOS/netsvc.py"),    # background network (#121)
     ("oreoOS/perf.py",          "oreoOS/perf.py"),      # boot timing (#121)
     ("oreoOS/bonds.py",         "oreoOS/bonds.py"),     # BLE bond store (bt.py)
