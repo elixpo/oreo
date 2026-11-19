@@ -180,7 +180,15 @@ class _ExpanderButtons(_GpioButtons):
 
     def _read(self):
         if self._exp is None:
-            return
+            # The expander didn't answer at boot (an I2C glitch): keep asking,
+            # or the badge would have no buttons until a reboot.
+            try:
+                from oreoWare import aw9523
+                self._exp = aw9523.get()
+            except Exception:
+                self._exp = None
+            if self._exp is None:
+                return
         try:
             self._port = self._exp.read_buttons()
         except Exception:

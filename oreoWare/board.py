@@ -40,8 +40,15 @@ def _probe():
         return BREADBOARD           # the host: no hardware
     found = BREADBOARD
     try:
-        i2c = SoftI2C(scl=Pin(PCB_SCL), sda=Pin(PCB_SDA), freq=100_000)
-        if i2c.readfrom_mem(AW9523_ADDR, AW9523_ID_REG, 1)[0] == AW9523_ID:
+        # timeout: SoftI2C waits up to 50 ms by default for a held-low SCL
+        # (on the breadboard, RIGHT held at boot, or a pin still floating
+        # low), twice per probe; 1 ms keeps boot fast and changes nothing
+        # on the PCB, whose expander never stretches the clock.
+        i2c = SoftI2C(scl=Pin(PCB_SCL), sda=Pin(PCB_SDA), freq=100_000,
+                      timeout=1000)
+        # Two good reads: one stray 0x23 can't make a breadboard a PCB.
+        if (i2c.readfrom_mem(AW9523_ADDR, AW9523_ID_REG, 1)[0] == AW9523_ID and
+                i2c.readfrom_mem(AW9523_ADDR, AW9523_ID_REG, 1)[0] == AW9523_ID):
             found = PCB
     except Exception:
         pass

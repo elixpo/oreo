@@ -497,6 +497,17 @@ def run_app(os_obj, app, loader=None, opened=None):
     # The PCB badge's touch screen (oreoWare.touch); None on the breadboard.
     touch = getattr(os_obj, "touch", None)
     touch_state = {}
+    # The touch controller shares the display's SPI bus, and reading it
+    # re-initialises the bus; the loader and oreoOS.busy animators write to
+    # the panel from another thread. So touch waits for this run's first
+    # present() (which stops the loader) and for no busy animation.
+    touch_ok = False
+    _busy = None
+    if touch is not None:
+        try:
+            from oreoOS import busy as _busy
+        except Exception:
+            _busy = None
 
     # Timing (oreoOS.perf, read from the REPL) and the background network
     # service (oreoOS.netsvc). Both are optional: a failed import leaves
@@ -649,7 +660,8 @@ def run_app(os_obj, app, loader=None, opened=None):
             # Routed like a button press: the pair prompt and an open
             # notification panel take precedence, so the app sees nothing
             # then; a finger landing counts as activity for the idle timer.
-            if touch is not None:
+            if touch is not None and touch_ok and not (
+                    _busy is not None and _busy.active()):
                 ev = touch_step(touch, touch_state)
                 if ev is not None:
                     if ev[0] != "up" and pm:
@@ -733,6 +745,7 @@ def run_app(os_obj, app, loader=None, opened=None):
                     os_obj.display.present()
                     present_hook(time.ticks_diff(
                         time.ticks_us(), present_start_us))
+                touch_ok = True
                 if opened is not None:
                     # The app's first frame is on the panel (the present
                     # above stopped the loader's animator).

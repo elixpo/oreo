@@ -130,6 +130,22 @@ class BoardTest(unittest.TestCase):
             self.assertIn((6, (FakePin.IN, FakePin.PULL_UP)), FakePin.made)
             self.assertIn((7, (FakePin.IN, FakePin.PULL_UP)), FakePin.made)
 
+    def test_probe_is_quick_and_needs_two_good_reads(self):
+        made = []
+
+        class I2C:
+            answers = [0x23, 0x00]           # one stray ID, then not
+
+            def __init__(self, **k):
+                made.append(k)
+
+            def readfrom_mem(self, addr, reg, n):
+                return bytes([I2C.answers.pop(0)])
+        b = self._board(I2C)
+        self.assertEqual(b.board(), "breadboard")
+        # 1 ms clock-stretch timeout, not SoftI2C's default 50 ms
+        self.assertEqual(made[0].get("timeout"), 1000)
+
     def test_override_file_wins_and_is_cached(self):
         b = self._board(self._i2c(OSError()), override="PCB\n")
         self.assertEqual(b.board(), "pcb")
@@ -356,6 +372,21 @@ class ExpanderButtonsTest(unittest.TestCase):
         self._frame(0xFF, ms=self.mod.EXP_POLL_MS, irq=False)
         self.assertEqual(self.exp.reads, start + 2)       # safety poll
 
+    def test_expander_missing_at_boot_is_retried(self):
+        api = self.api
+        aw = sys.modules["oreoWare.aw9523"]
+        aw.get = lambda: None                        # no answer during boot
+        b = self.mod.Buttons()
+        self.assertIsNone(b._exp)
+        aw.get = lambda: self.exp                    # the bus recovers
+        a_bit = self.pins.EXP_BUTTON_ORDER.index("A")
+        self.exp.port = 0xFF & ~(1 << a_bit)
+        b._int_flag[0] = 1
+        self.clock.t += 20
+        b.update()                                   # asks again, then reads
+        self.assertIs(b._exp, self.exp)
+        self.assertTrue(b.just_pressed(api.BTN_A))
+
     def test_debounce(self):
         api = self.api
         a = ~(1 << self.pins.EXP_BUTTON_ORDER.index("A")) & 0xFF
@@ -499,3 +530,53 @@ class HostUiPanelTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ── oreoWare.os: the expander is set up before the display ─────────────────
+
+class OsInitOrderTest(unittest.TestCase):
+    NAMES = ("oreoOS", "oreoOS.api", "oreoOS.state", "oreoWare", "oreoWare.pins",
+             "oreoWare.display", "oreoWare.buttons", "oreoWare.aw9523",
+             "oreoWare.touch", "oreoWare.os")
+
+    def setUp(self):
+        self.saved = _Saved(self.NAMES)
+
+    def tearDown(self):
+        self.saved.restore()
+
+    def _os(self, board):
+        order = []
+        pkg = types.ModuleType("oreoOS")
+        pkg.__path__ = [str(ROOT / "oreoOS")]
+        sys.modules["oreoOS"] = pkg
+        pkg.api = _load("oreoOS/api.py", "oreoOS.api")
+        st = types.ModuleType("oreoOS.state")
+        st.load = lambda name, default=None: default
+        st.save = lambda name, data: None
+        sys.modules["oreoOS.state"] = pkg.state = st
+        ow = _oreoware_pkg()
+        sys.modules["oreoWare"] = ow
+        mods = {
+            "pins": {"BOARD": board},
+            "display": {"Display": lambda: order.append("display") or types.SimpleNamespace()},
+            "buttons": {"Buttons": lambda: order.append("buttons") or object()},
+            "aw9523": {"get": lambda: order.append("expander") or object()},
+            "touch": {"create": lambda d: None},
+        }
+        for name, attrs in mods.items():
+            m = types.ModuleType("oreoWare." + name)
+            for k, v in attrs.items():
+                setattr(m, k, v)
+            sys.modules["oreoWare." + name] = m
+            setattr(ow, name, m)
+        os_mod = _load("oreoWare/os.py", "oreoWare.os")
+        os_mod.OS()
+        return order
+
+    def test_pcb_sets_up_the_expander_first(self):
+        order = self._os("pcb")
+        self.assertEqual(order[:2], ["expander", "display"])
+
+    def test_breadboard_never_touches_the_expander(self):
+        self.assertNotIn("expander", self._os("breadboard"))

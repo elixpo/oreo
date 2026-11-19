@@ -28,6 +28,17 @@ def _volatile(key):
 
 class OS(api.OS):
     def __init__(self):
+        # PCB badge: set up the I2C expander before the display. Out of reset
+        # it may hold the touch controller selected (T_CS low), and display
+        # traffic clocked into the XPT2046 could switch its pen interrupt off;
+        # init() deselects it and keeps the corner LEDs off.
+        try:
+            from oreoWare import pins as _pins
+            if getattr(_pins, "BOARD", "") == "pcb":
+                from oreoWare import aw9523
+                aw9523.get()
+        except Exception:
+            pass
         self.display = Display()
         self.buttons = Buttons()
         # The PCB badge's touch screen (oreoWare.touch); None on the

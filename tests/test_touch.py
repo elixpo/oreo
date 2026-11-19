@@ -259,6 +259,49 @@ class TouchRoutingTest(unittest.TestCase):
         app = self._run([(50, 60), None], frames=3, panel_open=True)
         self.assertEqual(app.events, [])
 
+    def test_no_reads_while_busy_animates(self):
+        busy = types.ModuleType("oreoOS.busy")
+        busy.active = lambda: True
+        saved = sys.modules.get("oreoOS.busy")
+        sys.modules["oreoOS.busy"] = busy
+        try:
+            app = self._run([(50, 60), (80, 60), None], frames=4)
+        finally:
+            if saved is None:
+                sys.modules.pop("oreoOS.busy", None)
+            else:
+                sys.modules["oreoOS.busy"] = saved
+        self.assertEqual(app.events, [])
+
+    def test_first_frame_is_not_read(self):
+        touch = ScriptedTouch([])
+        calls = []
+        real = touch.read
+        touch.read = lambda: calls.append(1) or real()
+        h, mod = self.h, self.mod
+        App = sys.modules["oreoOS.app"].App
+        os_obj = types.SimpleNamespace(
+            display=mod._Display(), _quit_requested=False, _launch_request=None,
+            _home_marked=True, _power=None, _just_woke=False, touch=touch)
+        os_obj.quit = lambda: setattr(os_obj, "_quit_requested", True)
+        os_obj.launch = lambda n: setattr(os_obj, "_launch_request", n)
+        os_obj.buttons = mod._Buttons([[], [], []], os_obj, h.clock)
+
+        class Plain(App):
+            name = "plain"
+
+            def on_enter(self, os_obj):
+                pass
+
+            def update(self, dt):
+                pass
+
+            def draw(self, d):
+                pass
+        h.launcher.run_app(os_obj, Plain())
+        frames = 4                                  # 3 scripted + the quit frame
+        self.assertEqual(len(calls), frames - 1)
+
     def test_no_touch_screen_changes_nothing(self):
         h, mod = self.h, self.mod
         App = sys.modules["oreoOS.app"].App
