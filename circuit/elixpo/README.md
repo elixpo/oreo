@@ -61,7 +61,10 @@ overrides it), and `oreoWare/pins.py` holds both pin maps. On the PCB it
 uses the ILI9341 panel driver (`oreoWare/_ili9341.py`), reads the buttons
 from the expander (`oreoWare/aw9523.py`), turns the switched 3.3 V supply on
 and wakes from deep sleep on the expander's interrupt. The touch screen
-isn't read yet.
+(XPT2046) is read by `oreoWare/touch.py` while its PENIRQ (GPIO21) is low:
+the bus drops to 2 MHz, the expander selects the chip, and apps get
+`on_touch` events. Its calibration is a typical one for these modules until
+it is measured on the first board.
 
 ## Electrical decisions
 
@@ -166,8 +169,8 @@ the SMD and through-hole parts to solder by hand, and the off-board parts,
 with LCSC numbers and prices.
 
 FaleraOS and its firmware are flashed over USB-C once a board is assembled.
-The OS supports this board (see the pin map above), apart from touch; check
-the picture's orientation and the buttons on the first board.
+The OS supports this board (see the pin map above); check the picture's
+orientation, the buttons and the touch calibration on the first board.
 
 The battery sits on the back in a 3D-printed L-shaped holder: it runs the
 cell's 50 mm edge, is as tall as the cell (6 mm) and has a 10-12 mm lip over

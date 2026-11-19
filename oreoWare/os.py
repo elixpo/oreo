@@ -30,6 +30,13 @@ class OS(api.OS):
     def __init__(self):
         self.display = Display()
         self.buttons = Buttons()
+        # The PCB badge's touch screen (oreoWare.touch); None on the
+        # breadboard badge or if it isn't answering.
+        try:
+            from oreoWare import touch as _touch
+            self.touch = _touch.create(self.display)
+        except Exception:
+            self.touch = None
         # backends added incrementally — wired up as each peripheral comes online
         self.leds = None
         self.ir   = None

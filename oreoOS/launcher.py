@@ -389,6 +389,39 @@ def _home_cancels(os_obj, loader):
         return False
 
 
+
+# Touch events: a finger that moves less than this many pixels between two
+# readings is still; it keeps "move" events from firing on reading noise.
+TOUCH_MOVE_PX = 3
+
+
+def touch_step(touch, state):
+    """One reading of the touch screen turned into an event.
+
+    state is a dict the caller keeps between frames ({} at first). Returns
+    ("down" | "move" | "up", x, y) or None. touch.read() samples only while
+    the controller's pen interrupt says the screen is pressed, so this costs
+    a pin read when nobody is touching it."""
+    try:
+        p = touch.read()
+    except Exception:
+        p = None
+    if p is not None:
+        x, y = p
+        if not state.get("down"):
+            state["down"] = True
+            state["x"], state["y"] = x, y
+            return ("down", x, y)
+        if abs(x - state["x"]) >= TOUCH_MOVE_PX or abs(y - state["y"]) >= TOUCH_MOVE_PX:
+            state["x"], state["y"] = x, y
+            return ("move", x, y)
+        return None
+    if state.get("down"):
+        state["down"] = False
+        return ("up", state["x"], state["y"])
+    return None
+
+
 def run_app(os_obj, app, loader=None, opened=None):
     """Run `app` until it quits or launches another.
 
@@ -461,6 +494,9 @@ def run_app(os_obj, app, loader=None, opened=None):
     AUTOREPEAT_BUTTONS = (api.BTN_UP, api.BTN_DOWN, api.BTN_LEFT, api.BTN_RIGHT)
     next_repeat_ms = {b: 0 for b in AUTOREPEAT_BUTTONS}
     last_c_ms = None    # previous C press, for the double-tap panel gesture
+    # The PCB badge's touch screen (oreoWare.touch); None on the breadboard.
+    touch = getattr(os_obj, "touch", None)
+    touch_state = {}
 
     # Timing (oreoOS.perf, read from the REPL) and the background network
     # service (oreoOS.netsvc). Both are optional: a failed import leaves
@@ -608,6 +644,20 @@ def run_app(os_obj, app, loader=None, opened=None):
                         panel.handle_button(b)
                     else:
                         app.on_button_press(b)
+
+            # ── touch screen (PCB badge) ──────────────────────────
+            # Routed like a button press: the pair prompt and an open
+            # notification panel take precedence, so the app sees nothing
+            # then; a finger landing counts as activity for the idle timer.
+            if touch is not None:
+                ev = touch_step(touch, touch_state)
+                if ev is not None:
+                    if ev[0] != "up" and pm:
+                        pm.note_event()
+                    if not (pair_pp.is_active() or panel.is_active()):
+                        hook = getattr(app, "on_touch", None)
+                        if hook is not None:
+                            hook(ev[0], ev[1], ev[2])
 
             # Tick the panel BEFORE the app draws so we can detect the
             # exact frame the close animation finishes and force the app

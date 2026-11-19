@@ -107,6 +107,7 @@ SHIP_PATTERNS = [
     "oreoWare/board.py",
     "oreoWare/battery.py",
     "oreoWare/bt.py",
+    "oreoWare/touch.py",
     "oreoWare/buttons.py",
     "oreoWare/display.py",
     "oreoWare/imu.py",
