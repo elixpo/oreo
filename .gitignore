@@ -45,3 +45,6 @@ oreoWare/doom/
 # the badge as /avatar.bin; never commit or ship one.
 apps/badge/assets/optimized/avatar.py
 avatar.bin
+
+# Rendered sponsor deck (pitch-deck/render.py)
+pitch-deck/out/
