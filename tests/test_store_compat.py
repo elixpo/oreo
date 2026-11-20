@@ -27,7 +27,7 @@ import test_commits_grid  # noqa: E402  (stub loader for the Commits app)
 
 # OS modules added after stable/v2.0.5. An App Store app may only import
 # them inside try/except ImportError.
-NEW_OS_MODULES = ("state", "profile", "crashlog")
+NEW_OS_MODULES = ("state", "profile", "crashlog", "player", "mediaui")
 
 
 def _guarded(tree):

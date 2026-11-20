@@ -248,6 +248,29 @@
         ["src/__init__.py", 0],
         ["src/app.py", 7729]
       ]
+    },
+    {
+      "id": "radio",
+      "path": "apps_market/radio",
+      "name": "Radio",
+      "tagline": "Internet radio stations",
+      "description": "Internet radio from the open Radio Browser directory. Needs the PCB badge's speaker.",
+      "category": "Utilities",
+      "author": "Circuit-Overtime",
+      "version": "0.1",
+      "icon": "radio_icon.png",
+      "size": 28034,
+      "files": [
+        ["__init__.py", 0],
+        ["assets/__init__.py", 0],
+        ["assets/optimized/__init__.py", 0],
+        ["assets/optimized/radio_icon.py", 8800],
+        ["main.py", 241],
+        ["manifest.json", 210],
+        ["src/__init__.py", 0],
+        ["src/app.py", 13109],
+        ["src/rb.py", 5674]
+      ]
     }
   ]
 }
