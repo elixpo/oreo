@@ -153,7 +153,7 @@ the stream's server and listens on nothing.
 | Radio | Radio Browser (open directory, no key) | App Store |
 | Podcasts | iTunes Search API (no key), the show's RSS feed | App Store |
 | Jamendo | Jamendo API v3 (Creative Commons music; client id) | App Store |
-| Music | MP3s on the microSD card; a Subsonic server | App Store |
+| Music | MP3s on the microSD card | App Store |
 
 All four are App Store apps rather than built-ins: they need the PCB
 badge's speaker, so the breadboard badge's image doesn't carry them, and
@@ -198,9 +198,10 @@ used and never committed.
 
 ### Music
 
-The owner's own MP3s.
+The owner's own MP3s, from the badge's microSD card. Music connects to
+nothing.
 
-- **microSD card** (first): `oreoWare/sdcard.py` (`os.sdcard`) mounts the
+- **microSD card**: `oreoWare/sdcard.py` (`os.sdcard`) mounts the
   card at `/sd` (1-bit SDMMC, GPIO 38/39/40) from a worker; on the PCB the
   AW9523B's P1_5 card-detect tells when one is in or pulled out. Browse
   folders; the first row plays the folder, a song plays the folder from
@@ -209,20 +210,13 @@ The owner's own MP3s.
   from ID3v2.2-2.4 or ID3v1 (`src/id3.py` reads only the text frames and
   seeks over cover art). How to put music on the card:
   [TRANSFER.md](TRANSFER.md#music-goes-on-the-microsd-card).
-- **A Subsonic server** (optional: Navidrome, Jellyfin, Airsonic, Gonic):
-  Server settings asks for the URL, user and password on the badge. The
-  password is turned into Subsonic token auth at once
-  (`t = md5(password + salt)`, a random salt) and only the URL, user, salt
-  and token are saved (`oreoOS.state`), never the password. Streams use
-  `stream.view?format=mp3&maxBitRate=128`, so the server transcodes any
-  format. An `https://` server's certificate must chain to a root in
-  `oreoOS/tls_roots.py`; a plain `http://` server works too.
+- Volume, shuffle and repeat are kept with `oreoOS.state`.
 
 ### TLS
 
 Radio Browser, iTunes, Jamendo's API and its stream host are in
 `tools/gen_ca_bundle.py` HOSTS and verify against the bundled roots.
-Stations, podcast hosts and Subsonic servers are anyone's: an `https://`
+Stations and podcast hosts are anyone's: an `https://`
 one whose chain ends outside the bundle fails with "TLS: untrusted
 certificate"; `http://` streams are unaffected.
 
@@ -247,5 +241,4 @@ keyboard and the now-playing panel, with touch.
    itself; an album plays in order.
 8. Music: a card with folders of MP3s; browse, play a folder, check the
    ID3 titles, shuffle and repeat; pull the card while playing (playback
-   stops, "Card removed") and put it back. Optionally set up a Navidrome
-   server and play an album.
+   stops, "Card removed") and put it back.

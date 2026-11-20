@@ -1,13 +1,11 @@
 """Host tests for the Music app (apps_market/music): ID3v2/v1 parsing,
-Subsonic token auth and URLs, the folder scan and play queue, the microSD
-driver (oreoWare/sdcard.py), and the app on stub modules with a temporary
+the folder scan and play queue, the microSD driver (oreoWare/sdcard.py), and the app on stub modules with a temporary
 folder as the card.
 
     python3 -m unittest tests.test_music_app -v
 """
 
 import io
-import json
 import struct
 import sys
 import tempfile
@@ -101,65 +99,6 @@ class Id3Test(unittest.TestCase):
         p = Path(self.tmp.name) / "a.mp3"
         p.write_bytes(tag(3, [frame(3, b"TIT2", b"\0P")]) + AUDIO)
         self.assertEqual(self.id3.read_tags(str(p)), {"title": "P"})
-
-
-class SubsonicTest(unittest.TestCase):
-    def setUp(self):
-        self.tmp = tempfile.TemporaryDirectory()
-        self.env = E.Env(self.tmp.name)
-        self.ss = self.env.load_app("apps_market/music", "music").subsonic
-
-    def tearDown(self):
-        self.env.close()
-        self.tmp.cleanup()
-
-    def test_token_matches_the_spec_example(self):
-        # subsonic.org/pages/api.jsp: password "sesame", salt "c19b2d"
-        self.assertEqual(self.ss.token("sesame", "c19b2d"), "26719a1196d2a940705a59634eb18eab")
-
-    def test_credentials_keep_no_password(self):
-        c = self.ss.credentials("music.example.org/", "me", "sesame", salt="c19b2d")
-        self.assertEqual(c, {"url": "https://music.example.org", "user": "me", "salt": "c19b2d",
-                             "token": "26719a1196d2a940705a59634eb18eab"})
-        self.assertNotIn("sesame", json.dumps(c))
-        s1, s2 = self.ss.new_salt(), self.ss.new_salt()
-        self.assertEqual(len(s1), 12)
-        self.assertNotEqual(s1, s2)
-
-    def test_urls(self):
-        c = self.ss.credentials("http://nas:4533", "me", "sesame", salt="c19b2d")
-        u = self.ss.stream_url(c, "so ng/1")
-        self.assertTrue(u.startswith("http://nas:4533/rest/stream.view?u=me&t=26719a"))
-        for part in ("s=c19b2d", "v=1.16.1", "c=FaleraOS", "f=json", "format=mp3",
-                     "maxBitRate=128", "id=so%20ng%2F1"):
-            self.assertIn(part, u)
-        self.assertNotIn("p=", u)
-        self.assertIn("/rest/ping.view?", self.ss.ping_url(c))
-        self.assertIn("type=newest", self.ss.albums_url(c))
-        self.assertIn("query=a%26b", self.ss.search_url(c, "a&b"))
-
-    def test_parsing(self):
-        c = self.ss.credentials("https://s", "me", "x", salt="aa")
-        ok = lambda body: json.dumps({"subsonic-response": dict(status="ok", version="1.16.1", **body)})
-        self.assertTrue(self.ss.parse_ping(ok({})))
-        albums = self.ss.parse_albums(ok({"albumList2": {"album": [
-            {"id": "a1", "name": "One", "artist": "X"}]}}))
-        self.assertEqual(albums, [{"id": "a1", "name": "One", "artist": "X"}])
-        songs = self.ss.parse_album(ok({"album": {"song": [
-            {"id": "2", "title": "B", "track": 2, "duration": 100},
-            {"id": "1", "title": "A", "track": 1, "artist": "X"},
-            {"id": "v", "title": "Clip", "isVideo": True}]}}), c)
-        self.assertEqual([s["title"] for s in songs], ["A", "B"])
-        self.assertIn("/rest/stream.view?", songs[0]["url"])
-        self.assertEqual(len(self.ss.parse_songs(ok({"searchResult3": {"song": [{"id": "3"}]}}), c)), 1)
-        self.assertEqual(self.ss.parse_random(ok({"randomSongs": {}}), c), [])
-        bad = json.dumps({"subsonic-response": {"status": "failed",
-                                                "error": {"code": 40, "message": "Wrong"}}})
-        with self.assertRaises(self.ss.SubsonicError) as cm:
-            self.ss.parse_ping(bad)
-        self.assertEqual(str(cm.exception), "wrong user or password")
-        with self.assertRaises(self.ss.SubsonicError):
-            self.ss.parse_ping(b"<html>")
 
 
 class LibraryTest(unittest.TestCase):
@@ -408,42 +347,18 @@ class MusicAppTest(unittest.TestCase):
         self.assertFalse(self.app.card)
         self.assertEqual(self.app.player.state, "idle")
 
-    def test_subsonic_settings_and_play(self):
-        ss = self.mod.subsonic
-        calls = []
-
-        def fetch(url, get=None):
-            calls.append(url)
-            base = {"status": "ok", "version": "1.16.1"}
-            if "/rest/ping.view" in url:
-                return json.dumps({"subsonic-response": base}).encode()
-            if "getAlbumList2" in url:
-                base["albumList2"] = {"album": [{"id": "al", "name": "Disc", "artist": "S"}]}
-            else:
-                base["album"] = {"song": [{"id": "s1", "title": "Tune", "artist": "S",
-                                           "album": "Disc", "track": 1}]}
-            return json.dumps({"subsonic-response": base}).encode()
-        ss.fetch = fetch
+    def test_starts_on_the_card_only(self):
         self.start()
-        # Server settings is the last home row
-        self.app.list.sel = len(self.app.list.items) - 1
-        self.press(self.api.BTN_A)
-        self.assertEqual(self.app.view, "keyboard")
-        for value in ("http://nas.example:4533", "me", "sesame"):
-            self.app.kb.text = value
-            self.app._kb("ok")
-            self.frame()
-        self.assertEqual(self.app.cred["user"], "me")
-        self.assertNotIn("sesame", json.dumps(self.env.state.load("music")))
-        self.assertEqual(self.app.cred["token"], ss.token("sesame", self.app.cred["salt"]))
-        self.assertIn("Server OK", self.os.display.joined())
-        self.app.list.sel = [k for k, _ in self.app.list.items].index("server")
-        self.press(self.api.BTN_A, self.api.BTN_A)          # My server > Newest albums
-        self.assertIn("Disc - S", self.os.display.joined())
-        self.press(self.api.BTN_A, self.api.BTN_A)          # album > first song
-        self.frame(3)
-        self.assertEqual(self.connects[0], ("nas.example", 4533, False))
-        self.assertIn("Tune", self.os.display.joined())
+        self.assertEqual([k for k, _ in self.app.list.items],
+                         ["card", "all", "shuffle", "repeat"])
+        txt = self.os.display.joined()
+        self.assertIn("microSD card", txt)
+        self.assertNotIn("server", txt.lower())
+        self.assertEqual(self.os.sdcard.mounts, 1)
+        self.assertTrue(self.app.card)
+        self.assertEqual(self.connects, [])
+        self.app.on_exit()
+        self.assertEqual(sorted(self.env.state.load("music")), ["repeat", "shuffle", "volume"])
 
     def test_no_speaker(self):
         a, _ = self.env.make_audio(available=False)

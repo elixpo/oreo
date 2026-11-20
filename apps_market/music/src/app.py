@@ -1,7 +1,6 @@
-"""Music: the owner's own MP3s, from the microSD card or a Subsonic server.
+"""Music: the owner's own MP3s, from the badge's microSD card.
 
-Home: microSD card (browse folders), Play whole card, Shuffle, Repeat, My
-server (Subsonic: newest albums, random songs, search), Server settings.
+Home: microSD card (browse folders), Play whole card, Shuffle, Repeat.
 In a folder, the first row plays the whole folder; A on a song plays the
 folder from that song. On the player: LEFT/RIGHT previous / next, UP/DOWN
 volume, A play/stop, B back. The title, artist and album come from the
@@ -9,12 +8,7 @@ file's ID3 tags. Touch on every screen.
 
 The card is mounted at /sd from a worker; on the PCB badge its card-detect
 switch tells when one is in. Copy music onto the card with a computer (any
-folders; MP3 files).
-
-A Subsonic server (Navidrome, Jellyfin, ...) is optional: its URL, user and
-a token made from the password (never the password itself) are kept with
-oreoOS.state, entered once in Server settings. Streams are transcoded by the
-server to MP3 at 128 kb/s at most.
+folders; MP3 files). Volume, shuffle and repeat are kept with oreoOS.state.
 """
 
 import oreoOS
@@ -25,7 +19,7 @@ try:
 except ImportError:         # an OS from before the audio apps
     state = mediaui = None
 
-from . import id3, library, subsonic
+from . import id3, library
 
 APP_ID = "music"
 
@@ -50,16 +44,12 @@ class App(oreoOS.App):
         self.volume = int(self.saved.get("volume", 60))
         self.shuffle = bool(self.saved.get("shuffle", False))
         self.repeat = int(self.saved.get("repeat", 0)) % 3
-        self.cred = self.saved.get("subsonic") if isinstance(self.saved.get("subsonic"), dict) else None
         self.view = "list"
         self.kind = "home"
         self.title = "MUSIC"
         self.stack = []
         self.list = mediaui.ListView()
         self.folder = None
-        self.kb = None
-        self.kb_step = None
-        self.form = {}
         self.jobs = {}
         self.message = None
         self.queue = None
@@ -93,10 +83,6 @@ class App(oreoOS.App):
     def _save(self):
         self.saved.update({"volume": self.volume, "shuffle": self.shuffle,
                            "repeat": self.repeat})
-        if self.cred:
-            self.saved["subsonic"] = self.cred
-        else:
-            self.saved.pop("subsonic", None)
         state.save(APP_ID, self.saved)
 
     def realtime_mode(self):
@@ -130,9 +116,6 @@ class App(oreoOS.App):
         items = [("card", "microSD card"), ("all", "Play whole card"),
                  ("shuffle", "Shuffle: " + ("on" if self.shuffle else "off")),
                  ("repeat", "Repeat: " + library.REPEAT_NAMES[self.repeat])]
-        if self.cred:
-            items.append(("server", "My server"))
-        items.append(("settings", "Server settings"))
         if self.queue is not None:
             items.insert(0, ("now", "Now playing"))
         return items
@@ -150,9 +133,8 @@ class App(oreoOS.App):
         self._dirty = True
 
     def _back(self):
-        if self.view in ("player", "keyboard", "nocard"):
+        if self.view in ("player", "nocard"):
             self.view = "list"
-            self.kb = None
         elif self.stack:
             self.kind, self.title, items, sel, top, self.folder = self.stack.pop()
             if self.kind == "home":
@@ -196,12 +178,6 @@ class App(oreoOS.App):
                 if self.queue is not None:
                     self.queue.repeat = self.repeat
                 self.list.set(self._home_items(), keep=True)
-            elif k == "server":
-                self._push("server", "MY SERVER", [("albums", "Newest albums"),
-                                                   ("random", "Random songs"),
-                                                   ("search", "Search")])
-            elif k == "settings":
-                self._settings()
             self._dirty = True
         elif self.kind == "folder":
             if it == PLAY_FOLDER:
@@ -212,79 +188,11 @@ class App(oreoOS.App):
             else:
                 files = self._folder_files()
                 self._play_files(files, files.index(self.folder.rstrip("/") + "/" + it))
-        elif self.kind == "server":
-            c = self.cred
-            if it[0] == "albums":
-                self._job("albums", lambda: subsonic.parse_albums(
-                    subsonic.fetch(subsonic.albums_url(c))), "Loading albums...")
-            elif it[0] == "random":
-                self._job("songs", lambda: subsonic.parse_random(
-                    subsonic.fetch(subsonic.random_url(c)), c), "Loading...")
-            else:
-                self.kb = mediaui.Keyboard("Search your server")
-                self.kb_step = "search"
-                self.view = "keyboard"
-        elif self.kind == "albums":
-            c = self.cred
-            aid = it["id"]
-            self._job("songs", lambda: subsonic.parse_album(
-                subsonic.fetch(subsonic.album_url(c, aid)), c), "Loading album...")
-        elif self.kind == "songs":
-            self._play_songs(self.list.items, self.list.sel)
         self._dirty = True
 
     def _folder_files(self):
         base = self.folder.rstrip("/") + "/"
         return [base + n for n in self.list.items if n != PLAY_FOLDER and not n.endswith("/")]
-
-    # ── settings ────────────────────────────────────────────────────────
-    def _settings(self):
-        self.form = {}
-        cur = self.cred or {}
-        self.kb = mediaui.Keyboard("Server URL (https://...)", cur.get("url", ""))
-        self.kb_step = "url"
-        self.view = "keyboard"
-
-    def _kb(self, r):
-        if r == "cancel":
-            self.view = "list"
-            self.kb = None
-            return
-        if r != "ok":
-            return
-        text = self.kb.text.strip()
-        step = self.kb_step
-        if step == "search":
-            self.view = "list"
-            self.kb = None
-            if text:
-                c = self.cred
-                self._job("songs", lambda: subsonic.parse_songs(
-                    subsonic.fetch(subsonic.search_url(c, text)), c), "Searching...")
-            return
-        if step == "url":
-            if not text:
-                # an empty URL removes the server
-                self.cred = None
-                self._save()
-                self.view = "list"
-                self.kb = None
-                self._home()
-                self.message = "Server removed"
-                return
-            self.form["url"] = text
-            self.kb = mediaui.Keyboard("User", (self.cred or {}).get("user", ""))
-            self.kb_step = "user"
-        elif step == "user":
-            self.form["user"] = text
-            self.kb = mediaui.Keyboard("Password (kept as a token)", secret=True)
-            self.kb_step = "password"
-        elif step == "password":
-            cred = subsonic.credentials(self.form["url"], self.form["user"], text)
-            self.view = "list"
-            self.kb = None
-            self._job("ping", lambda: (cred, subsonic.parse_ping(
-                subsonic.fetch(subsonic.ping_url(cred)))), "Checking the server...")
 
     # ── playing ─────────────────────────────────────────────────────────
     def _play_files(self, paths, start):
@@ -293,23 +201,13 @@ class App(oreoOS.App):
         self.queue = library.Queue(paths, start, self.shuffle, self.repeat)
         self._start()
 
-    def _play_songs(self, songs, start):
-        if not songs:
-            return
-        self.queue = library.Queue(songs, start, self.shuffle, self.repeat)
-        self._start()
-
     def _start(self):
         it = self.queue.current() if self.queue else None
         if it is None:
             return
-        if isinstance(it, dict):            # a server song
-            self.tags = {"title": it["title"], "artist": it["artist"], "album": it["album"]}
-            self.player.play(it["url"], name=it["artist"])
-        else:
-            self.tags = {"title": library.display_name(it)}
-            self.player.play(it, name="")
-            self._job("tags", lambda p=it: (p, id3.read_tags(p)))
+        self.tags = {"title": library.display_name(it)}
+        self.player.play(it, name="")
+        self._job("tags", lambda p=it: (p, id3.read_tags(p)))
         self.player.title = self.tags.get("title", "")
         self.view = "player"
         self._dirty = True
@@ -351,10 +249,6 @@ class App(oreoOS.App):
             if btn in (api.BTN_B, api.BTN_A):
                 self._back()
             return
-        if self.view == "keyboard":
-            self._kb(self.kb.key(btn))
-            self._dirty = True
-            return
         if self.view == "player":
             act = {api.BTN_A: "play", api.BTN_LEFT: "prev", api.BTN_RIGHT: "next",
                    api.BTN_UP: "vol+", api.BTN_DOWN: "vol-"}.get(btn)
@@ -375,9 +269,6 @@ class App(oreoOS.App):
             return
         if self.view == "nocard":
             self._back()
-        elif self.view == "keyboard":
-            self._kb(self.kb.hit(x, y))
-            self._dirty = True
         elif self.view == "player":
             act = mediaui.player_hit(x, y, BUTTONS)
             if act:
@@ -429,17 +320,6 @@ class App(oreoOS.App):
                              "artist": tags.get("artist", ""), "album": tags.get("album", "")}
                 self.player.title = self.tags["title"]
                 self.player.station_name = self.tags["artist"]
-        elif name == "albums":
-            self._push("albums", "ALBUMS", r)
-        elif name == "songs":
-            self._push("songs", "SONGS", r)
-            if not r:
-                self.message = "Nothing found"
-        elif name == "ping":
-            self.cred = r[0]
-            self._save()
-            self._home()
-            self.message = "Server OK"
 
     def update(self, dt):
         if self.view == "oldos":
@@ -471,7 +351,7 @@ class App(oreoOS.App):
             self._card_t = 0
             present = self.sd.present()
             if present is False and self.card:
-                if self.queue is not None and isinstance(self.queue.current(), str):
+                if self.queue is not None:
                     p.stop()
                 self.sd.unmount()
                 self.card = False
@@ -504,11 +384,6 @@ class App(oreoOS.App):
             mediaui.draw_message(d, "No microSD card", lines)
             widgets.draw_hint(d, "B back")
             return
-        if self.view == "keyboard":
-            widgets.draw_header(d, "MUSIC")
-            self.kb.draw(d)
-            widgets.draw_hint(d, "A key  B delete  OK next")
-            return
         if self.view == "player":
             widgets.draw_header(d, "MUSIC")
             p = self.player
@@ -531,16 +406,11 @@ class App(oreoOS.App):
             widgets.draw_hint(d, "LEFT/RIGHT track  A play/stop")
             return
         widgets.draw_header(d, self.title)
-        if self.kind in ("home", "server"):
+        if self.kind == "home":
             self.list.draw(d, lambda it: it[1])
-        elif self.kind == "folder":
+        else:
             self.list.draw(d, lambda it: it if it.endswith("/") or it == PLAY_FOLDER
                            else library.display_name(it))
-        elif self.kind == "albums":
-            self.list.draw(d, lambda it: it["name"] + " - " + it["artist"])
-        else:
-            self.list.draw(d, lambda it: it["title"] + " - " + it["artist"],
-                           right=lambda it: mediaui.mmss(it["duration"]) if it.get("duration") else "")
         if self.message:
             d.rect(0, mediaui.BOTTOM - 16, api.SCREEN_W, 16, theme.CARD, fill=True)
             d.text(mediaui.clean(self.message, 39), 4, mediaui.BOTTOM - 12, theme.TEXT_DIM)

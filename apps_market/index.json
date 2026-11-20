@@ -300,25 +300,24 @@
       "id": "music",
       "path": "apps_market/music",
       "name": "Music",
-      "tagline": "Your MP3s: card, server",
-      "description": "Your own MP3s from the microSD card or a Subsonic server (Navidrome, Jellyfin). Needs the PCB badge's speaker.",
+      "tagline": "Your MP3s from microSD",
+      "description": "Your own MP3s from the microSD card. Needs the PCB badge's speaker.",
       "category": "Utilities",
       "author": "Circuit-Overtime",
       "version": "0.1",
       "icon": "music_icon.png",
-      "size": 45268,
+      "size": 34113,
       "files": [
         ["__init__.py", 0],
         ["assets/__init__.py", 0],
         ["assets/optimized/__init__.py", 0],
         ["assets/optimized/music_icon.py", 8800],
         ["main.py", 241],
-        ["manifest.json", 235],
+        ["manifest.json", 192],
         ["src/__init__.py", 0],
-        ["src/app.py", 21640],
+        ["src/app.py", 16078],
         ["src/id3.py", 4479],
-        ["src/library.py", 4323],
-        ["src/subsonic.py", 5550]
+        ["src/library.py", 4323]
       ]
     },
     {

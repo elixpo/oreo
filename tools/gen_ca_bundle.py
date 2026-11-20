@@ -53,8 +53,7 @@ HOSTS = (
     "api.jamendo.com",                       # Jamendo app (GTS R4)
     "prod-1.storage.jamendo.com",            # Jamendo streams (USERTrust RSA)
 )
-# Radio stations, podcast feeds and episodes, and Subsonic servers are
-# anyone's hosts: one whose chain ends outside this bundle fails with
+# Radio stations and podcast feeds and episodes are anyone's hosts: one whose chain ends outside this bundle fails with
 # "TLS: untrusted certificate" (plain http:// streams are unaffected).
 
 # (file stem in --certs-dir, why it is in the bundle)
