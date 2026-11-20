@@ -57,6 +57,13 @@ class OS(api.OS):
                     self.touch.set_calibration(cal)
             except Exception:
                 pass
+        # The PCB badge's speaker (oreoWare.audio); always an object, with
+        # available False (and every call a no-op) on the breadboard badge.
+        try:
+            from oreoWare import audio as _audio
+            self.audio = _audio.get()
+        except Exception:
+            self.audio = None
         # backends added incrementally — wired up as each peripheral comes online
         self.leds = None
         self.ir   = None

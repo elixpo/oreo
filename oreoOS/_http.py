@@ -615,7 +615,7 @@ def _redirect_url(current_url, location):
 
 
 def get_url(url, accept=None, timeout_s=4, auth=None, on_progress=None,
-            secret_query=None):
+            secret_query=None, user_agent=None):
     """GET a URL and follow at most MAX_REDIRECTS HTTPS redirects.
 
     Authorization is deliberately dropped after a cross-host redirect. GitHub
@@ -626,15 +626,23 @@ def get_url(url, accept=None, timeout_s=4, auth=None, on_progress=None,
     `secret_query` (for example "appid=<key>") is appended to the request
     path only: it is never part of the URL that is logged or followed, and
     it is dropped after a cross-host redirect, like Authorization.
+
+    `user_agent` replaces USER_AGENT for services that ask clients to name
+    themselves (Radio Browser).
     """
     current = url
     request_auth = auth
     request_query = secret_query
     allow_auto_auth = True
     for redirect_count in range(MAX_REDIRECTS + 1):
-        result = _get_once(current, accept, timeout_s,
-                           request_auth, allow_auto_auth, on_progress,
-                           request_query)
+        if user_agent:
+            result = _get_once(current, accept, timeout_s,
+                               request_auth, allow_auto_auth, on_progress,
+                               request_query, user_agent)
+        else:
+            result = _get_once(current, accept, timeout_s,
+                               request_auth, allow_auto_auth, on_progress,
+                               request_query)
         if result is None:
             return None
         status, head, body = result
@@ -688,7 +696,7 @@ def get_url(url, accept=None, timeout_s=4, auth=None, on_progress=None,
 
 
 def _get_once(url, accept, timeout_s, auth, allow_auto_auth=True,
-              on_progress=None, secret_query=None):
+              on_progress=None, secret_query=None, user_agent=None):
     if not _OK:
         return None
     parsed = _split_https_url(url)
@@ -744,7 +752,7 @@ def _get_once(url, accept, timeout_s, auth, allow_auto_auth=True,
             "Accept-Encoding: identity\r\n"
             "%s"
             "Connection: close\r\n\r\n"
-        ) % (_with_query(path, secret_query), host, USER_AGENT, accept_hdr,
+        ) % (_with_query(path, secret_query), host, user_agent or USER_AGENT, accept_hdr,
              auth_hdr)
         _progress(on_progress, "request")
         s.write(req.encode())
