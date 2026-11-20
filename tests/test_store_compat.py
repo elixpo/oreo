@@ -154,7 +154,7 @@ class OldOsFallbackTest(_OldOsCase):
         self.assertEqual(m.load(), 0)
 
     def test_colors(self):
-        m = self.mod_file("apps_market/Colors/src/app.py", "colors_old_os")
+        m = self.mod("apps_market.Colors.src.app")   # a package: it imports .palette
         self.assertIsNone(m.state)
         p = self.legacy("apps/color_picker/state.txt", "1,2,3")
         self.assertEqual(m._load_rgb(), (1, 2, 3))

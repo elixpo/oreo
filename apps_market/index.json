@@ -212,12 +212,12 @@
       "path": "apps_market/Colors",
       "name": "Color",
       "tagline": "Pick colours by eye",
-      "description": "A full-screen colour spectrum: move the crosshair to pick a colour, B switches between RGB, HSL and CMYK, A saves it.",
+      "description": "A full-screen colour spectrum: move the crosshair to pick a colour, B switches between RGB, HSL, CMYK, a five-colour palette made from it and curated presets, A saves it.",
       "category": "Tools",
       "author": "Circuit-Overtime",
-      "version": "0.3",
+      "version": "0.4",
       "icon": "color_icon.png",
-      "size": 58360,
+      "size": 65197,
       "files": [
         ["__init__.py", 0],
         ["assets/__init__.py", 0],
@@ -225,9 +225,10 @@
         ["assets/optimized/color_icon.py", 8807],
         ["assets/optimized/color_splash.py", 33423],
         ["main.py", 242],
-        ["manifest.json", 250],
+        ["manifest.json", 266],
         ["src/__init__.py", 0],
-        ["src/app.py", 15638]
+        ["src/app.py", 18073],
+        ["src/palette.py", 4386]
       ]
     },
     {
