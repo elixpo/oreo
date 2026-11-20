@@ -17,7 +17,7 @@ export type AppIconId =
   | "BookOpen"| "Car"      | "Cloud"      | "GitCommit" | "User"
   | "Gamepad2"| "HardDrive"| "Palette"    | "PawPrint"  | "Cpu"
   | "Wifi"    | "Bluetooth"| "RefreshCw"  | "Settings"  | "Store"
-  | "Sparkles"| "Hand";
+  | "Sparkles"| "Hand"     | "Music";
 
 export type AppEntry = {
   slug:      string;
@@ -192,6 +192,14 @@ export const STORE: AppEntry[] = [
              "the readout between RGB, HSL and CMYK, and A saves. C lights the " +
              "badge's onboard RGB LED in the picked colour (a double-tap of C " +
              "still opens the notification panel)." }),
+  app("spotify",  { name: "Spotify",      category: "store", tint: "teal",    icon: "Music",
+    pngIcon: "/icons/spotify_icon.png", version: "1.2.0", author: "@sea-deep",
+    blurb:   "See and control what your Spotify account is playing.",
+    details: "A remote for Spotify Connect: the badge shows the track playing on your " +
+             "phone, computer or speaker, with play/pause, skip, volume and your library " +
+             "(liked songs, recent, top tracks, playlists).\n\nLink it by scanning the QR " +
+             "code on the badge, or entering its code at falera.elixpo.com/spotify. " +
+             "Playback control needs Spotify Premium." }),
   app("gestures", { name: "Gestures",     category: "store", tint: "teal",    icon: "Hand",
     pngIcon: "/icons/settings_icon.png",
     blurb:   "Configure shake, flip, and tap quick-actions.",

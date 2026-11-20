@@ -249,6 +249,32 @@
         ["src/__init__.py", 0],
         ["src/app.py", 7729]
       ]
+    },
+    {
+      "id": "spotify",
+      "path": "apps_market/spotify",
+      "name": "Spotify",
+      "tagline": "Spotify Connect remote",
+      "description": "See and control what your Spotify account is playing. Link with a QR code and PIN.",
+      "category": "Tools",
+      "author": "sea-deep",
+      "version": "1.2.0",
+      "icon": "spotify_icon.png",
+      "size": 77887,
+      "files": [
+        ["__init__.py", 0],
+        ["assets/__init__.py", 0],
+        ["assets/optimized/__init__.py", 0],
+        ["assets/optimized/spotify_icon.py", 8800],
+        ["main.py", 243],
+        ["manifest.json", 206],
+        ["src/__init__.py", 0],
+        ["src/app.py", 28495],
+        ["src/auth.py", 9480],
+        ["src/client.py", 14700],
+        ["src/net.py", 6417],
+        ["src/qr.py", 9546]
+      ]
     }
   ]
 }

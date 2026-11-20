@@ -170,6 +170,12 @@ class OldOsFallbackTest(_OldOsCase):
         m._save_state(1, 2, 3)
         self.assertEqual(p.read_text(), "1,2,3")
 
+    def test_spotify_asks_for_a_newer_os(self):
+        m = self.mod("apps_market.spotify.src.app")
+        self.assertIsNone(m.state)
+        self.assertEqual(m.APP_ID, "spotify")
+        self.assertFalse(m._platform_ok())
+
     def test_weather_reads_secrets_without_profile(self):
         m = self.mod("apps_market.weather.src.app")
         fake = types.ModuleType("secrets")

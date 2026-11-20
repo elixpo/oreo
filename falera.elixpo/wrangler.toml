@@ -11,3 +11,24 @@
 name = "falera"
 compatibility_date = "2024-09-01"
 pages_build_output_dir = "out"
+
+# Spotify sign-in relay (functions/api/spotify/, relay/spotify.js). Off until
+# both of these exist; until then its endpoints answer 503 "not_configured"
+# and the badge app says the relay is not set up.
+#
+#   SPOTIFY_CLIENT_ID  plain variable: the Spotify app's client id. Set it in
+#                      the Pages dashboard (Settings > Variables and Secrets)
+#                      or uncomment [vars] below.
+#   SPOTIFY_KV         KV namespace binding for PIN and PKCE records (10-minute
+#                      TTL). Create one (`npx wrangler kv namespace create
+#                      falera-spotify`) and bind it in the dashboard (Settings >
+#                      Bindings) or uncomment the block below with its id.
+#   SPOTIFY_REDIRECT_URI  optional override of
+#                      https://falera.elixpo.com/api/spotify/callback
+#
+# [vars]
+# SPOTIFY_CLIENT_ID = "<client id>"
+#
+# [[kv_namespaces]]
+# binding = "SPOTIFY_KV"
+# id = "<namespace id>"
