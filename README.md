@@ -2,7 +2,7 @@
 
 
 
-<img src="falera.elixpo/public/og-banner.png" alt="Lumi, the panda mascot" width="60">
+<img src="assets/sprites/raw/mascot.png" alt="Lumi, the panda mascot" width="60">
 
 # FaleraOS and the Falera Badge
 
@@ -36,7 +36,7 @@
 
 </div>
 
-<img src="assets/og-banner.png" alt="Lumi, the panda banner" width="100%">
+<img src="falera.elixpo/public/og-banner.png" alt="Lumi, the panda banner" width="100%">
 
 <div align="center">
 
