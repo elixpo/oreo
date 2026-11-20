@@ -1,0 +1,73 @@
+{
+  "version": "v1.0.0",
+  "entity": {
+    "type": "organisation",
+    "role": "owner",
+    "name": "Elixpo",
+    "email": "hello@elixpo.com",
+    "description": "Elixpo is an open-source project foundry in India. It builds FaleraOS and the Elixpo Falera Badge: open hardware, open software and the research behind them, all released under open licences.",
+    "webpageUrl": {
+      "url": "https://falera.elixpo.com",
+      "wellKnown": "https://falera.elixpo.com/.well-known/funding-manifest-urls"
+    }
+  },
+  "projects": [
+    {
+      "guid": "faleraos",
+      "name": "FaleraOS and the Elixpo Falera Badge",
+      "description": "FaleraOS is an open-source MicroPython operating system for the Elixpo Falera Badge, an open-hardware ESP32-S3 conference badge with a 2.8-inch touch screen, eight buttons, IR, a motion sensor, a speaker and microSD. It has an app SDK, an on-device App Store, over-the-air updates, a command-line tool (falera-cli) and RV565, a video format for small displays described in arXiv:2610.35935. The hardware is OSHWA-certified (IN000107) under CERN-OHL-P-2.0 and the software is MIT. Formerly OreoOS.",
+      "webpageUrl": {
+        "url": "https://falera.elixpo.com",
+        "wellKnown": "https://falera.elixpo.com/.well-known/funding-manifest-urls"
+      },
+      "repositoryUrl": {
+        "url": "https://github.com/elixpo/falera"
+      },
+      "licenses": ["spdx:MIT", "spdx:CERN-OHL-P-2.0", "spdx:CC-BY-4.0"],
+      "tags": ["open-hardware", "micropython", "esp32", "embedded", "operating-system", "education", "hardware"]
+    }
+  ],
+  "funding": {
+    "channels": [
+      {
+        "guid": "elixpo-pay",
+        "type": "payment-provider",
+        "address": "https://payouts.elixpo.com/f/falera-badge",
+        "description": "The Falera Badge fundraiser on Elixpo Pay (UPI, cards and netbanking, in INR)."
+      }
+    ],
+    "plans": [
+      {
+        "guid": "founder-boards",
+        "status": "active",
+        "name": "The first five founder boards",
+        "description": "Bare PCBs from JLCPCB and parts from LCSC for the first five badges, paid out of pocket so far; the fundraiser's goal. Every price is in circuit/elixpo/BOM_COST.md.",
+        "amount": 8000,
+        "currency": "INR",
+        "frequency": "one-time",
+        "channels": ["elixpo-pay"]
+      },
+      {
+        "guid": "one-badge",
+        "status": "active",
+        "name": "One badge",
+        "description": "The parts for one complete badge at the prices paid in November 2026 (board share, LCSC parts and shipping, display, battery and module), from circuit/elixpo/BOM_COST.md.",
+        "amount": 4172,
+        "currency": "INR",
+        "frequency": "one-time",
+        "channels": ["elixpo-pay"]
+      },
+      {
+        "guid": "workshop-batch",
+        "status": "active",
+        "name": "A workshop batch of 20 badges",
+        "description": "Twenty badges for a build-and-code workshop, at the one-badge price; a larger order costs less per badge.",
+        "amount": 83440,
+        "currency": "INR",
+        "frequency": "one-time",
+        "channels": ["elixpo-pay"]
+      }
+    ],
+    "history": []
+  }
+}

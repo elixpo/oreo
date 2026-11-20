@@ -1,5 +1,5 @@
-# Oreo Badge: ESP32-S3 N16R8 (16 MB flash, 8 MB octal PSRAM).
-# ESP32_GENERIC_S3 with its SPIRAM_OCT variant, plus the Oreo Badge identity
+# Falera Badge: ESP32-S3 N16R8 (16 MB flash, 8 MB octal PSRAM).
+# ESP32_GENERIC_S3 with its SPIRAM_OCT variant, plus the Falera Badge identity
 # (USB names, board name, hostname) and a 16 MiB flash layout.
 set(IDF_TARGET esp32s3)
 

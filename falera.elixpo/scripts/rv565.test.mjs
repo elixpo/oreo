@@ -1,12 +1,14 @@
-// Checks src/lib/rv565.ts against the RV565 format version 7 conformance
-// vectors from github.com/elixpo/rv565 (tests/data/v7, a subset copied to
-// scripts/fixtures/rv565-v7) and the version 6 reference vector.
+// Checks src/lib/rv565.ts against the RV565 format version 7 and 8
+// conformance vectors from github.com/elixpo/rv565 (tests/data/v7, a subset
+// copied to scripts/fixtures/rv565-v7, and tests/data/v8, copied to
+// scripts/fixtures/rv565-v8) and the version 6 reference vector.
 //
 //   npm run test:rv565            (node --test, no dependencies needed)
 //
 // With the reference Python package available, files written here are also
 // decoded by it: set RV565_PYTHON_SRC to the package's source directory
-// (rv565/python/src in the library repository), or install rv565 >= 2.0.
+// (rv565/python/src in the library repository), or install rv565 >= 2.0
+// (>= 3.0 for the region-delta cases).
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -16,16 +18,18 @@ import { join } from "node:path";
 import test from "node:test";
 
 import {
-  CODECS, PIXEL_FORMATS, Rv565Encoder, Rv565Error, changedLines, checkSchedule, convertPixels,
+  CODECS, PIXEL_FORMATS, Rv565Encoder, Rv565Error, bytesSentFraction, changedLines, changedRects, checkSchedule, convertPixels,
   decodeFrame, encodeClip, frameLines, frameSize, frameTypeCounts, linesSentFraction, parseContainer,
   rgb565beToRgba, rgbaToRgb565be, testPatternFrame, toCArray, toRgba, verify,
 } from "../src/lib/rv565.ts";
 
 const FIXTURES = new URL("./fixtures/rv565-v7/", import.meta.url);
+const FIXTURES_V8 = new URL("./fixtures/rv565-v8/", import.meta.url);
 const manifest = JSON.parse(readFileSync(new URL("manifest.json", FIXTURES), "utf8"));
-const load = (file) => new Uint8Array(readFileSync(new URL(file, FIXTURES)));
+const manifestV8 = JSON.parse(readFileSync(new URL("manifest.json", FIXTURES_V8), "utf8"));
+const load = (file, dir = FIXTURES) => new Uint8Array(readFileSync(new URL(file, dir)));
 const sha = (data) => createHash("sha256").update(data).digest("hex");
-const TYPES = ["key", "delta", "repeat", "partial"];
+const TYPES = ["key", "delta", "repeat", "partial", "region"];
 
 /** tools/make_conformance.py rgb_frames(): a gradient with a moving square;
  * frame 5 repeats frame 4. */
@@ -70,9 +74,22 @@ test("manifest covers every pixel format, both codecs, deltas, partial deltas, r
   assert.ok(valid.some((v) => v.frame_types.includes("repeat")));
 });
 
-for (const v of manifest.valid) {
+test("v8 manifest covers region deltas in every pixel format and codec, shifted ones, and invalid ones", () => {
+  for (const fmt of PIXEL_FORMATS) {
+    for (const codec of CODECS) {
+      assert.ok(manifestV8.valid.some((v) => v.pixel_format === fmt && v.codec === codec && v.frame_types.includes("region")), `${fmt} ${codec}`);
+    }
+  }
+  assert.ok(manifestV8.valid.some((v) => v.file.includes("shift")));
+  assert.ok(manifestV8.invalid.length >= 10);
+});
+
+const valid = [...manifest.valid.map((v) => [v, FIXTURES]), ...manifestV8.valid.map((v) => [v, FIXTURES_V8])];
+const invalid = [...manifest.invalid.map((v) => [v, FIXTURES]), ...manifestV8.invalid.map((v) => [v, FIXTURES_V8])];
+
+for (const [v, dir] of valid) {
   test(`decodes ${v.file}`, async () => {
-    const clip = parseContainer(load(v.file));
+    const clip = parseContainer(load(v.file, dir));
     const h = clip.header;
     assert.deepEqual(
       [h.version, h.width, h.height, h.fps, h.frames, h.pixelFormat, h.codec, h.keyframeInterval, h.frameBytes],
@@ -80,9 +97,10 @@ for (const v of manifest.valid) {
     );
     assert.deepEqual(clip.index.map((r) => TYPES[r.type]), v.frame_types);
     assert.deepEqual(v.frame_types.map((_, i) => changedLines(clip, i)), v.changed_lines);
+    if (v.changed_rects) assert.deepEqual(v.frame_types.map((_, i) => changedRects(clip, i)), v.changed_rects);
     for (let i = 0; i < v.frames; i++) assert.equal(sha(await decodeFrame(clip, i)), v.frame_sha256[i], `frame ${i} in order`);
     // Random access: a fresh clip, frames in reverse, each a seek from a keyframe.
-    const seek = parseContainer(load(v.file));
+    const seek = parseContainer(load(v.file, dir));
     for (let i = v.frames - 1; i >= 0; i--) {
       seek.last = undefined;
       assert.equal(sha(await decodeFrame(seek, i)), v.frame_sha256[i], `frame ${i} by seeking`);
@@ -92,9 +110,9 @@ for (const v of manifest.valid) {
   });
 }
 
-for (const v of manifest.invalid) {
+for (const [v, dir] of invalid) {
   test(`rejects ${v.file} (${v.reason}, at ${v.stage})`, async () => {
-    const data = load(v.file);
+    const data = load(v.file, dir);
     if (v.stage === "open") {
       assert.throws(() => parseContainer(data), Rv565Error);
     } else {
@@ -136,23 +154,38 @@ test("encoder chooses frames like the reference and round-trips every format and
         for (const bandLines of [0, 1, 4, 8]) {
           const what = `${pixelFormat} ${codec} K${keyframeInterval} B${bandLines}`;
           const clip = parseContainer(await encodeClip(W, H, fps, frames, { pixelFormat, codec, keyframeInterval, bandLines }));
-          assert.equal(clip.header.version, 7);
+          const v7 = parseContainer(await encodeClip(W, H, fps, frames, { pixelFormat, codec, keyframeInterval, bandLines, version: 7 }));
+          // Version 8 exactly when a region delta was written.
+          assert.equal(clip.header.version, frameTypeCounts(clip).region ? 8 : 7, what);
+          assert.equal(v7.header.version, 7);
+          assert.equal(frameTypeCounts(v7).region, 0, `${what}: version 7 writes no region deltas`);
           clip.index.forEach((r, i) => {
             const type = TYPES[r.type];
             if (i % keyframeInterval === 0) assert.equal(type, "key", `${what} frame ${i}`);
             else if (i === 5) assert.equal(type, "repeat", `${what}: frame 5 repeats frame 4`);
             else if (codec === "stored") assert.notEqual(type, "delta", `${what}: a stored delta is never smaller`);
-            if (!bandLines) assert.notEqual(type, "partial", `${what}: band height 0 disables partials`);
+            if (!bandLines) assert.ok(type !== "partial" && type !== "region", `${what}: band height 0 disables partials and regions`);
             if (type === "partial") assert.equal(r.partial.band, bandLines);
+            if (type === "region") {
+              assert.equal(r.region.band, bandLines);
+              assert.ok(r.region.ranges.some(([, xw]) => xw < frameLines(pixelFormat, W, H)[1]), `${what}: a region delta has a narrower range`);
+            }
           });
           if (bandLines && keyframeInterval === 255) {
             // The moving square leaves bands untouched (mono_vpage has 2 pages,
             // so only band height 1 can skip one).
             if (pixelFormat !== "mono_vpage" || bandLines === 1) {
-              assert.ok(frameTypeCounts(clip).partial > 0, `${what}: unchanged bands make partial deltas`);
-              assert.ok(linesSentFraction(clip) < 1, `${what}: fewer lines sent`);
+              assert.ok(frameTypeCounts(v7).partial > 0, `${what}: unchanged bands make partial deltas`);
+              assert.ok(linesSentFraction(v7) < 1, `${what}: fewer lines sent`);
+            }
+            // The square changes a few pixels of each line: region deltas
+            // (monochrome lines are only 2-3 bytes, too short to narrow).
+            if (!pixelFormat.startsWith("mono")) {
+              assert.ok(frameTypeCounts(clip).region > 0, `${what}: narrow changes make region deltas`);
+              assert.ok(bytesSentFraction(clip) < bytesSentFraction(v7), `${what}: fewer bytes sent`);
             }
           }
+          for (let i = 0; i < frames.length; i++) assert.deepEqual(await decodeFrame(v7, i), frames[i], `${what} v7 frame ${i}`);
           if (codec === "zlib" && keyframeInterval === 255 && !bandLines) {
             assert.ok(frameTypeCounts(clip).delta > 0, `${what}: small motion makes deltas`);
           }
@@ -169,7 +202,7 @@ test("partial deltas carry exactly the changed bands", async () => {
   const b = a.slice();
   b[2 * W * 9] ^= 0xff;            // row 9: band 1 with 8-line bands
   b[2 * W * 19 + 3] ^= 0x01;       // row 19: band 2, the short last band
-  const clip = parseContainer(await encodeClip(W, H, 10, [a, b], { keyframeInterval: 2, codec: "stored" }));
+  const clip = parseContainer(await encodeClip(W, H, 10, [a, b], { keyframeInterval: 2, codec: "stored", version: 7 }));
   assert.equal(TYPES[clip.index[1].type], "partial");
   assert.deepEqual(clip.index[1].partial.changed, [1, 2]);
   assert.deepEqual(changedLines(clip, 1), [[8, 12]]);
@@ -178,6 +211,46 @@ test("partial deltas carry exactly the changed bands", async () => {
   assert.deepEqual(clip.index[1].partial.shifts, [[0, 0], [0, 0]]);
   assert.deepEqual(frameLines("mono_vpage", 128, 64), [8, 128]);
   assert.deepEqual(frameLines("rgb444", 21, 13), [13, 32]);
+});
+
+test("region deltas carry exactly the changed range of each changed band", async () => {
+  const W = 10, H = 20, R = 2 * W;
+  const a = new Uint8Array(R * H).fill(0x11);
+  const b = a.slice();
+  b[R * 9 + 3] ^= 0xff;            // row 9, byte 3 (pixel 1): band 1, bytes 2-3
+  b[R * 19 + 18] ^= 0x01;          // row 19, byte 18 (pixel 9): band 2, bytes 18-19
+  b[R * 17 + 10] ^= 0x01;          // row 17, byte 10 (pixel 5): band 2 widens to 10-19
+  const data = await encodeClip(W, H, 10, [a, b], { keyframeInterval: 2, codec: "stored" });
+  assert.equal(data[3], 8);
+  const clip = parseContainer(data);
+  assert.equal(TYPES[clip.index[1].type], "region");
+  assert.deepEqual(clip.index[1].region.changed, [1, 2]);
+  assert.deepEqual(clip.index[1].region.ranges, [[2, 2], [10, 10]]);
+  assert.deepEqual(changedRects(clip, 1), [[8, 8, 2, 2], [16, 4, 10, 10]]);
+  assert.deepEqual(changedLines(clip, 1), [[8, 12]]);
+  assert.deepEqual(changedRects(clip, 0), [[0, 20, 0, R]]);
+  assert.deepEqual(await decodeFrame(clip, 1), b);
+  // rgb444 ranges align to 3 bytes (two pixels) or run to the end of the line.
+  const W4 = 5, R4 = 8;
+  const c = new Uint8Array(R4 * 4).fill(0x22), d = c.slice();
+  d[R4 + 7] ^= 0x10;
+  const clip4 = parseContainer(await encodeClip(W4, 4, 10, [c, d], { keyframeInterval: 2, codec: "stored", pixelFormat: "rgb444" }));
+  assert.equal(TYPES[clip4.index[1].type], "region");
+  assert.deepEqual(clip4.index[1].region.ranges, [[6, 2]]);
+  assert.deepEqual(await decodeFrame(clip4, 1), d);
+  // Version 7 asked for: a partial delta, and the file says version 7.
+  const old = await encodeClip(W, H, 10, [a, b], { keyframeInterval: 2, codec: "stored", version: 7 });
+  assert.equal(old[3], 7);
+  assert.equal(TYPES[parseContainer(old).index[1].type], "partial");
+  // A change across the whole width: no region delta, version 7.
+  const wide = a.slice();
+  wide[R * 3] ^= 1; wide[R * 3 + R - 1] ^= 1;
+  const w = await encodeClip(W, H, 10, [a, wide], { keyframeInterval: 2, codec: "stored" });
+  assert.equal(w[3], 7);
+  assert.equal(TYPES[parseContainer(w).index[1].type], "partial");
+  // Version 8 asked for always says 8.
+  assert.equal((await encodeClip(W, H, 10, [a, wide], { keyframeInterval: 2, version: 8 }))[3], 8);
+  assert.throws(() => new Rv565Encoder(4, 4, 24, { version: 9 }), Rv565Error);
 });
 
 test("partial deltas shift bands to follow scrolling and panning", async () => {
@@ -286,6 +359,7 @@ if src:
     sys.path.insert(0, src)
 import rv565
 assert rv565.VERSION == 7, "rv565 %s reads only version 6" % rv565.__version__
+has_rects = hasattr(rv565.Clip, "changed_rects")
 d = sys.argv[2]
 cases = json.load(open(d + "/cases.json"))
 for c in cases:
@@ -297,6 +371,8 @@ for c in cases:
         c["version"], c["width"], c["height"], c["fps"], c["pixel_format"], c["codec"], c["keyframe_interval"]), c["file"]
     assert [clip.frame_type(i) for i in range(len(clip))] == c["types"], c["file"]
     assert [[list(r) for r in clip.changed_lines(i)] for i in range(len(clip))] == c["changed_lines"], c["file"]
+    if has_rects:
+        assert [[list(r) for r in clip.changed_rects(i)] for i in range(len(clip))] == c["changed_rects"], c["file"]
     rgb = open(d + "/" + c["rgb"], "rb").read()
     js_frames = open(d + "/" + c["frames"], "rb").read()
     preview = open(d + "/" + c["preview"], "rb").read()
@@ -327,11 +403,12 @@ print(len(cases))
 
 function findPython() {
   const src = process.env.RV565_PYTHON_SRC ?? "";
-  const probe = spawnSync("python3", ["-I", "-c", "import sys\nif sys.argv[1]: sys.path.insert(0, sys.argv[1])\nimport rv565\nassert rv565.VERSION == 7\nassert rv565.PARTIAL == 3\nassert hasattr(rv565, 'MOTION_RANGE')", src]);
-  return probe.status === 0 ? src : null;
+  const probe = spawnSync("python3", ["-I", "-c", "import sys\nif sys.argv[1]: sys.path.insert(0, sys.argv[1])\nimport rv565\nassert rv565.VERSION == 7\nassert rv565.PARTIAL == 3\nassert hasattr(rv565, 'MOTION_RANGE')\nprint(getattr(rv565, 'REGION', 0) == 4)", src], { encoding: "utf8" });
+  return probe.status === 0 ? { src, v8: probe.stdout.trim() === "True" } : null;
 }
 
-const pySrc = findPython();
+const py = findPython();
+const pySrc = py?.src ?? null;
 
 test("files written here decode identically with the reference Python package",
   { skip: pySrc === null && "reference rv565 with partial deltas not found (set RV565_PYTHON_SRC)" }, async () => {
@@ -357,7 +434,7 @@ test("files written here decode identically with the reference Python package",
       }
       const cases = [];
       const writeCase = async (name, opts) => {
-        const { pixelFormat, codec, keyframeInterval, bandLines = 8, tolerance = 0, motionRange = 8, version = 7 } = opts;
+        const { pixelFormat, codec, keyframeInterval, bandLines = 8, tolerance = 0, motionRange = 8, version } = opts;
         const frames = rgb.map((f) => convertPixels(f, W, H, pixelFormat, 3));
         const data = await encodeClip(W, H, 30, frames, { pixelFormat, codec, keyframeInterval, bandLines, tolerance, motionRange, version });
         const clip = parseContainer(data);
@@ -372,28 +449,40 @@ test("files written here decode identically with the reference Python package",
         writeFileSync(join(dir, `${name}.frames`), Buffer.concat(decoded));
         writeFileSync(join(dir, `${name}.preview`), Buffer.concat(preview));
         cases.push({
-          file: `${name}.rv565`, rgb: "source.rgb", frames: `${name}.frames`, preview: `${name}.preview`, version,
+          file: `${name}.rv565`, rgb: "source.rgb", frames: `${name}.frames`, preview: `${name}.preview`, version: clip.header.version,
           width: W, height: H, fps: 30, pixel_format: pixelFormat, codec, keyframe_interval: keyframeInterval,
           band_lines: bandLines, tolerance, motion_range: motionRange,
           types: clip.index.map((r) => TYPES[r.type]),
           changed_lines: clip.index.map((_, i) => changedLines(clip, i)),
+          changed_rects: clip.index.map((_, i) => changedRects(clip, i)),
         });
         return clip;
       };
       writeFileSync(join(dir, "source.rgb"), Buffer.concat(rgb));
-      let partials = 0, shifted = 0;
-      for (const fmt of PIXEL_FORMATS) {
-        for (const codec of CODECS) {
-          for (const [bandLines, tolerance, motionRange] of [[8, 0, 8], [3, 0, 8], [8, 0, 0], [0, 0, 8], [8, 6, 8], [1, 40, 8], [4, 0, 3]]) {
-            const clip = await writeCase(`${fmt}_${codec}_b${bandLines}_t${tolerance}_m${motionRange}`,
-              { pixelFormat: fmt, codec, keyframeInterval: 9, bandLines, tolerance, motionRange });
-            partials += frameTypeCounts(clip).partial;
-            for (const r of clip.index) if (r.partial?.shifts.some(([dx, dy]) => dx || dy)) shifted++;
+      // Version 7 always; with a reference that writes version 8, also the
+      // default (version 8 when a region delta helps, which the reference
+      // must reproduce byte for byte when stored).
+      let partials = 0, shifted = 0, regions = 0, shiftedRegions = 0;
+      for (const version of py.v8 ? [7, undefined] : [7]) {
+        for (const fmt of PIXEL_FORMATS) {
+          for (const codec of CODECS) {
+            for (const [bandLines, tolerance, motionRange] of [[8, 0, 8], [3, 0, 8], [8, 0, 0], [0, 0, 8], [8, 6, 8], [1, 40, 8], [4, 0, 3]]) {
+              const clip = await writeCase(`${fmt}_${codec}_b${bandLines}_t${tolerance}_m${motionRange}_v${version ?? "auto"}`,
+                { pixelFormat: fmt, codec, keyframeInterval: 9, bandLines, tolerance, motionRange, version });
+              partials += frameTypeCounts(clip).partial;
+              regions += frameTypeCounts(clip).region;
+              for (const r of clip.index) if (r.partial?.shifts.some(([dx, dy]) => dx || dy)) shifted++;
+              for (const r of clip.index) if (r.region?.shifts.some(([dx, dy]) => dx || dy)) shiftedRegions++;
+            }
           }
         }
       }
       assert.ok(partials > 0, "the cross-check exercises partial deltas");
       assert.ok(shifted > 0, "the cross-check exercises shifted bands");
+      if (py.v8) {
+        assert.ok(regions > 0, "the cross-check exercises region deltas");
+        assert.ok(shiftedRegions > 0, "the cross-check exercises shifted region bands");
+      }
       await writeCase("rgb565be_v6", { pixelFormat: "rgb565be", codec: "zlib", keyframeInterval: 1, version: 6 });
       writeFileSync(join(dir, "cases.json"), JSON.stringify(cases));
       const run = spawnSync("python3", ["-I", "-c", PY_CHECK, pySrc, dir], { encoding: "utf8" });
