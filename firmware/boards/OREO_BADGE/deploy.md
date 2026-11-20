@@ -1,4 +1,4 @@
-Flash the complete OreoOS image with `./deploy --full` from the OreoOS
+Flash the complete FaleraOS image with `./deploy --full` from the FaleraOS
 repository, which writes this firmware and installs the OS files. To write
 only the firmware:
 
