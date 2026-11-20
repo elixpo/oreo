@@ -328,6 +328,53 @@ class ScrollerTest(unittest.TestCase):
         self.assertFalse(s.step(0.1))
 
 
+class ScrollbarTest(unittest.TestCase):
+    def setUp(self):
+        self.saved = _stub_oreoos()
+        self.w = _load("oreoOS/widgets.py", "oreoOS.widgets")
+
+    def tearDown(self):
+        sys.modules.pop("oreoOS.widgets", None)
+        _restore(self.saved)
+
+    def test_no_thumb_when_content_fits(self):
+        self.assertIsNone(self.w.scrollbar_thumb(100, 5, 5, 0))
+        self.assertIsNone(self.w.scrollbar_thumb(100, 3, 5, 0))
+
+    def test_thumb_spans_track_from_top_to_bottom(self):
+        # 20 rows, 5 visible, 100 px track: a 25 px thumb.
+        self.assertEqual(self.w.scrollbar_thumb(100, 20, 5, 0), (0, 25))
+        self.assertEqual(self.w.scrollbar_thumb(100, 20, 5, 15), (75, 25))
+        self.assertEqual(self.w.scrollbar_thumb(100, 20, 5, 99), (75, 25))
+        self.assertEqual(self.w.scrollbar_thumb(100, 20, 5, -3), (0, 25))
+
+    def test_minimum_thumb_and_units(self):
+        self.assertEqual(self.w.scrollbar_thumb(100, 1000, 5, 0)[1], 12)
+        self.assertEqual(self.w.scrollbar_thumb(100, 1000, 5, 0, 10)[1], 10)
+        # Rows or pixels give the same thumb.
+        self.assertEqual(self.w.scrollbar_thumb(150, 7, 3, 2),
+                         self.w.scrollbar_thumb(150, 7 * 40, 3 * 40, 80))
+
+    def test_matches_the_inline_code_it_replaced(self):
+        # Launcher: thumb from rows, offset from eased pixels.
+        track_h, rows_total, vis, cell = 180, 9, 3, 60
+        for scroll in range(0, (rows_total - vis) * cell + 1, 7):
+            thumb_h = max(12, track_h * vis // rows_total)
+            max_scroll = (rows_total - vis) * cell
+            want = ((track_h - thumb_h) * scroll // max_scroll, thumb_h)
+            self.assertEqual(self.w.scrollbar_thumb(
+                track_h, rows_total * cell, vis * cell, scroll), want)
+
+    def test_draw(self):
+        d = FakeDisplay(320, 240)
+        calls = []
+        d.rect = lambda x, y, w, h, c, fill=False: calls.append((x, y, w, h, c))
+        self.w.draw_scrollbar(d, 300, 40, 100, 5, 5, 0, track=1)
+        self.assertEqual(calls, [])
+        self.w.draw_scrollbar(d, 300, 40, 100, 20, 5, 15, track=1, color=2)
+        self.assertEqual(calls, [(300, 40, 2, 100, 1), (300, 115, 2, 25, 2)])
+
+
 class NotifPanelTest(unittest.TestCase):
     def setUp(self):
         self.saved = _stub_oreoos()

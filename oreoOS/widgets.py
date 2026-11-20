@@ -207,6 +207,36 @@ def draw_panel(d, x, y, w, h, color=None, border=True):
         d.rect(x, y + h - 1, w, 1, theme.PRIMARY, fill=True)
 
 
+def scrollbar_thumb(h, total, visible, pos, min_thumb=12):
+    """(offset, length) of a scrollbar thumb on a track `h` px long, for a
+    view of `visible` units scrolled `pos` units into `total` (rows, lines
+    or pixels: any unit, used consistently). None when it all fits."""
+    if total <= visible or h <= 0:
+        return None
+    thumb = h * visible // total
+    if thumb < min_thumb:
+        thumb = min_thumb
+    if thumb > h:
+        thumb = h
+    span = total - visible
+    pos = 0 if pos < 0 else span if pos > span else pos
+    return (h - thumb) * pos // span, thumb
+
+
+def draw_scrollbar(d, x, y, h, total, visible, pos, track=None, color=None,
+                   w=2, min_thumb=12):
+    """Vertical scrollbar at (x, y), `h` px tall: an optional `track`
+    colour behind a thumb in `color` (theme.PRIMARY). Draws nothing when
+    the content fits. See scrollbar_thumb() for the units."""
+    t = scrollbar_thumb(h, total, visible, pos, min_thumb)
+    if t is None:
+        return
+    if track is not None:
+        d.rect(x, y, w, h, track, fill=True)
+    d.rect(x, y + t[0], w, t[1],
+           theme.PRIMARY if color is None else color, fill=True)
+
+
 def play_area():
     """(x, y, w, h) of the screen region between header and hint bar."""
     SW = api.SCREEN_W

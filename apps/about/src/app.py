@@ -254,13 +254,6 @@ class App(oreoOS.App):
             y += ROW_H
 
         # Scrollbar
-        n = len(rows)
-        if n > VISIBLE:
-            track_y = LY + 4
-            track_h = LH - 8
-            thumb_h = max(12, track_h * VISIBLE // n)
-            max_top = n - VISIBLE
-            thumb_y = track_y + (track_h - thumb_h) * self._top // max_top
-            bx = LX + LW - 5
-            d.rect(bx, track_y, 2, track_h, theme.DOCK_SEL, fill=True)
-            d.rect(bx, thumb_y, 2, thumb_h, theme.PRIMARY, fill=True)
+        widgets.draw_scrollbar(d, LX + LW - 5, LY + 4, LH - 8,
+                               len(rows), VISIBLE, self._top,
+                               track=theme.DOCK_SEL)
