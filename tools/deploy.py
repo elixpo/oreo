@@ -190,6 +190,8 @@ DEPLOY = [
     ("oreoOS/opening.py",       "oreoOS/opening.py"),   # feedback while an app opens
     ("oreoOS/hostui.py",        "oreoOS/hostui.py"),    # screen while the CLI drives
     ("oreoOS/usbhost.py",       "oreoOS/usbhost.py"),   # is a computer on USB?
+    ("oreoOS/player.py",        "oreoOS/player.py"),    # MP3 streams (audio apps)
+    ("oreoOS/mediaui.py",       "oreoOS/mediaui.py"),   # audio apps' shared screens
 
     # Hardware drivers
     ("oreoWare/__init__.py",    "oreoWare/__init__.py"),
@@ -198,6 +200,8 @@ DEPLOY = [
     ("oreoWare/aw9523.py",      "oreoWare/aw9523.py"),
     ("oreoWare/board.py",       "oreoWare/board.py"),
     ("oreoWare/touch.py",       "oreoWare/touch.py"),
+    ("oreoWare/audio.py",       "oreoWare/audio.py"),   # PCB speaker (I2S)
+    ("oreoWare/sdcard.py",      "oreoWare/sdcard.py"),  # microSD at /sd
     ("oreoWare/buttons.py",     "oreoWare/buttons.py"),
     ("oreoWare/display.py",     "oreoWare/display.py"),
     ("oreoWare/battery.py",     "oreoWare/battery.py"),

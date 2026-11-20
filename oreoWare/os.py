@@ -57,6 +57,19 @@ class OS(api.OS):
                     self.touch.set_calibration(cal)
             except Exception:
                 pass
+        # The PCB badge's speaker (oreoWare.audio); always an object, with
+        # available False (and every call a no-op) on the breadboard badge.
+        try:
+            from oreoWare import audio as _audio
+            self.audio = _audio.get()
+        except Exception:
+            self.audio = None
+        # The microSD card (oreoWare.sdcard): mount() it from a worker.
+        try:
+            from oreoWare import sdcard as _sdcard
+            self.sdcard = _sdcard.get()
+        except Exception:
+            self.sdcard = None
         # backends added incrementally — wired up as each peripheral comes online
         self.leds = None
         self.ir   = None

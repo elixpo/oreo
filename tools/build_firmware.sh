@@ -13,7 +13,7 @@ MICROPY_VERSION="1.28.0"
 # Out-of-tree MicroPython board: ESP32_GENERIC_S3 + SPIRAM_OCT configuration
 # with the Falera Badge identity (USB names, board name, hostname).
 BOARD_DIR="$REPO_ROOT/firmware/boards/OREO_BADGE"
-BUILD_NAME="build-oreo-badge-v55"
+BUILD_NAME="${OREO_BUILD_NAME:-build-oreo-badge-v55}"
 
 ESP_ROOT="${OREO_ESP_ROOT:-${HOME}/esp}"
 IDF_DIR="${OREO_IDF_DIR:-${ESP_ROOT}/esp-idf-v${IDF_VERSION}}"
@@ -50,6 +50,8 @@ Environment overrides:
   OREO_IDF_DIR            Existing ESP-IDF v5.5.1 checkout
   OREO_MICROPYTHON_DIR    Existing MicroPython v1.28.0 checkout
   OREO_FIRMWARE_PYTHON    Standalone Python interpreter for IDF setup
+  OREO_BUILD_NAME         Build directory under ports/esp32 (default:
+                          build-oreo-badge-v55), for a second checkout
 
 Examples:
   ./build-firmware
@@ -237,6 +239,8 @@ strings "$MICROPY_IMAGE" | grep '_oreo_ir' >/dev/null || fail \
   "native _oreo_ir module is missing from the image"
 strings "$MICROPY_IMAGE" | grep '_oreo_rv565' >/dev/null || fail \
   "native _oreo_rv565 module is missing from the image"
+strings "$MICROPY_IMAGE" | grep '_oreo_audio' >/dev/null || fail \
+  "native _oreo_audio module is missing from the image"
 strings "$MICROPY_IMAGE" | grep -F 'Falera Badge' >/dev/null || fail \
   "Falera Badge board identity is missing from the image"
 # A build directory configured before the 16 MiB layout keeps its old
@@ -257,6 +261,7 @@ PY
 
 printf 'Verified native module: _oreo_ir\n'
 printf 'Verified native module: _oreo_rv565\n'
+printf 'Verified native module: _oreo_audio\n'
 printf 'Verified partition table: 16 MiB layout with vfs partition\n'
 printf 'Verified board identity: Falera Badge (USB: Elixpo / Falera Badge)\n'
 printf 'Built: %s\n' "$FIRMWARE_IMAGE"
