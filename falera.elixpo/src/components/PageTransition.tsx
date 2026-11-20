@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { usePathname } from "next/navigation";
+import { isPitchPath } from "@/components/SiteChrome";
 
 /* Lightweight route-change reveal. Just an opacity + y-slide on the
  * <main> contents, keyed on pathname so Next remounts the wrapper
@@ -19,6 +20,8 @@ export default function PageTransition({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  // Pitch slides are screenshotted: render them in their final state.
+  if (isPitchPath(pathname)) return <>{children}</>;
   return (
     <motion.div
       key={pathname}

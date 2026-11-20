@@ -9,6 +9,7 @@ export const dynamic = "force-static";
 // the move from oreo.elixpo.com to falera.elixpo.com).
 const lastModified = new Date();
 
+// /pitch/ (the sponsor deck) is left out on purpose: it is noindexed.
 const staticRoutes = [
   { path: "", priority: 1, changeFrequency: "weekly" as const },
   { path: "get-started", priority: 0.9, changeFrequency: "monthly" as const },

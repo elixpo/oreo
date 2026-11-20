@@ -1,0 +1,204 @@
+/* Sponsor pitch deck: fixed 1920x1080 slides, made to be screenshotted.
+ * Site palette (theme.js), simplified for print: white page, ink text,
+ * Falera pink-red for small accents, Lumi and her bow as details. */
+
+.pd-viewport {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #E7EAE6;
+}
+
+.pd-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1920px;
+  height: 1080px;
+  overflow: hidden;
+  background: #FFFFFF;
+  color: #142018;
+  font-family: Arial, Helvetica, ui-sans-serif, system-ui, sans-serif;
+  transform-origin: 0 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Content area: everything above the footer. */
+.pd-body {
+  position: absolute;
+  inset: 0 0 96px 0;
+  padding: 104px 136px 0 136px;
+}
+
+.pd-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.19em;
+  text-transform: uppercase;
+  color: #C93A45;
+}
+
+.pd-title {
+  margin-top: 28px;
+  max-width: 1400px;
+  font-size: 76px;
+  line-height: 1.06;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+}
+.pd-title em,
+.pd-hero em {
+  font-family: Georgia, serif;
+  font-weight: 400;
+  font-style: italic;
+  letter-spacing: -0.02em;
+}
+
+.pd-lede {
+  margin-top: 28px;
+  max-width: 1180px;
+  font-size: 34px;
+  line-height: 1.4;
+  color: #555C58;
+}
+
+.pd-small {
+  font-size: 24px;
+  line-height: 1.45;
+  color: #5F6962;
+}
+
+.pd-h3 {
+  font-size: 36px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+.pd-p {
+  margin-top: 12px;
+  font-size: 28px;
+  line-height: 1.42;
+  color: #555C58;
+}
+
+.pd-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.pd-rule {
+  height: 1px;
+  background: #D7DBD6;
+}
+
+.pd-card {
+  border: 1px solid #D7DBD6;
+  border-radius: 28px;
+  background: #F6F7F4;
+}
+
+/* Bow bullets */
+.pd-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.pd-list li {
+  position: relative;
+  padding-left: 52px;
+  font-size: 30px;
+  line-height: 1.38;
+  color: #2A352E;
+}
+.pd-list li + li {
+  margin-top: 22px;
+}
+.pd-list li > .pd-bow {
+  position: absolute;
+  left: 0;
+  top: 11px;
+}
+
+/* Footer: "FaleraOS · Elixpo", slide number, site. */
+.pd-footer {
+  position: absolute;
+  left: 136px;
+  right: 136px;
+  bottom: 0;
+  height: 96px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid #D7DBD6;
+  background: #FFFFFF;
+  z-index: 5;
+  font-size: 22px;
+  color: #5F6962;
+}
+.pd-footer b {
+  color: #142018;
+  font-weight: 700;
+}
+.pd-footer .pd-num {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 0.08em;
+}
+
+/* Lumi's corner mark on content slides. */
+.pd-mark {
+  position: absolute;
+  top: 72px;
+  right: 120px;
+  height: 92px;
+  width: auto;
+}
+
+/* Index page */
+.pd-index {
+  min-height: 100vh;
+  background: #FBFBF8;
+  color: #142018;
+  font-family: Arial, Helvetica, ui-sans-serif, system-ui, sans-serif;
+  padding: 56px 40px 80px;
+}
+.pd-index-grid {
+  margin: 40px auto 0;
+  max-width: 1560px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(480px, 1fr));
+  gap: 32px;
+}
+.pd-thumb {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+.pd-thumb-frame {
+  position: relative;
+  width: 480px;
+  height: 270px;
+  overflow: hidden;
+  border: 1px solid #D7DBD6;
+  border-radius: 12px;
+  background: #FFFFFF;
+  transition: box-shadow 0.15s;
+}
+.pd-thumb:hover .pd-thumb-frame {
+  box-shadow: 0 16px 40px rgba(24, 38, 28, 0.12);
+}
+.pd-thumb-frame .pd-canvas {
+  transform: scale(0.25);
+}
+.pd-thumb-label {
+  margin-top: 10px;
+  font-size: 15px;
+  color: #5F6962;
+}
+
+/* Keep Next's dev-mode indicator out of screenshots taken from `npm run dev`. */
+nextjs-portal {
+  display: none !important;
+}
