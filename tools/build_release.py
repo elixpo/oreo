@@ -112,6 +112,7 @@ SHIP_PATTERNS = [
     "oreoWare/bt.py",
     "oreoWare/touch.py",
     "oreoWare/audio.py",
+    "oreoWare/sdcard.py",
     "oreoWare/buttons.py",
     "oreoWare/display.py",
     "oreoWare/imu.py",

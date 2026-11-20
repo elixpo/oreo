@@ -177,36 +177,58 @@ class ListView:
 
 # ── on-screen keyboard ─────────────────────────────────────────────────────
 
-KB_ROWS = ("abcdefghij", "klmnopqrst", "uvwxyz0123", "456789 -.'")
-KB_ACTIONS = ("DEL", "CANCEL", "OK")
+# Three layouts of 4 x 10 keys; the bottom row switches between them.
+KB_LAYOUTS = (
+    ("abcdefghij", "klmnopqrst", "uvwxyz0123", "456789-_.@"),
+    ("ABCDEFGHIJ", "KLMNOPQRST", "UVWXYZ0123", "456789-_.@"),
+    ("1234567890", "!#$%&*()+=", "/:;,?'\"~|^", "<>[]{}\\`-."),
+)
+KB_ROWS = KB_LAYOUTS[0]
+KB_ACTIONS = ("aA", "#+", "SPACE", "DEL", "OK")
 KB_X, KB_Y, KB_W, KB_H = 10, 80, 30, 28
+KB_ACT_W = 60
 
 
 class Keyboard:
-    def __init__(self, prompt, text="", limit=32):
+    """Text entry: letters (lower and upper case), digits and symbols,
+    space, delete and OK. B deletes, or cancels when the text is empty."""
+
+    def __init__(self, prompt, text="", limit=64, secret=False):
         self.prompt = prompt
         self.text = text
         self.limit = limit
+        self.secret = secret
+        self.layout = 0
         self.r = 0
         self.c = 0
 
+    def rows(self):
+        return KB_LAYOUTS[self.layout]
+
     def _press(self, r, c):
-        if r < len(KB_ROWS):
+        if r < 4:
             if len(self.text) < self.limit:
-                self.text += KB_ROWS[r][c]
+                self.text += self.rows()[r][c]
             return None
         act = KB_ACTIONS[c]
-        if act == "DEL":
+        if act == "aA":
+            self.layout = 0 if self.layout == 1 else 1
+        elif act == "#+":
+            self.layout = 0 if self.layout == 2 else 2
+        elif act == "SPACE":
+            if len(self.text) < self.limit:
+                self.text += " "
+        elif act == "DEL":
             self.text = self.text[:-1]
-            return None
-        return act.lower()
+        else:
+            return "ok"
+        return None
 
     def key(self, btn):
-        rows = len(KB_ROWS) + 1
         if btn == api.BTN_UP:
-            self.r = (self.r - 1) % rows
+            self.r = (self.r - 1) % 5
         elif btn == api.BTN_DOWN:
-            self.r = (self.r + 1) % rows
+            self.r = (self.r + 1) % 5
         elif btn == api.BTN_LEFT:
             self.c -= 1
         elif btn == api.BTN_RIGHT:
@@ -218,22 +240,25 @@ class Keyboard:
                 self.text = self.text[:-1]
                 return None
             return "cancel"
-        width = len(KB_ACTIONS) if self.r == len(KB_ROWS) else len(KB_ROWS[0])
+        width = len(KB_ACTIONS) if self.r == 4 else 10
         self.c %= width
         return None
 
     def hit(self, x, y):
-        r = (y - KB_Y) // KB_H
-        if y < KB_Y or r > len(KB_ROWS):
+        """Press the key under a touch: "ok", or None."""
+        if y < KB_Y:
             return None
-        if r == len(KB_ROWS):
-            c = (x - KB_X) // 100
+        r = (y - KB_Y) // KB_H
+        if r == 4:
+            c = (x - KB_X) // KB_ACT_W
             if 0 <= c < len(KB_ACTIONS):
                 self.r, self.c = r, c
                 return self._press(r, c)
             return None
+        if r > 4:
+            return None
         c = (x - KB_X) // KB_W
-        if 0 <= c < len(KB_ROWS[0]):
+        if 0 <= c < 10:
             self.r, self.c = r, c
             return self._press(r, c)
         return None
@@ -242,20 +267,20 @@ class Keyboard:
         d.rect(0, TOP - 2, api.SCREEN_W, BOTTOM - TOP + 2, theme.BG, fill=True)
         d.text(clean(self.prompt, CHARS - 2), 10, TOP + 6, theme.TEXT_DIM)
         widgets.draw_panel(d, 8, TOP + 20, api.SCREEN_W - 16, 22)
-        d.text(clean(self.text[-34:]) + "_", 14, TOP + 27, theme.TEXT_BRIGHT)
-        for r, row in enumerate(KB_ROWS):
+        shown = "*" * len(self.text) if self.secret else self.text
+        d.text(clean(shown[-34:]) + "_", 14, TOP + 27, theme.TEXT_BRIGHT)
+        for r, row in enumerate(self.rows()):
             for c, ch in enumerate(row):
                 x, y = KB_X + c * KB_W, KB_Y + r * KB_H
                 sel = r == self.r and c == self.c
                 d.rect(x, y, KB_W - 2, KB_H - 2, theme.DOCK_SEL if sel else theme.CARD, fill=True)
-                d.text("_" if ch == " " else ch, x + 11, y + 9,
-                       theme.PRIMARY if sel else theme.TEXT_BRIGHT)
-        y = KB_Y + len(KB_ROWS) * KB_H
+                d.text(ch, x + 11, y + 9, theme.PRIMARY if sel else theme.TEXT_BRIGHT)
+        y = KB_Y + 4 * KB_H
         for c, act in enumerate(KB_ACTIONS):
-            x = KB_X + c * 100
-            sel = self.r == len(KB_ROWS) and self.c == c
-            d.rect(x, y, 96, KB_H - 2, theme.DOCK_SEL if sel else theme.CARD, fill=True)
-            d.text(act, x + (96 - 8 * len(act)) // 2, y + 9,
+            x = KB_X + c * KB_ACT_W
+            sel = self.r == 4 and self.c == c
+            d.rect(x, y, KB_ACT_W - 4, KB_H - 2, theme.DOCK_SEL if sel else theme.CARD, fill=True)
+            d.text(act, x + (KB_ACT_W - 4 - 8 * len(act)) // 2, y + 9,
                    theme.PRIMARY if sel else theme.TEXT_BRIGHT)
 
 

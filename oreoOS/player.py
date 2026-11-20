@@ -458,6 +458,40 @@ def open_stream(url, connect=None, range_start=None, icy=True):
     raise StreamError("too many redirects")
 
 
+def get_stream(url, sink, connect=None, user_agent=None, timeout_s=CONNECT_TIMEOUT_S):
+    """GET url (following redirects) and hand the body to sink(memoryview)
+    piece by piece, never holding it whole; stop early when sink returns
+    False. For feeds and other documents too big to buffer (podcast RSS).
+    Raises StreamError on an HTTP error. Run it on a worker."""
+    for _ in range(MAX_REDIRECTS + 1):
+        resp = request(url, connect, None, False, timeout_s, user_agent)
+        st = resp.status
+        if st in (301, 302, 303, 307, 308):
+            loc = resp.headers.get("location")
+            resp.close()
+            if not loc:
+                raise StreamError("redirect without a location")
+            url = join_url(url, loc)
+            continue
+        if st != 200:
+            resp.close()
+            raise StreamError("HTTP %d" % st)
+        try:
+            if resp.leftover and sink(memoryview(resp.leftover)) is False:
+                return
+            buf = bytearray(2048)
+            mv = memoryview(buf)
+            while True:
+                n = _recv_into(resp.sock, mv)
+                if not n:
+                    return
+                if sink(mv[:n]) is False:
+                    return
+        finally:
+            resp.close()
+    raise StreamError("too many redirects")
+
+
 # ── the player ─────────────────────────────────────────────────────────────
 
 def _decoder():

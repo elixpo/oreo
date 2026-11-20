@@ -201,6 +201,7 @@ DEPLOY = [
     ("oreoWare/board.py",       "oreoWare/board.py"),
     ("oreoWare/touch.py",       "oreoWare/touch.py"),
     ("oreoWare/audio.py",       "oreoWare/audio.py"),   # PCB speaker (I2S)
+    ("oreoWare/sdcard.py",      "oreoWare/sdcard.py"),  # microSD at /sd
     ("oreoWare/buttons.py",     "oreoWare/buttons.py"),
     ("oreoWare/display.py",     "oreoWare/display.py"),
     ("oreoWare/battery.py",     "oreoWare/battery.py"),

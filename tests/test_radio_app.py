@@ -196,7 +196,7 @@ class RadioAppTest(unittest.TestCase):
             c = mu.KB_ROWS[r].index(ch)
             self.app.on_touch("down", mu.KB_X + c * mu.KB_W + 5, mu.KB_Y + r * mu.KB_H + 5)
         self.assertEqual(self.app.kb.text, "jaz")
-        self.app.on_touch("down", mu.KB_X + 2 * 100 + 5, mu.KB_Y + len(mu.KB_ROWS) * mu.KB_H + 5)
+        self.app.on_touch("down", mu.KB_X + 4 * mu.KB_ACT_W + 5, mu.KB_Y + 4 * mu.KB_H + 5)
         self.frame()
         self.assertIn("name=jaz", self.fetched[-1])
         self.assertEqual(self.app.view, "list")

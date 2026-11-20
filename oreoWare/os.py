@@ -64,6 +64,12 @@ class OS(api.OS):
             self.audio = _audio.get()
         except Exception:
             self.audio = None
+        # The microSD card (oreoWare.sdcard): mount() it from a worker.
+        try:
+            from oreoWare import sdcard as _sdcard
+            self.sdcard = _sdcard.get()
+        except Exception:
+            self.sdcard = None
         # backends added incrementally — wired up as each peripheral comes online
         self.leds = None
         self.ir   = None
