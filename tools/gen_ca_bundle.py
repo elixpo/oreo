@@ -47,8 +47,6 @@ HOSTS = (
     "ipapi.co",                              # oreoOS.geo fallback
     "api.openweathermap.org",                # Weather app
     "speed.cloudflare.com",                  # Wi-Fi speed test
-    "api.spotify.com",                       # Spotify app (DigiCert Global Root G2)
-    "falera.elixpo.com",                     # Spotify app sign-in relay (GTS Root R4)
 )
 
 # (file stem in --certs-dir, why it is in the bundle)

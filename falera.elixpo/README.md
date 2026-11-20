@@ -71,39 +71,3 @@ displayed on the badge screen and hands the user off to
 `http://oreo.local/?prefill=<code>` in a new tab — the badge's own
 upload page picks up the prefill and continues the gated handshake
 from there. End-to-end bytes never leave the local network.
-
-## /spotify (badge sign-in relay)
-
-The badge's Spotify app (`apps_market/spotify`) links to a Spotify account
-through this site. `/spotify` is a static page where the owner types the
-code the badge shows; four Cloudflare Pages Functions under
-`functions/api/spotify/` do the rest (shared code in `relay/spotify.js`):
-
-| Endpoint | Caller | Does |
-|---|---|---|
-| `POST /api/spotify/session` | badge | new 6-character PIN + a poll secret only the badge sees |
-| `GET /api/spotify/login?pin=` | browser | redirects to Spotify (Authorization Code with PKCE) |
-| `GET /api/spotify/callback` | Spotify | exchanges the code, parks the tokens under the PIN |
-| `POST /api/spotify/poll` | badge | `pending`, then the tokens exactly once, then `expired` |
-| `POST /api/spotify/refresh` | badge | forwards a refresh token to Spotify with the client id; stores nothing |
-
-PKCE needs no client secret. `/refresh` exists because
-`accounts.spotify.com` chains to a root CA the badge's TLS bundle lacks
-(`docs/TLS.md`); it needs only `SPOTIFY_CLIENT_ID`.
-
-Setup (nothing works until both required items exist; the endpoints answer
-503 `not_configured` and the badge says so):
-
-1. Create an app at developer.spotify.com/dashboard, tick **Web API**, and
-   add the Redirect URI `https://falera.elixpo.com/api/spotify/callback`
-   (exactly; also `http://127.0.0.1:8788/api/spotify/callback` for
-   `wrangler pages dev`). In development mode Spotify only lets accounts
-   listed under the app's **User Management** sign in.
-2. Pages project settings: variable `SPOTIFY_CLIENT_ID` = the app's client
-   id, and a KV namespace bound as `SPOTIFY_KV` (see `wrangler.toml`).
-   `SPOTIFY_REDIRECT_URI` overrides the callback URL if needed.
-
-KV is eventually consistent, so the badge can take up to about a minute to
-notice a sign-in. Each link costs about five KV writes.
-
-Tests: `npm run test:spotify`.

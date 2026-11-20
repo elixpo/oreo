@@ -57,12 +57,6 @@ host test fails when the code gains an `https://` host not listed there):
 | ipwho.is, ipapi.co | `oreoOS.geo` | Google Trust Services WE1 → GTS Root R4 |
 | api.openweathermap.org | Weather app | Sectigo OV R36 → Sectigo Root R46 → USERTrust RSA |
 | speed.cloudflare.com | Wi-Fi speed test | Google Trust Services WE1 → GTS Root R4 |
-| api.spotify.com | Spotify app (2026-11-20) | DigiCert Global G2 TLS RSA SHA256 2020 CA1 → DigiCert Global Root G2 |
-| falera.elixpo.com | Spotify app sign-in and token refresh relay (2026-11-20) | Google Trust Services WE1 → GTS Root R4 |
-
-accounts.spotify.com (Certainly Intermediate R1 → Starfield Root G2) is
-not in the bundle, so the Spotify app refreshes its token through the
-falera.elixpo.com relay rather than calling it directly.
 
 NTP (`pool.ntp.org`, UDP) is not TLS.
 
