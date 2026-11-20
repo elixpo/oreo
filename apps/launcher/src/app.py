@@ -827,17 +827,10 @@ class App(oreoOS.App):
             widgets.draw_hint(d, self._hint())
 
         # ── scrollbar on the right ───────────────────────────────────────
-        if rows_total > VISIBLE_ROWS:
-            track_x = SW - 4
-            track_y = PAD_TOP
-            track_h = SH - PAD_TOP - PAD_BOT
-            d.rect(track_x, track_y, 2, track_h, theme.MUTED2, fill=True)
-            thumb_h = max(12, track_h * VISIBLE_ROWS // rows_total)
-            # Thumb follows the eased offset, so it glides with the grid.
-            max_scroll = max(1, (rows_total - VISIBLE_ROWS) * CELL_H)
-            thumb_y = track_y + (track_h - thumb_h) * \
-                max(0, min(max_scroll, scroll_int)) // max_scroll
-            d.rect(track_x, thumb_y, 2, thumb_h, theme.PRIMARY, fill=True)
+        # Thumb follows the eased offset (pixels), so it glides with the grid.
+        widgets.draw_scrollbar(d, SW - 4, PAD_TOP, SH - PAD_TOP - PAD_BOT,
+                               rows_total * CELL_H, VISIBLE_ROWS * CELL_H,
+                               scroll_int, track=theme.MUTED2)
 
         if partial:
             self._present_region = (0, widgets.HEADER_H, SW,

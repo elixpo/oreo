@@ -11,7 +11,10 @@ Layout:
 
 Controls:
   arrows  move the crosshair (long-press accelerates ~5x after ~0.4 s held)
-  B       cycle display model RGB -> HSL -> CMYK -> RGB
+  B       cycle the view: RGB -> HSL -> CMYK -> PALETTE -> PRESETS -> RGB
+          PALETTE shows a five-colour ribbon derived from the picked colour
+          (src/palette.py); PRESETS shows curated palettes, LEFT / RIGHT
+          step through them and A saves the preset's main colour
   A       save the current colour (kept in /state/color_picker.json)
   C       show the colour on the badge's RGB LED, or turn it off
           (a double-tap of C opens the notification panel)
@@ -24,6 +27,7 @@ artefacts). The HSL / CMYK readouts are derived on the fly from RGB.
 
 import oreoOS
 from oreoOS import api, theme, widgets
+from . import palette
 try:
     from oreoOS import state
 except ImportError:   # OS before the /state helper: keep the old file save
@@ -46,7 +50,10 @@ FAST_PX_PER_S       = 380.0
 ACCEL_AFTER_S       = 0.4
 
 # Channel labels per model (just for the header readout)
-_MODELS = ("RGB", "HSL", "CMYK")
+_MODELS = ("RGB", "HSL", "CMYK", "PAL", "PRESET")
+RIBBON_H = 20                        # palette ribbon above the hint bar
+_DIRS = ((api.BTN_LEFT, -1, 0), (api.BTN_RIGHT, +1, 0),
+         (api.BTN_UP, 0, -1), (api.BTN_DOWN, 0, +1))
 
 LED_SCALE = 0.4      # WS2812 at full power is glaring a hand's width away
 
@@ -213,6 +220,7 @@ class App(oreoOS.App):
         self._cx, self._cy = PLAY_W / 2.0, PLAY_H / 2.0
         self._rgb = _load_rgb()       # restored from disk
         self._mode = "RGB"            # header readout model
+        self._preset = 0              # index into palette.PRESETS
         self._saved_flash = 0.0
         # Hold-times for direction buttons (seconds held). Reset to 0 the
         # instant a button is released so the next tap restarts the curve.
@@ -241,6 +249,15 @@ class App(oreoOS.App):
 
     # ── input ──────────────────────────────────────────────────────────────
     def on_button_press(self, btn):
+        if self._mode == "PRESET" and btn in (api.BTN_LEFT, api.BTN_RIGHT,
+                                              api.BTN_UP, api.BTN_DOWN):
+            if btn in (api.BTN_LEFT, api.BTN_RIGHT):
+                step = 1 if btn == api.BTN_RIGHT else -1
+                self._preset = (self._preset + step) % len(palette.PRESETS)
+                self._rgb = palette.PRESETS[self._preset][1][0]
+                self._update_led()
+                self._dirty = True
+            return
         # Single-tap nudge so a quick press always moves at least a couple
         # of pixels (the update() loop only ramps after ACCEL_AFTER_S).
         if   btn == api.BTN_LEFT:   self._cx -= TAP_NUDGE_PX
@@ -250,6 +267,8 @@ class App(oreoOS.App):
         elif btn == api.BTN_B:
             i = _MODELS.index(self._mode)
             self._mode = _MODELS[(i + 1) % len(_MODELS)]
+            if self._mode == "PRESET":
+                self._rgb = palette.PRESETS[self._preset][1][0]
         elif btn == api.BTN_A:
             _save_rgb(self._rgb)
             try:
@@ -263,8 +282,9 @@ class App(oreoOS.App):
                 self._os.settings_set("color_picker_led", self._led_on)
             except Exception:
                 pass
-        self._clamp_cursor()
-        self._sample_color()
+        if self._mode != "PRESET":    # the preset's colour stays picked
+            self._clamp_cursor()
+            self._sample_color()
         self._update_led()
         self._dirty = True
 
@@ -272,10 +292,9 @@ class App(oreoOS.App):
         # Long-press: poll which dir buttons are held and accumulate.
         moved = False
         b = self._os.buttons
-        for btn, dx, dy in ((api.BTN_LEFT,  -1, 0),
-                            (api.BTN_RIGHT, +1, 0),
-                            (api.BTN_UP,     0, -1),
-                            (api.BTN_DOWN,   0, +1)):
+        # In PRESETS the arrows pick presets, not the crosshair.
+        dirs = () if self._mode == "PRESET" else _DIRS
+        for btn, dx, dy in dirs:
             try:
                 held = b.is_pressed(btn)
             except Exception:
@@ -339,17 +358,27 @@ class App(oreoOS.App):
 
         # ── header bar (pink, compact) ─────────────────────────────────────
         self._draw_header(d)
-        widgets.draw_hint(d, "arrows=pick B=mode A=save C=LED")
+        if self._mode == "PRESET":
+            widgets.draw_hint(d, "L/R=preset B=mode A=save C=LED")
+        else:
+            widgets.draw_hint(d, "arrows=pick B=mode A=save C=LED")
+
+        # ── palette ribbon (PALETTE / PRESETS views) ──────────────────────
+        if self._mode == "PAL":
+            self._draw_ribbon(d, palette.derive(self._rgb))
+        elif self._mode == "PRESET":
+            self._draw_ribbon(d, palette.PRESETS[self._preset][1])
 
         # ── crosshair ──────────────────────────────────────────────────────
-        self._draw_cursor(d)
+        if self._mode != "PRESET":
+            self._draw_cursor(d)
 
         # ── "Saved!" toast ────────────────────────────────────────────────
         if self._saved_flash > 0:
             msg = "Saved!"
             mw = len(msg) * 16
             tx = (SW - mw) // 2
-            ty = PLAY_BOT - 32
+            ty = PLAY_BOT - RIBBON_H - 30
             d.rect(tx - 8, ty - 4, mw + 16, 22, theme.GREEN, fill=True)
             d.text(msg, tx, ty, api.WHITE, scale=2)
 
@@ -372,8 +401,27 @@ class App(oreoOS.App):
         if self._led_on:
             d.text("LED", SW - 30, (H - 8) // 2, theme.GOLD)
 
+    def _draw_ribbon(self, d, pal):
+        """Five swatches across the bottom of the play area, each labelled
+        in whichever of dark / white text reads on it."""
+        y = PLAY_BOT - RIBBON_H
+        n = len(pal)
+        d.rect(0, y - 1, SW, 1, api.BLACK, fill=True)
+        for i in range(n):
+            x0 = SW * i // n
+            x1 = SW * (i + 1) // n
+            c = pal[i]
+            d.rect(x0, y, x1 - x0, RIBBON_H, api.rgb(*c), fill=True)
+            lbl = palette.SLOTS[i]
+            d.text(lbl, x0 + (x1 - x0 - len(lbl) * 8) // 2,
+                   y + (RIBBON_H - 8) // 2, api.rgb(*palette.contrast_text(c)))
+
     def _readout_str(self):
         r, g, b = self._rgb
+        if self._mode == "PAL":
+            return "PAL #%02X%02X%02X" % (r, g, b)
+        if self._mode == "PRESET":
+            return palette.PRESETS[self._preset][0][:18]
         if self._mode == "RGB":
             return "RGB %d %d %d" % (r, g, b)
         if self._mode == "HSL":

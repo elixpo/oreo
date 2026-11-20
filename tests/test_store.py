@@ -84,6 +84,29 @@ class CatalogueTest(unittest.TestCase):
         self.assertTrue(store.is_newer("2.0b", "1.9"))
 
 
+class CapacityTest(unittest.TestCase):
+    def test_has_room(self):
+        self.assertTrue(store.has_room(1000, 1000 + store.MIN_FREE))
+        self.assertFalse(store.has_room(1001, 1000 + store.MIN_FREE))
+        self.assertTrue(store.has_room(10 ** 9, None))
+        self.assertTrue(store.has_room(0, 0, reserve=0))
+
+    def test_free_bytes_reads_statvfs(self):
+        saved = store._os
+
+        class FakeOS:
+            @staticmethod
+            def statvfs(path):
+                return (4096, 4096, 1000, 300, 250, 0, 0, 0, 0, 255)
+        store._os = FakeOS
+        try:
+            self.assertEqual(store.free_bytes(), 4096 * 250)
+            FakeOS.statvfs = staticmethod(lambda p: 1 / 0)
+            self.assertIsNone(store.free_bytes())
+        finally:
+            store._os = saved
+
+
 class InstallTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
@@ -92,7 +115,8 @@ class InstallTest(unittest.TestCase):
         os.mkdir("apps")
         self.saved = {k: getattr(store, k) for k in
                       ("TMP_DIR", "wifi_up", "_io", "_apps",
-                       "_featured", "_invalidate_launcher")}
+                       "_featured", "_invalidate_launcher", "free_bytes")}
+        store.free_bytes = lambda path="/": 10 * 1024 * 1024
         store.TMP_DIR = self.tmp + "/stage"
         store.wifi_up = lambda: True
         store._invalidate_launcher = lambda: None
@@ -173,6 +197,24 @@ class InstallTest(unittest.TestCase):
         ok, _ = store.install("racer")
         self.assertFalse(ok)
         self.assertFalse(os.path.exists("apps/racer"))
+
+    def test_low_storage_refuses_before_downloading(self):
+        total = store.find("racer")["size"]
+        store.free_bytes = lambda path="/": total + store.MIN_FREE - 1
+        ok, msg = store.install("racer")
+        self.assertFalse(ok)
+        self.assertIn("not enough storage", msg)
+        self.assertFalse(os.path.exists("apps/racer"))
+        self.assertFalse(os.path.exists(store.TMP_DIR + "/racer"))
+        # Exactly enough room (the app plus the reserve) installs.
+        store.free_bytes = lambda path="/": total + store.MIN_FREE
+        ok, msg = store.install("racer")
+        self.assertTrue(ok, msg)
+
+    def test_unknown_free_space_does_not_block(self):
+        store.free_bytes = lambda path="/": None
+        ok, msg = store.install("racer")
+        self.assertTrue(ok, msg)
 
     def test_default_apps_cannot_be_uninstalled(self):
         os.makedirs("apps/settings")
