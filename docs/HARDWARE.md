@@ -21,8 +21,9 @@ There are two designs:
   [`circuit/elixpo/README.md`](../circuit/elixpo/README.md), and the parts
   and cost of one badge in
   [`circuit/elixpo/BOM_COST.md`](../circuit/elixpo/BOM_COST.md). FaleraOS
-  needs a matching pin map and drivers before it runs on this board
-  (#154); it is flashed once a board is assembled.
+  detects the board at boot and has its pin map, display driver,
+  expander buttons and touch screen (`oreoWare/touch.py`, calibrated in
+  Settings > Touch); it is flashed once a board is assembled.
 
 Where the two differ, the parts lists and power section below describe the
 breadboard.

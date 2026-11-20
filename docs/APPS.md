@@ -104,13 +104,25 @@ class App(oreoOS.App):
     def on_button_press(self, btn):
         ...
 
+    def on_touch(self, event, x, y):   # optional; PCB badge only
+        ...                            # event: "down", "move" or "up"
+
     def on_exit(self):             # once, when the app closes (also after a crash)
         ...
 ```
 
 The OS runs one loop: read buttons, call `on_button_press` /
-`on_button_release`, then `update(dt)`, then `draw(d)`, then presents the
-frame. Rules that keep the badge responsive:
+`on_button_release`, then `on_touch` on a badge with a touch screen, then
+`update(dt)`, then `draw(d)`, then presents the frame.
+
+**Touch.** The PCB badge has a resistive touch screen. `on_touch(event, x,
+y)` gets `"down"` when a finger lands, `"move"` while it slides (by 3 pixels
+or more), and `"up"` when it lifts, with `x` 0-319 and `y` 0-239. The
+breadboard badge has no touch screen and never calls it, so every action
+must still work with the buttons. `os.touch` is `None` there; check
+`os.touch is not None` to show touch hints only where they apply. While the
+notification panel or a pairing prompt is open, touches don't reach the
+app. Rules that keep the badge responsive:
 
 - **Never call `d.present()`.** The OS presents once per frame.
 - **Never block.** Anything slower than a few milliseconds in `update` or

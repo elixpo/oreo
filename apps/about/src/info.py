@@ -89,7 +89,15 @@ def step_os(os_):
 
 
 def step_hw():
-    out = {"board": "ESP32-S3 N16R8"}
+    out = {"board": "ESP32-S3 N16R8", "display": "ST7789 320x240"}
+    try:
+        from oreoWare import pins
+        if getattr(pins, "BOARD", "") == "pcb":
+            out["board"] = "Falera PCB, ESP32-S3"
+        if getattr(pins, "DISPLAY_DRIVER", "") == "ili9341":
+            out["display"] = "ILI9341 320x240"
+    except Exception:
+        pass
     try:
         import machine
         out["cpu"] = "%d MHz" % (machine.freq() // 1000000)

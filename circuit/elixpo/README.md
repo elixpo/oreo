@@ -53,11 +53,18 @@ controller's chip select. Other
 I2C devices: MPU-6050 0x69 (AD0 tied to its VLOGIC pin;
 `oreoWare/imu.py` tries 0x68, then 0x69).
 
-This differs from the breadboard's `oreoWare/pins.py` (buttons on GPIOs,
-SD on 38-40, the amp on 41/21/46): the expander freed the button pins, so
-the PCB regroups them. The OS needs a matching pin map, an ILI9341 driver,
-a touch driver and the expander button driver (#154) before it runs on
-this board.
+This differs from the breadboard (buttons on GPIOs, I2C on 42/47, the amp
+on 41/21/46): the expander freed the button pins, so the PCB regroups them.
+FaleraOS finds out which board it runs on at boot (`oreoWare/board.py` reads
+the AW9523B's chip ID; a `/board.txt` holding `pcb` or `breadboard`
+overrides it), and `oreoWare/pins.py` holds both pin maps. On the PCB it
+uses the ILI9341 panel driver (`oreoWare/_ili9341.py`), reads the buttons
+from the expander (`oreoWare/aw9523.py`), turns the switched 3.3 V supply on
+and wakes from deep sleep on the expander's interrupt. The touch screen
+(XPT2046) is read by `oreoWare/touch.py` while its PENIRQ (GPIO21) is low:
+the bus drops to 2 MHz, the expander selects the chip, and apps get
+`on_touch` events. It starts with a typical calibration for these modules;
+Settings > Touch calibrates it by tapping four targets and saves the result.
 
 ## Electrical decisions
 
@@ -161,9 +168,9 @@ those. `BOM_ORDER.csv` lists everything a badge needs: what JLCPCB can fit,
 the SMD and through-hole parts to solder by hand, and the off-board parts,
 with LCSC numbers and prices.
 
-FaleraOS and its firmware are flashed over USB-C once a board is assembled;
-the OS first needs this board's pin map, an ILI9341 driver, a touch driver
-and the expander button driver (#154).
+FaleraOS and its firmware are flashed over USB-C once a board is assembled.
+The OS supports this board (see the pin map above); check the picture's
+orientation, the buttons and the touch calibration on the first board.
 
 The battery sits on the back in a 3D-printed L-shaped holder: it runs the
 cell's 50 mm edge, is as tall as the cell (6 mm) and has a 10-12 mm lip over
@@ -224,6 +231,6 @@ badge plays.
 The hardware design files in this directory are Open Hardware, licensed under
 the [CERN Open Hardware Licence v2 - Permissive](../../LICENSES/preferred/CERN-OHL-P-2.0)
 (CERN-OHL-P-2.0); see [`LICENSE`](LICENSE) for the notice. You may make,
-modify and sell boards from them; the Elixpo and Oreo names and mascot are
+modify and sell boards from them; the Elixpo and Falera names and the Lumi mascot are
 trademarks, so derived boards need their own names (see
 [`TRADEMARKS.md`](../../TRADEMARKS.md)).

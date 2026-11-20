@@ -24,6 +24,11 @@ On-device runtime / firmware
       Copyright (c) 2026 Ayushman Bhattacharya and Elixpo
       Vendored in firmware/usermods/oreo_rv565/rv565/ (see VENDORED.md there).
       https://github.com/elixpo/rv565
+  * minimp3                          - CC0-1.0 (public domain dedication)
+      By lieff and contributors.
+      Vendored in firmware/usermods/oreo_audio/minimp3/ (see VENDORED.md there).
+      See ../preferred/CC0-1.0.
+      https://github.com/lieff/minimp3
 
 Host-side tooling (see oreoOS/requirements.txt for versions)
 ------------------------------------------------------------

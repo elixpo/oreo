@@ -28,8 +28,48 @@ def _volatile(key):
 
 class OS(api.OS):
     def __init__(self):
+        # PCB badge: set up the I2C expander before the display. Out of reset
+        # it may hold the touch controller selected (T_CS low), and display
+        # traffic clocked into the XPT2046 could switch its pen interrupt off;
+        # init() deselects it and keeps the corner LEDs off.
+        try:
+            from oreoWare import pins as _pins
+            if getattr(_pins, "BOARD", "") == "pcb":
+                from oreoWare import aw9523
+                aw9523.get()
+        except Exception:
+            pass
         self.display = Display()
         self.buttons = Buttons()
+        # The PCB badge's touch screen (oreoWare.touch); None on the
+        # breadboard badge or if it isn't answering.
+        try:
+            from oreoWare import touch as _touch
+            self.touch = _touch.create(self.display)
+        except Exception:
+            self.touch = None
+        # A calibration saved by Settings > Touch replaces the default one.
+        if self.touch is not None:
+            try:
+                from oreoOS import touchcal
+                cal = touchcal.load()
+                if cal:
+                    self.touch.set_calibration(cal)
+            except Exception:
+                pass
+        # The PCB badge's speaker (oreoWare.audio); always an object, with
+        # available False (and every call a no-op) on the breadboard badge.
+        try:
+            from oreoWare import audio as _audio
+            self.audio = _audio.get()
+        except Exception:
+            self.audio = None
+        # The microSD card (oreoWare.sdcard): mount() it from a worker.
+        try:
+            from oreoWare import sdcard as _sdcard
+            self.sdcard = _sdcard.get()
+        except Exception:
+            self.sdcard = None
         # backends added incrementally — wired up as each peripheral comes online
         self.leds = None
         self.ir   = None

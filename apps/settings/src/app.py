@@ -222,6 +222,13 @@ class App(oreoOS.App):
             _Row("Reboot",      "action",
                  setter=lambda v: self._reboot()),
         ]
+        # The PCB badge's touch screen: calibrate it by tapping four targets
+        # (oreoOS.touchcal). Not shown on the breadboard badge.
+        self._cal = None
+        if getattr(os, "touch", None) is not None:
+            self._rows.insert(len(self._rows) - 2, _Row(
+                "Touch", "action", getter=lambda: "calibrate",
+                setter=lambda v: self._open_touchcal()))
 
     # ── actions ──────────────────────────────────────────────────────────
     def _toggle_wifi(self, on):
@@ -420,8 +427,46 @@ class App(oreoOS.App):
         except Exception:
             return "—"
 
+    # ── touch calibration ───────────────────────────────────────────────
+    def _open_touchcal(self):
+        try:
+            from oreoOS import touchcal
+            self._cal = touchcal.Calibration(self._os.touch)
+            self._cal_saved = False
+        except Exception:
+            self._cal = None
+
+    def _close_touchcal(self):
+        self._cal = None
+        self._dirty = True
+
+    def _touchcal_button(self, btn):
+        cal = self._cal
+        if cal.state == "target":
+            if btn == api.BTN_B:
+                self._close_touchcal()
+        elif cal.state == "failed" and btn == api.BTN_A:
+            self._open_touchcal()
+        else:
+            self._close_touchcal()
+
+    def _touchcal_update(self):
+        cal = self._cal
+        cal.update()
+        if cal.state == "done" and not self._cal_saved:
+            self._cal_saved = True
+            try:
+                from oreoOS import touchcal
+                self._os.touch.set_calibration(cal.result)
+                touchcal.save(cal.result)
+            except Exception:
+                pass
+
     # ── input ────────────────────────────────────────────────────────────
     def on_button_press(self, btn):
+        if getattr(self, "_cal", None) is not None:
+            self._touchcal_button(btn)
+            return
         n = len(self._rows)
         if   btn == api.BTN_UP:    self._sel = (self._sel - 1) % n
         elif btn == api.BTN_DOWN:  self._sel = (self._sel + 1) % n
@@ -455,6 +500,9 @@ class App(oreoOS.App):
             row.setter(None)
 
     def update(self, dt):
+        if getattr(self, "_cal", None) is not None:
+            self._touchcal_update()
+            return
         if self._save_at is not None and \
                 _diff(_ticks(), self._save_at) >= SAVE_MS:
             self._flush_power()
@@ -478,6 +526,9 @@ class App(oreoOS.App):
 
     # ── render ───────────────────────────────────────────────────────────
     def draw(self, d):
+        if getattr(self, "_cal", None) is not None:
+            self._cal.draw(d, theme)
+            return
         if not self._dirty:
             return
         d.clear(theme.BG)

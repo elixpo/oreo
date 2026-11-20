@@ -47,7 +47,14 @@ HOSTS = (
     "ipapi.co",                              # oreoOS.geo fallback
     "api.openweathermap.org",                # Weather app
     "speed.cloudflare.com",                  # Wi-Fi speed test
+    "de1.api.radio-browser.info",            # Radio app (Let's Encrypt)
+    "de2.api.radio-browser.info",            # Radio app, second server
+    "itunes.apple.com",                      # Podcasts search (DigiCert G2)
+    "api.jamendo.com",                       # Jamendo app (GTS R4)
+    "prod-1.storage.jamendo.com",            # Jamendo streams (USERTrust RSA)
 )
+# Radio stations and podcast feeds and episodes are anyone's hosts: one whose chain ends outside this bundle fails with
+# "TLS: untrusted certificate" (plain http:// streams are unaffected).
 
 # (file stem in --certs-dir, why it is in the bundle)
 ROOTS = (

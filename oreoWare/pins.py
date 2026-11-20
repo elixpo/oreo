@@ -1,4 +1,4 @@
-"""GPIO assignments for the Lix badge breadboard prototype.
+"""GPIO assignments for the Falera Badge: the breadboard prototype, then the PCB.
 
 Single source of truth. Every hardware module imports from here — never hardcode a
 GPIO number anywhere else. When the PCB swaps pins, this is the only file to edit.
@@ -81,3 +81,49 @@ IMU_INT   = 3      # RTC_GPIO3 — wakes from deep sleep on a motion interrupt
 # GPIO21 is I2S LRCLK, and GPIO33 is not on the DevKit header at all (inside
 # the N16R8 module it belongs to the octal PSRAM bus). Pick new pins for
 # touch on the expander or the PCB (#102).
+
+
+# ═════ PCB badge (circuit/elixpo/) ══════════════════════════════════════
+# The values above are the breadboard's. On the PCB badge, which
+# oreoWare.board detects from its AW9523B expander, the pins below
+# replace them. The display (11, 12, 14-17), microSD (38-40), IR (2, 18),
+# status LED (48) and battery sense (1) keep the same GPIOs.
+try:
+    from oreoWare import board as _board
+    BOARD = _board.board()
+except ImportError:
+    BOARD = "breadboard"
+
+DISPLAY_DRIVER = "st7789"
+EXPANDER = False            # buttons on GPIOs (breadboard) or the AW9523B
+
+if BOARD == "pcb":
+    # 2.8" ILI9341 module (MSP2807 type) with an XPT2046 touch controller
+    DISPLAY_DRIVER = "ili9341"
+    DISPLAY_MISO   = 13     # the touch controller's data out; the LCD has none
+    TOUCH_IRQ      = 21     # XPT2046 PENIRQ, active low; T_CS is EXP_TOUCH_CS
+    # The buttons are on the expander, not on GPIOs.
+    EXPANDER = True
+    BTN_HOME = BTN_A = BTN_B = BTN_C = None
+    BTN_UP = BTN_DOWN = BTN_LEFT = BTN_RIGHT = None
+    # I2C: AW9523B 0x58 and MPU-6050 0x69 (AD0 high), 2.2 kΩ pull-ups
+    I2C_SDA   = 6
+    I2C_SCL   = 7
+    EXP_ADDR  = 0x58
+    EXP_INT   = 3           # AW9523B ~INT, active low, RTC GPIO: wakes the badge
+    IMU_INT   = 4
+    # MAX98357A; its SD_MODE is EXP_AMP_EN on the expander
+    I2S_BCLK  = 8
+    I2S_LRCLK = 9
+    I2S_DOUT  = 10
+    # J6 expansion header: 3V3, GND, then these, in this order
+    EXPANSION = (5, 41, 42, 47)
+
+# AW9523B pins (PCB only). Port 0 bit n is the button EXP_BUTTON_ORDER[n]
+# names; port 1 holds the rest.
+EXP_BUTTON_ORDER = ("UP", "DOWN", "LEFT", "RIGHT", "A", "B", "C", "HOME")
+EXP_LED_BITS   = 0x0F       # P1_0-P1_3: corner LEDs TL, TR, BL, BR (LED mode only)
+EXP_AMP_EN     = 1 << 4     # P1_4: high turns the speaker amp on
+EXP_SD_DET     = 1 << 5     # P1_5: low when a card is in
+EXP_AUX_ON_N   = 1 << 6     # P1_6: low powers the IR receiver and status LED
+EXP_TOUCH_CS   = 1 << 7     # P1_7: the touch controller's chip select, active low

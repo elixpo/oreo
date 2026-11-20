@@ -21,7 +21,7 @@ clear()
 
 Rules this module keeps:
 - It works without FaleraOS running: it sets up the SPI bus and the panel
-  itself (oreoWare._st7789's resume(): no reset, so no blank flash, and a
+  itself (the panel driver's resume(): no reset, so no blank flash, and a
   panel that lost its setup is configured again), turns the backlight on,
   and draws straight to the panel, without the 153 KB framebuffer.
 - It is cheap enough to call for every chunk: after the first frame only
@@ -83,10 +83,13 @@ def _panel():
         pass
     from machine import Pin, SPI
     from oreoWare import pins
-    from oreoWare._st7789 import ST7789
+    if getattr(pins, "DISPLAY_DRIVER", "st7789") == "ili9341":
+        from oreoWare._ili9341 import ILI9341 as Panel     # the PCB badge
+    else:
+        from oreoWare._st7789 import ST7789 as Panel
     spi = SPI(1, baudrate=pins.DISPLAY_BAUD, polarity=0, phase=0,
               sck=Pin(pins.DISPLAY_SCK), mosi=Pin(pins.DISPLAY_MOSI))
-    p = ST7789(spi,
+    p = Panel(spi,
                dc=Pin(pins.DISPLAY_DC, Pin.OUT),
                cs=Pin(pins.DISPLAY_CS, Pin.OUT, value=1),
                rst=Pin(pins.DISPLAY_RESET, Pin.OUT, value=1),

@@ -248,6 +248,101 @@
         ["src/__init__.py", 0],
         ["src/app.py", 7729]
       ]
+    },
+    {
+      "id": "radio",
+      "path": "apps_market/radio",
+      "name": "Radio",
+      "tagline": "Internet radio stations",
+      "description": "Internet radio from the open Radio Browser directory. Needs the PCB badge's speaker.",
+      "category": "Utilities",
+      "author": "Circuit-Overtime",
+      "version": "0.1",
+      "icon": "radio_icon.png",
+      "size": 28034,
+      "files": [
+        ["__init__.py", 0],
+        ["assets/__init__.py", 0],
+        ["assets/optimized/__init__.py", 0],
+        ["assets/optimized/radio_icon.py", 8800],
+        ["main.py", 241],
+        ["manifest.json", 210],
+        ["src/__init__.py", 0],
+        ["src/app.py", 13109],
+        ["src/rb.py", 5674]
+      ]
+    },
+    {
+      "id": "jamendo",
+      "path": "apps_market/jamendo",
+      "name": "Jamendo",
+      "tagline": "Free CC-licensed music",
+      "description": "Creative Commons music from Jamendo: featured, genres, albums and search. Needs the PCB badge's speaker.",
+      "category": "Utilities",
+      "author": "Circuit-Overtime",
+      "version": "0.1",
+      "icon": "jamendo_icon.png",
+      "size": 27700,
+      "files": [
+        ["__init__.py", 0],
+        ["assets/__init__.py", 0],
+        ["assets/optimized/__init__.py", 0],
+        ["assets/optimized/jamendo_icon.py", 8800],
+        ["main.py", 243],
+        ["manifest.json", 233],
+        ["src/__init__.py", 0],
+        ["src/app.py", 12868],
+        ["src/config.py", 619],
+        ["src/jam.py", 4937]
+      ]
+    },
+    {
+      "id": "music",
+      "path": "apps_market/music",
+      "name": "Music",
+      "tagline": "Your MP3s from microSD",
+      "description": "Your own MP3s from the microSD card. Needs the PCB badge's speaker.",
+      "category": "Utilities",
+      "author": "Circuit-Overtime",
+      "version": "0.1",
+      "icon": "music_icon.png",
+      "size": 34113,
+      "files": [
+        ["__init__.py", 0],
+        ["assets/__init__.py", 0],
+        ["assets/optimized/__init__.py", 0],
+        ["assets/optimized/music_icon.py", 8800],
+        ["main.py", 241],
+        ["manifest.json", 192],
+        ["src/__init__.py", 0],
+        ["src/app.py", 16078],
+        ["src/id3.py", 4479],
+        ["src/library.py", 4323]
+      ]
+    },
+    {
+      "id": "podcasts",
+      "path": "apps_market/podcasts",
+      "name": "Podcasts",
+      "tagline": "Podcasts and episodes",
+      "description": "Search, subscribe and listen to podcasts, with resume and skip. Needs the PCB badge's speaker.",
+      "category": "Utilities",
+      "author": "Circuit-Overtime",
+      "version": "0.1",
+      "icon": "podcasts_icon.png",
+      "size": 36902,
+      "files": [
+        ["__init__.py", 0],
+        ["assets/__init__.py", 0],
+        ["assets/optimized/__init__.py", 0],
+        ["assets/optimized/podcasts_icon.py", 8800],
+        ["main.py", 244],
+        ["manifest.json", 225],
+        ["src/__init__.py", 0],
+        ["src/app.py", 16160],
+        ["src/itunes.py", 2087],
+        ["src/rss.py", 9386]
+      ]
     }
   ]
 }

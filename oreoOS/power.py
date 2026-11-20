@@ -98,30 +98,15 @@ class PowerManager:
         # Wake condition: a button that was UNPRESSED at sleep entry now
         # reads PRESSED. Snapshot of initial state prevents a stuck press
         # from insta-waking us.
-        btn_ids = (pins.BTN_HOME, pins.BTN_A, pins.BTN_B, pins.BTN_C,
-                   pins.BTN_UP, pins.BTN_DOWN, pins.BTN_LEFT, pins.BTN_RIGHT)
-        btn_pins = {}
-        for b in btn_ids:
-            try:
-                btn_pins[b] = machine.Pin(b, machine.Pin.IN,
-                                           machine.Pin.PULL_UP)
-            except Exception:
-                pass
-
-        initial_btn = {b: pin.value() for b, pin in btn_pins.items()}
+        pressed = self._pressed_reader()
+        initial_btn = set(pressed())
 
         # Safety ceiling: 24 h so a wedged pin can't strand us forever.
         deadline = time.ticks_add(time.ticks_ms(), 24 * 60 * 60 * 1000)
 
         while True:
-            woke = False
-            for b, pin in btn_pins.items():
-                if pin.value() == 0 and initial_btn[b] == 1:
-                    woke = True
-                    break
-            if woke:
+            if set(pressed()) - initial_btn:
                 break
-
             if time.ticks_diff(deadline, time.ticks_ms()) <= 0:
                 break
             time.sleep_ms(30)
@@ -133,12 +118,7 @@ class PowerManager:
         # 200 ms safety ceiling so a stuck button doesn't strand us here.
         release_deadline = time.ticks_add(time.ticks_ms(), 200)
         while time.ticks_diff(release_deadline, time.ticks_ms()) > 0:
-            any_held = False
-            for pin in btn_pins.values():
-                if pin.value() == 0:
-                    any_held = True
-                    break
-            if not any_held:
+            if not pressed():
                 break
             time.sleep_ms(10)
         # Flag the run loop so it skips one input-dispatch frame and
@@ -157,6 +137,27 @@ class PowerManager:
         except Exception:
             pass
 
+    def _pressed_reader(self):
+        """A function returning the buttons down right now, read straight
+        from the hardware while the run loop is paused: the buttons
+        driver's raw_pressed() (GPIOs on the breadboard badge, the AW9523B
+        on the PCB badge), or the breadboard GPIOs for an older driver."""
+        reader = getattr(getattr(self._os, "buttons", None), "raw_pressed", None)
+        if reader is not None:
+            return reader
+        btn_pins = []
+        for b in (pins.BTN_HOME, pins.BTN_A, pins.BTN_B, pins.BTN_C,
+                  pins.BTN_UP, pins.BTN_DOWN, pins.BTN_LEFT, pins.BTN_RIGHT):
+            try:
+                btn_pins.append(machine.Pin(b, machine.Pin.IN,
+                                            machine.Pin.PULL_UP))
+            except Exception:
+                pass
+
+        def _gpio():
+            return [i for i, p in enumerate(btn_pins) if p.value() == 0]
+        return _gpio
+
     def enter_deep_sleep(self):
         """Save state, configure wake sources, and call machine.deepsleep().
 
@@ -170,6 +171,26 @@ class PowerManager:
             self._os.display.set_brightness(0)
         except Exception:
             pass
+        if getattr(pins, "EXPANDER", False):
+            # PCB badge: the buttons are on the AW9523B, whose ~INT
+            # (pins.EXP_INT, an RTC GPIO with a pull-up) goes low when one
+            # changes. Clear a pending interrupt, switch the IR receiver,
+            # status LED and corner LEDs off, and wake on ~INT going low.
+            try:
+                from oreoWare import aw9523
+                exp = aw9523.get()
+                if exp is not None:
+                    exp.leds_off()
+                    exp.set_aux(False)
+                    exp.set_amp(False)
+                    exp.read_buttons()
+                import esp32
+                esp32.wake_on_ext0(pin=machine.Pin(pins.EXP_INT),
+                                   level=esp32.WAKEUP_ALL_LOW)
+            except Exception:
+                pass
+            machine.deepsleep()
+            return
         # Wake mask: every matrix button. Active-low → wake on any going LOW.
         wake_pins = [
             pins.BTN_HOME, pins.BTN_A, pins.BTN_B, pins.BTN_C,

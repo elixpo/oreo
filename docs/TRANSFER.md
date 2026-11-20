@@ -98,6 +98,21 @@ The last few results stay listed at the bottom of the screen (**OK** or
 - **No network.** Transfer uses only the USB cable; it never turns on Wi-Fi
   or Bluetooth.
 
+### Music goes on the microSD card
+
+Transfer does not take MP3 files: music is too big for the badge's flash
+and belongs on the microSD card (PCB badge). Copy it there with the
+computer:
+
+1. Take the card out of the badge and put it in the computer's card reader
+   (or a USB card reader). It is an ordinary FAT32 or exFAT card.
+2. Copy MP3 files onto it, in any folders (`Artist/Album/01 Song.mp3`
+   works well). Other formats are not played.
+3. Eject it, put it back in the badge and open **Music**, which reads the
+   folders and the files' ID3 tags (title, artist, album).
+
+See [AUDIO.md](AUDIO.md#music) for the Music app.
+
 ### While Transfer is open
 
 While it is open, Transfer reads the USB console, and other `falera` commands

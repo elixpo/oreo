@@ -49,3 +49,10 @@ class App:
 
     def on_button_release(self, btn):
         pass
+
+    def on_touch(self, event, x, y):
+        """The touch screen (the PCB badge only): event is "down" when a
+        finger lands, "move" while it slides, "up" when it lifts, with the
+        point in screen pixels (0-319, 0-239). The breadboard badge has no
+        touch screen and never calls this."""
+        pass
