@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import {
   RV565_BAND_LINES, RV565_MOTION_RANGE, RV565_MAX_FPS, RV565_MAX_FPS_V6, Rv565Encoder, checkSchedule, convertPixels, decodeFrame,
-  frameTypeCounts, linesSentFraction,
+  bytesSentFraction, frameTypeCounts,
   parseContainer, toCArray, toRgba, verify, type Codec, type PixelFormat, type Rv565Clip, type ScheduleReport,
 } from "@/lib/rv565";
 
@@ -14,7 +14,7 @@ import {
  * by the browser's own <video> element, drawn to a canvas at the target size,
  * converted to the chosen pixel format and compressed with CompressionStream.
  * Nothing is uploaded, so the size cap only protects the visitor's memory.
- * An existing .rv565 file (version 6 or 7) dropped here is checked and played
+ * An existing .rv565 file (version 6, 7 or 8) dropped here is checked and played
  * instead. */
 
 const MAX_INPUT_MB = 200;
@@ -49,14 +49,15 @@ type Fit = "fill" | "fit";
 type KeyMode = "second" | "every" | "custom";
 type Result = {
   clip: Rv565Clip; container: Uint8Array; report: ScheduleReport; serial: ScheduleReport; name: string;
-  counts: { key: number; delta: number; repeat: number; partial: number }; opened: boolean;
-  /** Share of all frame lines sent to the display (repeats and unchanged bands are skipped). */
-  linesSent: number;
+  counts: { key: number; delta: number; repeat: number; partial: number; region: number }; opened: boolean;
+  /** Share of all frame pixels sent to the display (repeats, unchanged bands
+   * and the unchanged parts of region-delta bands are skipped). */
+  sent: number;
 };
 
 function makeResult(clip: Rv565Clip, name: string, opened: boolean): Result {
   return {
-    clip, container: clip.data, name, opened, counts: frameTypeCounts(clip), linesSent: linesSentFraction(clip),
+    clip, container: clip.data, name, opened, counts: frameTypeCounts(clip), sent: bytesSentFraction(clip),
     report: checkSchedule(clip, true), serial: checkSchedule(clip, false),
   };
 }
@@ -94,6 +95,7 @@ export default function Rv565Converter() {
   const [seconds, setSeconds] = useState(10);
   const [fit, setFit] = useState<Fit>("fill");
   const [v6, setV6] = useState(false);
+  const [v7, setV7] = useState(false);
   const [pixelFormat, setPixelFormat] = useState<PixelFormat>("rgb565be");
   const [codec, setCodec] = useState<Codec>("zlib");
   const [keyMode, setKeyMode] = useState<KeyMode>("second");
@@ -171,7 +173,7 @@ export default function Rv565Converter() {
       const dx = (size.w - dw) / 2, dy = (size.h - dh) / 2;
 
       const encoder = new Rv565Encoder(size.w, size.h, fps, {
-        version: v6 ? 6 : 7, pixelFormat: v6 ? "rgb565be" : pixelFormat, codec: v6 ? "zlib" : codec, keyframeInterval,
+        version: v6 ? 6 : v7 ? 7 : undefined, pixelFormat: v6 ? "rgb565be" : pixelFormat, codec: v6 ? "zlib" : codec, keyframeInterval,
         bandLines: v6 ? 0 : bandLines, tolerance, motionRange,
       });
       for (let i = 0; i < frameCount; i++) {
@@ -201,7 +203,7 @@ export default function Rv565Converter() {
     } finally {
       setBusy(false);
     }
-  }, [videoUrl, file, size, fit, fps, start, frameCount, v6, pixelFormat, codec, keyframeInterval, bandLines, tolerance, motionRange]);
+  }, [videoUrl, file, size, fit, fps, start, frameCount, v6, v7, pixelFormat, codec, keyframeInterval, bandLines, tolerance, motionRange]);
 
   // Preview: decode each frame on the fly, as the microcontroller does, then
   // show it as RGB (grayscale and monochrome formats as white on black).
@@ -254,7 +256,7 @@ export default function Rv565Converter() {
               <Upload className="h-7 w-7" />
               <span className="mt-3 font-semibold">Drop a video here, or click to choose</span>
               <span className="mt-1 text-xs text-muted">MP4, WebM or MOV · up to {MAX_INPUT_MB} MB · stays on your device</span>
-              <span className="mt-1 text-xs text-muted">Or drop an .rv565 file (version 6 or 7) to check and play it</span>
+              <span className="mt-1 text-xs text-muted">Or drop an .rv565 file (version 6, 7 or 8) to check and play it</span>
             </>
           )}
         </label>
@@ -312,9 +314,11 @@ export default function Rv565Converter() {
           </label>
           <p className="text-xs leading-relaxed text-muted sm:col-span-2">
             Between keyframes, a frame identical to the one before is stored as a repeat. Any other frame is stored as
-            whichever is smallest of a keyframe, an XOR delta and a partial delta, which carries only the bands of rows
-            that changed, each predicted from the previous frame, shifted to follow motion. The partial delta wins even when it is slightly larger, because the board then sends only those
-            bands to the display. A keyframe every second keeps seeking to at most one second of frames.
+            whichever is smallest of a keyframe, an XOR delta, a partial delta, which carries only the bands of rows
+            that changed, each predicted from the previous frame, shifted to follow motion, and a region delta, which
+            narrows each changed band to the columns that changed. Region and partial deltas win even when slightly
+            larger, because the board then sends only those parts to the display. A keyframe every second keeps seeking
+            to at most one second of frames.
           </p>
           <label className="block text-sm sm:col-span-2">
             <span className="eyebrow">Tolerance</span>
@@ -339,7 +343,7 @@ export default function Rv565Converter() {
                      className="mt-2 w-full rounded-pill border border-border bg-bg px-4 py-2" />
               <span className="mt-2 block text-xs leading-snug text-muted">
                 Partial deltas mark changes in bands of this many rows (pages of 8 rows for SSD1306-style monochrome). Smaller
-                bands send less to the display but add a few bytes of mask. Default {RV565_BAND_LINES}; 0 turns partial deltas off.
+                bands send less to the display but add a few bytes of mask. Default {RV565_BAND_LINES}; 0 turns partial and region deltas off.
               </span>
             </label>
             <label className="mt-4 block">
@@ -354,6 +358,17 @@ export default function Rv565Converter() {
               </span>
             </label>
           </details>
+          <label className="flex items-start gap-3 text-sm sm:col-span-2">
+            <input type="checkbox" checked={v6 || v7} disabled={v6} className="mt-1 accent-[#142018]"
+                   onChange={(e) => setV7(e.target.checked)} />
+            <span>
+              <span className="font-semibold">Compatible with version 7 players</span>
+              <span className="block text-xs leading-snug text-muted">
+                Leaves out region deltas, so RV565 2.x players read the file. Without it the file is version 8 when region
+                deltas make it smaller or send less to the display, and version 7 otherwise.
+              </span>
+            </span>
+          </label>
           <label className="flex items-start gap-3 text-sm sm:col-span-2">
             <input type="checkbox" checked={v6} className="mt-1 accent-[#142018]"
                    onChange={(e) => { setV6(e.target.checked); if (e.target.checked) setFps((f) => Math.min(f, RV565_MAX_FPS_V6)); }} />
@@ -453,10 +468,16 @@ export default function Rv565Converter() {
             </div>
             <p className="mt-2 font-mono text-xs text-muted">
               RV565 v{result.clip.header.version} · {result.clip.header.pixelFormat} · {result.clip.header.codec}
-              {" "}· keyframe every {result.clip.header.keyframeInterval} · {result.counts.key} key, {result.counts.delta} delta, {result.counts.partial} partial, {result.counts.repeat} repeat
-              {" "}· {(result.linesSent * 100).toFixed(1)}% of lines sent to the display
+              {" "}· keyframe every {result.clip.header.keyframeInterval} · {result.counts.key} key, {result.counts.delta} delta, {result.counts.partial} partial, {result.counts.region} region, {result.counts.repeat} repeat
+              {" "}· {(result.sent * 100).toFixed(1)}% of pixels sent to the display
               {result.opened ? " · every frame verified" : ""}
             </p>
+            {result.clip.header.version === 8 && (
+              <p className="mt-2 text-xs leading-relaxed text-muted">
+                Version 8 files use region deltas and need an RV565 3.0 player. For RV565 2.x players, tick
+                &ldquo;Compatible with version 7 players&rdquo;.
+              </p>
+            )}
             {result.clip.header.version === 7 && (
               <p className="mt-2 text-xs leading-relaxed text-muted">
                 Version 7 files need an RV565 2.0 player. The released RV565 1.x library and the Falera badge Gallery read
