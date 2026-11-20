@@ -151,6 +151,80 @@ the stream's server and listens on nothing.
 | App | Source | Where |
 |---|---|---|
 | Radio | Radio Browser (open directory, no key) | App Store |
+| Podcasts | iTunes Search API (no key), the show's RSS feed | App Store |
+| Jamendo | Jamendo API v3 (Creative Commons music; client id) | App Store |
+| Music | MP3s on the microSD card; a Subsonic server | App Store |
+
+All four are App Store apps rather than built-ins: they need the PCB
+badge's speaker, so the breadboard badge's image doesn't carry them, and
+the built-in app list (a contract with `falera`) stays as it is. Each
+asks for a FaleraOS update when the audio modules are missing.
+
+### Radio
+
+Radio Browser stations by top clicks, country, genre or name, MP3 only and
+low bit rates first, with favourites. It reports a click when a station
+starts, as the API asks, and sends `User-Agent: FaleraOS-Radio/1.0`.
+
+### Podcasts
+
+Search with `itunes.apple.com/search?media=podcast` (no key), subscribe,
+list episodes from the show's own RSS feed, play the MP3 enclosures.
+`apps_market/podcasts/src/rss.py` parses the feed while it downloads
+(`player.get_stream`): it keeps only an unfinished tag (at most 4 KB) and
+the text of the few elements it wants, drops CDATA, comments and
+descriptions as they pass, and stops reading after 40 episodes, so a
+multi-megabyte feed never sits in memory. Subscriptions and each episode's
+position (seconds and bit rate, every 15 s and on exit) are kept with
+`oreoOS.state`; an episode resumes with an HTTP Range request. LEFT skips
+back 15 s and RIGHT forward 30 s when the host honours ranges (nearly all
+podcast hosts do); otherwise the player says it can't seek.
+
+### Jamendo
+
+Featured tracks, this week's popular tracks, genres (tags), albums and
+search from `api.jamendo.com/v3.0` with `audioformat=mp32`. The player
+always shows the artist, track and its CC licence (from `license_ccurl`,
+e.g. "CC BY-NC-SA 3.0"), which the licences require. A list plays on to
+the next track; an album plays in album order.
+
+Jamendo needs a client id: a public, project-wide app id from
+devportal.jamendo.com (sent in every request URL), not a secret.
+`apps_market/jamendo/src/config.py` holds the Falera Badge's
+(`DEFAULT_CLIENT_ID`); a badge can use another by saving
+`{"client_id": "..."}` in `/state/jamendo.json`. With neither, the app
+shows "Jamendo not set up" and the steps. The client *secret* is never
+used and never committed.
+
+### Music
+
+The owner's own MP3s.
+
+- **microSD card** (first): `oreoWare/sdcard.py` (`os.sdcard`) mounts the
+  card at `/sd` (1-bit SDMMC, GPIO 38/39/40) from a worker; on the PCB the
+  AW9523B's P1_5 card-detect tells when one is in or pulled out. Browse
+  folders; the first row plays the folder, a song plays the folder from
+  there; Play whole card queues up to 1000 files. Shuffle and Repeat
+  (off / all / one) are on the home screen. Title, artist and album come
+  from ID3v2.2-2.4 or ID3v1 (`src/id3.py` reads only the text frames and
+  seeks over cover art). How to put music on the card:
+  [TRANSFER.md](TRANSFER.md#music-goes-on-the-microsd-card).
+- **A Subsonic server** (optional: Navidrome, Jellyfin, Airsonic, Gonic):
+  Server settings asks for the URL, user and password on the badge. The
+  password is turned into Subsonic token auth at once
+  (`t = md5(password + salt)`, a random salt) and only the URL, user, salt
+  and token are saved (`oreoOS.state`), never the password. Streams use
+  `stream.view?format=mp3&maxBitRate=128`, so the server transcodes any
+  format. An `https://` server's certificate must chain to a root in
+  `oreoOS/tls_roots.py`; a plain `http://` server works too.
+
+### TLS
+
+Radio Browser, iTunes, Jamendo's API and its stream host are in
+`tools/gen_ca_bundle.py` HOSTS and verify against the bundled roots.
+Stations, podcast hosts and Subsonic servers are anyone's: an `https://`
+one whose chain ends outside the bundle fails with "TLS: untrusted
+certificate"; `http://` streams are unaffected.
 
 `oreoOS/mediaui.py` holds their shared screens: a list, an on-screen
 keyboard and the now-playing panel, with touch.
@@ -167,3 +241,11 @@ keyboard and the now-playing panel, with touch.
    and other screens of the app. No dropouts beyond Wi-Fi stalls.
 5. Watch `os.audio.underruns` on the REPL while playing to see if the main
    loop starves I2S.
+6. Podcasts: search a show, subscribe, play an episode, skip -15 / +30,
+   leave and come back: it resumes near where it stopped.
+7. Jamendo: Featured plays and the licence shows; the next track starts by
+   itself; an album plays in order.
+8. Music: a card with folders of MP3s; browse, play a folder, check the
+   ID3 titles, shuffle and repeat; pull the card while playing (playback
+   stops, "Card removed") and put it back. Optionally set up a Navidrome
+   server and play an album.
