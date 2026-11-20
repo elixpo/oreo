@@ -1,4 +1,4 @@
-/* RV565 container (format version 7, reads version 6) in the browser:
+/* RV565 container (format versions 8 and 7, reads version 6) in the browser:
  * convert, encode, parse, decode.
  *
  * Mirrors the reference package in github.com/elixpo/rv565
@@ -6,15 +6,21 @@
  *
  *   header   "RV5", version, u16 width, u16 height, u8 fps, u8 flags,
  *            u16 frame count; version 7 adds u8 header size (16), u8 pixel
- *            format, u8 codec, u8 keyframe interval K
+ *            format, u8 codec, u8 keyframe interval K; version 8 is version
+ *            7 plus region deltas
  *   records  u32 length, u8 frame type (key / XOR delta / repeat / partial
- *            delta), body; version 6 records have no type byte and are all
- *            zlib keyframes of big-endian RGB565
+ *            delta / region delta, version 8 only), body; version 6 records
+ *            have no type byte and are all zlib keyframes of big-endian RGB565
  *
  * A partial delta carries only the bands of lines that changed (u8 band
  * height, a band mask, a (dx, dy) shift per changed band, then each band's
  * residual against its shifted prediction from the previous frame), so a
- * player decodes and sends only those bands to the display.
+ * player decodes and sends only those bands to the display. A region delta
+ * (version 8) is a partial delta whose changed bands also carry a byte range
+ * (u16 x0, u16 xw, on whole pixels), and only that range of each line has a
+ * residual, so a player sends one small window per band. The encoder writes
+ * version 8 only when it used a region delta, so every other file stays
+ * readable by version 7 players.
  *
  * Colour conversion follows the reference rules exactly, so a frame
  * converted here is byte-identical to `rv565.convert` in Python; the
@@ -28,6 +34,8 @@
 
 export const RV565_VERSION = 7;
 export const RV565_VERSION_6 = 6;
+/** Version 7 plus region deltas (frame type 4). */
+export const RV565_VERSION_8 = 8;
 export const RV565_HEADER_SIZE = 16;
 export const RV565_HEADER_SIZE_V6 = 12;
 export const RV565_MAX_FPS = 60;
@@ -44,9 +52,9 @@ export type PixelFormat = (typeof PIXEL_FORMATS)[number];
 export const CODECS = ["stored", "zlib"] as const;
 export type Codec = (typeof CODECS)[number];
 
-export const KEYFRAME = 0, DELTA = 1, REPEAT = 2, PARTIAL = 3;
-export type FrameType = typeof KEYFRAME | typeof DELTA | typeof REPEAT | typeof PARTIAL;
-export const FRAME_TYPE_NAMES = ["key", "delta", "repeat", "partial"] as const;
+export const KEYFRAME = 0, DELTA = 1, REPEAT = 2, PARTIAL = 3, REGION = 4;
+export type FrameType = typeof KEYFRAME | typeof DELTA | typeof REPEAT | typeof PARTIAL | typeof REGION;
+export const FRAME_TYPE_NAMES = ["key", "delta", "repeat", "partial", "region"] as const;
 /** Default band height, in lines, of the reference encoder's partial deltas. */
 export const RV565_BAND_LINES = 8;
 /** Default shift search range, in pixels, of the reference encoder. */
@@ -74,7 +82,13 @@ export type PartialLayout = {
   band: number; changed: number[]; shifts: Array<[number, number]>; start: number; size: number;
 };
 
-export type Rv565Record = { type: FrameType; offset: number; length: number; partial?: PartialLayout };
+/** A parsed region delta body: a partial delta's fields plus each changed
+ * band's byte range [x0, xw] along its lines. */
+export type RegionLayout = PartialLayout & { ranges: Array<[number, number]> };
+
+export type Rv565Record = {
+  type: FrameType; offset: number; length: number; partial?: PartialLayout; region?: RegionLayout;
+};
 
 export type Rv565Clip = {
   header: Rv565Header;
@@ -140,29 +154,76 @@ export function partialLayout(body: Uint8Array, lines: number, lineBytes: number
   return { band, changed, shifts, start, size };
 }
 
+/** Byte ranges of region deltas start and end on whole pixels: a range is a
+ * multiple of this many bytes, or runs to the end of the line (rv565._ALIGN). */
+export const RV565_ALIGN: Record<PixelFormat, number> = {
+  rgb565be: 2, rgb565le: 2, rgb444: 3, rgb666: 3, rgb888: 3, gray8: 1, gray4: 1, mono: 1, mono_vpage: 1,
+};
+
+/** Parse the header part of a region delta body (docs/FORMAT.md, Region delta). */
+export function regionLayout(body: Uint8Array, lines: number, lineBytes: number, align: number): RegionLayout {
+  if (body.length < 1 || body[0] === 0) throw new Rv565Error("region delta with band height 0");
+  const band = body[0];
+  const count = Math.ceil(lines / band);
+  const maskLen = (count + 7) >> 3;
+  if (body.length < 1 + maskLen) throw new Rv565Error("region delta too short for its band mask");
+  const changed: number[] = [];
+  for (let b = 0; b < 8 * maskLen; b++) {
+    if (!((body[1 + (b >> 3)] >> (b & 7)) & 1)) continue;
+    if (b >= count) throw new Rv565Error("region delta sets a band past the frame");
+    changed.push(b);
+  }
+  if (!changed.length) throw new Rv565Error("region delta with no changed band");
+  const start = 1 + maskLen + 6 * changed.length;
+  if (body.length < start) throw new Rv565Error("region delta too short for its band entries");
+  const shifts: Array<[number, number]> = [], ranges: Array<[number, number]> = [];
+  let size = 0;
+  changed.forEach((b, k) => {
+    const o = 1 + maskLen + 6 * k;
+    const dx = (body[o] << 24) >> 24, dy = (body[o + 1] << 24) >> 24;
+    const x0 = body[o + 2] | (body[o + 3] << 8), xw = body[o + 4] | (body[o + 5] << 8);
+    if (Math.abs(dy) >= band) throw new Rv565Error(`region delta shifts a band by ${dy} lines, more than it has`);
+    if (xw === 0 || x0 + xw > lineBytes || x0 % align || ((x0 + xw) % align && x0 + xw !== lineBytes)) {
+      throw new Rv565Error(`region delta band ${b} has an invalid range ${x0}+${xw}`);
+    }
+    shifts.push([dx, dy]);
+    ranges.push([x0, xw]);
+    size += (Math.min(lines, (b + 1) * band) - b * band) * xw;
+  });
+  return { band, changed, shifts, ranges, start, size };
+}
+
 /* Prediction of a band: byte j of line y is byte j - dx of line y - dy of
  * prev when that line is in the same band [first, end) and 0 <= j - dx < R,
  * else 0. residual = band XOR prediction; band = prediction XOR residual. */
 
-/** Band lines [first, end) of `cur` XOR their shifted prediction from prev. */
-function bandResidual(cur: Uint8Array, prev: Uint8Array, first: number, end: number, R: number, dx: number, dy: number): Uint8Array {
-  const out = cur.slice(first * R, end * R);
+/** Bytes [x0, x0 + xw) of band lines [first, end) of `cur` XOR their shifted
+ * prediction from prev, line by line (the whole lines by default). */
+function bandResidual(
+  cur: Uint8Array, prev: Uint8Array, first: number, end: number, R: number, dx: number, dy: number, x0 = 0, xw = R,
+): Uint8Array {
+  const out = new Uint8Array((end - first) * xw);
   for (let y = first; y < end; y++) {
+    const o = (y - first) * xw;
+    out.set(cur.subarray(y * R + x0, y * R + x0 + xw), o);
     const src = y - dy;
     if (src < first || src >= end) continue;
-    const o = (y - first) * R, s = src * R;
-    for (let j = Math.max(0, dx); j < Math.min(R, R + dx); j++) out[o + j] ^= prev[s + j - dx];
+    const s = src * R;
+    for (let j = Math.max(x0, dx); j < Math.min(x0 + xw, R + dx); j++) out[o + j - x0] ^= prev[s + j - dx];
   }
   return out;
 }
 
 /** Nonzero bytes of bandResidual, stopping once it reaches `limit`. */
-function residualCost(cur: Uint8Array, prev: Uint8Array, first: number, end: number, R: number, dx: number, dy: number, limit: number): number {
+function residualCost(
+  cur: Uint8Array, prev: Uint8Array, first: number, end: number, R: number, dx: number, dy: number, limit: number,
+  x0 = 0, xw = R,
+): number {
   let cost = 0;
   for (let y = first; y < end; y++) {
     const src = y - dy, o = y * R;
     const inBand = src >= first && src < end, s = src * R;
-    for (let j = 0; j < R; j++) {
+    for (let j = x0; j < x0 + xw; j++) {
       const k = j - dx;
       const p = inBand && k >= 0 && k < R ? prev[s + k] : 0;
       if (cur[o + j] !== p && ++cost >= limit) return cost;
@@ -171,17 +232,41 @@ function residualCost(cur: Uint8Array, prev: Uint8Array, first: number, end: num
   return cost;
 }
 
-/** Decode one changed band in place: out's lines [first, end) become the
- * prediction from prev XOR the residual at data[pos...]. */
-function decodeBand(out: Uint8Array, prev: Uint8Array, data: Uint8Array, pos: number, first: number, end: number, R: number, dx: number, dy: number) {
+/** Decode one changed band in place: bytes [x0, x0 + xw) of out's lines
+ * [first, end) become the prediction from prev XOR the residual at
+ * data[pos...], xw bytes per line (the whole lines by default). */
+function decodeBand(
+  out: Uint8Array, prev: Uint8Array, data: Uint8Array, pos: number, first: number, end: number, R: number,
+  dx: number, dy: number, x0 = 0, xw = R,
+) {
   for (let y = first; y < end; y++) {
-    const src = y - dy, o = y * R, r = pos + (y - first) * R;
+    const src = y - dy, o = y * R, r = pos + (y - first) * xw - x0;
     const inBand = src >= first && src < end, s = src * R;
-    for (let j = 0; j < R; j++) {
+    for (let j = x0; j < x0 + xw; j++) {
       const k = j - dx;
       out[o + j] = (inBand && k >= 0 && k < R ? prev[s + k] : 0) ^ data[r + j];
     }
   }
+}
+
+/** [x0, xw]: the bytes of band lines [first, end) that differ between cur and
+ * old, widened to whole pixels, or null if none do (rv565._changed_range). */
+function changedRange(cur: Uint8Array, old: Uint8Array, first: number, end: number, R: number, align: number): [number, number] | null {
+  let lo = R, hi = -1;
+  for (let y = first; y < end; y++) {
+    const o = y * R;
+    let i = 0;
+    while (i < R && cur[o + i] === old[o + i]) i++;
+    if (i === R) continue;
+    let j = R - 1;
+    while (cur[o + j] === old[o + j]) j--;
+    lo = Math.min(lo, i);
+    hi = Math.max(hi, j);
+  }
+  if (hi < 0) return null;
+  const x0 = lo - (lo % align);
+  const x1 = Math.min(R, hi + 1 + ((align - ((hi + 1) % align)) % align));
+  return [x0, x1 - x0];
 }
 
 /** (step, max) of the horizontal shift search in bytes, for a range in pixels
@@ -380,8 +465,11 @@ const equal = (a: Uint8Array, b: Uint8Array) => {
 /* Encoding ---------------------------------------------------------------- */
 
 export type EncodeOptions = {
-  /** 7 (default) or 6, for players older than RV565 2.0 (rgb565be, zlib, K = 1 only). */
-  version?: 6 | 7;
+  /** Left out (the default): version 8 if a region delta was written, else
+   * 7, as the reference `rv565.write(version=None)`. 7 never writes region
+   * deltas (for RV565 2.x players); 8 always says version 8; 6 is for
+   * players older than RV565 2.0 (rgb565be, zlib, K = 1 only). */
+  version?: 6 | 7 | 8;
   pixelFormat?: PixelFormat;
   codec?: Codec;
   /** A keyframe at least every K frames (1-255). */
@@ -399,18 +487,25 @@ export type EncodeOptions = {
  * encoded records. Frame choice is the reference encoder's
  * (rv565.encode_frames): frames at multiples of K are keyframes; any other
  * frame is a repeat when it equals the previous one, else the smallest of a
- * keyframe, a delta (zlib only: a stored delta is never smaller) and a partial
- * delta, except that the partial delta wins whenever it is at most 2% (and at
- * least 16 bytes) larger, since it saves the display transfer of every
- * unchanged band. Each changed band of a partial delta gets the first shift,
- * in the reference search order, with the fewest nonzero residual bytes.
+ * keyframe, a delta (zlib only: a stored delta is never smaller), a partial
+ * delta and a region delta (unless version 7 was asked for), except that a
+ * region delta, then a partial delta, wins whenever it is at most 2% (and at
+ * least 16 bytes) larger, since it saves the display transfer of everything
+ * unchanged. A region delta is not built when every changed band changed
+ * across its whole width (the partial delta says the same in fewer bytes).
+ * Each changed band gets the first shift, in the reference search order,
+ * with the fewest nonzero residual bytes (inside its range, for a region
+ * delta).
  * With a tolerance, each frame first keeps the previous
  * decoded pixel wherever the new one is within the tolerance. */
 export class Rv565Encoder {
   readonly width: number;
   readonly height: number;
   readonly fps: number;
-  readonly version: 6 | 7;
+  /** As asked for; undefined means 8 if a region delta is written, else 7. */
+  readonly version: 6 | 7 | 8 | undefined;
+  /** Whether region deltas are considered (not for version 6 or 7). */
+  readonly regions: boolean;
   readonly pixelFormat: PixelFormat;
   readonly codec: Codec;
   readonly keyframeInterval: number;
@@ -420,12 +515,14 @@ export class Rv565Encoder {
   readonly frameBytes: number;
   private prev: Uint8Array | null = null;
   private records: Array<{ type: FrameType; body: Uint8Array }> = [];
+  private usedRegions = false;
 
   constructor(width: number, height: number, fps: number, options: EncodeOptions = {}) {
     this.width = width;
     this.height = height;
     this.fps = fps;
-    this.version = options.version ?? RV565_VERSION;
+    this.version = options.version;
+    this.regions = this.version === undefined || this.version === RV565_VERSION_8;
     this.pixelFormat = options.pixelFormat ?? "rgb565be";
     this.codec = options.codec ?? "zlib";
     this.keyframeInterval = options.keyframeInterval ?? 1;
@@ -447,15 +544,20 @@ export class Rv565Encoder {
         throw new Rv565Error("version 6 supports only rgb565be, zlib, keyframe interval 1");
       }
       if (!(fps >= 1 && fps <= RV565_MAX_FPS_V6)) throw new Rv565Error(`fps must be 1-${RV565_MAX_FPS_V6}`);
-    } else if (this.version === RV565_VERSION) {
+    } else if (this.version === undefined || this.version === RV565_VERSION || this.version === RV565_VERSION_8) {
       if (!(fps >= 1 && fps <= RV565_MAX_FPS)) throw new Rv565Error(`fps must be 1-${RV565_MAX_FPS}`);
     } else {
-      throw new Rv565Error(`can write version 6 or 7, not ${this.version}`);
+      throw new Rv565Error(`can write version 6, 7 or 8, not ${this.version}`);
     }
     this.frameBytes = frameSize(this.pixelFormat, width, height);
   }
 
   get frames() { return this.records.length; }
+
+  /** The version finish() writes, given the frames added so far. */
+  get fileVersion(): 6 | 7 | 8 {
+    return this.version ?? (this.usedRegions ? RV565_VERSION_8 : RV565_VERSION);
+  }
 
   private encode(data: Uint8Array) {
     return this.codec === "stored" ? data.slice() : zlibCompress(data);
@@ -475,54 +577,101 @@ export class Rv565Encoder {
     return convertPixels(mixed, w, h, fmt, 4);
   }
 
-  /** Body of a partial delta, or null when no band changed. */
-  private async partialBody(frame: Uint8Array, prev: Uint8Array): Promise<Uint8Array | null> {
+  /** The shift of band lines [first, end) whose residual over bytes
+   * [x0, x0 + xw) has the fewest nonzero bytes, as rv565._partial_body and
+   * rv565._region_body search: dy 0, -1, +1, ...; for each, dx 0, -s, +s, ...;
+   * the first shift with the fewest wins. */
+  private searchShift(
+    frame: Uint8Array, prev: Uint8Array, first: number, end: number, lineBytes: number, x0: number, xw: number,
+  ): [number, number] {
+    const m = this.motionRange;
+    let [step, maxDx] = m ? shiftSteps(this.pixelFormat, m) : [1, 0];
+    const maxDy = m ? Math.min(this.bandLines - 1, 127) : 0;
+    maxDx = Math.min(maxDx, 127 - (127 % step));
+    let bestCost = residualCost(frame, prev, first, end, lineBytes, 0, 0, Infinity, x0, xw);
+    let best: [number, number] = [0, 0];
+    if (!bestCost || !(maxDx || maxDy)) return best;
+    const dxs = alternating(maxDx, step);
+    for (const dy of alternating(Math.min(maxDy, end - first - 1))) {
+      for (const dx of dxs) {
+        if (dx === 0 && dy === 0) continue;
+        const cost = residualCost(frame, prev, first, end, lineBytes, dx, dy, bestCost, x0, xw);
+        if (cost < bestCost) {
+          bestCost = cost;
+          best = [dx, dy];
+          if (cost === 0) return best;
+        }
+      }
+    }
+    return best;
+  }
+
+  /** u8 band height, band mask, per-band entries, then the encoded residuals. */
+  private async bandedBody(band: number, mask: Uint8Array, entries: number[], parts: Uint8Array[]): Promise<Uint8Array> {
+    const joined = new Uint8Array(parts.reduce((n, x) => n + x.length, 0));
+    parts.reduce((at, x) => (joined.set(x, at), at + x.length), 0);
+    const data = await this.encode(joined);
+    const head = 1 + mask.length + entries.length;
+    const out = new Uint8Array(head + data.length);
+    out[0] = band;
+    out.set(mask, 1);
+    out.set(entries, 1 + mask.length);
+    out.set(data, head);
+    return out;
+  }
+
+  /** Body of a partial delta, or null when no band changed. Records each
+   * changed band's shift in `found`, for the region delta. */
+  private async partialBody(frame: Uint8Array, prev: Uint8Array, found: Map<number, [number, number]>): Promise<Uint8Array | null> {
     const band = this.bandLines;
     const [lines, lineBytes] = frameLines(this.pixelFormat, this.width, this.height);
     const count = Math.ceil(lines / band);
     const mask = new Uint8Array((count + 7) >> 3);
     const shifts: number[] = [];
     const parts: Uint8Array[] = [];
-    const m = this.motionRange;
-    let [step, maxDx] = m ? shiftSteps(this.pixelFormat, m) : [1, 0];
-    const maxDy = m ? Math.min(band - 1, 127) : 0;
-    maxDx = Math.min(maxDx, 127 - (127 % step));
-    const dxs = alternating(maxDx, step);
     for (let b = 0; b < count; b++) {
       const first = b * band, end = Math.min(lines, (b + 1) * band);
       const lo = first * lineBytes, hi = end * lineBytes;
       if (equal(frame.subarray(lo, hi), prev.subarray(lo, hi))) continue;
       mask[b >> 3] |= 1 << (b & 7);
-      // The search of rv565._partial_body: dy 0, -1, +1, ...; for each, dx
-      // 0, -s, +s, ...; the first shift with the fewest nonzero bytes wins.
-      let bestCost = residualCost(frame, prev, first, end, lineBytes, 0, 0, Infinity), best: [number, number] = [0, 0];
-      if (bestCost && (maxDx || maxDy)) {
-        search: for (const dy of alternating(Math.min(maxDy, end - first - 1))) {
-          for (const dx of dxs) {
-            if (dx === 0 && dy === 0) continue;
-            const cost = residualCost(frame, prev, first, end, lineBytes, dx, dy, bestCost);
-            if (cost < bestCost) {
-              bestCost = cost;
-              best = [dx, dy];
-              if (cost === 0) break search;
-            }
-          }
-        }
-      }
-      shifts.push(best[0] & 0xff, best[1] & 0xff);
-      parts.push(bandResidual(frame, prev, first, end, lineBytes, best[0], best[1]));
+      const [dx, dy] = this.searchShift(frame, prev, first, end, lineBytes, 0, lineBytes);
+      found.set(b, [dx, dy]);
+      shifts.push(dx & 0xff, dy & 0xff);
+      parts.push(bandResidual(frame, prev, first, end, lineBytes, dx, dy));
     }
     if (!parts.length) return null;
-    const joined = new Uint8Array(parts.reduce((n, x) => n + x.length, 0));
-    parts.reduce((at, x) => (joined.set(x, at), at + x.length), 0);
-    const data = await this.encode(joined);
-    const head = 1 + mask.length + shifts.length;
-    const out = new Uint8Array(head + data.length);
-    out[0] = band;
-    out.set(mask, 1);
-    out.set(shifts, 1 + mask.length);
-    out.set(data, head);
-    return out;
+    return this.bandedBody(band, mask, shifts, parts);
+  }
+
+  /** Body of a region delta (rv565._region_body), or null when no band
+   * changed or every changed band changed across its whole width. A band
+   * whose range is the whole line searches exactly as in the partial delta,
+   * so it reuses that band's shift from `found`. */
+  private async regionBody(frame: Uint8Array, prev: Uint8Array, found: Map<number, [number, number]>): Promise<Uint8Array | null> {
+    const band = this.bandLines;
+    const [lines, lineBytes] = frameLines(this.pixelFormat, this.width, this.height);
+    const count = Math.ceil(lines / band);
+    const align = RV565_ALIGN[this.pixelFormat];
+    const changed: Array<[number, number, number]> = [];
+    let narrower = false;
+    for (let b = 0; b < count; b++) {
+      const range = changedRange(frame, prev, b * band, Math.min(lines, (b + 1) * band), lineBytes, align);
+      if (!range) continue;
+      changed.push([b, range[0], range[1]]);
+      narrower ||= range[1] < lineBytes;
+    }
+    if (!narrower) return null;
+    const mask = new Uint8Array((count + 7) >> 3);
+    const entries: number[] = [];
+    const parts: Uint8Array[] = [];
+    for (const [b, x0, xw] of changed) {
+      const first = b * band, end = Math.min(lines, (b + 1) * band);
+      mask[b >> 3] |= 1 << (b & 7);
+      const [dx, dy] = (xw === lineBytes && found.get(b)) || this.searchShift(frame, prev, first, end, lineBytes, x0, xw);
+      entries.push(dx & 0xff, dy & 0xff, x0 & 0xff, x0 >> 8, xw & 0xff, xw >> 8);
+      parts.push(bandResidual(frame, prev, first, end, lineBytes, dx, dy, x0, xw));
+    }
+    return this.bandedBody(band, mask, entries, parts);
   }
 
   /** Add one frame, already in the clip's pixel format; returns its type. */
@@ -540,21 +689,25 @@ export class Rv565Encoder {
     } else {
       const options: Array<{ type: FrameType; body: Uint8Array }> = [{ type: KEYFRAME, body: await this.encode(frame) }];
       if (this.codec !== "stored") options.push({ type: DELTA, body: await this.encode(xor(frame, prev)) });
-      const partialBody = this.bandLines ? await this.partialBody(frame, prev) : null;
+      const found = new Map<number, [number, number]>();
+      const partialBody = this.bandLines ? await this.partialBody(frame, prev, found) : null;
       if (partialBody) options.push({ type: PARTIAL, body: partialBody });
+      const regionBody = this.bandLines && this.regions ? await this.regionBody(frame, prev, found) : null;
+      if (regionBody) options.push({ type: REGION, body: regionBody });
       // The smallest body, a delta winning ties (as min() over (length,
-      // type != delta) in the reference); then the partial delta if it is
-      // within 2% (at least 16 bytes) of that.
+      // type != delta) in the reference); then the region delta, else the
+      // partial delta, if it is within 2% (at least 16 bytes) of that.
       let best = options[0];
       for (const o of options.slice(1)) {
         if (o.body.length < best.body.length || (o.body.length === best.body.length && o.type === DELTA && best.type !== DELTA)) best = o;
       }
-      if (partialBody && partialBody.length <= best.body.length + Math.max(16, Math.floor(best.body.length / 50))) {
-        best = { type: PARTIAL, body: partialBody };
-      }
+      const slack = best.body.length + Math.max(16, Math.floor(best.body.length / 50));
+      if (regionBody && regionBody.length <= slack) best = { type: REGION, body: regionBody };
+      else if (partialBody && partialBody.length <= slack) best = { type: PARTIAL, body: partialBody };
       record = best;
     }
     this.records.push(record);
+    if (record.type === REGION) this.usedRegions = true;
     this.prev = frame === source ? source.slice() : frame;
     return record.type;
   }
@@ -568,7 +721,7 @@ export class Rv565Encoder {
     const perRecord = v6 ? 4 : 5;
     const out = new Uint8Array(this.records.reduce((t, r) => t + perRecord + r.body.length, headerSize));
     const view = new DataView(out.buffer);
-    out.set([0x52, 0x56, 0x35, this.version], 0);
+    out.set([0x52, 0x56, 0x35, this.fileVersion], 0);
     view.setUint16(4, this.width, true);
     view.setUint16(6, this.height, true);
     out[8] = this.fps;
@@ -603,7 +756,7 @@ export async function encodeClip(
 
 /* Decoding ---------------------------------------------------------------- */
 
-/** Parse and range-check a version 6 or 7 header. */
+/** Parse and range-check a version 6, 7 or 8 header. */
 export function parseHeader(data: Uint8Array): Rv565Header {
   if (data.length < RV565_HEADER_SIZE_V6) throw new Rv565Error("file too short");
   if (data[0] !== 0x52 || data[1] !== 0x56 || data[2] !== 0x35) throw new Rv565Error("not an RV565 file");
@@ -618,7 +771,7 @@ export function parseHeader(data: Uint8Array): Rv565Header {
       pixelFormat: "rgb565be", codec: "zlib", keyframeInterval: 1, frameBytes: 2 * width * height,
     };
   }
-  if (version !== RV565_VERSION) throw new Rv565Error(`unsupported RV565 version ${version}`);
+  if (version !== RV565_VERSION && version !== RV565_VERSION_8) throw new Rv565Error(`unsupported RV565 version ${version}`);
   if (data.length < RV565_HEADER_SIZE) throw new Rv565Error("file too short");
   if (!width || !height || fps < 1 || fps > RV565_MAX_FPS || !frames) throw new Rv565Error("invalid header");
   const headerSize = data[12], format = data[13], codec = data[14], keyframeInterval = data[15];
@@ -651,7 +804,9 @@ export function parseContainer(data: Uint8Array): Rv565Clip {
       index.push({ type: KEYFRAME, offset, length });
     } else {
       const type = data[offset];
-      if (type > PARTIAL) throw new Rv565Error(`unsupported frame type ${type} at frame ${i}`);
+      if (type > REGION || (type === REGION && header.version < RV565_VERSION_8)) {
+        throw new Rv565Error(`unsupported frame type ${type} at frame ${i}`);
+      }
       if (i % header.keyframeInterval === 0 && type !== KEYFRAME) throw new Rv565Error(`frame ${i} must be a keyframe`);
       if (type === REPEAT && length !== 1) throw new Rv565Error(`repeat frame ${i} has a body`);
       if ((type === KEYFRAME || type === DELTA) && header.codec === "stored" && length - 1 !== header.frameBytes) {
@@ -665,6 +820,14 @@ export function parseContainer(data: Uint8Array): Rv565Clip {
           throw new Rv565Error(`stored partial frame ${i} has ${length - 1 - layout.start} bytes, expected ${layout.size}`);
         }
         record.partial = layout;
+      }
+      if (type === REGION) {
+        const [lines, lineBytes] = frameLines(header.pixelFormat, header.width, header.height);
+        const layout = regionLayout(data.subarray(offset + 1, offset + length), lines, lineBytes, RV565_ALIGN[header.pixelFormat]);
+        if (header.codec === "stored" && length - 1 - layout.start !== layout.size) {
+          throw new Rv565Error(`stored region frame ${i} has ${length - 1 - layout.start} bytes, expected ${layout.size}`);
+        }
+        record.region = layout;
       }
       index.push(record);
     }
@@ -698,6 +861,25 @@ async function applyPartial(clip: Rv565Clip, i: number, prev: Uint8Array): Promi
   return out;
 }
 
+/** prev with the range of each changed band of region delta i replaced by
+ * its prediction XOR its residual. */
+async function applyRegion(clip: Rv565Clip, i: number, prev: Uint8Array): Promise<Uint8Array> {
+  const { offset, length, region } = clip.index[i];
+  const { band, changed, shifts, ranges, start, size } = region!;
+  const raw = clip.data.subarray(offset + start, offset + length);
+  const data = clip.header.codec === "stored" ? raw : await inflateExact(raw, size, i);
+  const [lines, lineBytes] = frameLines(clip.header.pixelFormat, clip.header.width, clip.header.height);
+  const out = prev.slice();
+  let pos = 0;
+  changed.forEach((b, k) => {
+    const first = b * band, end = Math.min(lines, (b + 1) * band);
+    const [x0, xw] = ranges[k];
+    decodeBand(out, prev, data, pos, first, end, lineBytes, shifts[k][0], shifts[k][1], x0, xw);
+    pos += (end - first) * xw;
+  });
+  return out;
+}
+
 /** Line ranges [first, count] that frame i changes, so a player knows what to
  * send to the display: everything for a keyframe or delta, nothing for a
  * repeat, the changed bands (merged into runs) for a partial delta. Lines are
@@ -705,17 +887,43 @@ async function applyPartial(clip: Rv565Clip, i: number, prev: Uint8Array): Promi
 export function changedLines(clip: Rv565Clip, i: number): Array<[number, number]> {
   const { pixelFormat, width, height } = clip.header;
   const lines = frameLines(pixelFormat, width, height)[0];
-  const { type, partial } = clip.index[i];
+  const { type } = clip.index[i];
   if (type === REPEAT) return [];
-  if (type !== PARTIAL) return [[0, lines]];
+  if (type !== PARTIAL && type !== REGION) return [[0, lines]];
+  const layout = (clip.index[i].partial ?? clip.index[i].region)!;
   const runs: Array<[number, number]> = [];
-  for (const b of partial!.changed) {
-    const first = b * partial!.band, end = Math.min(lines, (b + 1) * partial!.band);
+  for (const b of layout.changed) {
+    const first = b * layout.band, end = Math.min(lines, (b + 1) * layout.band);
     const last = runs[runs.length - 1];
     if (last && last[0] + last[1] === first) last[1] = end - last[0];
     else runs.push([first, end - first]);
   }
   return runs;
+}
+
+/** Rectangles [first line, line count, first byte, byte count] that frame i
+ * changes, as the reference `Clip.changed_rects`: one per changed band of a
+ * region delta, the runs of changed lines (whole lines) otherwise. A player
+ * sends each to the display as one window. */
+export function changedRects(clip: Rv565Clip, i: number): Array<[number, number, number, number]> {
+  const { pixelFormat, width, height } = clip.header;
+  const [lines, lineBytes] = frameLines(pixelFormat, width, height);
+  const { type, region } = clip.index[i];
+  if (type === REGION) {
+    return region!.changed.map((b, k) => [
+      b * region!.band, Math.min(lines, (b + 1) * region!.band) - b * region!.band, region!.ranges[k][0], region!.ranges[k][1],
+    ]);
+  }
+  return changedLines(clip, i).map(([first, count]) => [first, count, 0, lineBytes]);
+}
+
+/** Share of all frame bytes (so, pixels) that the clip sends to the display (0-1). */
+export function bytesSentFraction(clip: Rv565Clip): number {
+  const { pixelFormat, width, height, frames } = clip.header;
+  const [lines, lineBytes] = frameLines(pixelFormat, width, height);
+  let sent = 0;
+  for (let i = 0; i < frames; i++) for (const [, n, , w] of changedRects(clip, i)) sent += n * w;
+  return sent / (lines * lineBytes * frames);
 }
 
 /** Share of all frame lines that the clip sends to the display (0-1). */
@@ -747,6 +955,7 @@ export async function decodeFrame(clip: Rv565Clip, i: number): Promise<Uint8Arra
     if (type === KEYFRAME) frame = await body(clip, j);
     else if (type === DELTA) frame = xor(frame, await body(clip, j));
     else if (type === PARTIAL) frame = await applyPartial(clip, j, frame);
+    else if (type === REGION) frame = await applyRegion(clip, j, frame);
   }
   clip.last = { i, frame };
   return frame;
@@ -760,7 +969,7 @@ export async function verify(clip: Rv565Clip): Promise<number> {
 }
 
 export function frameTypeCounts(clip: Rv565Clip) {
-  const counts = { key: 0, delta: 0, repeat: 0, partial: 0 };
+  const counts = { key: 0, delta: 0, repeat: 0, partial: 0, region: 0 };
   for (const { type } of clip.index) counts[FRAME_TYPE_NAMES[type]]++;
   return counts;
 }

@@ -61,7 +61,26 @@ def _esc(v):
 
 
 def _unesc(s):
-    return s.replace("\\n", "\n").replace("\\\\", "\\")
+    if "\\" not in s:
+        return s
+    out = []
+    i = 0
+    n = len(s)
+    while i < n:
+        c = s[i]
+        if c == "\\" and i + 1 < n:
+            nxt = s[i + 1]
+            if nxt == "n":
+                out.append("\n")
+                i += 2
+                continue
+            elif nxt == "\\":
+                out.append("\\")
+                i += 2
+                continue
+        out.append(c)
+        i += 1
+    return "".join(out)
 
 
 def _deser(text):

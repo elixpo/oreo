@@ -5,7 +5,7 @@
     "deploy_options": {
         "flash_offset": "0"
     },
-    "docs": "https://oreo.elixpo.com/docs/",
+    "docs": "https://falera.elixpo.com/docs/",
     "features": [
         "BLE",
         "Display",
@@ -19,8 +19,8 @@
         "oreo_badge.jpg"
     ],
     "mcu": "esp32s3",
-    "product": "Oreo Badge",
+    "product": "Falera Badge",
     "thumbnail": "",
-    "url": "https://oreo.elixpo.com/badge/",
+    "url": "https://falera.elixpo.com/badge/",
     "vendor": "Elixpo"
 }

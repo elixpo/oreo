@@ -32,11 +32,11 @@ const FAQ = [
   },
   {
     q: "What is the RV565 format?",
-    a: "A small video container for microcontrollers whose frames decode straight to the display's native pixels, so the board runs no colour conversion. Version 7 declares one of nine pixel formats (RGB565 in either byte order, RGB444, RGB666, RGB888, 8- and 4-bit grayscale, and 1-bit monochrome in rows or SSD1306-style pages) and a codec (zlib or stored). Frames are keyframes, XOR deltas from the previous frame, repeats, or partial deltas that carry only the bands of rows that changed (each predicted from the previous frame, optionally shifted to follow motion), so the board sends only those rows to the display. A keyframe comes at least every K frames, so seeking stays fast. Version 6, the format the paper arXiv:2610.35935 measured, is the RGB565 + zlib + every-frame-a-keyframe case. Both are specified in the RV565 repository.",
+    a: "A small video container for microcontrollers whose frames decode straight to the display's native pixels, so the board runs no colour conversion. Version 7 declares one of nine pixel formats (RGB565 in either byte order, RGB444, RGB666, RGB888, 8- and 4-bit grayscale, and 1-bit monochrome in rows or SSD1306-style pages) and a codec (zlib or stored). Frames are keyframes, XOR deltas from the previous frame, repeats, or partial deltas that carry only the bands of rows that changed (each predicted from the previous frame, optionally shifted to follow motion), so the board sends only those rows to the display. A keyframe comes at least every K frames, so seeking stays fast. Version 8 (RV565 3.0) adds region deltas: each changed band also carries the range of columns that changed, so the board decodes and sends only that rectangle. The converter writes version 8 only when a clip uses region deltas, and version 7 otherwise. Version 6, the format the paper arXiv:2610.35935 measured, is the RGB565 + zlib + every-frame-a-keyframe case. All three are specified in the RV565 repository.",
   },
   {
     q: "Which boards and displays work?",
-    a: "The released RV565 1.x library plays version 6 files on ESP32-S3 (measured at 24 FPS with zero missed frames), on other ESP32 chips, and experimentally on the Raspberry Pi Pico 2, with ST7789 SPI panels such as 320×240, 240×240 and 135×240 modules; it also works with TFT_eSPI and LovyanGFX. Version 7 adds the formats for ILI9341/ILI9488 18-bit panels, grayscale OLEDs such as the SSD1322, 1-bit OLEDs such as the SSD1306, and e-paper; version 7 files need RV565 2.0 on the board. Until your player is on 2.0, tick “Version 6 file”.",
+    a: "The released RV565 1.x library plays version 6 files on ESP32-S3 (measured at 24 FPS with zero missed frames), on other ESP32 chips, and experimentally on the Raspberry Pi Pico 2, with ST7789 SPI panels such as 320×240, 240×240 and 135×240 modules; it also works with TFT_eSPI and LovyanGFX. Version 7 adds the formats for ILI9341/ILI9488 18-bit panels, grayscale OLEDs such as the SSD1322, 1-bit OLEDs such as the SSD1306, and e-paper; version 7 files need RV565 2.0 on the board, and version 8 files RV565 3.0. For a 2.x player, tick “Compatible with version 7 players”; until your player is on 2.0, tick “Version 6 file”.",
   },
   {
     q: "What frame size and frame rate should I choose?",
@@ -92,7 +92,8 @@ export default function ConvertPage() {
         <p className="mt-6 max-w-3xl text-[1.05rem] leading-relaxed text-text-dim">
           Turn an MP4 or WebM into an RV565 clip or an Arduino <code className="font-mono">clip.h</code>: RGB565 for
           ST7789 and ILI9341 TFTs, 18-bit RGB666, 4-bit grayscale for SSD1322 OLEDs, 1-bit for SSD1306 OLEDs and
-          e-paper, and more. Files use RV565 format version 7, or version 6 for the released RV565 1.x library on
+          e-paper, and more. Files use RV565 format version 8 when region deltas help and version 7 otherwise, or
+          version 6 for the released RV565 1.x library on
           ESP32-S3, other ESP32 chips and the Raspberry Pi Pico 2. No upload, no account.
         </p>
         <ul className="mt-8 flex flex-wrap gap-3 text-sm">

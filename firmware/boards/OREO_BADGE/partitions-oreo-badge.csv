@@ -1,6 +1,6 @@
-# Oreo Badge flash layout (16 MiB, ESP32-S3 N16R8).
-# The firmware partition holds MicroPython with OreoOS's native modules;
-# "vfs" is the OreoOS filesystem and takes the rest of the flash.
+# Falera Badge flash layout (16 MiB, ESP32-S3 N16R8).
+# The firmware partition holds MicroPython with FaleraOS's native modules;
+# "vfs" is the FaleraOS filesystem and takes the rest of the flash.
 # Name,   Type, SubType, Offset,   Size,     Flags
 nvs,      data, nvs,     0x9000,   0x6000,
 phy_init, data, phy,     0xf000,   0x1000,
