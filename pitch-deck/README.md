@@ -80,10 +80,10 @@ All in `assets/`:
 
 | File | What | Used on |
 |---|---|---|
-| `lumi-badge.webp` | Lumi, the Falera panda, holding a badge | 1, 13 |
-| `lumi-mark.webp` | Lumi's small corner mark | 2–12 |
+| `lumi-badge.webp` | Lumi, the Falera panda, holding a badge; also the corner mark | all |
+| `lumi-mark.webp` | Lumi's old corner mark, no longer used | — |
 | `bow.svg` | Lumi's bow: bullets, eyebrows, cards | all |
-| `board-angle.webp` | Render of the Falera Badge PCB | 3 |
+| `board-angle.webp` | Render of the Falera Badge PCB, no longer used | — |
 | `pcb_back.jpg` | Photo of the back of the first boards | 4 |
 | `oshw_mark.png` | OSHWA certification mark, IN000107 | 4 |
 | `photo_portrait.jpg` | FaleraOS on the breadboard badge | 5 |
@@ -98,15 +98,17 @@ source before changing a figure, and don't add a figure, supporter or
 partner that isn't in one.
 
 1. **Title:** OSHWA certificate IN000107 (README.md).
-2. **The problem:** EMAILS_BATCH2.md, the FOSS United "Why it matters" and NIDHI-PRAYAS "Problem" sections.
-3. **What Falera is:** README.md; LAUNCH_KIT.md one-line pitch; licences from README.md.
+2. **The problem:** GitHub Octoverse 2026 (India 32.0M developers, Sept 2026); Hackaday, "Badgelife: the hardware demoscene", 20 Aug 2018 (DEF CON 2018 badge). Sources are printed on the slide.
+3. **The solution (03a):** answers the three columns of slide 2.
+   **What Falera is (03b):** the community loop (apps in Python, App Store, OTA updates, events); README.md and docs/APPS.md.
 4. **The hardware:** circuit/elixpo/README.md and BOM_COST.md (origin/pcb-bringup), README.md hardware table; ₹4,171.70 is the BOM_COST.md total of the prices paid on 17 Nov 2026.
 5. **The software:** README.md (apps, App Store, updates, CLI); apps_market/index.json (10 apps); PR #197 (audio apps, in review).
-6. **Built so far:** CHANGELOG.md (v1.4.19, v2.0.0); README.md press section (Adafruit, Espressif USB ID); cli/CHANGELOG.md (1.0.0); BOM_COST.md (orders of 17 Nov 2026); PR #180 (PCB support).
-7. **RV565:** elixpo/rv565 README.md and docs/RESULTS_V8.md (badge measurements of 20 Nov 2026; format version 8 = RV565 3.0); README.md press section.
-8. **Recognition:** README.md "In the press" and "Recognised upstream"; the fundraiser API (payouts.elixpo.com/f/falera-badge, read 20 Nov 2026: ₹781 from 13 contributors); FUNDRAISER_APPEAL.md (about ₹8,000 spent out of pocket).
-9. **Where it goes:** EMAILS_BATCH2.md (FOSS United milestones; NIDHI note's projected ₹3,000 a badge at 100 units); SPONSORS.md (IndiaFOSS 2027, FOSSASIA Summit 2027 as events to approach); README.md (GSoC 2027: Elixpo is applying, not accepted).
-10. **The ask:** EMAILS_BATCH2.md, FOSS United budget table (the lines add up to ₹3,00,000).
-11. **Sponsorship:** the levels (Bamboo, Bow, Lumi), badge counts and benefits are defined in `pitch-deck/SPONSORSHIP.md`; change them there first. The event-badge price (about ₹3,000 at 100 units) is from EMAILS_BATCH2.md.
-12. **Team:** README.md "Built by the community" and "Recognition & programs"; EMAILS_BATCH2.md team section. No photos in the repository, so initials are shown.
+6. **RV565, the story (06a) and where it went (06b):** elixpo/rv565 README.md and docs/RESULTS_V8.md, "On the badge" (UI animation measured 20 Nov 2026: 31.4 ms whole frames, 14.8 ms with format version 7 = RV565 2.0, 6.3 ms with version 8 = RV565 3.0; 44.3% and 17.1% of pixels); README.md press section; rv565 CHANGELOG (3.0.0: LVGL widget, FFmpeg patches, 77 conformance files).
+7. **Recognition (07a-recognition.html):** README.md "In the press" and "Recognised upstream"; the fundraiser API (payouts.elixpo.com/f/falera-badge, read 20 Nov 2026: ₹781 from 13 contributors); FUNDRAISER_APPEAL.md (about ₹8,000 spent out of pocket).
+8. **Built so far (07b-built-so-far.html):** release counts from the git tags `stable/*` (57 since the first on 15 May 2026, 19 in November); README.md press section (Adafruit, Espressif USB ID); cli/CHANGELOG.md (1.0.0); BOM_COST.md (orders of 17 Nov 2026); PR #180 (PCB support).
+9. **Where it goes (09-where-it-goes.html):** a road from today to the goal. Today and the next four months: EMAILS_BATCH2.md (FOSS United milestones: 25 badges by a fab house, revision 2, two workshops). 2027: SPONSORS.md (IndiaFOSS 2027, FOSSASIA Summit 2027 as events to approach), README.md (GSoC 2027: Elixpo is applying, not accepted). Where we are heading: AGENTS.md (Bluetooth and the mobile app come last, #101, #103, #124).
+10. **What we put in (10a-what-we-put-in.html):** release count from git tags `stable/*`; apps/ and apps_market/index.json; first boards about ₹8,000 paid by the team and ₹781 from 13 people (fundraiser, 20 Nov 2026); "unpaid" is the maintainers' own statement to confirm.
+    **The ask (10b-the-ask.html):** dollars at ₹93.96 (17 Nov 2026); EMAILS_BATCH2.md, FOSS United budget table (the lines add up to ₹3,00,000; ₹75,000 a month). "One Lumi sponsor, or three at Bow" follows SPONSORSHIP.md. The 25 badges at ₹90,000 (₹3,600 each) is below the ₹4,172 prototype parts cost on slide 4: it assumes 25-unit board and parts prices; get a fab quote before relying on it.
+11. **Sponsorship (11a-what-sponsors-get.html) and after you sign (11b-after-you-sign.html):** every level, return and date is defined in `pitch-deck/SPONSORSHIP.md`; change it there first. Dollars at ₹93.96 (17 Nov 2026). Board revision 2 is month 3 of the plan.
+12. **The team (12-team.html):** photos are the maintainers' GitHub profile pictures (assets/team-*.jpg); the "check our work" records are github.com/elixpo, arXiv 2610.35935, OSHWA IN000107 and USB ID 303a:83ec. The earlier "45+ contributors" and programme list are off the slide.
 13. **Contact:** README.md closing line (hello@elixpo.com).

@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>14 / 17 · Sponsorship · FaleraOS sponsor deck</title>
+  <link rel="stylesheet" href="../style.css">
+  <style>
+    /* Three levels, each with fixed returns and fixed dates. Each says what
+       the money turns into (a line of the plan on the ask slide), then what
+       comes back. Lumi stands taller: it funds the whole plan. Every return
+       here is defined in pitch-deck/SPONSORSHIP.md; change it there first.
+       Dollars at ₹93.96 (17 Nov 2026). */
+    .sub { margin-top: 18px; font-size: 30px; line-height: 1.35; color: var(--dim); }
+    .sub b { color: var(--ink); }
+    .tiers {
+      margin-top: 60px; display: grid; grid-template-columns: 1fr 1fr 1.14fr;
+      column-gap: 26px; width: 1648px; align-items: end;
+    }
+    .tier { border: 1px solid var(--border); border-radius: 22px; background: #fff; padding: 28px 30px 26px; position: relative; }
+    .tier.top { border: 2px solid var(--red); padding-top: 34px; }
+    .ribbon {
+      position: absolute; top: -17px; left: 28px;
+      background: var(--red); color: #fff; border-radius: 10px; padding: 5px 14px;
+      font-family: var(--mono); font-size: 16px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+    }
+    .name { display: flex; align-items: center; gap: 12px; font-size: 30px; font-weight: 700; color: var(--ink); letter-spacing: -0.02em; }
+    .price { margin-top: 8px; display: flex; align-items: baseline; gap: 14px; }
+    .price b { font-family: var(--mono); font-size: 44px; color: var(--ink); letter-spacing: -0.02em; }
+    .top .price b { color: var(--red); font-size: 50px; }
+    .price span { font-family: var(--mono); font-size: 23px; font-weight: 700; color: var(--red); }
+
+    .becomes { margin-top: 16px; padding: 12px 16px; border-radius: 12px; background: var(--card); font-size: 22px; line-height: 1.35; color: var(--dim); }
+    .becomes b { color: var(--ink); }
+    .top .becomes { background: #fbe9ea; }
+
+    .back { margin-top: 18px; font-family: var(--mono); font-size: 15px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+    .tier ul { margin: 6px 0 0; padding: 0; list-style: none; }
+    .tier li { display: flex; gap: 12px; align-items: baseline; font-size: 22px; line-height: 1.35; color: var(--text); padding: 8px 0; border-top: 1px solid var(--border); }
+    .tier li .k { flex: 0 0 20px; color: var(--red); font-weight: 700; }
+    .tier li b { color: var(--ink); }
+    .badges { margin-top: 14px; display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+    .badges i { width: 18px; height: 24px; border-radius: 4px; background: var(--ink); }
+    .top .badges i { background: var(--red); }
+    .badges span { margin-left: 8px; font-size: 22px; color: var(--ink); font-weight: 700; }
+
+    .next { margin-top: 26px; font-size: 21px; color: var(--muted); }
+    /* Terms every sponsor gets (unused here; see 11b). */
+    .terms { margin-top: 16px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; width: 1648px; }
+    .terms div { padding: 10px 16px; border-radius: 14px; background: var(--card); font-size: 19px; line-height: 1.35; color: var(--dim); }
+    .terms b { display: block; font-size: 21px; color: var(--ink); }
+  </style>
+</head>
+<body>
+<div class="slide">
+  <img class="mark" src="../assets/lumi-badge.webp" alt="">
+  <div class="body">
+    <div class="eyebrow">
+      <img class="bow-34" src="../assets/bow.svg" alt="">
+      <span>Sponsorship</span>
+    </div>
+
+    <h2 class="title" style="max-width: 1560px">
+      And we want to <em>give back to you too.</em>
+    </h2>
+    <p class="sub">Every return below is fixed, and it stays with you <b>after these four months</b>.</p>
+
+    <div class="tiers">
+      <div class="tier">
+        <div class="name"><img class="bow-34" src="../assets/bow.svg" alt="">Bamboo</div>
+        <div class="price"><b>₹25,000</b><span>$266</span></div>
+        <div class="becomes">Your money becomes <b>the test bench</b> every badge is checked on.</div>
+        <div class="back">You get</div>
+        <ul>
+          <li><span class="k">✓</span><span>Logo and link on falera.elixpo.com and the README</span></li>
+          <li><span class="k">✓</span><span>Your name in the About screen of every badge</span></li>
+          <li><span class="k">✓</span><span>A thank-you post from Elixpo</span></li>
+        </ul>
+        <div class="badges"><i></i><i></i><span>2 badges for your team</span></div>
+      </div>
+
+      <div class="tier">
+        <div class="name"><img class="bow-34" src="../assets/bow.svg" alt="">Bow</div>
+        <div class="price"><b>₹1,00,000</b><span>$1,064</span></div>
+        <div class="becomes">Your money becomes <b>the 25 badges</b> for contributors and workshops.</div>
+        <div class="back">You get everything in Bamboo, plus</div>
+        <ul>
+          <li><span class="k">✓</span><span>A larger logo on the site and the README</span></li>
+          <li><span class="k">✓</span><span>Your logo in the About screen of every badge</span></li>
+          <li><span class="k">✓</span><span>Named in all four monthly progress reports</span></li>
+        </ul>
+        <div class="badges"><i></i><i></i><i></i><i></i><i></i><span>5 badges for your team</span></div>
+      </div>
+
+      <div class="tier top">
+        <div class="ribbon">Funds the whole plan</div>
+        <div class="name"><img class="bow-34" src="../assets/bow.svg" alt="">Lumi</div>
+        <div class="price"><b>₹3,00,000</b><span>$3,193</span></div>
+        <div class="becomes">Your money becomes <b>all four months</b>: two maintainers, 25 badges, board revision 2 and two workshops.</div>
+        <div class="back">You get everything in Bow, plus</div>
+        <ul>
+          <li><span class="k">✓</span><span><b>Your logo printed on board revision 2</b></span></li>
+          <li><span class="k">✓</span><span>First place and the largest logo, everywhere</span></li>
+          <li><span class="k">✓</span><span>A dedicated launch post, and tags in every build log</span></li>
+        </ul>
+        <div class="badges"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><span>10 badges for your team</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <span><b>FaleraOS</b> · Elixpo</span>
+    <span class="num">14 / 17</span>
+    <span>falera.elixpo.com</span>
+  </div>
+</div>
+</body>
+</html>
