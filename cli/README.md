@@ -67,6 +67,7 @@ checks this.
 | `falera info` | FaleraOS and firmware version, space by category, Wi-Fi, Bluetooth, battery |
 | `falera shell` | MicroPython REPL; FaleraOS restarts when you leave (Ctrl-] / Ctrl-X) |
 | `falera ls / push / pull / rm` | Files, with progress bars; pushes are atomic and SHA-256 checked |
+| `falera screenshot [FILE] [--scale N]` | Saves the badge's screen as a PNG, pixel for pixel; FaleraOS restarts after |
 | `falera add <file>...` | Photo/video into the Gallery, `.md`/`.txt` into the Reader, after a space check |
 | `falera transfer send <file>...` (or `falera send`) | Sends files to the badge's **Transfer** app with the code it shows; FaleraOS keeps running. Also `falera transfer list` / `rm` |
 | `falera apps [list\|refresh\|install\|update\|remove]` | The badge's App Store, over the badge's Wi-Fi |

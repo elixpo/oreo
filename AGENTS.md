@@ -67,6 +67,7 @@ Keep both sides, their tests and their docs in step:
 | Transfer protocol (`VERSION`) | `apps/transfer/src/proto.py` | `cli/oreo_cli/transfer.py` | protocol tests on both sides; bump `VERSION` on any wire change |
 | "Connected to computer" screen: `show(title, detail, progress)`, `clear()` | `oreoOS/hostui.py` | `cli/oreo_cli/badge.py` and callers | CLI hostui tests; the CLI must keep working on an OS without it |
 | Launcher loading `/remote/apps` for `falera dev` | `oreoOS/launcher.py` | `cli/oreo_cli/commands.py` `dev_notes` | CLI test |
+| Screenshot: `display.current()` returns the newest Display; its `_buf` is the 320x240 frame as big-endian RGB565 | `oreoWare/display.py`; fallback for older FaleraOS: `oreoOS/busy.py` `_display` (bound by `launcher.py`) | `cli/oreo_cli/screenshot.py` (`falera screenshot`) | `tests/test_display_current.py`; CLI contract tests against `display.py` and `busy.py` |
 | USB identity `303a:83ec` "Elixpo Falera Badge" | `firmware/boards/OREO_BADGE` | CLI discovery and `doctor` | CLI tests |
 
 A newer CLI must still work with the previous FaleraOS release: feature-check

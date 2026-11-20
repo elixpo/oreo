@@ -458,6 +458,44 @@ def cmd_pull(ctx):
         ui.ok("saved %d file(s) under %s" % (len(jobs), esc(local)))
 
 
+# ── screenshot ───────────────────────────────────────────────────────
+
+def screenshot_path(dest, now=None):
+    """Where `falera screenshot [FILE]` writes: FILE, or a timestamped name
+    in FILE when it is a folder, or in the current folder."""
+    import time
+    name = time.strftime("falera-screenshot-%Y%m%d-%H%M%S.png", time.localtime(now))
+    if not dest:
+        return Path(name)
+    p = Path(dest).expanduser()
+    if p.is_dir() or dest.endswith(("/", os.sep)):
+        return p / name
+    return p
+
+
+@command("screenshot")
+def cmd_screenshot(ctx):
+    from . import screenshot
+    ui = ctx.ui
+    args = ctx.args
+    scale = args.scale
+    if not 1 <= scale <= screenshot.MAX_SCALE:
+        raise UsageError("--scale must be 1 to %d" % screenshot.MAX_SCALE)
+    target = screenshot_path(args.file)
+    with ctx.session() as b:
+        with ui.status("reading the badge's screen"):
+            w, h, data, dirty = screenshot.capture(b)
+    png = screenshot.to_png(data, w, h, scale)
+    with local_file(target):
+        if target.parent != Path(""):
+            target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(png)
+    if dirty:
+        ui.warn("FaleraOS was stopped while drawing a frame, so the picture may be "
+                "half drawn; run the command again if it looks wrong")
+    ui.ok("saved %dx%d screenshot to %s" % (w * scale, h * scale, esc(target)))
+
+
 # Folders whose whole contents belong to FaleraOS: removing anything inside
 # them can stop the badge booting. "/" and "/apps" themselves are protected
 # (see badge.PROTECTED) but not everything under them, so `falera rm -r

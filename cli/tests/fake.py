@@ -325,6 +325,7 @@ class FakeTransport:
         self.sent = []          # every snippet, as text
         self.outputs = []       # every output, as bytes
         self.enters = 0
+        self.soft_resets = []   # soft_reset of each enter()
         self.restarts = []
         self.closed = False
         self.t = None
@@ -402,6 +403,7 @@ class FakeTransport:
 
     def enter(self, soft_reset=True):
         self.enters += 1
+        self.soft_resets.append(soft_reset)
         self.closed = False
         self._globals = None
 

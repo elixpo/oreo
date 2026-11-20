@@ -25,6 +25,7 @@ native USB port.
 | Update FaleraOS | `falera update` (or Settings > Updates on the badge) | [CLI.md](CLI.md#falera-update-update-faleraos) |
 | Install apps | `falera apps install` (or the App Store on the badge) | [CLI.md](CLI.md#falera-apps-the-app-store) |
 | See what the badge prints | `falera logs` | [CLI.md](CLI.md#falera-logs-console-output) |
+| Save what the screen shows as a PNG | `falera screenshot` | [CLI.md](CLI.md#falera-screenshot-the-screen-as-a-png) |
 | Copy any file, write code, use the REPL | `falera push` / `pull` / `shell` / `dev` | [CLI.md](CLI.md#commands) |
 | Drive it by hand without falera-cli | `mpremote` | [Advanced](#advanced-raw-mpremote) |
 

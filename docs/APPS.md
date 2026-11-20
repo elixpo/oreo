@@ -481,7 +481,9 @@ large libraries. Compile-check with `mpy-cross` if you have it.
 
 - [ ] `python3 tools/validate_app.py <your app>` passes with no errors.
 - [ ] `README.md` in the app folder: one sentence on what it does, the
-      controls, and a screenshot or photo of the badge.
+      controls, and a screenshot or photo of the badge. With your app
+      open on the badge, `falera screenshot --scale 2` saves its screen
+      as a PNG.
 - [ ] Controls follow the table above (A selects, B goes back, HOME exits).
 - [ ] Movement uses `dt`; `draw()` skips frames when nothing changed.
 - [ ] State goes through `oreoOS.state`; no files written into the app folder.
