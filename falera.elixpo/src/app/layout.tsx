@@ -4,7 +4,6 @@ import Header         from "@/components/Header";
 import Footer         from "@/components/Footer";
 import PageTransition from "@/components/PageTransition";
 import JsonLd         from "@/components/JsonLd";
-import SiteChrome     from "@/components/SiteChrome";
 import { DISAMBIGUATION, OG_IMAGE, SITE_NAME, SITE_URL, WIKIDATA } from "@/lib/seo";
 import { COVERAGE } from "@/data/press";
 
@@ -226,11 +225,11 @@ export default function RootLayout({
             },
           ],
         }} />
-        <SiteChrome><Header /></SiteChrome>
+        <Header />
         <main className="flex-1">
           <PageTransition>{children}</PageTransition>
         </main>
-        <SiteChrome><Footer /></SiteChrome>
+        <Footer />
       </body>
     </html>
   );

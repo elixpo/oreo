@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>9 / 13 · Where it goes · FaleraOS sponsor deck</title>
+  <link rel="stylesheet" href="../style.css">
+  <style>
+    .columns {
+      margin-top: 64px;
+      display: grid;
+      grid-template-columns: 1000px 1fr;
+      column-gap: 80px;
+    }
+    /* Milestones: month, then what happens. */
+    .milestone {
+      display: grid;
+      grid-template-columns: 180px 1fr;
+      align-items: baseline;
+      padding: 26px 0;
+      border-top: 1px solid var(--border);
+    }
+    .milestone:first-child { border-top: none; }
+    .month {
+      font-family: var(--mono);
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--red);
+      letter-spacing: 0.06em;
+    }
+    .what { font-size: 31px; line-height: 1.35; }
+  </style>
+</head>
+<body>
+<div class="slide">
+  <img class="mark" src="../assets/lumi-mark.webp" alt="">
+  <div class="body">
+    <div class="eyebrow">
+      <img class="bow-34" src="../assets/bow.svg" alt="">
+      <span>Where it goes</span>
+    </div>
+
+    <h2 class="title">
+      From five boards <em>to workshops.</em>
+    </h2>
+
+    <div class="columns">
+      <!-- Left: four months of milestones -->
+      <div>
+        <div class="milestone">
+          <div class="month">Month 1</div>
+          <div class="what">First PCB badges assembled and running FaleraOS; a build guide published.</div>
+        </div>
+        <div class="milestone">
+          <div class="month">Month 2</div>
+          <div class="what">Touch, audio and an app tutorial; 25 badges assembled by a fab house.</div>
+        </div>
+        <div class="milestone">
+          <div class="month">Month 3</div>
+          <div class="what">Board revision 2 with fixes from the first batch.</div>
+        </div>
+        <div class="milestone">
+          <div class="month">Month 4</div>
+          <div class="what">Two workshops: everyone builds a badge and publishes an app.</div>
+        </div>
+      </div>
+
+      <!-- Right: events, unit cost, GSoC -->
+      <div style="padding-top: 22px">
+        <ul class="list">
+          <li><img class="bow" src="../assets/bow.svg" alt="">Events to approach: IndiaFOSS 2027 and FOSSASIA Summit 2027.</li>
+          <li><img class="bow" src="../assets/bow.svg" alt="">About ₹3,000 a badge in parts, projected at 100 units.</li>
+          <li><img class="bow" src="../assets/bow.svg" alt="">Elixpo is <b>applying</b> to be a Google Summer of Code 2027 mentoring organisation.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <span><b>FaleraOS</b> · Elixpo</span>
+    <span class="num">9 / 13</span>
+    <span>falera.elixpo.com</span>
+  </div>
+</div>
+</body>
+</html>

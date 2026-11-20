@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>4 / 13 · The hardware · FaleraOS sponsor deck</title>
+  <link rel="stylesheet" href="../style.css">
+  <style>
+    .specs {
+      margin-top: 60px;
+      display: grid;
+      grid-template-columns: 600px 540px;
+      column-gap: 36px;
+    }
+    .oshw-card {
+      margin-top: 56px;
+      width: 1120px;
+      padding: 30px 40px;
+      display: flex;
+      align-items: center;
+      gap: 40px;
+    }
+    .oshw-card img { height: 76px; }
+    .photo {
+      position: absolute;
+      right: 136px;
+      top: 210px;
+      width: 430px;
+      margin: 0;
+    }
+    .photo img {
+      width: 430px;
+      height: 666px;
+      display: block;
+      border-radius: 20px;
+      box-shadow: 0 20px 50px rgba(20, 32, 24, 0.16);
+    }
+    .photo figcaption { margin-top: 14px; font-size: 19px; }
+  </style>
+</head>
+<body>
+<div class="slide">
+  <img class="mark" src="../assets/lumi-mark.webp" alt="">
+  <div class="body">
+    <div class="eyebrow">
+      <img class="bow-34" src="../assets/bow.svg" alt="">
+      <span>The hardware</span>
+    </div>
+
+    <h2 class="title" style="max-width: 1180px">
+      A complete device,
+      <br>
+      <em>₹4,171.70 in parts.</em>
+    </h2>
+
+    <!-- Two columns of specs -->
+    <div class="specs">
+      <ul class="list">
+        <li><img class="bow" src="../assets/bow.svg" alt="">ESP32-S3: 16 MB flash, 8 MB PSRAM</li>
+        <li><img class="bow" src="../assets/bow.svg" alt="">Wi-Fi and Bluetooth LE 5</li>
+        <li><img class="bow" src="../assets/bow.svg" alt="">2.8″ 320×240 touch screen</li>
+        <li><img class="bow" src="../assets/bow.svg" alt="">Eight buttons</li>
+      </ul>
+      <ul class="list">
+        <li><img class="bow" src="../assets/bow.svg" alt="">IR send and receive, motion sensor</li>
+        <li><img class="bow" src="../assets/bow.svg" alt="">Speaker amp and microSD</li>
+        <li><img class="bow" src="../assets/bow.svg" alt="">LiPo, charged over USB-C</li>
+        <li><img class="bow" src="../assets/bow.svg" alt="">Qwiic and a 4-GPIO header</li>
+      </ul>
+    </div>
+
+    <!-- OSHWA mark and cost note -->
+    <div class="card oshw-card">
+      <img src="../assets/oshw_mark.png" alt="Certified open source hardware, OSHWA IN000107">
+      <p class="small" style="font-size: 24px">
+        4-layer board, 88 × 133.5 mm. Cost from the prices paid on 17 Nov 2026 for the first five
+        boards; customs duty, tools and labour not included.
+      </p>
+    </div>
+
+    <!-- PCB photo -->
+    <figure class="photo">
+      <img src="../assets/pcb_back.jpg" alt="Back of the Falera Badge PCB">
+      <figcaption class="small">
+        The back of the first boards, made before the rename from Oreo.
+      </figcaption>
+    </figure>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <span><b>FaleraOS</b> · Elixpo</span>
+    <span class="num">4 / 13</span>
+    <span>falera.elixpo.com</span>
+  </div>
+</div>
+</body>
+</html>

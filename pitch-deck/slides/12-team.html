@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>12 / 13 · Team · FaleraOS sponsor deck</title>
+  <link rel="stylesheet" href="../style.css">
+  <style>
+    .people {
+      margin-top: 72px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 48px;
+      width: 1648px;
+    }
+    .person {
+      padding: 44px 48px;
+      display: flex;
+      gap: 40px;
+      align-items: center;
+    }
+    /* Initials in a circle (there are no photos in the repository). */
+    .initials {
+      flex: none;
+      width: 132px;
+      height: 132px;
+      border-radius: 66px;
+      background: #FFFFFF;
+      border: 2px solid var(--ink);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 44px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .name { font-size: 42px; font-weight: 700; letter-spacing: -0.03em; }
+    .role { margin-top: 8px; font-size: 28px; color: var(--red); font-weight: 700; }
+    .does { margin-top: 8px; font-size: 28px; color: var(--dim); }
+    .gh { margin-top: 12px; font-family: var(--mono); font-size: 21px; color: var(--muted); }
+  </style>
+</head>
+<body>
+<div class="slide">
+  <img class="mark" src="../assets/lumi-mark.webp" alt="">
+  <div class="body">
+    <div class="eyebrow">
+      <img class="bow-34" src="../assets/bow.svg" alt="">
+      <span>The team</span>
+    </div>
+
+    <h2 class="title">
+      Built in India, <em>in the open.</em>
+    </h2>
+
+    <div class="people">
+      <div class="card person">
+        <div class="initials">AB</div>
+        <div>
+          <div class="name">Ayushman Bhattacharya</div>
+          <div class="role">Founder and lead, Elixpo</div>
+          <div class="does">Hardware, FaleraOS and RV565</div>
+          <div class="gh">github.com/Circuit-Overtime</div>
+        </div>
+      </div>
+      <div class="card person">
+        <div class="initials">AC</div>
+        <div>
+          <div class="name">Anwesha Chakraborty</div>
+          <div class="role">Core maintainer, Elixpo</div>
+          <div class="does">Co-author of RV565</div>
+          <div class="gh">github.com/anwe-ch</div>
+        </div>
+      </div>
+    </div>
+
+    <p class="lede" style="margin-top: 64px; max-width: 1560px">
+      Elixpo is an open-source community of 45+ contributors. It has taken part in and been
+      supported by GSSOC, Hacktoberfest, Pollinations.AI, MS Startup Foundations and OSCI.
+    </p>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <span><b>FaleraOS</b> · Elixpo</span>
+    <span class="num">12 / 13</span>
+    <span>falera.elixpo.com</span>
+  </div>
+</div>
+</body>
+</html>

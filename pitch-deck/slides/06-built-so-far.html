@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>6 / 13 · Built so far · FaleraOS sponsor deck</title>
+  <link rel="stylesheet" href="../style.css">
+  <style>
+    /* Timeline: date, dot on a vertical line, event. */
+    .timeline { margin-top: 64px; position: relative; width: 1648px; }
+    .step {
+      display: grid;
+      grid-template-columns: 300px 60px 1fr;
+      align-items: center;
+      height: 82px;
+    }
+    .date {
+      font-family: var(--mono);
+      font-size: 24px;
+      color: var(--muted);
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+    .track {
+      position: relative;
+      height: 82px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .line {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: var(--border);
+    }
+    .first .line { top: 41px; }
+    .last .line { bottom: 41px; }
+    .dot {
+      position: relative;
+      width: 18px;
+      height: 18px;
+      border-radius: 9px;
+      background: #FFFFFF;
+      border: 3px solid var(--ink);
+    }
+    .event { font-size: 31px; color: var(--ink); padding-left: 16px; }
+    /* The last step ("Now") is red. */
+    .last .date { color: var(--red); }
+    .last .dot { background: var(--red); border-color: var(--red); }
+  </style>
+</head>
+<body>
+<div class="slide">
+  <img class="mark" src="../assets/lumi-mark.webp" alt="">
+  <div class="body">
+    <div class="eyebrow">
+      <img class="bow-34" src="../assets/bow.svg" alt="">
+      <span>Built so far</span>
+    </div>
+
+    <h2 class="title">
+      Working software, <em>first boards ordered.</em>
+    </h2>
+
+    <!-- Timeline: mark the first step "first" and the last "last". -->
+    <div class="timeline">
+      <div class="step first">
+        <div class="date">16 May 2026</div>
+        <div class="track"><div class="line"></div><div class="dot"></div></div>
+        <div class="event">OS release 1.4.19 on the breadboard badge</div>
+      </div>
+      <div class="step">
+        <div class="date">4 Nov 2026</div>
+        <div class="track"><div class="line"></div><div class="dot"></div></div>
+        <div class="event">Adafruit writes about the OS</div>
+      </div>
+      <div class="step">
+        <div class="date">7 Nov 2026</div>
+        <div class="track"><div class="line"></div><div class="dot"></div></div>
+        <div class="event">FaleraOS 2.0: the App Store and a new shell</div>
+      </div>
+      <div class="step">
+        <div class="date">10 Nov 2026</div>
+        <div class="track"><div class="line"></div><div class="dot"></div></div>
+        <div class="event">Espressif assigns the badge its USB ID, 303a:83ec</div>
+      </div>
+      <div class="step">
+        <div class="date">11 Nov 2026</div>
+        <div class="track"><div class="line"></div><div class="dot"></div></div>
+        <div class="event">falera CLI 1.0: the badge from a computer, over USB</div>
+      </div>
+      <div class="step">
+        <div class="date">17 Nov 2026</div>
+        <div class="track"><div class="line"></div><div class="dot"></div></div>
+        <div class="event">First five PCBs and their parts ordered</div>
+      </div>
+      <div class="step last">
+        <div class="date">Now</div>
+        <div class="track"><div class="line"></div><div class="dot"></div></div>
+        <div class="event">PCB drivers and touch screen support in review</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <span><b>FaleraOS</b> · Elixpo</span>
+    <span class="num">6 / 13</span>
+    <span>falera.elixpo.com</span>
+  </div>
+</div>
+</body>
+</html>
