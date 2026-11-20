@@ -55,6 +55,9 @@ TMP_DIR     = "/store_tmp"
 APPS_DIR    = "apps"
 USER_AGENT  = "FaleraBadge-AppStore"
 T_API       = 8           # seconds, catalogue / icon requests
+# Flash kept free after an install, for state saves, caches and OTA staging:
+# an install that would eat into it is refused before anything downloads.
+MIN_FREE    = 64 * 1024
 
 # Apps that ship on every badge and cannot be uninstalled from the Store.
 # Keep in sync with the directories under apps/ (tests/test_store.py
@@ -194,6 +197,28 @@ def _tree_size(root):
             else:
                 total += st[6]
     return total
+
+
+def free_bytes(path="/"):
+    """Free filesystem bytes (f_frsize x f_bavail), or None when statvfs is
+    unavailable (the check is then skipped rather than blocking installs)."""
+    try:
+        st = _os.statvfs(path)
+        return st[1] * st[4]
+    except Exception:
+        return None
+
+
+def has_room(need, free, reserve=MIN_FREE):
+    """True when `need` bytes fit in `free` and leave `reserve` spare.
+    An unknown `free` (None) never blocks."""
+    if free is None:
+        return True
+    return need + reserve <= free
+
+
+def _kb(n):
+    return (n + 1023) // 1024
 
 
 def _read_json(path):
@@ -750,6 +775,12 @@ def install(app_id, progress_cb=None):
         return False, "incomplete app"
 
     total = sum(f[1] for f in files)
+    # An update stages the whole new copy next to the old one, so the full
+    # size is needed either way.
+    free = free_bytes()
+    if not has_room(total, free):
+        return False, "not enough storage (needs %d KB, %d KB free)" % (
+            _kb(total + MIN_FREE), _kb(free))
     done = 0
 
     # 1. App files into a staging directory, manifest.json last.
