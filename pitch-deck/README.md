@@ -107,6 +107,6 @@ partner that isn't in one.
 8. **Recognition:** README.md "In the press" and "Recognised upstream"; the fundraiser API (payouts.elixpo.com/f/falera-badge, read 20 Nov 2026: ₹781 from 13 contributors); FUNDRAISER_APPEAL.md (about ₹8,000 spent out of pocket).
 9. **Where it goes:** EMAILS_BATCH2.md (FOSS United milestones; NIDHI note's projected ₹3,000 a badge at 100 units); SPONSORS.md (IndiaFOSS 2027, FOSSASIA Summit 2027 as events to approach); README.md (GSoC 2027: Elixpo is applying, not accepted).
 10. **The ask:** EMAILS_BATCH2.md, FOSS United budget table (the lines add up to ₹3,00,000).
-11. **What sponsors get:** SPONSORS.md "What to send each type" and the "In return" lines of EMAILS_BATCH2.md drafts 1–4. SPONSORS.md defines no tiers, so none are shown.
+11. **Sponsorship:** the levels (Bamboo, Bow, Lumi), badge counts and benefits are defined in `pitch-deck/SPONSORSHIP.md`; change them there first. The event-badge price (about ₹3,000 at 100 units) is from EMAILS_BATCH2.md.
 12. **Team:** README.md "Built by the community" and "Recognition & programs"; EMAILS_BATCH2.md team section. No photos in the repository, so initials are shown.
 13. **Contact:** README.md closing line (hello@elixpo.com).
