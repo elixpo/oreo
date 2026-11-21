@@ -5,7 +5,7 @@
     "role": "owner",
     "name": "Elixpo",
     "email": "hello@elixpo.com",
-    "description": "Elixpo is an open-source project foundry in India. It builds FaleraOS and the Elixpo Falera Badge: open hardware, open software and the research behind them, all released under open licences.",
+    "description": "Elixpo is an open-source project foundry in India, a Udyam-registered MSME (UDYAM-WB-07-0152337). It builds FaleraOS and the Elixpo Falera Badge: open hardware, open software and the research behind them, all released under open licences. Three maintainers: Ayushman Bhattacharya (lead), Anwesha Chakraborty and Vivek Yadav.",
     "webpageUrl": {
       "url": "https://falera.elixpo.com",
       "wellKnown": "https://falera.elixpo.com/.well-known/funding-manifest-urls"
@@ -23,8 +23,20 @@
       "repositoryUrl": {
         "url": "https://github.com/elixpo/falera"
       },
-      "licenses": ["spdx:MIT", "spdx:CERN-OHL-P-2.0", "spdx:CC-BY-4.0"],
-      "tags": ["open-hardware", "micropython", "esp32", "embedded", "operating-system", "education", "hardware"]
+      "licenses": [
+        "spdx:MIT",
+        "spdx:CERN-OHL-P-2.0",
+        "spdx:CC-BY-4.0"
+      ],
+      "tags": [
+        "open-hardware",
+        "micropython",
+        "esp32",
+        "embedded",
+        "operating-system",
+        "education",
+        "hardware"
+      ]
     }
   ],
   "funding": {
@@ -45,7 +57,9 @@
         "amount": 8000,
         "currency": "INR",
         "frequency": "one-time",
-        "channels": ["elixpo-pay"]
+        "channels": [
+          "elixpo-pay"
+        ]
       },
       {
         "guid": "one-badge",
@@ -55,19 +69,92 @@
         "amount": 4172,
         "currency": "INR",
         "frequency": "one-time",
-        "channels": ["elixpo-pay"]
+        "channels": [
+          "elixpo-pay"
+        ]
       },
       {
-        "guid": "workshop-batch",
+        "guid": "four-month-plan",
         "status": "active",
-        "name": "A workshop batch of 20 badges",
-        "description": "Twenty badges for a build-and-code workshop, at the one-badge price; a larger order costs less per badge.",
-        "amount": 83440,
+        "name": "Four months: 25 badges in developers' hands",
+        "description": "The next four months, ₹3,00,000 in all. Milestones: month 1, the first PCB badges running FaleraOS and a public build guide; month 2, touch, audio and an app tutorial, and 25 badges built and tested for contributors and testers; month 3, board revision 2 with fixes from the first batch; month 4, two workshops where every attendee builds a badge and publishes an app. Each milestone is reported publicly in the repository. Lines: maintainer stipends ₹1,20,000; 25 badges ₹1,00,000; board revision 2 ₹30,000; test equipment ₹25,000; two workshops ₹25,000. Full terms: pitch-deck/SPONSORSHIP.md.",
+        "amount": 300000,
         "currency": "INR",
         "frequency": "one-time",
-        "channels": ["elixpo-pay"]
+        "channels": [
+          "elixpo-pay"
+        ]
+      },
+      {
+        "guid": "maintainer-stipends",
+        "status": "active",
+        "name": "Maintainer stipends",
+        "description": "Three maintainers × ₹10,000 a month for four months (₹1,20,000), paid by milestone, so the work continues at full pace.",
+        "amount": 30000,
+        "currency": "INR",
+        "frequency": "monthly",
+        "channels": [
+          "elixpo-pay"
+        ]
+      },
+      {
+        "guid": "twenty-five-badges",
+        "status": "active",
+        "name": "25 badges, built and tested",
+        "description": "25 Falera Badges for contributors, testers and the two workshops, at ₹4,000 each at 25-unit prices (₹4,172 in parts for the first five, circuit/elixpo/BOM_COST.md).",
+        "amount": 100000,
+        "currency": "INR",
+        "frequency": "one-time",
+        "channels": [
+          "elixpo-pay"
+        ]
+      },
+      {
+        "guid": "board-revision-2",
+        "status": "active",
+        "name": "Board revision 2",
+        "description": "Fabrication and assembly of the next prototypes, with the fixes found on the first five boards.",
+        "amount": 30000,
+        "currency": "INR",
+        "frequency": "one-time",
+        "channels": [
+          "elixpo-pay"
+        ]
+      },
+      {
+        "guid": "test-equipment",
+        "status": "active",
+        "name": "Test equipment",
+        "description": "A hot-air station, a bench power supply and a logic analyser for bringing up and testing every batch.",
+        "amount": 25000,
+        "currency": "INR",
+        "frequency": "one-time",
+        "channels": [
+          "elixpo-pay"
+        ]
+      },
+      {
+        "guid": "two-workshops",
+        "status": "active",
+        "name": "Two workshops",
+        "description": "Kits, travel and documentation for two build-and-code workshops: everyone builds a badge and publishes an app to the App Store.",
+        "amount": 25000,
+        "currency": "INR",
+        "frequency": "one-time",
+        "channels": [
+          "elixpo-pay"
+        ]
       }
     ],
-    "history": []
+    "history": [
+      {
+        "year": 2026,
+        "income": 872,
+        "expenses": 8185,
+        "taxes": 0,
+        "currency": "INR",
+        "description": "Income: the community fundraiser, ₹872 from 16 people as of 21 November 2026. Expenses: the first five PCBs (JLCPCB, ₹4,122) and their parts (LCSC, ₹4,063), paid by the maintainers."
+      }
+    ]
   }
 }
