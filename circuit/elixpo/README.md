@@ -22,6 +22,14 @@ schematic, `elixpo.kicad_sch`, links five sheets:
 5. MAX98357A speaker amp, MPU-6050, microSD, infrared, status LED, Qwiic and the
    J6 expansion header.
 
+The renders, and the 3D model on the website's badge page
+(`falera.elixpo/public/models/falera-badge.glb`), come from
+`python3 circuit/elixpo/render_board.py`. They use the board stackup colours:
+black mask, white silkscreen, HASL. The first five boards were made before the
+rename, so their silkscreen still says OREO BADGE and oreo.elixpo.com; the
+design files now say FALERA BADGE, falera.elixpo.com and
+github.com/elixpo/falera.
+
 Run `./circuit/elixpo/build.sh` from any directory to regenerate the design and
 produce the ERC report, PDF and KiCad-native BOM under `circuit/elixpo/build/`.
 

@@ -5,20 +5,24 @@
   "license": "MIT",
   "description": "The Falera Badge — marketing site, app catalogue, and gated file-transfer launcher.",
   "scripts": {
+    "predev": "node scripts/copy-draco.mjs",
     "dev": "next dev",
+    "prebuild": "node scripts/copy-draco.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "deploy": "next build && wrangler pages deploy out --project-name=falera --branch=main",
+    "deploy": "npm run build && wrangler pages deploy out --project-name=falera --branch=main",
     "test:rv565": "node --test scripts/rv565.test.mjs"
   },
   "dependencies": {
+    "@google/model-viewer": "4.4.0",
     "framer-motion": "^11.11.17",
     "lucide-react": "^0.460.0",
     "mermaid": "^11.17.2",
     "next": "^15.5.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "three": "0.183.2"
   },
   "devDependencies": {
     "@types/node": "^22.10.1",

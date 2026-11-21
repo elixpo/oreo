@@ -57,7 +57,7 @@ HEART = (79.0, 35.5, 11.0)                # front, far right, where the panda is
 # in the free column beside the ESP32-S3 module, under the clip slot.
 BACK_ROW_Y = 47.5                          # centre line of "Elixpo"
 BACK_COLUMN = (15.0, 9.0)                  # front-view centre x and top of the column
-REPO_URL = "github.com/elixpo/oreo"            # under "Elixpo"
+REPO_URL = "github.com/elixpo/falera"            # under "Elixpo"
 JLC_MARK = None                                 # no JLCPCB order number ("Remove Mark")
 OSHW_H = 12.0                              # height of the OSHWA certification mark
 
@@ -584,8 +584,8 @@ def silkscreen(board):
     add_text(board, bs, "Elixpo", mid, y0, 4.2, 0.6, mirror=True, bold=True)
     add_text(board, bs, REPO_URL, mid, y0 + 4.6, 1.0, 0.15, mirror=True)
     tx, ty = BACK_COLUMN
-    for text, dy, size, thick, bold in (("OREO BADGE", OSHW_H + 3.0, 1.5, 0.25, True),
-                                        ("oreo.elixpo.com", OSHW_H + 5.8, 1.0, 0.15, False),
+    for text, dy, size, thick, bold in (("FALERA BADGE", OSHW_H + 3.0, 1.5, 0.25, True),
+                                        ("falera.elixpo.com", OSHW_H + 5.8, 1.0, 0.15, False),
                                         ("CERN-OHL-P-2.0", OSHW_H + 8.2, 0.9, 0.15, False),
                                         ("A/A-2509-0023", OSHW_H + 10.6, 0.9, 0.15, False)):
         add_text(board, bs, text, tx, ty + dy, size, thick, mirror=True, bold=bold)
@@ -724,7 +724,7 @@ def write_netclasses():
 STACKUP_6 = """\t\t(stackup
 \t\t\t(layer "F.SilkS" (type "Top Silk Screen") (color "White"))
 \t\t\t(layer "F.Paste" (type "Top Solder Paste"))
-\t\t\t(layer "F.Mask" (type "Top Solder Mask") (color "Black") (thickness 0.01))
+\t\t\t(layer "F.Mask" (type "Top Solder Mask") (color "#0A0A0AF0") (thickness 0.01))
 \t\t\t(layer "F.Cu" (type "copper") (thickness 0.035))
 \t\t\t(layer "dielectric 1" (type "prepreg") (thickness 0.1) (material "FR4") (epsilon_r 4.5) (loss_tangent 0.02))
 \t\t\t(layer "In1.Cu" (type "copper") (thickness 0.035))
@@ -736,10 +736,10 @@ STACKUP_6 = """\t\t(stackup
 \t\t\t(layer "In4.Cu" (type "copper") (thickness 0.035))
 \t\t\t(layer "dielectric 5" (type "prepreg") (thickness 0.1) (material "FR4") (epsilon_r 4.5) (loss_tangent 0.02))
 \t\t\t(layer "B.Cu" (type "copper") (thickness 0.035))
-\t\t\t(layer "B.Mask" (type "Bottom Solder Mask") (color "Black") (thickness 0.01))
+\t\t\t(layer "B.Mask" (type "Bottom Solder Mask") (color "#0A0A0AF0") (thickness 0.01))
 \t\t\t(layer "B.Paste" (type "Bottom Solder Paste"))
 \t\t\t(layer "B.SilkS" (type "Bottom Silk Screen") (color "White"))
-\t\t\t(copper_finish "ENIG")
+\t\t\t(copper_finish "HAL lead-free")
 \t\t\t(dielectric_constraints no)
 \t\t)
 """
@@ -748,7 +748,7 @@ STACKUP_6 = """\t\t(stackup
 STACKUP_4 = """\t\t(stackup
 \t\t\t(layer "F.SilkS" (type "Top Silk Screen") (color "White"))
 \t\t\t(layer "F.Paste" (type "Top Solder Paste"))
-\t\t\t(layer "F.Mask" (type "Top Solder Mask") (color "Black") (thickness 0.01))
+\t\t\t(layer "F.Mask" (type "Top Solder Mask") (color "#0A0A0AF0") (thickness 0.01))
 \t\t\t(layer "F.Cu" (type "copper") (thickness 0.035))
 \t\t\t(layer "dielectric 1" (type "prepreg") (thickness 0.2104) (material "FR4") (epsilon_r 4.4) (loss_tangent 0.02))
 \t\t\t(layer "In1.Cu" (type "copper") (thickness 0.0152))
@@ -756,17 +756,17 @@ STACKUP_4 = """\t\t(stackup
 \t\t\t(layer "In2.Cu" (type "copper") (thickness 0.0152))
 \t\t\t(layer "dielectric 3" (type "prepreg") (thickness 0.2104) (material "FR4") (epsilon_r 4.4) (loss_tangent 0.02))
 \t\t\t(layer "B.Cu" (type "copper") (thickness 0.035))
-\t\t\t(layer "B.Mask" (type "Bottom Solder Mask") (color "Black") (thickness 0.01))
+\t\t\t(layer "B.Mask" (type "Bottom Solder Mask") (color "#0A0A0AF0") (thickness 0.01))
 \t\t\t(layer "B.Paste" (type "Bottom Solder Paste"))
 \t\t\t(layer "B.SilkS" (type "Bottom Silk Screen") (color "White"))
-\t\t\t(copper_finish "ENIG")
+\t\t\t(copper_finish "HAL lead-free")
 \t\t\t(dielectric_constraints no)
 \t\t)
 """
 STACKUP = STACKUP_4 if COPPER_LAYERS == 4 else STACKUP_6   # JLCPCB JLC04161H-7628 for 4 layers
 
 
-TITLE_BLOCK_FMT = '\t(title_block\n\t\t(title "Oreo Badge")\n\t\t(date "2026-11-15")\n\t\t(rev "1.0")\n\t\t(company "Elixpo")\n\t\t(comment 1 "Hardware: CERN-OHL-P-2.0, OSHWA IN000107")\n\t\t(comment 2 "%d layers, 1.6 mm, ENIG, black mask")\n\t)\n'
+TITLE_BLOCK_FMT = '\t(title_block\n\t\t(title "Falera Badge")\n\t\t(date "2026-11-15")\n\t\t(rev "1.0")\n\t\t(company "Elixpo")\n\t\t(comment 1 "Hardware: CERN-OHL-P-2.0, OSHWA IN000107")\n\t\t(comment 2 "%d layers, 1.6 mm, HASL, black mask")\n\t)\n'
 
 
 TITLE_BLOCK = TITLE_BLOCK_FMT % COPPER_LAYERS
