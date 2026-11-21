@@ -17,6 +17,11 @@ Four months, ₹3,00,000 ($3,193), ₹75,000 ($798) a month:
 | Test equipment: hot-air station, bench supply, logic analyser | ₹25,000 ($266) | 8% |
 | Two workshops: kits, travel and documentation | ₹25,000 ($266) | 8% |
 
+This is the development phase, not production: the plan pays for three
+people, a better board and the first 25 badges, which make the badge ready
+to produce. Production follows at about ₹4,000 ($43) a badge, and a sponsor
+can add badges on top of any level: each extra ₹4,000 adds one.
+
 A badge costs ₹4,172 in parts at the prices paid for the first five boards
 (`circuit/elixpo/BOM_COST.md`). At 25 units the board and parts cost less,
 which is where the ₹4,000 a badge comes from.
