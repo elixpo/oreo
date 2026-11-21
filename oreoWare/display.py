@@ -106,6 +106,16 @@ def _stop_native_splash():
         pass
 
 
+# The newest Display, so code at the raw REPL (`falera screenshot`) can read
+# its framebuffer (_buf: big-endian RGB565, as sent to the panel) after
+# Ctrl-C has stopped FaleraOS.
+_current = None
+
+
+def current():
+    return _current
+
+
 class Display(api.Display):
     _mono_pal = None        # 2×1 RGB565 palette for blit_mono, built lazily
 
@@ -147,6 +157,8 @@ class Display(api.Display):
             self._bl_pwm = PWM(Pin(pins.DISPLAY_BL, Pin.OUT), freq=1000, duty_u16=65535)
         except Exception:
             self._bl_pwm = None
+        global _current
+        _current = self
 
     # ── primitives ────────────────────────────────────────────────────────────
 

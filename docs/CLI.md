@@ -362,6 +362,7 @@ Put these before the command, for example `falera --port /dev/ttyACM1 info`.
 | [`falera transfer`](#falera-transfer-send-files-to-the-transfer-app) / `falera send` | Send files to the Transfer app, using the code on the badge | **no** |
 | [`falera add`](#falera-add-photos-videos-and-documents-without-the-transfer-app) | Send photos, videos and documents without opening an app | briefly |
 | [`falera ls` / `push` / `pull` / `rm`](#falera-ls--push--pull--rm-files) | Any file on the badge | briefly |
+| [`falera screenshot`](#falera-screenshot-the-screen-as-a-png) | Save the badge's screen as a PNG | briefly, then restarts |
 | [`falera apps`](#falera-apps-the-app-store) | App Store: list, install, update, remove | briefly |
 | [`falera setup`](#falera-setup-owner-profile) | Owner profile: GitHub user, name, timezone, weather | briefly, then restarts |
 | [`falera new`](#falera-new-start-an-app) | Make a new app folder from the app template | no (never opens a port) |
@@ -549,6 +550,37 @@ falera rm -r /apps/myapp               # asks first
   badge from booting.
 - A badge path can be written with a leading `:` (`:documents/`). In Git Bash
   on Windows you need it (see [Troubleshooting](#troubleshooting)).
+
+### `falera screenshot`: the screen as a PNG
+
+```sh
+falera screenshot                      # falera-screenshot-<date>-<time>.png here
+falera screenshot home.png
+falera screenshot docs/ --scale 2      # 640x480, into docs/
+```
+
+| Option | Meaning |
+|---|---|
+| `FILE` | The PNG to write, or a folder to put the default name in (default: `falera-screenshot-YYYYmmdd-HHMMSS.png` in the current folder) |
+| `--scale N` | Enlarge N times (1 to 8, default 1) without smoothing, so every badge pixel stays a sharp square |
+
+- The picture is exactly what FaleraOS last drew: the CLI reads FaleraOS's
+  320×240 framebuffer (big-endian RGB565, as sent to the panel) and widens
+  each pixel to 8-bit RGB exactly (`r = r5 << 3 | r5 >> 2`, and so on).
+  The PNG is written with the standard library only.
+- To keep that frame, the command stops FaleraOS with Ctrl-C but without the
+  usual soft reset (which would clear the framebuffer). The transfer is
+  checked with SHA-256 and sent again once if it was damaged. FaleraOS
+  restarts afterwards like after any other command.
+- If FaleraOS was stopped halfway through drawing a frame, the command says
+  so; run it again.
+- It finds the framebuffer through `oreoWare.display.current()`. A FaleraOS
+  without it (stable/v2.0.18 and earlier) is read through
+  `oreoOS.busy._display` instead, the same display the launcher binds at
+  boot, so released badges need no update. Only a FaleraOS with neither
+  is asked to update (`falera update`).
+- Video playing in the Gallery and the loading spinner are drawn straight to
+  the panel, not into the framebuffer, so they do not show in a screenshot.
 
 ### `falera apps`: the App Store
 

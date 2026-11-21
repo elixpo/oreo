@@ -46,6 +46,14 @@ HELP = {
     "pull": ("Copy files from the badge",
              "  falera pull /wifi_seen.json\n"
              "  falera pull -r /apps/pet ./pet-backup"),
+    "screenshot": ("Save the badge's screen as a PNG",
+                   "Reads the frame FaleraOS last drew, pixel for pixel, and saves it as\n"
+                   "a PNG on this computer (320x240; --scale enlarges it without\n"
+                   "smoothing). FaleraOS restarts after. Works on released FaleraOS\n"
+                   "versions too (through oreoOS.busy when display.current() is missing).\n\n"
+                   "  falera screenshot                  falera-screenshot-<date>-<time>.png here\n"
+                   "  falera screenshot home.png\n"
+                   "  falera screenshot docs/ --scale 2  640x480, into docs/"),
     "rm": ("Remove files from the badge",
            "Folders need -r. FaleraOS's own files and anything inside them\n"
            "(/oreoOS, /oreoWare, /assets, built-in apps, /main.py, /secrets.py,\n"
@@ -234,6 +242,12 @@ def build_parser():
     s.add_argument("source", metavar="badge-path")
     s.add_argument("dest", nargs="?", default=".", metavar="local")
     s.add_argument("-r", "--recursive", action="store_true", help="copy folders")
+
+    s = _sub(subs, "screenshot")
+    s.add_argument("file", nargs="?", metavar="FILE",
+                   help="PNG to write, or a folder (default: falera-screenshot-<date>-<time>.png)")
+    s.add_argument("--scale", type=int, default=1, metavar="N",
+                   help="enlarge N times, nearest neighbour (1-8, default 1)")
 
     s = _sub(subs, "rm")
     s.add_argument("paths", nargs="+", metavar="badge-path")

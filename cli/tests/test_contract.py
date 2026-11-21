@@ -22,6 +22,8 @@ REPO = Path(__file__).resolve().parents[2]
 WIFI = REPO / "oreoWare" / "wifi.py"
 STORAGE = REPO / "oreoOS" / "storage.py"
 STORE = REPO / "oreoOS" / "store.py"
+DISPLAY = REPO / "oreoWare" / "display.py"
+API = REPO / "oreoOS" / "api.py"
 
 
 class FakeWLAN:
@@ -175,6 +177,126 @@ class DefaultAppsContractTest(unittest.TestCase):
         self.assertIsNotNone(found, "DEFAULT_APPS not found in oreoOS/store.py")
         self.assertEqual(sorted(commands.DEFAULT_APPS), sorted(found))
         self.assertEqual(len(set(commands.DEFAULT_APPS)), len(commands.DEFAULT_APPS))
+
+
+class _Pin:
+    OUT = 1
+
+    def __init__(self, *a, **k):
+        pass
+
+    def __call__(self, v=None):
+        return 0
+
+
+class _Panel:
+    def __init__(self, spi, dc, cs, rst, bl):
+        self.spi, self.dc, self.cs, self.bl = spi, dc, cs, bl
+        self._ramwr_cmd = b"\x2c"
+
+    def init(self):
+        pass
+
+
+class _FrameBuffer:
+    """framebuf.FrameBuffer(RGB565) for fill/fill_rect: stores each value
+    little-endian, as the real one does."""
+
+    def __init__(self, buf, w, h, fmt):
+        self.buf, self.w = buf, w
+
+    def fill_rect(self, x, y, w, h, c):
+        for yy in range(y, y + h):
+            for xx in range(x, x + w):
+                o = (yy * self.w + xx) * 2
+                self.buf[o], self.buf[o + 1] = c & 0xFF, c >> 8
+
+    def fill(self, c):
+        self.fill_rect(0, 0, self.w, len(self.buf) // (2 * self.w), c)
+
+
+@unittest.skipUnless(DISPLAY.exists(), "not inside a FaleraOS checkout")
+class RealDisplayContractTest(unittest.TestCase):
+    """`falera screenshot` against the real oreoWare/display.py: current()
+    and the big-endian RGB565 framebuffer it reads."""
+
+    def _load(self, path, name):
+        spec = importlib.util.spec_from_file_location(name, path)
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[name] = mod
+        spec.loader.exec_module(mod)
+        return mod
+
+    def setUp(self):
+        names = ("framebuf", "machine", "oreoOS", "oreoOS.api", "oreoWare",
+                 "oreoWare.pins", "oreoWare._st7789", "oreoWare.display")
+        saved = {k: sys.modules.get(k) for k in names}
+
+        def restore():
+            for k, v in saved.items():
+                if v is None:
+                    sys.modules.pop(k, None)
+                else:
+                    sys.modules[k] = v
+        self.addCleanup(restore)
+        import time
+        if not hasattr(time, "sleep_us"):
+            time.sleep_us = lambda us: None
+            self.addCleanup(delattr, time, "sleep_us")
+        fb = types.ModuleType("framebuf")
+        fb.RGB565, fb.MONO_HLSB, fb.FrameBuffer = 1, 2, _FrameBuffer
+        machine = types.ModuleType("machine")
+        machine.Pin = _Pin
+        machine.SPI = lambda *a, **k: types.SimpleNamespace(write=lambda d: None)
+        sys.modules.update(framebuf=fb, machine=machine)
+        pkg = types.ModuleType("oreoOS")
+        pkg.__path__ = [str(REPO / "oreoOS")]
+        sys.modules["oreoOS"] = pkg
+        self.api = pkg.api = self._load(API, "oreoOS.api")
+        ware = types.ModuleType("oreoWare")
+        ware.__path__ = [str(REPO / "oreoWare")]
+        sys.modules["oreoWare"] = ware
+        ware.pins = self._load(REPO / "oreoWare" / "pins.py", "oreoWare.pins")
+        st = types.ModuleType("oreoWare._st7789")
+        st.ST7789 = _Panel
+        sys.modules["oreoWare._st7789"] = st
+        self.display = self._load(DISPLAY, "oreoWare.display")
+        self.fake = FakeTransport()
+        self.addCleanup(self.fake.cleanup)
+        self.fake.modules["oreoWare.display"] = self.display
+        self.fake.modules["oreoOS.api"] = self.api
+
+    def test_screenshot_reads_what_faleraos_drew(self):
+        from oreo_cli import screenshot
+        d = self.display.Display()
+        d.clear(0x001F)                                  # blue
+        d.rect(0, 0, 2, 1, 0xF800, fill=True)            # red, top left
+        d.rect(319, 239, 1, 1, 0x07E0, fill=True)        # green, bottom right
+        d.present()                                      # nothing half drawn
+        w, h, data, dirty = screenshot.capture(Badge(self.fake))
+        self.assertEqual((w, h, dirty), (self.api.SCREEN_W, self.api.SCREEN_H, False))
+        rgb = screenshot.rgb565_to_rgb888(data)
+        self.assertEqual(rgb[0:6], b"\xff\x00\x00" * 2)
+        self.assertEqual(rgb[6:9], b"\x00\x00\xff")
+        self.assertEqual(rgb[-3:], b"\x00\xff\x00")
+
+
+@unittest.skipUnless((REPO / "oreoOS" / "busy.py").exists(), "not inside a FaleraOS checkout")
+class BusyDisplayFallbackContractTest(unittest.TestCase):
+    """`falera screenshot` on a FaleraOS without display.current() reads
+    oreoOS.busy._display, which the launcher binds at boot."""
+
+    def test_busy_keeps_the_display_the_launcher_binds(self):
+        import ast
+        tree = ast.parse((REPO / "oreoOS" / "busy.py").read_text(encoding="utf-8"))
+        names = {t.id for n in tree.body if isinstance(n, ast.Assign)
+                 for t in n.targets if isinstance(t, ast.Name)}
+        self.assertIn("_display", names)
+        bind = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "bind")
+        self.assertTrue(any(isinstance(n, ast.Global) and "_display" in n.names
+                            for n in ast.walk(bind)))
+        launcher = (REPO / "oreoOS" / "launcher.py").read_text(encoding="utf-8")
+        self.assertIn("busy.bind(os_obj.display)", launcher)
 
 
 if __name__ == "__main__":

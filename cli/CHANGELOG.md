@@ -10,6 +10,18 @@ from its `## [<version>]` section below, so every release needs one.
 
 ## [Unreleased]
 
+### Added
+
+- **`falera screenshot [FILE] [--scale N]`**: saves the badge's screen as a
+  PNG, pixel for pixel. It reads the frame FaleraOS last drew from its
+  framebuffer (`oreoWare.display.current()`, big-endian RGB565), checks it
+  with SHA-256, widens it to 8-bit RGB exactly and writes the PNG with the
+  standard library; `--scale` enlarges it by an integer without smoothing.
+  FaleraOS restarts afterwards. On a FaleraOS without `display.current()`
+  (stable/v2.0.18 and earlier) it reads the display the launcher binds to
+  `oreoOS.busy` at boot, so released badges work as they are; only a
+  FaleraOS with neither asks to be updated.
+
 ### Changed
 
 - **Renamed to `falera`** (#186), with the OS (OreoOS is now FaleraOS). The package is `falera-cli`, the command `falera` (and `falera-cli`); **`oreo` and `oreo-cli` still work** as aliases for a few releases. Release files are `falera_cli-<version>-py3-none-any.whl` and `.tar.gz`; the installers fall back to the `oreo_cli-` files of releases made before the rename. The `OREO_*` environment variables keep their names.
