@@ -235,12 +235,12 @@ export default function Rv565Converter() {
   return (
     <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
       {/* Input and options */}
-      <div className="rounded-[1.4rem] border border-border bg-card p-6 sm:p-8">
+      <div className="rounded-card border border-border bg-card p-6 sm:p-8">
         <label
           onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
           onDragLeave={() => setDragging(false)}
           onDrop={(e) => { e.preventDefault(); setDragging(false); choose(e.dataTransfer.files[0]); }}
-          className={`flex cursor-pointer flex-col items-center justify-center rounded-[1.1rem] border-2 border-dashed px-6 py-10 text-center transition-colors ${dragging ? "border-text bg-bg" : "border-border bg-bg/60 hover:border-text"}`}
+          className={`flex cursor-pointer flex-col items-center justify-center rounded-inner border-2 border-dashed px-6 py-10 text-center transition-colors ${dragging ? "border-text bg-bg" : "border-border bg-bg/60 hover:border-text"}`}
         >
           <input type="file" accept="video/*,.rv565" className="sr-only" onChange={(e) => choose(e.target.files?.[0])} />
           {file ? (
@@ -270,7 +270,7 @@ export default function Rv565Converter() {
           <div className="grid gap-2 sm:grid-cols-2">
             {SIZES.map((s) => (
               <button key={s.id} type="button" onClick={() => setSizeId(s.id)}
-                      className={`rounded-xl border px-4 py-3 text-left transition-colors ${sizeId === s.id ? "border-text bg-bg" : "border-border hover:border-text"}`}>
+                      className={`rounded-inner border px-4 py-3 text-left transition-colors ${sizeId === s.id ? "border-text bg-bg" : "border-border hover:border-text"}`}>
                 <span className="font-mono text-sm font-bold">{s.label}</span>
                 <span className="mt-1 block text-xs leading-snug text-muted">{s.note}</span>
               </button>
@@ -445,9 +445,9 @@ export default function Rv565Converter() {
       </div>
 
       {/* Result */}
-      <div className="rounded-[1.4rem] border border-border bg-card p-6 sm:p-8">
+      <div className="rounded-card border border-border bg-card p-6 sm:p-8">
         <p className="eyebrow">Preview</p>
-        <div className="mt-3 flex aspect-[4/3] items-center justify-center overflow-hidden rounded-xl bg-[#0d120f]">
+        <div className="mt-3 flex aspect-[4/3] items-center justify-center overflow-hidden rounded-inner bg-[#0d120f]">
           {result ? (
             <canvas ref={previewRef} width={result.clip.header.width} height={result.clip.header.height}
                     className="h-full w-full object-contain [image-rendering:pixelated]" />
@@ -494,7 +494,7 @@ export default function Rv565Converter() {
               </button>
             </div>
 
-            <div className="mt-6 rounded-xl border border-border bg-bg p-4 text-sm">
+            <div className="mt-6 rounded-inner border border-border bg-bg p-4 text-sm">
               <p className="eyebrow">Will it play smoothly?</p>
               {modelApplies && header ? (
                 <ul className="mt-2 space-y-1">

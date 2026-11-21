@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ArrowRight, ArrowUpRight } from "lucide-react";
+import { LumiTip } from "@/components/Lumi";
+import { Card, NextStep, NumberBand, PageHeader, Section, SectionHeader } from "@/components/ui";
 import { pageMetadata } from "@/lib/seo";
 
 // Set to the arXiv identifier (e.g. "2610.01234") once the paper is announced;
@@ -72,129 +73,111 @@ export default function PaperPage() {
 
   return (
     <article>
-      {/* Hero */}
-      <header className="container-page border-b border-border pb-16 pt-20 sm:pt-28">
-        <p className="eyebrow">Paper · cs.AR · {ARXIV_ID ? `arXiv:${ARXIV_ID}` : "arXiv moderation"}</p>
-        <h1 className="max-w-6xl font-display text-[clamp(2.4rem,5.2vw,5.4rem)] leading-[0.98]">
-          RV565: cross-layer co-design for <em>frame-independent</em> video on ESP32-S3.
-        </h1>
-        <p className="mt-6 max-w-4xl text-sm leading-relaxed text-muted">{TITLE}</p>
-        <ul className="mt-8 flex flex-wrap gap-x-8 gap-y-3 text-sm">
-          {AUTHORS.map((a) => (
-            <li key={a.email}>
-              <a href={`mailto:${a.email}`} className="font-bold transition-opacity hover:opacity-55">{a.name}</a>
-              <span className="block text-xs text-muted">{a.affiliation}</span>
-            </li>
-          ))}
-        </ul>
-        <div className="mt-10 flex flex-wrap gap-3">
-          {arxivUrl ? (
-            <a href={arxivUrl} target="_blank" rel="noreferrer" className="btn-primary">
-              Read on arXiv <ArrowUpRight className="h-4 w-4" />
-            </a>
-          ) : (
-            <span className="btn-primary cursor-default opacity-60">arXiv link pending</span>
-          )}
-          <a href={`https://doi.org/${ZENODO_DOI}`} target="_blank" rel="noreferrer" className="btn-ghost">
-            Artifact on Zenodo <ArrowUpRight className="h-4 w-4" />
-          </a>
-          <Link href="/rv565/convert/" className="btn-ghost">
-            Convert a video <ArrowRight className="h-4 w-4" />
-          </Link>
-          <a href="https://pypi.org/project/rv565/" target="_blank" rel="noreferrer" className="btn-ghost">
-            pip install rv565 <ArrowUpRight className="h-4 w-4" />
-          </a>
-          <Link href="/docs/video-architecture/" className="btn-ghost">
-            Architecture notes <ArrowRight className="h-4 w-4" />
-          </Link>
-        </div>
-      </header>
+      <PageHeader
+        eyebrow={`Paper · cs.AR · ${ARXIV_ID ? `arXiv:${ARXIV_ID}` : "arXiv moderation"}`}
+        title={<>RV565: cross-layer co-design for <em>frame-independent</em> video on ESP32-S3.</>}
+        lede={
+          <>
+            <span className="block text-sm leading-relaxed text-muted">{TITLE}</span>
+            <span className="mt-6 flex flex-wrap gap-x-8 gap-y-3 text-sm">
+              {AUTHORS.map((a) => (
+                <span key={a.email}>
+                  <a href={`mailto:${a.email}`} className="font-bold text-text hover:text-primary">{a.name}</a>
+                  <span className="block text-xs text-muted">{a.affiliation}</span>
+                </span>
+              ))}
+            </span>
+          </>
+        }
+      >
+        {arxivUrl ? (
+          <a href={arxivUrl} target="_blank" rel="noreferrer" className="btn-primary">Read on arXiv ↗</a>
+        ) : (
+          <span className="btn-primary cursor-default opacity-60">arXiv link pending</span>
+        )}
+        <a href={`https://doi.org/${ZENODO_DOI}`} target="_blank" rel="noreferrer" className="btn-ghost">Artifact on Zenodo ↗</a>
+        <Link href="/rv565/convert/" className="btn-ghost">Convert a video</Link>
+        <a href="https://pypi.org/project/rv565/" target="_blank" rel="noreferrer" className="btn-ghost">pip install rv565 ↗</a>
+        <Link href="/docs/video-architecture/" className="btn-ghost">Architecture notes</Link>
+      </PageHeader>
 
       {/* Headline numbers */}
-      <section className="border-b border-border">
-        <div className="container-page grid sm:grid-cols-2 lg:grid-cols-4">
-          {HEADLINES.map((h, i) => (
-            <div key={h.label} className={`py-10 pr-6 ${i > 0 ? "lg:border-l lg:border-border lg:pl-6" : ""}`}>
-              <p className="font-display text-4xl">{h.value}</p>
-              <p className="mt-2 max-w-[16rem] text-xs leading-relaxed text-muted">{h.label}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+      <Section label="Headline numbers" tone="ink">
+        <p className="eyebrow mb-10">Headline numbers</p>
+        <NumberBand items={HEADLINES} />
+      </Section>
 
       {/* Abstract + status */}
-      <section className="container-page grid gap-12 border-b border-border py-20 lg:grid-cols-[1.3fr_0.7fr]">
-        <div>
-          <p className="eyebrow">Abstract</p>
-          <div className="space-y-5 text-[1.05rem] leading-[1.75] text-text-dim">
-            <p>
-              Video on SPI-attached microcontroller displays is limited less by decoding than by where each
-              byte lives and which stages run serially. RV565 is a decode framework for frame-independent
-              video whose decoded representation is the panel&apos;s native RGB565 format, evaluated on an
-              ESP32-S3 with two ten-second windows of an openly licensed film.
-            </p>
-            <p>
-              A serial path meets the 41.7 ms deadline on the lighter window but misses all 7,200 frames of the
-              heavier one. RV565&apos;s dual-core pipeline inflates the next frame on the second core during the
-              display transfer and sustains 24 FPS with zero misses and 10.3 ms of slack on both windows; frame
-              time then equals a transfer that runs at 98.1% of the wire-time bound.
-            </p>
-            <p>
-              Because frames are independent, inflation time is linear in the compressed length stored in the
-              container: a model fitted on one window predicts the other within 0.04 ms and identifies, from
-              metadata alone, which window the serial path cannot schedule. Inside FaleraOS, firmware inflation
-              alone reaches 12.2 FPS, and stage timing attributes the remaining cost to serialized input,
-              external-RAM placement, and blocking presentation rather than the interpreter.
-            </p>
+      <Section id="abstract">
+        <div className="grid gap-12 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,0.6fr)] lg:gap-16">
+          <div>
+            <SectionHeader eyebrow="Abstract" title={<>Where each byte lives, <em>and which stages run serially.</em></>} />
+            <div className="mt-8 max-w-prose-site space-y-5 text-[1.0625rem] leading-[1.75] text-text-dim">
+              <p>
+                Video on SPI-attached microcontroller displays is limited less by decoding than by where each
+                byte lives and which stages run serially. RV565 is a decode framework for frame-independent
+                video whose decoded representation is the panel&apos;s native RGB565 format, evaluated on an
+                ESP32-S3 with two ten-second windows of an openly licensed film.
+              </p>
+              <p>
+                A serial path meets the 41.7 ms deadline on the lighter window but misses all 7,200 frames of the
+                heavier one. RV565&apos;s dual-core pipeline inflates the next frame on the second core during the
+                display transfer and sustains 24 FPS with zero misses and 10.3 ms of slack on both windows; frame
+                time then equals a transfer that runs at 98.1% of the wire-time bound.
+              </p>
+              <p>
+                Because frames are independent, inflation time is linear in the compressed length stored in the
+                container: a model fitted on one window predicts the other within 0.04 ms and identifies, from
+                metadata alone, which window the serial path cannot schedule. Inside FaleraOS, firmware inflation
+                alone reaches 12.2 FPS, and stage timing attributes the remaining cost to serialized input,
+                external-RAM placement, and blocking presentation rather than the interpreter.
+              </p>
+            </div>
           </div>
+          <Card fill className="self-start p-6">
+            <p className="eyebrow">Status</p>
+            <dl className="mt-5 space-y-4 text-sm">
+              <div><dt className="label">Venue</dt><dd className="mt-1 font-semibold">arXiv preprint · cs.AR (cs.MM, cs.PF, eess.IV)</dd></div>
+              <div><dt className="label">Review</dt><dd className="mt-1 font-semibold">{ARXIV_ID ? "Announced; not peer reviewed" : "Submitted; awaiting moderation"}</dd></div>
+              <div><dt className="label">Artifact</dt><dd className="mt-1"><a href={`https://doi.org/${ZENODO_DOI}`} target="_blank" rel="noreferrer" className="link font-semibold">doi:{ZENODO_DOI}</a></dd></div>
+              <div><dt className="label">Workload</dt><dd className="mt-1 font-semibold">Big Buck Bunny (CC BY 3.0), Blender Foundation</dd></div>
+              <div><dt className="label">Licence</dt><dd className="mt-1 font-semibold">CC BY 4.0</dd></div>
+              <div><dt className="label">Format</dt><dd className="mt-1 font-semibold">Measured with RV565 format version 6. Version 7 (RV565 2.0) adds more pixel formats and delta frames; version 6 files remain valid.</dd></div>
+            </dl>
+          </Card>
         </div>
-        <aside className="self-start rounded-[1.4rem] border border-border bg-card p-6">
-          <p className="eyebrow">Status</p>
-          <dl className="space-y-4 text-sm">
-            <div><dt className="text-xs text-muted">Venue</dt><dd className="font-semibold">arXiv preprint · cs.AR (cs.MM, cs.PF, eess.IV)</dd></div>
-            <div><dt className="text-xs text-muted">Review</dt><dd className="font-semibold">{ARXIV_ID ? "Announced; not peer reviewed" : "Submitted; awaiting moderation"}</dd></div>
-            <div><dt className="text-xs text-muted">Artifact</dt><dd><a href={`https://doi.org/${ZENODO_DOI}`} target="_blank" rel="noreferrer" className="font-semibold underline decoration-border underline-offset-4 hover:decoration-text">doi:{ZENODO_DOI}</a></dd></div>
-            <div><dt className="text-xs text-muted">Workload</dt><dd className="font-semibold">Big Buck Bunny (CC BY 3.0), Blender Foundation</dd></div>
-            <div><dt className="text-xs text-muted">Licence</dt><dd className="font-semibold">CC BY 4.0</dd></div>
-            <div><dt className="text-xs text-muted">Format</dt><dd className="font-semibold">Measured with RV565 format version 6. Version 7 (RV565 2.0) adds more pixel formats and delta frames; version 6 files remain valid.</dd></div>
-          </dl>
-        </aside>
-      </section>
+      </Section>
 
       {/* Contributions */}
-      <section className="container-page border-b border-border py-20">
-        <header className="mb-12 grid gap-6 lg:grid-cols-[1.15fr_0.65fr]">
-          <h2 className="font-display text-[clamp(2.2rem,4.4vw,4.4rem)] leading-[0.98]">
-            What the paper <em>establishes</em>.
-          </h2>
-          <p className="self-end text-sm leading-relaxed text-muted">
-            RV565 does not propose a new entropy coder. The contribution is the co-design of representation,
-            memory placement, scheduling, and display I/O — and the measurements that explain it.
-          </p>
-        </header>
-        <ol className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <Section id="contributions">
+        <SectionHeader
+          eyebrow="Contributions"
+          title={<>What the paper <em>establishes.</em></>}
+          lede="RV565 does not propose a new entropy coder. The contribution is the co-design of representation, memory placement, scheduling, and display I/O — and the measurements that explain it."
+        />
+        <ol className="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {CONTRIBUTIONS.map(([title, body], i) => (
-            <li key={title} className="card-surface flex flex-col p-6">
-              <span className="font-mono text-xs text-muted">{String(i + 1).padStart(2, "0")}</span>
-              <h3 className="mt-4 font-display text-2xl leading-tight">{title}</h3>
-              <p className="mt-3 text-sm leading-relaxed text-muted">{body}</p>
+            <li key={title} className="card flex flex-col p-6">
+              <span className="font-mono text-sm font-bold text-primary">{String(i + 1).padStart(2, "0")}</span>
+              <h3 className="h-card mt-4">{title}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-text-dim">{body}</p>
             </li>
           ))}
         </ol>
-      </section>
+      </Section>
 
       {/* Results */}
-      <section className="container-page border-b border-border py-20">
-        <p className="eyebrow">Measured results</p>
-        <h2 className="mb-10 max-w-4xl font-display text-[clamp(2rem,3.6vw,3.6rem)] leading-[1]">
-          Ten independently reset runs per standalone configuration.
-        </h2>
-        <div className="overflow-x-auto rounded-[1.4rem] border border-border bg-card">
+      <Section id="results" fill>
+        <SectionHeader
+          eyebrow="Measured results"
+          title={<>Ten independently reset runs <em>per standalone configuration.</em></>}
+        />
+        <div className="mt-10 overflow-x-auto rounded-card border border-border bg-card">
           <table className="w-full min-w-[720px] text-left text-sm">
-            <thead className="border-b border-border font-mono text-[0.68rem] uppercase tracking-[0.14em] text-muted">
-              <tr>
-                <th className="p-4">Window</th><th className="p-4">Path</th><th className="p-4">FPS</th>
-                <th className="p-4">Misses</th><th className="p-4">Mean (ms)</th><th className="p-4">Max (ms)</th>
+            <thead className="border-b border-border bg-card-sub">
+              <tr className="label">
+                <th className="p-4 font-semibold">Window</th><th className="p-4 font-semibold">Path</th><th className="p-4 font-semibold">FPS</th>
+                <th className="p-4 font-semibold">Misses</th><th className="p-4 font-semibold">Mean (ms)</th><th className="p-4 font-semibold">Max (ms)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -202,28 +185,34 @@ export default function PaperPage() {
                 <tr key={`${w}-${path}`}>
                   <td className="p-4 font-mono">{w}</td>
                   <td className="p-4 font-semibold">{path}</td>
-                  <td className="p-4">{fps}</td>
-                  <td className={`p-4 ${misses === "0" ? "text-teal" : "text-primary"}`}>{misses}</td>
-                  <td className="p-4">{mean}</td>
-                  <td className="p-4">{max}</td>
+                  <td className="p-4 tabular-nums">{fps}</td>
+                  <td className={`p-4 tabular-nums ${misses === "0" ? "text-teal" : "font-semibold text-primary"}`}>{misses}</td>
+                  <td className="p-4 tabular-nums">{mean}</td>
+                  <td className="p-4 tabular-nums">{max}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        <p className="mt-5 max-w-4xl text-xs leading-relaxed text-muted">
+        <p className="mt-5 max-w-3xl text-xs leading-relaxed text-muted">
           W90 and W360 are the 90–100 s and 360–370 s windows of Big Buck Bunny, encoded at 180×135 and
           24 FPS. The FaleraOS row is one 720-frame run; Gallery slows playback instead of skipping frames.
         </p>
-      </section>
+      </Section>
 
       {/* Citation */}
-      <section className="container-page py-20">
-        <p className="eyebrow">Cite</p>
-        <pre className="overflow-x-auto rounded-[1.4rem] border border-border bg-card p-6 font-mono text-xs leading-relaxed">
-          {bibtex()}
-        </pre>
-      </section>
+      <Section id="cite">
+        <SectionHeader eyebrow="Cite" title={<>BibTeX.</>} />
+        <pre className="pre mt-8 p-6">{bibtex()}</pre>
+        <LumiTip pose="read">The measurement artifact is on Zenodo, so you can check every number on this page yourself.</LumiTip>
+      </Section>
+
+      <NextStep
+        title={<>Make an RV565 clip <em>in your browser.</em></>}
+        body="Convert an MP4 or WebM to RV565 or an Arduino clip.h. No upload, no account."
+        href="/rv565/convert/"
+        cta="Open the converter"
+      />
     </article>
   );
 }

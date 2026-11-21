@@ -5,6 +5,14 @@ import type { Config } from "tailwindcss";
 // which doesn't expose `require` — use a static import instead.
 import theme from "./theme.js";
 
+/* The layout system (see globals.css for the component classes):
+ *
+ *   container   .container-page  max 1200px, gutters 16 / 24 / 32px
+ *   rhythm      .section         py 64 / 80 / 96px between sections
+ *   reading     max-w-prose-site 42rem for body copy and Markdown
+ *   type        text-display, text-title, text-lede (below)
+ *
+ * Pages use these instead of hand-rolled margins. */
 const config: Config = {
   content: [
     "./src/**/*.{ts,tsx}",
@@ -24,58 +32,47 @@ const config: Config = {
         gold:         theme.colors.gold,
         lilac:        theme.colors.lilac,
         text:         theme.colors.text,
+        "text-body":  theme.colors.textBody,
         "text-dim":   theme.colors.textDim,
         muted:        theme.colors.muted,
         "muted-deep": theme.colors.mutedDeep,
 
-        // shadcn-compatible semantic aliases (drop-in components use
-        // these). They're CSS-var-backed so the dark-mode toggle
-        // story works the day we add one.
+        // CSS-variable aliases, kept for the converter and Markdown output.
+        // The accent of the current section tone (red on paper, a lighter
+        // red on ink, deep red on the red tint, green on the green tint).
+        accent:               "var(--accent)",
+        "red-tint":           "#FBE9EA",
+        "green-tint":         "#E5F0E8",
+        ink:                  theme.colors.text,
         background:           "var(--background)",
         foreground:           "var(--foreground)",
-        "card-bg":            "var(--card)",
-        "card-foreground":    "var(--card-foreground)",
-        "popover":            "var(--popover)",
-        "popover-foreground": "var(--popover-foreground)",
-        "primary-foreground": "var(--primary-foreground)",
-        "secondary":          "var(--secondary)",
-        "secondary-foreground":"var(--secondary-foreground)",
-        "accent":             "var(--accent)",
-        "accent-foreground":  "var(--accent-foreground)",
-        "destructive":        "var(--destructive)",
-        "destructive-foreground":"var(--destructive-foreground)",
-        "input":              "var(--input)",
-        "ring":               "var(--ring)",
       },
       borderRadius: {
-        sm:   theme.radius.sm,
-        md:   theme.radius.md,
-        lg:   theme.radius.lg,
-        pill: theme.radius.pill,
+        sm:    theme.radius.sm,
+        md:    theme.radius.md,
+        lg:    theme.radius.lg,
+        inner: theme.radius.inner,
+        card:  theme.radius.card,
+        pill:  theme.radius.pill,
       },
       fontFamily: {
-        sans: ["ui-sans-serif", "system-ui", "-apple-system", "Segoe UI",
-               "Roboto", "Helvetica", "Arial", "sans-serif"],
+        sans: ["Arial", "Helvetica", "ui-sans-serif", "system-ui", "-apple-system",
+               "Segoe UI", "Roboto", "sans-serif"],
+        serif: ["Georgia", "serif"],
         mono: ["ui-monospace", "SFMono-Regular", "Menlo", "Consolas",
                "monospace"],
-        display: ["var(--font-display)", "ui-sans-serif", "system-ui"],
+        display: ["Arial", "Helvetica", "ui-sans-serif", "system-ui", "sans-serif"],
       },
-      // Custom keyframes used by the hero / feature cards. Framer
-      // Motion handles most animations but a couple of always-on
-      // ambient pulses are cheaper as CSS.
-      keyframes: {
-        "pulse-soft": {
-          "0%,100%": { opacity: "0.3" },
-          "50%":     { opacity: "1" },
-        },
-        "float-y": {
-          "0%,100%": { transform: "translateY(0px)" },
-          "50%":     { transform: "translateY(-6px)" },
-        },
+      // One type scale. Headings use these three sizes only; body copy is
+      // text-base / text-sm, labels are .eyebrow.
+      fontSize: {
+        display: ["clamp(2.25rem, 1.6rem + 3.2vw, 4rem)",  { lineHeight: "1.04", letterSpacing: "-0.04em" }],
+        title:   ["clamp(1.75rem, 1.4rem + 1.6vw, 2.625rem)", { lineHeight: "1.1", letterSpacing: "-0.035em" }],
+        lede:    ["clamp(1.0625rem, 1rem + 0.3vw, 1.1875rem)", { lineHeight: "1.65" }],
       },
-      animation: {
-        "pulse-soft": "pulse-soft 1.6s ease-in-out infinite",
-        "float-y":    "float-y 6s ease-in-out infinite",
+      maxWidth: {
+        page: "75rem",
+        "prose-site": "42rem",
       },
     },
   },

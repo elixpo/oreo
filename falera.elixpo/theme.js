@@ -8,15 +8,17 @@
 
 const theme = {
   colors: {
-    // Surfaces — the Elixpo Research paper palette: warm off-white page,
-    // white cards, and a slightly deeper wash for inset panels.
+    // Surfaces — the Elixpo Research paper page with the sponsor deck's
+    // cards (pitch-deck/style.css): white cards with a 1px grey-green
+    // border, and a light fill (--card in the deck) for secondary blocks.
     bg:         "#FBFBF8",
     bgRaised:   "#EFF1ED",
     card:       "#FFFFFF",
-    cardSubtle: "#EFF1ED",
+    cardSubtle: "#F6F7F4",
     border:     "#D7DBD6",
 
-    // Brand — Falera pink-red, deepened so it stays readable on paper.
+    // Brand — Falera red (the deck's --red / --red-dim, Lumi's bow).
+    // One accent per block: numbers, labels and one emphasis.
     primary:    "#C93A45",
     primaryDim: "#A92F39",
 
@@ -27,27 +29,21 @@ const theme = {
 
     // Text — research ink on paper.
     text:       "#142018",
+    textBody:   "#2A352E",
     textDim:    "#555C58",
     muted:      "#5F6962",
     mutedDeep:  "#9AA39D",
   },
 
-  // Radii / spacing — matches the badge's UI to keep visual continuity.
+  // Radii. `card` is every card and panel; `inner` is a block inside a
+  // card (an option button, a code block); `pill` is buttons and chips.
   radius: {
     sm: "4px",
     md: "8px",
     lg: "16px",
+    inner: "0.75rem",
+    card: "1.25rem",
     pill: "999px",
-  },
-
-  // Motion presets. Imported by components that need a consistent
-  // springiness across the site — keeping these centralised avoids
-  // the "every animation feels slightly different" problem.
-  motion: {
-    softSpring:   { type: "spring", stiffness: 220, damping: 24 },
-    crispSpring:  { type: "spring", stiffness: 340, damping: 28 },
-    easeOut:      { type: "tween",  ease: [0.16, 1, 0.3, 1], duration: 0.55 },
-    fastEaseOut:  { type: "tween",  ease: [0.16, 1, 0.3, 1], duration: 0.28 },
   },
 
   // The repo + canonical brand URLs, surfaced in the header / footer.

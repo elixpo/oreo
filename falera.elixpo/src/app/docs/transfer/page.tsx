@@ -1,4 +1,3 @@
-import { Send } from "lucide-react";
 import RepoDoc from "@/components/RepoDoc";
 import { pageMetadata } from "@/lib/seo";
 
@@ -17,7 +16,6 @@ export default function TransferDocsPage() {
     <RepoDoc
       file="docs/TRANSFER.md"
       chip="docs · Transfer"
-      icon={Send}
       title="Transfer: files from a computer to the badge."
       lead="Open Transfer on the badge, run falera send with your files, and type the six-character code only the badge shows. FaleraOS keeps running the whole time."
       quickLinks={[

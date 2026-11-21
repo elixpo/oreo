@@ -61,6 +61,31 @@ export const UPSTREAM: PressItem[] = [
     what: "Listed in Awesome CircuitPython and Awesome Raspberry Pi",
     href: "https://github.com/adafruit/awesome-circuitpython/pull/63",
   },
+  {
+    who: "Awesome MicroPython",
+    what: "Lists FaleraOS and RV565",
+    href: "https://github.com/mcauser/awesome-micropython",
+    date: "20 Nov 2026",
+  },
+  {
+    who: "OpenSSF",
+    what: "Best Practices badge, passing (100%)",
+    href: "https://www.bestpractices.dev/projects/16187",
+  },
+];
+
+/** Posts by the team on blogs.elixpo.com. */
+export const BLOG: PressItem[] = [
+  {
+    who: "From 0.5 FPS to native video",
+    what: "How video on the badge started, in FaleraOS's Gallery",
+    href: "https://blogs.elixpo.com/elixpohere/esp32s3-spiderman",
+  },
+  {
+    who: "The screen was blank",
+    what: "Porting RV565 to the Raspberry Pi Pico 2",
+    href: "https://blogs.elixpo.com/elixpohere/rv565-pico-2-tweak",
+  },
 ];
 
 export const PUBLISHED: PressItem[] = [

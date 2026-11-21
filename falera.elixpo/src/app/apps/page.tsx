@@ -1,123 +1,100 @@
-"use client";
-
 import Link from "next/link";
-import { motion } from "framer-motion";
-import { BookOpen, ArrowRight } from "lucide-react";
-import { Reveal, staggerContainer, fadeUp } from "@/components/MotionWrap";
-import AppCard from "@/components/AppCard";
+import AppCard, { AppIcon } from "@/components/AppCard";
+import { LumiTip } from "@/components/Lumi";
+import { NextStep, PageHeader, Screen, Section, SectionHeader, Split } from "@/components/ui";
 import { PRELOADED, ALL_APPS, STORE } from "@/data/apps";
+import { GITHUB } from "@/lib/links";
+
+/* /apps: the green area. A tinted header with the App Store on the badge's
+ * screen, the preloaded apps beside the About screen, the system apps as
+ * compact rows, and the App Store catalogue as cards. */
 
 export default function AppsPage() {
+  const more = ALL_APPS.filter((a) => !PRELOADED.find((p) => p.slug === a.slug));
   return (
-    <div className="relative">
-      {/* Ambient glows so the page feels like part of the brand. */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[520px] overflow-hidden">
-        <div className="absolute left-1/2 top-0 h-[420px] w-[420px] -translate-x-1/2
-                        rounded-full bg-primary/[0.10] blur-[140px]" />
-        <div className="absolute right-1/4 top-40 h-[260px] w-[260px]
-                        rounded-full bg-lilac/[0.10] blur-[120px]" />
-      </div>
+    <>
+      <PageHeader
+        tone="green"
+        eyebrow={`Apps · ${ALL_APPS.length + STORE.length} and counting`}
+        title={<>Everything that ships, <em>and everything that streams in.</em></>}
+        lede="The preloaded set lands on the badge at flash time. The store pulls fresh apps from GitHub at runtime — no laptop, no recompile, no developer mode toggle."
+        aside={
+          <Screen
+            src="/screens/store.webp"
+            alt="The App Store on the badge's screen, listing Patakha, Racer, Flappy Lumi and Snake with Install buttons"
+            caption="The App Store, on the badge."
+            className="hidden lg:block"
+          />
+        }
+      >
+        <Link href="/docs/apps/" className="btn-primary">Read the app-building docs</Link>
+        <a href={`${GITHUB}/tree/main/apps_market`} target="_blank" rel="noreferrer" className="btn-ghost">
+          Browse the catalogue on GitHub
+        </a>
+      </PageHeader>
 
-      <div className="container-page pt-16 pb-28">
-        {/* Centred header */}
-        <motion.div
-          initial="hidden"
-          animate="visible"
-          variants={staggerContainer}
-          className="mx-auto max-w-3xl text-center"
+      <Section id="preloaded">
+        <Split
+          flip
+          media={
+            <Screen
+              src="/screens/about.webp"
+              alt="The About app on the badge: FaleraOS v2.0.1, ESP32-S3, MicroPython 1.28 and free flash and memory"
+              caption="About, one of the built-in apps."
+              className="mx-auto w-full max-w-md"
+            />
+          }
         >
-          <motion.span variants={fadeUp} className="chip mb-6">
-            {ALL_APPS.length + STORE.length} apps and counting
-          </motion.span>
-          <motion.h1
-            variants={fadeUp}
-            className="font-display text-4xl leading-[1.05] tracking-tight sm:text-5xl"
-          >
-            Everything that ships,
-            <br />
-            <span className="bg-gradient-to-r from-primary via-gold to-lilac
-                             bg-clip-text text-transparent">
-              and everything that streams in.
-            </span>
-          </motion.h1>
-          <motion.p variants={fadeUp} className="mx-auto mt-5 max-w-2xl text-text-dim">
-            The preloaded set lands on the badge at flash time. The store
-            pulls fresh apps from GitHub at runtime — no laptop, no
-            recompile, no developer mode toggle.
-          </motion.p>
+          <SectionHeader
+            eyebrow="Preloaded"
+            title={<>Built into <em>FaleraOS 2.0.</em></>}
+            lede="Edit any of them locally."
+          />
+          <ul className="mt-8 grid gap-3">
+            {PRELOADED.map((a) => <li key={a.slug} className="min-w-0"><AppCard app={a} /></li>)}
+          </ul>
+        </Split>
+      </Section>
 
-          {/* Docs CTA — every catalogue tile is just an example; if
-              someone's reading this page they probably want to write
-              their own. Send them straight to /docs/apps. */}
-          <motion.div variants={fadeUp} className="mt-8 flex justify-center">
-            <Link
-              href="/docs/apps/"
-              className="inline-flex items-center gap-2 rounded-md
-                         border border-primary/40 bg-primary/10 px-4 py-2.5
-                         text-sm font-medium text-primary
-                         transition-colors hover:border-primary
-                         hover:bg-primary/15"
-            >
-              <BookOpen className="h-4 w-4" />
-              Read the app-building docs
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-          </motion.div>
-        </motion.div>
+      <Section id="more" fill>
+        <SectionHeader
+          eyebrow="More on the badge"
+          title={<>Settings, tools and games, <em>one drawer-tap away.</em></>}
+        />
+        <ul className="mt-10 grid gap-x-10 border-t border-border sm:grid-cols-2">
+          {more.map((a) => (
+            <li key={a.slug} className="min-w-0 border-b border-border">
+              <Link href={`/apps/${a.urlSlug}/`} className="group flex items-center gap-4 py-4">
+                <AppIcon app={a} size="sm" />
+                <span className="min-w-0 flex-1">
+                  <span className="block font-bold text-text group-hover:text-primary">{a.name}</span>
+                  <span className="block text-sm leading-snug text-text-dim">{a.blurb}</span>
+                </span>
+                <span aria-hidden="true" className="text-accent transition-transform group-hover:translate-x-1">→</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </Section>
 
-        {/* Preloaded — centred */}
-        <Reveal>
-          <div className="mx-auto mt-20 max-w-5xl text-center">
-            <h2 className="font-display text-2xl tracking-tight">Preloaded</h2>
-            <p className="mt-1 text-sm text-muted">
-              Built into FaleraOS 2.0. Edit any of them locally.
-            </p>
-          </div>
-        </Reveal>
-        <div className="mx-auto mt-6 grid max-w-5xl gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {PRELOADED.map((a, i) => <AppCard key={a.slug} app={a} index={i} />)}
-        </div>
+      <Section id="store">
+        <SectionHeader
+          eyebrow="From the App Store"
+          title={<>Install, update or remove, <em>on the badge.</em></>}
+          lede={<>These live in <code className="code">apps_market/</code> on the repo; the badge&apos;s App Store installs them.</>}
+        />
+        <ul className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {STORE.map((a) => <li key={a.slug} className="reveal min-w-0"><AppCard app={a} /></li>)}
+        </ul>
+        <LumiTip pose="pet">Psst, every app is one Python class: subclass oreoOS.App and the launcher finds it.</LumiTip>
+      </Section>
 
-        {/* Full catalogue */}
-        <Reveal>
-          <div className="mx-auto mt-24 max-w-5xl text-center">
-            <h2 className="font-display text-2xl tracking-tight">More on the badge</h2>
-            <p className="mt-1 text-sm text-muted">
-              Settings, tools, and games sit one drawer-tap away.
-            </p>
-          </div>
-        </Reveal>
-        <div className="mx-auto mt-6 grid max-w-5xl gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {ALL_APPS.filter(a => !PRELOADED.find(p => p.slug === a.slug))
-            .map((a, i) => <AppCard key={a.slug} app={a} index={i} />)}
-        </div>
-
-        {/* Store */}
-        <Reveal>
-          <div className="mx-auto mt-24 max-w-5xl text-center">
-            <h2 className="font-display text-2xl tracking-tight">From the App Store</h2>
-            <p className="mt-1 text-sm text-muted">
-              Install, update or remove these from the badge's App Store. They live in{" "}
-              <code className="text-text-dim">apps_market/</code> on the repo.
-            </p>
-          </div>
-        </Reveal>
-        <div className="mx-auto mt-6 grid max-w-5xl gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {STORE.map((a, i) => <AppCard key={a.slug} app={a} index={i} />)}
-        </div>
-
-        <Reveal>
-          <div className="mx-auto mt-16 max-w-3xl text-center">
-            <a
-              href="https://github.com/elixpo/falera/tree/main/apps_market"
-              target="_blank" rel="noreferrer"
-              className="btn-ghost"
-            >
-              Browse the full catalogue on GitHub
-            </a>
-          </div>
-        </Reveal>
-      </div>
-    </div>
+      <NextStep
+        title={<>Want one of these <em>on your own badge?</em></>}
+        body="Set up a badge in about fifteen minutes with a USB-C cable and a computer."
+        href="/get-started/"
+        cta="Get started"
+      />
+    </>
   );
 }

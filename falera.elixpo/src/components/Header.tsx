@@ -1,237 +1,238 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronDown, Github, Menu, Star, X } from "lucide-react";
-import { useGithubStats } from "@/lib/useGithubStats";
+import { FUND_URL, GITHUB } from "@/lib/links";
+import { formatStars, useGithubStars } from "@/lib/useGithubStats";
 
-const NAV = [
-  { href: "/",             label: "Home" },
-  { href: "/get-started/", label: "Get Started" },
+const NAV: { href: string; label: string; love?: boolean }[] = [
   { href: "/badge/",       label: "Badge" },
   { href: "/apps/",        label: "Apps" },
-  { href: "/docs/",        label: "Docs" },
-  { href: "/supporters/",  label: "Supporters" },
+  { href: "/get-started/", label: "Get started" },
+  { href: "/rv565/",       label: "RV565" },
+  { href: "/contribute/",  label: "Contribute" },
+  { href: "/supporters/",  label: "Supporters", love: true },
 ];
 
-// Everything else, under "More". External links open in a new tab.
-type MoreLink = { href: string; label: string; external?: boolean };
-const MORE: { title: string; links: MoreLink[] }[] = [
-  {
-    title: "Guides",
-    links: [
-      { href: "/docs/cli/",      label: "falera CLI" },
-      { href: "/docs/transfer/", label: "Transfer files" },
-      { href: "/docs/usb/",      label: "Connect over USB" },
-      { href: "/docs/apps/",     label: "Build an app" },
-      { href: "/hacks/",         label: "Hacks" },
-    ],
-  },
-  {
-    title: "RV565 video",
-    links: [
-      { href: "/paper/",                   label: "Research paper" },
-      { href: "/rv565/convert/",           label: "Video converter" },
-      { href: "/docs/video-architecture/", label: "Video architecture" },
-    ],
-  },
-  {
-    title: "Community",
-    links: [
-      { href: "/contribute/", label: "Contribute" },
-      { href: "https://payouts.elixpo.com/f/falera-badge", label: "Fund the badge", external: true },
-      { href: "https://github.com/elixpo/falera/discussions", label: "Discussions", external: true },
-    ],
-  },
+// Everything else, in the "More" menu.
+const MORE: { href: string; label: string; external?: boolean }[] = [
+  { href: "/hacks/",                    label: "Badge hacks" },
+  { href: "/docs/apps/",                label: "Write an app" },
+  { href: "/docs/cli/",                 label: "falera CLI" },
+  { href: "/docs/usb/",                 label: "Connect over USB" },
+  { href: "/docs/transfer/",            label: "Transfer files" },
+  { href: "/rv565/convert/",            label: "Video converter" },
+  { href: "/docs/video-architecture/",  label: "Video architecture" },
+  { href: "/paper/",                    label: "Research paper" },
+  { href: "https://research.elixpo.com", label: "Elixpo Research", external: true },
 ];
-const MORE_LINKS = MORE.flatMap((g) => g.links);
 
-function MoreItem({ link, className, onClick }: { link: MoreLink; className: string; onClick?: () => void }) {
-  if (link.external) {
-    return (
-      <a href={link.href} target="_blank" rel="noreferrer" className={className} onClick={onClick}>
-        {link.label} <span aria-hidden="true">↗</span>
-      </a>
-    );
-  }
+// A small heart. In the header, the one on "Supporters" and the one on
+// "Fund the badge" beat together when either is hovered or focused.
+function Heart({ className = "" }: { className?: string }) {
   return (
-    <Link href={link.href} className={className} onClick={onClick}>
-      {link.label}
-    </Link>
+    <svg viewBox="0 0 16 16" className={`love-heart h-3 w-3 shrink-0 ${className}`} aria-hidden="true">
+      <path d="M8 14s-5.5-3.4-5.5-7.4A3 3 0 0 1 8 4.7a3 3 0 0 1 5.5 1.9C13.5 10.6 8 14 8 14z" fill="currentColor" />
+    </svg>
   );
 }
 
-function fmtCount(n: number | null): string {
-  if (n === null) return "–";
-  if (n >= 10_000) return (n / 1000).toFixed(1) + "k";
-  if (n >= 1000)   return (n / 1000).toFixed(1).replace(/\.0$/, "") + "k";
-  return String(n);
+// Pages that live under another nav item.
+const SECTION_OF: [string, string][] = [
+  ["/hacks/", "/docs/"],
+  ["/paper/", "/rv565/"],
+  ["/docs/video-architecture/", "/rv565/"],
+];
+
+function GithubIcon({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden="true">
+      <path d="M12 .5C5.65.5.5 5.65.5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.05-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.68 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.41-2.7 5.38-5.26 5.67.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5z" />
+    </svg>
+  );
 }
 
-// Floating pill header, following the Elixpo Research site: brand on the
-// left, plain text navigation, and an ink GitHub pill on the right.
+/* Sticky header: logo, the main routes, GitHub and "Fund the badge".
+ * Below lg the routes fold into a <details> menu, which opens and closes
+ * without JavaScript; the only script here marks the current page and
+ * closes the menu after a navigation. */
 export default function Header() {
-  const pathname = usePathname();
-  const { stars } = useGithubStats();
-  const [open, setOpen] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(false);
-  const moreRef = useRef<HTMLDivElement>(null);
+  const pathname = usePathname() ?? "/";
+  const stars = useGithubStars();
+  const menu = useRef<HTMLDetailsElement>(null);
+  const more = useRef<HTMLDetailsElement>(null);
 
-  // Close the menus after navigating.
   useEffect(() => {
-    setOpen(false);
-    setMoreOpen(false);
+    if (menu.current) menu.current.open = false;
+    if (more.current) more.current.open = false;
   }, [pathname]);
 
-  // Close "More" on a click outside it or on Escape.
-  useEffect(() => {
-    if (!moreOpen) return;
-    const onDown = (e: MouseEvent) => {
-      if (moreRef.current && !moreRef.current.contains(e.target as Node)) setMoreOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setMoreOpen(false);
-    };
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [moreOpen]);
-
-  const isActive = (href: string) =>
-    href === "/" ? pathname === "/" : pathname?.startsWith(href);
-  // Docs stays underlined only on /docs/ itself when a docs page is under More.
-  const navActive = (href: string) =>
-    href === "/docs/" ? pathname === "/docs/" || pathname === "/docs" : isActive(href);
-  const moreActive = MORE_LINKS.some((l) => !l.external && isActive(l.href));
+  const section = SECTION_OF.find(([p]) => pathname.startsWith(p))?.[1];
+  const current = (href: string) => pathname.startsWith(href) || section === href;
 
   return (
-    <header className="sticky top-3 z-40 mx-auto mt-3 w-[min(calc(100%-1.5rem),1510px)]">
-      <div className="flex min-h-[64px] items-center justify-between gap-4 rounded-pill
-                      border border-text/15 bg-bg/90 py-2 pl-4 pr-2
-                      shadow-[0_18px_48px_rgba(20,32,24,0.09)] backdrop-blur-xl">
-        <Link href="/" className="flex items-center gap-3">
+    <header className="site-header sticky top-0 z-40 border-b border-border bg-bg/95 backdrop-blur supports-[backdrop-filter]:bg-bg/85">
+      <div className="container-page flex h-[var(--header-h)] items-center justify-between gap-4">
+        <Link href="/" className="flex shrink-0 items-center gap-2.5" aria-label="Falera, home">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/favicon.ico" alt="" className="h-8 w-8 object-contain" loading="eager" decoding="async" />
+          <img src="/favicon-48x48.png" alt="" width={28} height={28} className="h-7 w-7" />
           <span className="flex items-baseline gap-2">
-            <b className="text-base">Falera</b>
-            <small className="hidden text-xs text-muted sm:inline">FaleraOS · Elixpo</small>
+            <b className="text-[0.95rem] tracking-tight">Falera</b>
+            <small className="hidden text-xs text-muted xl:inline">FaleraOS · Elixpo</small>
           </span>
         </Link>
 
-        <nav className="hidden items-center gap-6 text-xs font-semibold lg:flex">
-          {NAV.map((n) => (
-            <Link
-              key={n.href}
-              href={n.href}
-              aria-current={navActive(n.href) ? "page" : undefined}
-              className={`transition-opacity hover:opacity-55 ${
-                navActive(n.href) ? "underline decoration-primary decoration-2 underline-offset-[6px]" : ""
-              }`}
-            >
-              {n.label}
-            </Link>
-          ))}
-          <div ref={moreRef} className="relative">
-            <button
-              type="button"
-              onClick={() => setMoreOpen((v) => !v)}
-              aria-expanded={moreOpen}
-              aria-haspopup="true"
-              className={`inline-flex items-center gap-1 transition-opacity hover:opacity-55 ${
-                moreActive ? "underline decoration-primary decoration-2 underline-offset-[6px]" : ""
-              }`}
-            >
-              More
-              <ChevronDown className={`h-3.5 w-3.5 transition-transform ${moreOpen ? "rotate-180" : ""}`}
-                           aria-hidden="true" />
-            </button>
-            {moreOpen && (
-              <div className="absolute right-0 top-[calc(100%+14px)] grid w-[34rem] max-w-[calc(100vw-2rem)]
-                              grid-cols-3 gap-4 rounded-[1.4rem] border border-text/15 bg-bg/95 p-5
-                              shadow-[0_18px_48px_rgba(20,32,24,0.12)] backdrop-blur-xl">
-                {MORE.map((g) => (
-                  <div key={g.title} className="min-w-0">
-                    <p className="mb-2 text-[11px] uppercase tracking-widest text-muted">{g.title}</p>
-                    <ul className="grid gap-1">
-                      {g.links.map((l) => (
-                        <li key={l.href}>
-                          <MoreItem
-                            link={l}
-                            onClick={() => setMoreOpen(false)}
-                            className={`block rounded-md px-2 py-1.5 text-sm font-medium transition-colors
-                                        hover:bg-bg-raised ${!l.external && isActive(l.href) ? "text-primary" : ""}`}
-                          />
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+        <nav aria-label="Main" className="hidden xl:block">
+          <ul className="flex items-center gap-6 text-[0.8125rem] font-semibold">
+            {NAV.map((n) => (
+              <li key={n.href}>
+                <Link
+                  href={n.href}
+                  aria-current={current(n.href) ? "page" : undefined}
+                  className={`inline-flex items-center gap-1.5 py-2 transition-colors hover:text-primary ${
+                    current(n.href) ? "text-primary" : "text-text"
+                  } ${n.love ? "love-link" : ""}`}
+                >
+                  {n.love && <Heart className="text-primary" />}
+                  {n.label}
+                </Link>
+              </li>
+            ))}
+            <li>
+              <details ref={more} className="group relative">
+                <summary className="flex cursor-pointer list-none items-center gap-1 py-2 text-text hover:text-primary
+                                    [&::-webkit-details-marker]:hidden">
+                  More
+                  <svg viewBox="0 0 12 12" className="h-3 w-3 transition-transform group-open:rotate-180" aria-hidden="true">
+                    <path d="M2.5 4.5L6 8l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </summary>
+                <ul className="card absolute right-0 top-full z-50 mt-2 w-60 p-2 text-[0.8125rem]">
+                  {MORE.map((m) => (
+                    <li key={m.href}>
+                      {m.external ? (
+                        <a href={m.href} target="_blank" rel="noreferrer"
+                           className="flex items-center justify-between rounded-inner px-3 py-2 hover:bg-bg-raised hover:text-primary">
+                          {m.label} <span aria-hidden="true">↗</span>
+                        </a>
+                      ) : (
+                        <Link href={m.href} aria-current={pathname.startsWith(m.href) ? "page" : undefined}
+                              className={`block rounded-inner px-3 py-2 hover:bg-bg-raised hover:text-primary ${
+                                pathname.startsWith(m.href) ? "text-primary" : ""}`}>
+                          {m.label}
+                        </Link>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            </li>
+          </ul>
         </nav>
 
         <div className="flex items-center gap-2">
           <a
-            href="https://github.com/elixpo/falera"
-            target="_blank" rel="noreferrer"
-            className="inline-flex items-center gap-2 rounded-pill bg-text px-4 py-3
-                       text-xs font-bold text-bg transition-opacity hover:opacity-85"
-            title={stars !== null ? `${stars} stars` : "GitHub"}
+            href={GITHUB}
+            target="_blank"
+            rel="noreferrer"
+            aria-label={stars !== null ? `FaleraOS on GitHub, ${stars} stars` : "FaleraOS on GitHub"}
+            className="hidden h-10 min-w-[6.75rem] items-center justify-center gap-2 rounded-pill bg-text px-4 text-[0.8125rem] font-bold text-bg transition-colors hover:bg-text/85 md:inline-flex"
           >
-            <Github className="h-4 w-4" />
-            <span className="hidden sm:inline">GitHub</span>
-            <span className="inline-flex items-center gap-1 opacity-75">
-              <Star className="h-3 w-3" /> {fmtCount(stars)}
-            </span>
+            <GithubIcon />
+            {stars !== null ? (
+              <span className="inline-flex items-center gap-1 tabular-nums">
+                <svg viewBox="0 0 16 16" className="h-3 w-3" aria-hidden="true"><path d="M8 1.5l1.9 4 4.4.5-3.3 3 .9 4.3L8 11.2 4.1 13.3 5 9 1.7 6l4.4-.5z" fill="currentColor" /></svg>
+                {formatStars(stars)}
+              </span>
+            ) : (
+              <span>GitHub</span>
+            )}
           </a>
-          <button
-            type="button"
-            onClick={() => setOpen((v) => !v)}
-            aria-expanded={open}
-            aria-label={open ? "Close menu" : "Open menu"}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-pill
-                       border border-border lg:hidden"
+          <Link
+            href="/docs/"
+            aria-current={pathname.startsWith("/docs/") && !section ? "page" : undefined}
+            className={`hidden h-10 items-center rounded-pill border px-4 text-[0.8125rem] font-bold transition-colors hover:border-text sm:inline-flex ${
+              current("/docs/") ? "border-primary text-primary" : "border-text/60 text-text"
+            }`}
           >
-            {open ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-          </button>
+            Docs
+          </Link>
+          <a
+            href={FUND_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="love-link btn-accent min-h-[44px] flex-col gap-0 px-4 py-1 leading-tight"
+            aria-label="Fund the badge, from $0.11"
+          >
+            <span className="inline-flex items-center gap-1.5 text-[0.8125rem]"><Heart /> Fund the badge</span>
+            <span className="text-[0.6875rem] font-semibold opacity-90">from $0.11 (₹10)</span>
+          </a>
+
+          <details ref={menu} className="group relative xl:hidden">
+            <summary
+              className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-pill border border-border
+                         [&::-webkit-details-marker]:hidden"
+              aria-label="Menu"
+            >
+              <svg viewBox="0 0 20 20" className="h-4 w-4 group-open:hidden" aria-hidden="true">
+                <path d="M3 6h14M3 10h14M3 14h14" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+              </svg>
+              <svg viewBox="0 0 20 20" className="hidden h-4 w-4 group-open:block" aria-hidden="true">
+                <path d="M5 5l10 10M15 5L5 15" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+              </svg>
+            </summary>
+            <nav
+              aria-label="Main"
+              className="fixed inset-x-0 top-[var(--header-h)] max-h-[calc(100dvh-var(--header-h))] overflow-y-auto
+                         border-b border-border bg-bg"
+            >
+              <ul className="container-page grid gap-1 py-4 text-base font-semibold">
+                <li>
+                  <Link href="/" aria-current={pathname === "/" ? "page" : undefined}
+                        className={`block rounded-inner px-3 py-3 hover:bg-bg-raised ${pathname === "/" ? "text-primary" : ""}`}>
+                    Home
+                  </Link>
+                </li>
+                {[...NAV.slice(0, 3), { href: "/docs/", label: "Docs" }, ...NAV.slice(3)].map((n) => (
+                  <li key={n.href}>
+                    <Link
+                      href={n.href}
+                      aria-current={current(n.href) ? "page" : undefined}
+                      className={`flex items-center gap-2 rounded-inner px-3 py-3 hover:bg-bg-raised ${current(n.href) ? "text-primary" : ""}`}
+                    >
+                      {"love" in n && n.love && <Heart className="text-primary" />}
+                      {n.label}
+                    </Link>
+                  </li>
+                ))}
+                <li className="mt-2 border-t border-border px-3 pb-1 pt-4 font-mono text-xs uppercase tracking-[0.12em] text-muted">More</li>
+                {MORE.map((m) => (
+                  <li key={m.href}>
+                    {m.external ? (
+                      <a href={m.href} target="_blank" rel="noreferrer"
+                         className="flex items-center gap-2 rounded-inner px-3 py-3 hover:bg-bg-raised">
+                        {m.label} <span aria-hidden="true">↗</span>
+                      </a>
+                    ) : (
+                      <Link href={m.href} className={`block rounded-inner px-3 py-3 hover:bg-bg-raised ${
+                        pathname.startsWith(m.href) ? "text-primary" : ""}`}>
+                        {m.label}
+                      </Link>
+                    )}
+                  </li>
+                ))}
+                <li className="mt-2 border-t border-border pt-3">
+                  <a href={GITHUB} target="_blank" rel="noreferrer"
+                     className="flex items-center gap-2 rounded-inner px-3 py-3 hover:bg-bg-raised">
+                    <GithubIcon /> GitHub <span aria-hidden="true">↗</span>
+                  </a>
+                </li>
+              </ul>
+            </nav>
+          </details>
         </div>
       </div>
-
-      {open && (
-        <nav className="mt-2 grid gap-1 rounded-[1.4rem] border border-text/15 bg-bg/95 p-3
-                        text-sm font-semibold shadow-[0_18px_48px_rgba(20,32,24,0.09)]
-                        backdrop-blur-xl lg:hidden">
-          {NAV.map((n) => (
-            <Link
-              key={n.href}
-              href={n.href}
-              aria-current={navActive(n.href) ? "page" : undefined}
-              className={`rounded-pill px-4 py-2.5 ${navActive(n.href) ? "bg-bg-raised" : "hover:bg-bg-raised"}`}
-            >
-              {n.label}
-            </Link>
-          ))}
-          {MORE.map((g) => (
-            <div key={g.title} className="mt-2 border-t border-border pt-2">
-              <p className="px-4 pb-1 pt-1 text-[11px] uppercase tracking-widest text-muted">{g.title}</p>
-              {g.links.map((l) => (
-                <MoreItem
-                  key={l.href}
-                  link={l}
-                  className={`block rounded-pill px-4 py-2.5 ${
-                    !l.external && isActive(l.href) ? "bg-bg-raised" : "hover:bg-bg-raised"
-                  }`}
-                />
-              ))}
-            </div>
-          ))}
-        </nav>
-      )}
     </header>
   );
 }

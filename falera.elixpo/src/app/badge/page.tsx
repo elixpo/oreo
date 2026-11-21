@@ -1,243 +1,146 @@
-"use client";
+import BoardViewerLazy from "@/components/BoardViewerLazy";
+import PressStrip from "@/components/PressStrip";
+import { LumiTip } from "@/components/Lumi";
+import { Card, Fact, NextStep, PageHeader, Section, SectionHeader } from "@/components/ui";
+import { FUND_URL, GITHUB } from "@/lib/links";
 
-import dynamic from "next/dynamic";
-import { motion } from "framer-motion";
-import { Reveal, fadeUp, staggerContainer } from "@/components/MotionWrap";
-import {
-  Cpu, MemoryStick, Battery, Radio, Usb, Layers,
-  Layout, Ruler, Github, Heart,
-} from "lucide-react";
+const CIRCUIT = `${GITHUB}/blob/main/circuit/elixpo`;
 
-// <model-viewer> touches window and WebGL, so it only ever loads in the
-// browser; the static export ships the loading state in its place.
-const BoardViewer = dynamic(() => import("@/components/BoardViewer"), {
-  ssr: false,
-  loading: () => (
-    <div className="flex h-full items-center justify-center text-xs uppercase tracking-widest text-muted">
-      Loading the 3D board…
-    </div>
-  ),
-});
-
-const SPECS = [
-  { Icon: Cpu,          k: "MCU",      v: "ESP32-S3-WROOM-1 · dual core @ 240 MHz" },
-  { Icon: MemoryStick,  k: "Memory",   v: "16 MB flash · 8 MB PSRAM · microSD" },
-  { Icon: Radio,        k: "Radio",    v: "Wi-Fi 2.4 GHz · Bluetooth LE 5 · IR transmit and receive" },
-  { Icon: Layout,       k: "Display",  v: "2.8″ ILI9341 320×240 · resistive touch · landscape" },
-  { Icon: Battery,      k: "Power",    v: "LiPo · USB-C charging (BQ24074) · 3.3 V buck-boost" },
-  { Icon: Usb,          k: "I/O",      v: "8 buttons · MPU-6050 · speaker · Qwiic · 4-GPIO header" },
-  { Icon: Ruler,        k: "Dimensions", v: "88 × 133.5 mm portrait PCB" },
-  { Icon: Layers,       k: "Layers",   v: "4-layer FR-4 · 1.6 mm · black mask" },
+// Four specs sit beside the 3D board, four under it.
+const SPECS_SIDE: [string, string][] = [
+  ["MCU", "ESP32-S3-WROOM-1 · dual core @ 240 MHz"],
+  ["Memory", "16 MB flash · 8 MB PSRAM · microSD"],
+  ["Display", "2.8″ ILI9341 320×240 · resistive touch · landscape"],
+  ["Radio", "Wi-Fi 2.4 GHz · Bluetooth LE 5 · IR transmit and receive"],
+];
+const SPECS_BELOW: [string, string][] = [
+  ["Power", "LiPo · USB-C charging (BQ24074) · 3.3 V buck-boost"],
+  ["I/O", "8 buttons · MPU-6050 · speaker · Qwiic · 4-GPIO header"],
+  ["Dimensions", "88 × 133.5 mm portrait PCB"],
+  ["Layers", "4-layer FR-4 · 1.6 mm · black mask"],
 ];
 
 const STACK = [
-  { lvl: "apps/",        body: "Userland — manifest.json + main.py per app.",
-    tint: "from-primary/30 to-primary/5" },
-  { lvl: "oreoOS/",      body: "The OS: launcher, store, OTA, notifications, file transfer.",
-    tint: "from-lilac/30 to-lilac/5" },
-  { lvl: "oreoWare/",    body: "HAL / Board Support: drivers for screen, buttons, IMU, BLE, WiFi, IR, battery.",
-    tint: "from-teal/30 to-teal/5" },
-  { lvl: "MicroPython",  body: "Runtime — we credit it loudly; we did not write it.",
-    tint: "from-gold/30 to-gold/5" },
+  { lvl: "apps/",       body: "Userland — manifest.json + main.py per app." },
+  { lvl: "oreoOS/",     body: "The OS: launcher, store, OTA, notifications, file transfer." },
+  { lvl: "oreoWare/",   body: "HAL / Board Support: drivers for screen, buttons, IMU, BLE, WiFi, IR, battery." },
+  { lvl: "MicroPython", body: "Runtime — we credit it loudly; we did not write it." },
 ];
+
+// Flat tints, top to bottom: the app layer in red, the OS white, the
+// drivers green, the runtime grey.
+const LAYER_TINT = ["bg-red-tint", "bg-card", "bg-green-tint", "bg-card-sub"];
 
 export default function BadgePage() {
   return (
-    <div className="relative">
-      {/* Soft brand glows */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[640px] overflow-hidden">
-        <div className="absolute left-1/3 top-0  h-[440px] w-[440px] rounded-full bg-primary/[0.10] blur-[140px]" />
-        <div className="absolute right-1/4 top-32 h-[300px] w-[300px] rounded-full bg-lilac/[0.10]  blur-[120px]" />
-        <div className="absolute left-1/4 top-64  h-[260px] w-[260px] rounded-full bg-teal/[0.08]   blur-[120px]" />
-      </div>
+    <>
+      <PageHeader
+        eyebrow="The badge · PCB v1 · first boards ordered"
+        title={<>The hardware, <em>all open.</em></>}
+        lede="A 2.8″ touch screen, eight buttons, IR for line-of-sight quests, an MPU-6050 for shake and tilt, a speaker, and LEDs around the frame. The KiCad design, the bill of materials and the build notes live in the repo, so you can fork them and make your own."
+        aside={
+          <a
+            href="https://certification.oshwa.org/in000107.html"
+            target="_blank" rel="noreferrer"
+            className="card-link flex items-center gap-5 p-5"
+            aria-label="Certified open source hardware, OSHWA UID IN000107"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/oshw_mark.png" alt="" className="h-10 w-auto" width={4000} height={1122} decoding="async" />
+            <span className="text-sm leading-snug text-text-dim">
+              Certified open source hardware by OSHWA
+            </span>
+          </a>
+        }
+      >
+        <a href={FUND_URL} target="_blank" rel="noreferrer" className="btn-accent">Fund the badge</a>
+        <a href={`${CIRCUIT}/README.md`} target="_blank" rel="noreferrer" className="btn-ghost">Board design notes</a>
+        <a href={`${CIRCUIT}/BOM_COST.md`} target="_blank" rel="noreferrer" className="btn-ghost">Bill of materials</a>
+        <a href={`${GITHUB}/tree/main/circuit/elixpo`} target="_blank" rel="noreferrer" className="btn-ghost">KiCad files</a>
+        <a href={GITHUB} target="_blank" rel="noreferrer" className="btn-ghost">Repo</a>
+      </PageHeader>
 
-      <div className="container-page pt-16 pb-28">
-        {/* ── HERO ────────────────────────────────────────────────────── */}
-        <div className="max-w-3xl">
-          <motion.div initial="hidden" animate="visible" variants={staggerContainer}>
-            <motion.span variants={fadeUp} className="chip mb-6">
-              PCB v1 · first boards ordered
-            </motion.span>
-            <motion.h1
-              variants={fadeUp}
-              className="font-display text-4xl leading-[1.05] tracking-tight sm:text-5xl"
-            >
-              The hardware,{" "}
-              <span className="bg-gradient-to-r from-primary via-gold to-lilac
-                               bg-clip-text text-transparent">
-                all open.
-              </span>
-            </motion.h1>
-            <motion.p variants={fadeUp} className="mt-5 max-w-2xl text-text-dim">
-              A 2.8″ touch screen, eight buttons, IR for line-of-sight quests,
-              an MPU-6050 for shake and tilt, a speaker, and LEDs around the
-              frame. The KiCad design, the bill of materials and the build
-              notes live in the repo, so you can fork them and make your own.
-            </motion.p>
-            <motion.div variants={fadeUp} className="mt-8 flex flex-wrap gap-3">
-              <a
-                href="https://payouts.elixpo.com/f/falera-badge"
-                target="_blank" rel="noreferrer"
-                className="btn-primary"
-              >
-                <Heart className="h-4 w-4" /> Fund the badge
-              </a>
-              <a
-                href="https://github.com/elixpo/falera/blob/main/circuit/elixpo/README.md"
-                target="_blank" rel="noreferrer"
-                className="btn-ghost"
-              >
-                <Github className="h-4 w-4" /> Board design notes
-              </a>
-              <a
-                href="https://github.com/elixpo/falera/blob/main/circuit/elixpo/BOM_COST.md"
-                target="_blank" rel="noreferrer"
-                className="btn-ghost"
-              >
-                Bill of materials
-              </a>
-              <a
-                href="https://github.com/elixpo/falera/tree/main/circuit/elixpo"
-                target="_blank" rel="noreferrer"
-                className="btn-ghost"
-              >
-                KiCad files
-              </a>
-              <a
-                href="https://github.com/elixpo/falera"
-                target="_blank" rel="noreferrer"
-                className="btn-ghost"
-              >
-                Repo
-              </a>
-            </motion.div>
-            <motion.a
-              variants={fadeUp}
-              href="https://certification.oshwa.org/in000107.html"
-              target="_blank" rel="noreferrer"
-              className="mt-8 inline-flex items-center gap-4"
-              aria-label="Certified open source hardware, OSHWA UID IN000107"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/oshw_mark.png"
-                alt="OSHW IN000107"
-                className="h-12 w-auto"
-                width={4000} height={1122}
-                decoding="async"
-              />
-              <span className="text-sm text-text-dim">
-                Certified open source hardware by OSHWA
-              </span>
-            </motion.a>
-          </motion.div>
-
-        </div>
-
-        {/* ── THE BOARD ───────────────────────────────────────────────── */}
-        <Reveal>
-          <figure className="mt-16 overflow-hidden rounded-lg border border-border
-                             bg-[radial-gradient(ellipse_at_center,#FFFFFF_0%,#EFF1ED_70%)]">
+      {/* The board, with the specs around it. */}
+      <Section label="The board in 3D" tone="ink">
+        <p className="eyebrow mb-8">PCB v1 · drag to turn it</p>
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-center">
+          <figure className="card-fill overflow-hidden">
             {/* Fixed height, so the page does not shift while the model loads. */}
             <div className="h-[400px] sm:h-[560px] lg:h-[620px]">
-              <BoardViewer />
+              <BoardViewerLazy />
             </div>
             <figcaption className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1
                                    border-t border-border px-4 py-3 text-xs text-muted">
-              <span className="uppercase tracking-widest">
-                PCB v1 · black mask, white silkscreen, HASL
-              </span>
+              <span className="font-mono uppercase tracking-[0.12em]">PCB v1 · black mask, white silkscreen, HASL</span>
               <span>
                 Flat renders:{" "}
-                <a href="/pcb_front.jpg" className="text-text underline-offset-4 hover:underline">front</a>
+                <a href="/pcb_front.jpg" className="link">front</a>
                 {" · "}
-                <a href="/pcb_back.jpg" className="text-text underline-offset-4 hover:underline">back</a>
+                <a href="/pcb_back.jpg" className="link">back</a>
                 {" · "}
-                <a href="/models/falera-badge.glb" download
-                   className="text-text underline-offset-4 hover:underline">GLB model</a>
+                <a href="/models/falera-badge.glb" download className="link">GLB model</a>
               </span>
             </figcaption>
           </figure>
-        </Reveal>
+          <div className="grid content-start gap-4 sm:grid-cols-2 lg:grid-cols-1 lg:content-center">
+            {SPECS_SIDE.map(([k, v]) => <Fact key={k} k={k}>{v}</Fact>)}
+          </div>
+        </div>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {SPECS_BELOW.map(([k, v]) => <Fact key={k} k={k}>{v}</Fact>)}
+        </div>
+      </Section>
 
-        {/* ── SPEC GRID ────────────────────────────────────────────── */}
-        <div className="mt-14 grid gap-3 sm:grid-cols-2">
-          {SPECS.map((s, i) => (
-            <motion.div
-              key={s.k}
-              initial={{ opacity: 0, y: 10 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.04 * i, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-              className="card-surface flex items-start gap-3 p-5"
-            >
-              <div className="grid h-9 w-9 place-items-center rounded-md
-                              bg-card-sub text-primary">
-                <s.Icon className="h-4 w-4" />
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-widest text-muted">{s.k}</p>
-                <p className="mt-1 text-text">{s.v}</p>
-              </div>
-            </motion.div>
-          ))}
+      <Section id="architecture">
+        <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-16">
+          <SectionHeader
+            eyebrow="Software stack"
+            title={<>Layered <em>architecture.</em></>}
+            lede="Four layers, each can be rewritten without the others noticing."
+          />
+          {/* Drawn as a stack: apps on top, MicroPython at the bottom. */}
+          <ol className="grid gap-2">
+            {STACK.map((row, i) => (
+              <li
+                key={row.lvl}
+                className={`reveal flex flex-col gap-1 rounded-card border border-border p-5 sm:flex-row sm:items-baseline sm:gap-6 ${LAYER_TINT[i]}`}
+                style={{ marginInline: `${i * 0.75}rem` }}
+              >
+                <span className="w-8 shrink-0 font-mono text-sm font-bold text-primary-dim">L{STACK.length - i}</span>
+                <code className="w-32 shrink-0 font-mono text-base font-bold text-text">{row.lvl}</code>
+                <span className="text-sm leading-relaxed text-text-dim">{row.body}</span>
+              </li>
+            ))}
+          </ol>
         </div>
 
-        {/* ── LAYERED ARCHITECTURE ────────────────────────────────── */}
-        <Reveal>
-          <div className="mt-16">
-            <h2 className="font-display text-2xl tracking-tight">
-              Layered architecture
-            </h2>
-            <p className="mt-2 text-text-dim">
-              Four layers, each can be rewritten without the others noticing.
-            </p>
-          </div>
-        </Reveal>
+        <Card fill className="mt-10 p-6 sm:p-8">
+          <p className="eyebrow">Made by</p>
+          <p className="mt-3 max-w-3xl leading-relaxed text-text-dim">
+            Designed by{" "}
+            <a href="https://github.com/Circuit-Overtime" target="_blank" rel="noreferrer" className="link">
+              Ayushman Bhattacharya (@Circuit-Overtime)
+            </a>{" "}
+            with{" "}
+            <a href="https://github.com/anwe-ch" target="_blank" rel="noreferrer" className="link">
+              Anwesha Chakraborty (@anwe-ch)
+            </a>
+            , Elixpo core maintainer and co-author of the RV565 video format the badge plays.
+          </p>
+        </Card>
+      </Section>
 
-        <div className="mt-8 grid gap-3">
-          {STACK.map((row, i) => (
-            <motion.div
-              key={row.lvl}
-              initial={{ opacity: 0, x: -16 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.06 * i, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-              className={`relative overflow-hidden rounded-lg border border-border
-                          bg-gradient-to-r ${row.tint} p-5`}
-            >
-              <div className="flex items-center justify-between gap-4">
-                <code className="font-mono text-lg text-text">{row.lvl}</code>
-                <span className="text-xs uppercase tracking-widest text-muted">
-                  L{STACK.length - i}
-                </span>
-              </div>
-              <p className="mt-2 text-sm leading-relaxed text-text-dim">{row.body}</p>
-            </motion.div>
-          ))}
-        </div>
+      <Section id="press">
+        <PressStrip />
+        <LumiTip pose="badge">This board is certified open hardware (OSHWA IN000107). Fork the KiCad files and make your own!</LumiTip>
+      </Section>
 
-        {/* ── CREDITS ───────────────────────────────────────────────── */}
-        <Reveal>
-          <div className="mt-16 card-surface p-6">
-            <h2 className="font-display text-2xl tracking-tight">Made by</h2>
-            <p className="mt-3 max-w-2xl text-text-dim">
-              Designed by{" "}
-              <a href="https://github.com/Circuit-Overtime" target="_blank" rel="noreferrer"
-                 className="text-text underline-offset-4 hover:underline">
-                Ayushman Bhattacharya (@Circuit-Overtime)
-              </a>{" "}
-              with{" "}
-              <a href="https://github.com/anwe-ch" target="_blank" rel="noreferrer"
-                 className="text-text underline-offset-4 hover:underline">
-                Anwesha Chakraborty (@anwe-ch)
-              </a>
-              , Elixpo core maintainer and co-author of the RV565 video format the
-              badge plays.
-            </p>
-          </div>
-        </Reveal>
-      </div>
-    </div>
+      <NextStep
+        title={<>Twenty apps <em>run on this board.</em></>}
+        body="Ten come built in; the on-device App Store installs ten more from GitHub."
+        href="/apps/"
+        cta="See the apps"
+      />
+    </>
   );
 }

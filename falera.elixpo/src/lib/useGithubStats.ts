@@ -2,75 +2,47 @@
 
 import { useEffect, useState } from "react";
 
+// Live star count for the header's GitHub pill. Cached in sessionStorage
+// for ten minutes so a visit makes at most one API call. On any failure
+// (offline, rate-limited) `stars` stays null and the pill shows "GitHub".
+const REPO = "elixpo/falera";
+const CACHE_KEY = "falera-gh-stars";
+const TTL_MS = 10 * 60 * 1000;
 
-const REPO       = "elixpo/falera";
-const CACHE_KEY  = "oreo-gh-stats";
-const TTL_MS     = 10 * 60 * 1000;        // 10 mins
+export function useGithubStars(): number | null {
+  const [stars, setStars] = useState<number | null>(null);
 
-// Conservative defaults so the UI never renders "0 stars" while the
-// fetch is in flight; replaced the instant the live response lands.
-const FALLBACK   = { stars: 446, forks: 140 };
-
-type Stats = { stars: number | null; forks: number | null; loading: boolean };
-
-export function useGithubStats(): Stats {
-  const [stats, setStats] = useState<Stats>(() => {
-    // SSR-safe initial state — sessionStorage isn't available during
-    // server rendering so we serve the conservative fallback and let
-    // the effect upgrade to live numbers on the client.
-    if (typeof window === "undefined") {
-      return { stars: FALLBACK.stars, forks: FALLBACK.forks, loading: false };
-    }
+  useEffect(() => {
+    let aborted = false;
     try {
       const raw = sessionStorage.getItem(CACHE_KEY);
       if (raw) {
         const obj = JSON.parse(raw);
-        if (obj && obj.ts && Date.now() - obj.ts < TTL_MS) {
-          return { stars: obj.stars, forks: obj.forks, loading: false };
+        if (obj && typeof obj.stars === "number" && Date.now() - obj.ts < TTL_MS) {
+          setStars(obj.stars);
+          return;
         }
       }
-    } catch { /* ignore — fall through to fallback */ }
-    return { stars: FALLBACK.stars, forks: FALLBACK.forks, loading: true };
-  });
+    } catch { /* storage blocked: fetch anyway */ }
 
-  useEffect(() => {
-    let aborted = false;
-    (async () => {
-      try {
-        // sessionStorage hit is honoured silently — already reflected
-        // in initial state; only refresh on a stale or missing entry.
-        const raw = sessionStorage.getItem(CACHE_KEY);
-        if (raw) {
-          const obj = JSON.parse(raw);
-          if (obj && obj.ts && Date.now() - obj.ts < TTL_MS) {
-            return;
-          }
-        }
-        const r = await fetch(`https://api.github.com/repos/${REPO}`, {
-          headers: { Accept: "application/vnd.github+json" },
-        });
-        if (!r.ok) throw new Error("HTTP " + r.status);
-        const j = await r.json();
-        const fresh = {
-          stars:   j.stargazers_count ?? FALLBACK.stars,
-          forks:   j.forks_count      ?? FALLBACK.forks,
-          loading: false,
-        };
-        if (!aborted) setStats(fresh);
+    fetch(`https://api.github.com/repos/${REPO}`, { headers: { Accept: "application/vnd.github+json" } })
+      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+      .then((j) => {
+        if (aborted || typeof j.stargazers_count !== "number") return;
+        setStars(j.stargazers_count);
         try {
-          sessionStorage.setItem(CACHE_KEY, JSON.stringify({
-            ts: Date.now(), stars: fresh.stars, forks: fresh.forks,
-          }));
-        } catch { /* private mode / quota */ }
-      } catch {
-        // Network blew up — keep the fallback, just flip loading off.
-        if (!aborted) {
-          setStats(s => ({ ...s, loading: false }));
-        }
-      }
-    })();
+          sessionStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), stars: j.stargazers_count }));
+        } catch { /* private mode */ }
+      })
+      .catch(() => { /* keep null: the pill says "GitHub" */ });
     return () => { aborted = true; };
   }, []);
 
-  return stats;
+  return stars;
+}
+
+export function formatStars(n: number): string {
+  if (n >= 10_000) return (n / 1000).toFixed(0) + "k";
+  if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, "") + "k";
+  return String(n);
 }

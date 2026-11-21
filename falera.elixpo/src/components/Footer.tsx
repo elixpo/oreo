@@ -1,29 +1,39 @@
 import Link from "next/link";
+import { Bow } from "@/components/ui";
+import { LumiWave } from "@/components/Lumi";
 
-// One column row. `external` is optional; absent → internal Link.
 type FooterLink = { label: string; href: string; external?: boolean };
 type FooterColumn = { title: string; links: FooterLink[] };
 
 const COLUMNS: FooterColumn[] = [
   {
-    title: "Project",
+    title: "Falera",
     links: [
-      { label: "Get Started", href: "/get-started/" },
       { label: "Badge",       href: "/badge/" },
-      { label: "Supporters",  href: "/supporters/" },
       { label: "Apps",        href: "/apps/" },
-      { label: "Docs",        href: "/docs/" },
-      { label: "falera CLI",    href: "/docs/cli/" },
+      { label: "Get started", href: "/get-started/" },
       { label: "Hacks",       href: "/hacks/" },
-      { label: "Contribute",  href: "/contribute/" },
-      { label: "Transfer",    href: "/docs/transfer/" },
+      { label: "Supporters",  href: "/supporters/" },
     ],
   },
   {
-    title: "Research",
+    title: "Build",
     links: [
-      { label: "RV565 Paper",        href: "/paper/" },
-      { label: "Video Architecture", href: "/docs/video-architecture/" },
+      { label: "Docs",            href: "/docs/" },
+      { label: "falera CLI",      href: "/docs/cli/" },
+      { label: "Write an app",    href: "/docs/apps/" },
+      { label: "Transfer files",  href: "/docs/transfer/" },
+      { label: "Connect over USB", href: "/docs/usb/" },
+      { label: "Contribute",      href: "/contribute/" },
+    ],
+  },
+  {
+    title: "RV565",
+    links: [
+      { label: "Overview",           href: "/rv565/" },
+      { label: "Video converter",    href: "/rv565/convert/" },
+      { label: "Research paper",     href: "/paper/" },
+      { label: "Video architecture", href: "/docs/video-architecture/" },
       { label: "Artifact (Zenodo)",  href: "https://doi.org/10.5281/zenodo.23543367", external: true },
       { label: "Elixpo Research",    href: "https://research.elixpo.com", external: true },
     ],
@@ -41,56 +51,66 @@ const COLUMNS: FooterColumn[] = [
   },
 ];
 
-// Editorial footer in the Elixpo Research style: brand and tagline on the
-// left, plain link columns on the right, one rule above.
+const linkClass = "text-text-dim transition-colors hover:text-primary";
+
+// Research-style footer: brand on the left, plain link columns, a rule,
+// then the legal lines. Text only: no logos besides the Falera mark.
 export default function Footer() {
   return (
-    <footer className="mt-32 border-t border-border">
-      <div className="container-page grid gap-12 py-14 lg:grid-cols-[1.2fr_2fr]">
-        <div className="flex items-start gap-4">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/favicon.ico" alt="" className="h-11 w-11 object-contain" loading="lazy" decoding="async" />
-          <div>
+    <footer className="border-t border-border bg-bg">
+      <div className="container-page grid gap-12 py-14 sm:py-16 lg:grid-cols-[1fr_2.4fr]">
+        <div className="max-w-xs">
+          <Link href="/" className="inline-flex items-center gap-2.5">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/favicon-48x48.png" alt="" width={32} height={32} className="h-8 w-8" loading="lazy" decoding="async" />
             <strong className="text-base">FaleraOS</strong>
-            <p className="mt-1 max-w-xs text-sm leading-relaxed text-muted">
-              An open-source operating system for a pocket-sized badge.
-              Open hardware, open firmware, open research.
-            </p>
-          </div>
+          </Link>
+          <p className="mt-4 text-sm leading-relaxed text-text-dim">
+            An open-source operating system for a pocket-sized badge.
+            Open hardware, open firmware, open research.
+          </p>
+          <div className="mt-6"><LumiWave /></div>
+          <p className="mt-5">
+            <a href="https://certification.oshwa.org/in000107.html" target="_blank" rel="noreferrer"
+               className="inline-flex items-center gap-2 text-sm font-semibold text-text hover:text-primary">
+              <Bow className="h-2.5 w-4" />
+              <span>OSHWA certified · <span className="font-mono">IN000107</span> <span aria-hidden="true">↗</span></span>
+            </a>
+          </p>
         </div>
 
-        <div className="grid gap-10 sm:grid-cols-3">
+        <nav aria-label="Footer" className="grid grid-cols-2 gap-x-6 gap-y-10 sm:grid-cols-4">
           {COLUMNS.map((col) => (
             <div key={col.title}>
-              <p className="eyebrow mb-4">{col.title}</p>
-              <ul className="space-y-2.5 text-sm font-semibold">
+              <p className="label mb-4">{col.title}</p>
+              <ul className="space-y-2.5 text-sm">
                 {col.links.map((l) => (
                   <li key={l.href}>
                     {l.external ? (
-                      <a href={l.href} target="_blank" rel="noreferrer" className="transition-opacity hover:opacity-55">
-                        {l.label} ↗
+                      <a href={l.href} target="_blank" rel="noreferrer" className={linkClass}>
+                        {l.label} <span aria-hidden="true">↗</span>
                       </a>
                     ) : (
-                      <Link href={l.href} className="transition-opacity hover:opacity-55">
-                        {l.label}
-                      </Link>
+                      <Link href={l.href} className={linkClass}>{l.label}</Link>
                     )}
                   </li>
                 ))}
               </ul>
             </div>
           ))}
+        </nav>
+      </div>
+
+      <div className="border-t border-border">
+        <div className="container-page flex flex-col gap-2 py-6 text-xs leading-relaxed text-muted md:flex-row md:justify-between">
+          <p>© 2026 Elixpo · Udyam-registered MSME · UDYAM-WB-07-0152337</p>
+          <p>Code MIT · hardware CERN-OHL-P-2.0 · built on MicroPython and ESP-IDF</p>
         </div>
+        <p className="container-page pb-8 text-xs leading-relaxed text-muted">
+          FaleraOS is an open-source MicroPython operating system for the Elixpo Falera Badge. It is not
+          related to Android 8.0 Oreo or to OREO® cookies, a trademark of Mondelēz International.
+        </p>
       </div>
-      <div className="container-page flex flex-col justify-between gap-2 border-t border-border py-6
-                      text-xs text-muted sm:flex-row">
-        <p>© 2026 Elixpo · MIT (code) + trademark carve-out</p>
-        <p>Built on MicroPython and ESP-IDF.</p>
-      </div>
-      <p className="container-page pb-6 text-xs text-muted">
-        FaleraOS is an open-source MicroPython operating system for the Elixpo Falera Badge. It is not
-        related to Android 8.0 Oreo or to OREO® cookies, a trademark of Mondelēz International.
-      </p>
     </footer>
   );
 }

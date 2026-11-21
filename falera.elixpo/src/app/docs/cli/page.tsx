@@ -1,4 +1,3 @@
-import { Terminal } from "lucide-react";
 import RepoDoc from "@/components/RepoDoc";
 import { pageMetadata } from "@/lib/seo";
 
@@ -17,7 +16,6 @@ export default function CliDocsPage() {
     <RepoDoc
       file="docs/CLI.md"
       chip="docs · falera CLI"
-      icon={Terminal}
       title="The falera command-line tool."
       lead="falera-cli controls the badge from a computer over USB: status, the Transfer app, files, apps, Wi-Fi, your profile, logs, a MicroPython shell and FaleraOS updates. It finds the badge by its USB ID, so you never guess a port name."
       quickLinks={[

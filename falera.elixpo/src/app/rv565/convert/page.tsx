@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { ArrowRight, ArrowUpRight } from "lucide-react";
+import { NextStep, PageHeader, Section, SectionHeader, Steps } from "@/components/ui";
 import JsonLd from "@/components/JsonLd";
+import { LumiTip } from "@/components/Lumi";
 import Rv565Converter from "@/components/Rv565Converter";
 import { SITE_URL, pageMetadata } from "@/lib/seo";
 
@@ -84,70 +85,69 @@ export default function ConvertPage() {
         }}
       />
 
-      <header className="container-page border-b border-border pb-14 pt-20 sm:pt-28">
-        <p className="eyebrow">RV565 · free tool · runs in your browser</p>
-        <h1 className="max-w-6xl font-display text-[clamp(2.4rem,5.2vw,5.4rem)] leading-[0.98]">
-          Video in your display&apos;s <em>own pixels</em>, ready for your microcontroller.
-        </h1>
-        <p className="mt-6 max-w-3xl text-[1.05rem] leading-relaxed text-text-dim">
-          Turn an MP4 or WebM into an RV565 clip or an Arduino <code className="font-mono">clip.h</code>: RGB565 for
-          ST7789 and ILI9341 TFTs, 18-bit RGB666, 4-bit grayscale for SSD1322 OLEDs, 1-bit for SSD1306 OLEDs and
-          e-paper, and more. Files use RV565 format version 8 when region deltas help and version 7 otherwise, or
-          version 6 for the released RV565 1.x library on
-          ESP32-S3, other ESP32 chips and the Raspberry Pi Pico 2. No upload, no account.
-        </p>
-        <ul className="mt-8 flex flex-wrap gap-3 text-sm">
-          <li className="chip">Arduino · Library Manager → RV565</li>
-          <li><a href="https://pypi.org/project/rv565/" target="_blank" rel="noreferrer" className="chip hover:text-text">Python · pip install rv565</a></li>
-          <li><a href="https://github.com/elixpo/rv565" target="_blank" rel="noreferrer" className="chip hover:text-text">GitHub · elixpo/rv565</a></li>
-        </ul>
-      </header>
+      <PageHeader
+        tone="red"
+        eyebrow="RV565 · free tool · runs in your browser"
+        title={<>Video in your display&apos;s <em>own pixels</em>, ready for your microcontroller.</>}
+        lede={
+          <>
+            Turn an MP4 or WebM into an RV565 clip or an Arduino <code className="code">clip.h</code>: RGB565 for
+            ST7789 and ILI9341 TFTs, 18-bit RGB666, 4-bit grayscale for SSD1322 OLEDs, 1-bit for SSD1306 OLEDs and
+            e-paper, and more. Files use RV565 format version 8 when region deltas help and version 7 otherwise, or
+            version 6 for the released RV565 1.x library on
+            ESP32-S3, other ESP32 chips and the Raspberry Pi Pico 2. No upload, no account.
+          </>
+        }
+      >
+        <span className="chip">Arduino · Library Manager → RV565</span>
+        <a href="https://pypi.org/project/rv565/" target="_blank" rel="noreferrer" className="chip transition-colors hover:border-text/50 hover:text-text">Python · pip install rv565</a>
+        <a href="https://github.com/elixpo/rv565" target="_blank" rel="noreferrer" className="chip transition-colors hover:border-text/50 hover:text-text">GitHub · elixpo/rv565</a>
+      </PageHeader>
 
-      <section className="container-page border-b border-border py-14">
+      <Section id="converter" label="Converter">
         <Rv565Converter />
-      </section>
+        <LumiTip align="right">Your video never leaves your computer: the whole conversion runs in this browser tab.</LumiTip>
+      </Section>
 
-      <section className="container-page border-b border-border py-20">
-        <p className="eyebrow">From video to screen</p>
-        <h2 className="mb-10 max-w-4xl font-display text-[clamp(2rem,3.6vw,3.6rem)] leading-[1]">
-          Three steps to video on a microcontroller.
-        </h2>
-        <ol className="grid gap-4 md:grid-cols-3">
-          {STEPS.map(([title, body], i) => (
-            <li key={title} className="card-surface flex flex-col p-6">
-              <span className="font-mono text-xs text-muted">{String(i + 1).padStart(2, "0")}</span>
-              <h3 className="mt-4 font-display text-2xl leading-tight">{title}</h3>
-              <p className="mt-3 text-sm leading-relaxed text-muted">{body}</p>
-            </li>
-          ))}
-        </ol>
+      <Section id="steps" tone="red">
+        <SectionHeader
+          eyebrow="From video to screen"
+          title={<>Three steps to video <em>on a microcontroller.</em></>}
+        />
+        <Steps className="mt-12" steps={STEPS.map(([title, body]) => ({ title, body }))} />
         <div className="mt-10 flex flex-wrap gap-3">
           <a href="https://github.com/elixpo/rv565" target="_blank" rel="noreferrer" className="btn-primary">
-            RV565 library on GitHub <ArrowUpRight className="h-4 w-4" />
+            RV565 library on GitHub ↗
           </a>
           <a href="https://pypi.org/project/rv565/" target="_blank" rel="noreferrer" className="btn-ghost">
-            pip install rv565 <ArrowUpRight className="h-4 w-4" />
+            pip install rv565 ↗
           </a>
-          <Link href="/paper/" className="btn-ghost">
-            Read the paper <ArrowRight className="h-4 w-4" />
-          </Link>
+          <Link href="/paper/" className="btn-ghost">Read the paper</Link>
         </div>
-      </section>
+      </Section>
 
-      <section className="container-page py-20">
-        <p className="eyebrow">Questions</p>
-        <h2 className="mb-10 font-display text-[clamp(2rem,3.6vw,3.6rem)] leading-[1]">Frequently asked.</h2>
-        <div className="divide-y divide-border rounded-[1.4rem] border border-border bg-card">
+      <Section id="faq">
+        <SectionHeader eyebrow="Questions" title={<>Frequently <em>asked.</em></>} />
+        <div className="mt-10 divide-y divide-border rounded-card border border-border bg-card">
           {FAQ.map(({ q, a }) => (
             <details key={q} className="group p-6">
-              <summary className="cursor-pointer list-none font-semibold marker:hidden">
-                {q}
+              <summary className="flex cursor-pointer list-none items-start justify-between gap-4 font-bold text-text marker:hidden [&::-webkit-details-marker]:hidden">
+                <h3>{q}</h3>
+                <span aria-hidden="true" className="font-mono text-primary group-open:rotate-45 transition-transform">+</span>
               </summary>
-              <p className="mt-3 max-w-3xl text-sm leading-relaxed text-muted">{a}</p>
+              <p className="mt-3 max-w-3xl text-sm leading-relaxed text-text-dim">{a}</p>
             </details>
           ))}
         </div>
-      </section>
+      </Section>
+
+      <NextStep
+        eyebrow="Back to RV565"
+        title={<>The format, the paper <em>and where it ships.</em></>}
+        body="An overview of RV565, with the measured results and the packages."
+        href="/rv565/"
+        cta="RV565 overview"
+      />
     </article>
   );
 }

@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import Header         from "@/components/Header";
 import Footer         from "@/components/Footer";
-import PageTransition from "@/components/PageTransition";
 import JsonLd         from "@/components/JsonLd";
 import { DISAMBIGUATION, OG_IMAGE, SITE_NAME, SITE_URL, WIKIDATA } from "@/lib/seo";
 import { COVERAGE } from "@/data/press";
@@ -134,7 +133,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="min-h-screen flex flex-col">
+      <body className="flex min-h-screen flex-col text-text">
         <JsonLd data={{
           "@context": "https://schema.org",
           "@graph": [
@@ -225,9 +224,13 @@ export default function RootLayout({
             },
           ],
         }} />
+        <a href="#main"
+           className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-3 focus:z-50 focus:rounded-pill focus:bg-text focus:px-4 focus:py-2 focus:text-sm focus:font-bold focus:text-bg">
+          Skip to content
+        </a>
         <Header />
-        <main className="flex-1">
-          <PageTransition>{children}</PageTransition>
+        <main id="main" className="flex-1">
+          {children}
         </main>
         <Footer />
       </body>

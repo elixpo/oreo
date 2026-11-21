@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { Wrench } from "lucide-react";
 import RepoDoc from "@/components/RepoDoc";
 import { HACK_GUIDES } from "@/data/hacks";
 import { pageMetadata } from "@/lib/seo";
@@ -38,7 +37,6 @@ export default async function HackPage({ params }: Props) {
     <RepoDoc
       file={`docs/hacks/${hack.doc}`}
       chip={`hack · ${hack.difficulty} · ${hack.mins < 60 ? `${hack.mins} min` : `${Math.round(hack.mins / 60)} h`}`}
-      icon={Wrench}
       title={hack.title}
       lead={hack.lead ?? hack.body}
       quickLinks={[{ label: "All hacks", href: "/hacks/" }]}

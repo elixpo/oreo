@@ -1,4 +1,4 @@
-import { Heart } from "lucide-react";
+import { NextStep } from "@/components/ui";
 import ContributeTracks from "@/components/ContributeTracks";
 import RepoDoc from "@/components/RepoDoc";
 
@@ -8,16 +8,15 @@ import RepoDoc from "@/components/RepoDoc";
 
 export default function ContributePage() {
   return (
+    <>
     <RepoDoc
       file="CONTRIBUTING.md"
+      childrenTone="green"
+      lumi="You don't need a badge to start: most of FaleraOS is tested on an ordinary computer."
       chip="made by humans, with humans"
-      icon={Heart}
       title={
         <>
-          Contribute to Falera.{" "}
-          <span className="bg-gradient-to-r from-primary via-gold to-lilac bg-clip-text text-transparent">
-            Bring snacks.
-          </span>
+          Contribute to Falera. <em>Bring snacks.</em>
         </>
       }
       lead="FaleraOS is open: the OS, its apps, the falera CLI, the hardware and the docs. Most of it is tested on an ordinary computer, so you can start without a badge. Pick one of four paths; each opens its own issue form."
@@ -36,5 +35,12 @@ export default function ContributePage() {
     >
       <ContributeTracks />
     </RepoDoc>
+    <NextStep
+      title={<>Can&apos;t write code this week? <em>Back the boards.</em></>}
+      body="The first Falera PCBs are funded by the community. Every supporter is thanked by name."
+      href="/supporters/"
+      cta="Support Falera"
+    />
+    </>
   );
 }

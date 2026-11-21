@@ -21,6 +21,7 @@ const staticRoutes = [
   { path: "docs/transfer", priority: 0.8, changeFrequency: "monthly" as const },
   { path: "docs/apps", priority: 0.8, changeFrequency: "monthly" as const },
   { path: "docs/video-architecture", priority: 0.8, changeFrequency: "monthly" as const },
+  { path: "rv565", priority: 0.8, changeFrequency: "monthly" as const },
   { path: "paper", priority: 0.7, changeFrequency: "monthly" as const },
   { path: "rv565/convert", priority: 0.9, changeFrequency: "monthly" as const },
   { path: "hacks", priority: 0.7, changeFrequency: "monthly" as const },
