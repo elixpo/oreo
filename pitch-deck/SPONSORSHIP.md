@@ -7,62 +7,63 @@ dates are defined here first.
 
 ## The plan a sponsor funds
 
-Four months, ₹3,00,000 ($3,193), ₹75,000 ($798) a month:
+Four months, ₹2,50,000 ($2,661), ₹62,500 ($665) a month. Its purpose is to
+make the **version 2 board final**: the fixes found on the first five boards,
+proven on 10 badges, so every board built after it works first time.
 
 | Line | Amount | Share |
 | --- | ---: | ---: |
-| Maintainer stipends: 3 maintainers × ₹10,000 × 4 months, paid by milestone | ₹1,20,000 ($1,277) | 40% |
-| 25 badges, built and tested: ₹4,000 each at 25-unit prices | ₹1,00,000 ($1,064) | 33% |
-| Board revision 2: fabrication and assembly of the next prototypes | ₹30,000 ($319) | 10% |
-| Test equipment: hot-air station, bench supply, logic analyser | ₹25,000 ($266) | 8% |
-| Two workshops: kits, travel and documentation | ₹25,000 ($266) | 8% |
+| Maintainer stipends: 3 maintainers × ₹10,000 × 4 months, paid by milestone | ₹1,20,000 ($1,277) | 48% |
+| Final version 2 board: the fixes, fabrication and assembly, then 10 badges built and tested on it | ₹75,000 ($798) | 30% |
+| Two workshops: kits, travel and documentation | ₹30,000 ($319) | 12% |
+| Test equipment: hot-air station, bench supply, logic analyser | ₹25,000 ($266) | 10% |
 
-This is the development phase, not production: the plan pays for three
-people, a better board and the first 25 badges, which make the badge ready
-to produce. Production follows at about ₹4,000 ($43) a badge, and a sponsor
-can add badges on top of any level: each extra ₹4,000 adds one.
+This is the development phase, not production. Once the board is final,
+production follows at about ₹4,000 ($43) a badge, and a sponsor can add
+badges on top of any level: each extra ₹4,000 adds one.
 
 A badge costs ₹4,172 in parts at the prices paid for the first five boards
-(`circuit/elixpo/BOM_COST.md`). At 25 units the board and parts cost less,
+(`circuit/elixpo/BOM_COST.md`); in larger runs the board and parts cost less,
 which is where the ₹4,000 a badge comes from.
 
 ## Levels
 
-Each level pays for a named part of the plan, and includes every return
-of the level below it.
+Each level pays for a named part of the plan, and includes every return of
+the level below it.
 
 | | Sprout | Bamboo | Bow | Lumi |
 | --- | --- | --- | --- | --- |
-| **Contribution** | ₹10,000 ($106) | ₹25,000 ($266) | ₹1,00,000 ($1,064) | ₹3,00,000 ($3,193) |
-| **Pays for** | parts for two more badges | the test bench every badge is checked on | the 25 badges for contributors and workshops | the whole four-month plan |
-| Logo and link on falera.elixpo.com (supporters page) and in the repository README | name only | yes | larger | largest, listed first |
+| **Contribution** | ₹10,000 ($106) | ₹25,000 ($266) | ₹75,000 ($798) | ₹2,50,000 ($2,661) |
+| **Pays for** | parts for two more badges | the test bench every board is checked on | the final version 2 board and its first 10 badges | the whole four-month plan |
+| Name on falera.elixpo.com (supporters page) and in the repository README | yes | logo and link | larger logo | largest logo, listed first |
 | Credit in the About screen of every badge | name | name | name and logo | name and logo, top of the list |
 | Monthly progress report | yes | yes | yes, with your name in it | yes, with your name in it |
-| Logo printed on board revision 2 | | | | yes |
-| Posts from Elixpo | thank-you post | thank-you post | thank-you post | dedicated launch post, tags in every build log |
-| Falera Badges for your team | | 2 | 5 | 10 |
+| Printed on the final version 2 board, on every board made | | your name | your name | your logo |
+| Invitation to both workshops | | yes | yes | yes, and one workshop hosted with your team |
+| Posts from Elixpo | | thank-you post | dedicated post | launch post, tags in every build log |
+| Falera Badges for your team | | 3 | 6 | 12 |
 
-**Founding sponsors.** Every sponsor who signs before the first 25 badges
-ship is listed as a founding sponsor in FaleraOS's About screen, for as long
-as FaleraOS ships.
+**Founding sponsors.** Every sponsor who signs before the final board ships is
+listed as a founding sponsor in FaleraOS's About screen, for as long as
+FaleraOS ships.
 
 Dollars are at ₹93.96, the rate charged on the 17 November 2026 orders.
 
 ## What happens after you sign
 
-Days and weeks count from Day 0, when the MoU is signed and the payment made.
+Days and months count from Day 0, when the MoU is signed and the payment made.
 
 | When | What | Who |
 | --- | --- | --- |
 | Day 0 | MoU signed by both sides (the level, its returns and the payment terms), payment and receipt | every sponsor |
-| Day 7 | Logo and link live on falera.elixpo.com and the README | every sponsor |
+| Day 7 | Name or logo live on falera.elixpo.com and the README | every sponsor |
 | Next FaleraOS update | Credit in the About screen, delivered over the air to every badge | every sponsor |
-| Weeks 4–6 | Your team's badges, assembled, tested and shipped | every sponsor (2, 5 or 10) |
 | Months 1–4 | Progress report: milestones and spending against the plan | every sponsor; named from Bow |
-| Month 3 | Logo printed on board revision 2 | Lumi |
+| Month 3 | Printed on the final version 2 board | names from Bamboo; logo at Lumi |
+| After month 4 | Your team's badges, from the first run of the final board | Bamboo 3, Bow 6, Lumi 12 |
 
-After the four months, website and README credit stays for 12 months, and
-the About screen credit stays on every badge already made.
+After the four months, website and README credit stays for 12 months, and the
+About screen credit stays on every badge already made.
 
 ## How credit appears
 
@@ -81,8 +82,8 @@ the About screen credit stays on every badge already made.
 
 ## Other ways to take part
 
-- **In kind:** PCB fabrication or assembly for 10 to 25 badges, bare boards
-  for revision 2, or ESP32-S3 modules for workshop badges. Credit follows the
+- **In kind:** PCB fabrication or assembly for the final board and its
+  badges, bare boards, or ESP32-S3 modules for workshop badges. Credit follows the
   value sent, measured against the levels above, and the open KiCad project
   and BOM link to the sponsor.
 - **Event badges:** badges for a conference at cost for the quantity
