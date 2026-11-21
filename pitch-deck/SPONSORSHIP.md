@@ -11,7 +11,7 @@ Four months, ₹3,00,000 ($3,193), ₹75,000 ($798) a month:
 
 | Line | Amount | Share |
 | --- | ---: | ---: |
-| Maintainer stipends: 2 maintainers × ₹15,000 × 4 months, paid by milestone | ₹1,20,000 ($1,277) | 40% |
+| Maintainer stipends: 3 maintainers × ₹10,000 × 4 months, paid by milestone | ₹1,20,000 ($1,277) | 40% |
 | 25 badges, built and tested: ₹4,000 each at 25-unit prices | ₹1,00,000 ($1,064) | 33% |
 | Board revision 2: fabrication and assembly of the next prototypes | ₹30,000 ($319) | 10% |
 | Test equipment: hot-air station, bench supply, logic analyser | ₹25,000 ($266) | 8% |
