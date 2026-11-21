@@ -46,9 +46,46 @@ export function readRepoDoc(file: string): string {
   return fs.readFileSync(full, "utf8");
 }
 
+/** The header's right column on every doc page: where the page lives on
+ *  GitHub, and the two things a reader can do about it. */
+function SourceCard({ file }: { file: string }) {
+  const rows: [string, string][] = [
+    ["Read it on GitHub", `${REPO}/blob/main/${file}`],
+    ["Suggest an edit", `${REPO}/edit/main/${file}`],
+    ["Good first issues", `${REPO}/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22`],
+  ];
+  return (
+    <div className="card hidden p-6 lg:block">
+      <div className="flex items-center gap-3">
+        <svg viewBox="0 0 24 24" className="h-10 w-10 shrink-0 text-text" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5C5.65.5.5 5.65.5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.05-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.68 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.41-2.7 5.38-5.26 5.67.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5z" />
+        </svg>
+        <div className="min-w-0">
+          <p className="eyebrow">Open source</p>
+          <p className="truncate font-mono text-sm font-bold text-text">elixpo/falera</p>
+        </div>
+      </div>
+      <p className="mt-4 text-sm leading-relaxed text-text-dim">
+        This page is <code className="font-mono text-text">{file}</code> in the repository. Fix a typo or add a step
+        with a pull request.
+      </p>
+      <ul className="mt-4 border-t border-border">
+        {rows.map(([label, href]) => (
+          <li key={label} className="border-b border-border last:border-0">
+            <a href={href} target="_blank" rel="noreferrer"
+               className="flex items-center justify-between py-2.5 text-sm font-semibold text-text hover:text-primary">
+              {label} <span aria-hidden="true">↗</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export default function RepoDoc({
   file, chip, title, lead, quickLinks = [], related = [], children,
-  bodyTitle,
+  bodyTitle, aside,
 }: {
   /** Path in the repository, e.g. "docs/CLI.md" or "CONTRIBUTING.md". */
   file: string;
@@ -62,6 +99,8 @@ export default function RepoDoc({
   children?: ReactNode;
   /** A heading above the rendered document, when `children` come first. */
   bodyTitle?: string;
+  /** Right column of the header; defaults to the page's GitHub card. */
+  aside?: ReactNode;
 }) {
   const dir = path.posix.dirname(file) === "." ? "" : path.posix.dirname(file);
   const doc = renderMarkdown(
@@ -73,7 +112,7 @@ export default function RepoDoc({
 
   return (
     <>
-      <PageHeader eyebrow={chip} title={title} lede={lead}>
+      <PageHeader eyebrow={chip} title={title} lede={lead} aside={aside ?? <SourceCard file={file} />}>
         {quickLinks.map((q) => (
           <a key={q.href} href={q.href} className="chip transition-colors hover:border-text/50 hover:text-text">
             {q.label}

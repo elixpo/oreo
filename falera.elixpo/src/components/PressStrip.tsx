@@ -1,10 +1,11 @@
-import { COVERAGE, PUBLISHED, UPSTREAM, type PressItem } from "@/data/press";
+import { BLOG, COVERAGE, PUBLISHED, UPSTREAM, type PressItem } from "@/data/press";
 import { SectionHeader } from "@/components/ui";
 
 const GROUPS = [
   { title: "Wrote about it", items: COVERAGE },
   { title: "Recognised upstream", items: UPSTREAM },
   { title: "Published", items: PUBLISHED },
+  { title: "From our blog", items: BLOG },
 ];
 
 function Item({ item }: { item: PressItem }) {
@@ -30,7 +31,7 @@ export default function PressStrip() {
         eyebrow="In the press"
         title={<>What others wrote, <em>and where it was accepted.</em></>}
       />
-      <div className="mt-10 grid gap-x-8 gap-y-10 lg:grid-cols-3">
+      <div className="mt-10 grid gap-x-8 gap-y-10 md:grid-cols-2 xl:grid-cols-4">
         {GROUPS.map((g) => (
           <div key={g.title} className="min-w-0">
             <p className="eyebrow border-b-2 border-primary pb-3">{g.title}</p>

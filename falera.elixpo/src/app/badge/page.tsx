@@ -1,4 +1,5 @@
 import BoardViewerLazy from "@/components/BoardViewerLazy";
+import PressStrip from "@/components/PressStrip";
 import { Card, Fact, NextStep, PageHeader, Section, SectionHeader } from "@/components/ui";
 import { FUND_URL, GITHUB } from "@/lib/links";
 
@@ -114,6 +115,10 @@ export default function BadgePage() {
             , Elixpo core maintainer and co-author of the RV565 video format the badge plays.
           </p>
         </Card>
+      </Section>
+
+      <Section id="press">
+        <PressStrip />
       </Section>
 
       <NextStep

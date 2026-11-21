@@ -15,6 +15,19 @@ const NAV = [
   { href: "/supporters/",  label: "Support" },
 ];
 
+// Everything else, in the "More" menu.
+const MORE: { href: string; label: string; external?: boolean }[] = [
+  { href: "/hacks/",                    label: "Badge hacks" },
+  { href: "/docs/apps/",                label: "Write an app" },
+  { href: "/docs/cli/",                 label: "falera CLI" },
+  { href: "/docs/usb/",                 label: "Connect over USB" },
+  { href: "/docs/transfer/",            label: "Transfer files" },
+  { href: "/rv565/convert/",            label: "Video converter" },
+  { href: "/docs/video-architecture/",  label: "Video architecture" },
+  { href: "/paper/",                    label: "Research paper" },
+  { href: "https://research.elixpo.com", label: "Elixpo Research", external: true },
+];
+
 // Pages that live under another nav item.
 const SECTION_OF: [string, string][] = [
   ["/hacks/", "/docs/"],
@@ -37,9 +50,11 @@ function GithubIcon({ className = "h-4 w-4" }: { className?: string }) {
 export default function Header() {
   const pathname = usePathname() ?? "/";
   const menu = useRef<HTMLDetailsElement>(null);
+  const more = useRef<HTMLDetailsElement>(null);
 
   useEffect(() => {
     if (menu.current) menu.current.open = false;
+    if (more.current) more.current.open = false;
   }, [pathname]);
 
   const section = SECTION_OF.find(([p]) => pathname.startsWith(p))?.[1];
@@ -72,6 +87,35 @@ export default function Header() {
                 </Link>
               </li>
             ))}
+            <li>
+              <details ref={more} className="group relative">
+                <summary className="flex cursor-pointer list-none items-center gap-1 py-2 text-text hover:text-primary
+                                    [&::-webkit-details-marker]:hidden">
+                  More
+                  <svg viewBox="0 0 12 12" className="h-3 w-3 transition-transform group-open:rotate-180" aria-hidden="true">
+                    <path d="M2.5 4.5L6 8l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </summary>
+                <ul className="card absolute right-0 top-full z-50 mt-2 w-60 p-2 text-[0.8125rem]">
+                  {MORE.map((m) => (
+                    <li key={m.href}>
+                      {m.external ? (
+                        <a href={m.href} target="_blank" rel="noreferrer"
+                           className="flex items-center justify-between rounded-inner px-3 py-2 hover:bg-bg-raised hover:text-primary">
+                          {m.label} <span aria-hidden="true">↗</span>
+                        </a>
+                      ) : (
+                        <Link href={m.href} aria-current={pathname.startsWith(m.href) ? "page" : undefined}
+                              className={`block rounded-inner px-3 py-2 hover:bg-bg-raised hover:text-primary ${
+                                pathname.startsWith(m.href) ? "text-primary" : ""}`}>
+                          {m.label}
+                        </Link>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            </li>
           </ul>
         </nav>
 
@@ -128,6 +172,22 @@ export default function Header() {
                     >
                       {n.label}
                     </Link>
+                  </li>
+                ))}
+                <li className="mt-2 border-t border-border px-3 pb-1 pt-4 font-mono text-xs uppercase tracking-[0.12em] text-muted">More</li>
+                {MORE.map((m) => (
+                  <li key={m.href}>
+                    {m.external ? (
+                      <a href={m.href} target="_blank" rel="noreferrer"
+                         className="flex items-center gap-2 rounded-inner px-3 py-3 hover:bg-bg-raised">
+                        {m.label} <span aria-hidden="true">↗</span>
+                      </a>
+                    ) : (
+                      <Link href={m.href} className={`block rounded-inner px-3 py-3 hover:bg-bg-raised ${
+                        pathname.startsWith(m.href) ? "text-primary" : ""}`}>
+                        {m.label}
+                      </Link>
+                    )}
                   </li>
                 ))}
                 <li className="mt-2 border-t border-border pt-3">
