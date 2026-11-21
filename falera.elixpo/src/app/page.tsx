@@ -48,7 +48,7 @@ export default function Home() {
             </h1>
             <p className="lede mt-6 max-w-prose-site">
               FaleraOS runs 20 apps on the ESP32-S3 Falera Badge: a launcher, an on-device App Store,
-              OTA updates over Wi-Fi, file transfer over USB, IR-quest peer pairing, and a Tamagotchi
+              OTA updates over Wi-Fi, file transfer over USB, IR-quest peer pairing, and a virtual pet
               panda that judges you for skipping meals.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
@@ -175,7 +175,7 @@ export default function Home() {
             <SectionHeader
               eyebrow="Support"
               title={<>The first Falera PCBs <em>are being made now.</em></>}
-              lede="Falera has no company or investor behind it. The first five boards were paid for out of pocket, and the community is funding the rest. Even $1 or ₹100 helps build them, and everyone who chips in is thanked by name."
+              lede="Falera has no investor behind it. The first five boards were paid for out of pocket, and the community is funding the rest. Even ₹10 helps build them, and everyone who chips in is thanked by name."
             >
               <div className="mt-8 flex flex-wrap gap-3">
                 <a href={FUND_URL} target="_blank" rel="noreferrer" className="btn-accent">Fund the badge</a>

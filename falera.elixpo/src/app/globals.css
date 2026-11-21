@@ -54,6 +54,33 @@ html {
 /* No horizontal scroll on phones: nothing may be wider than the page. */
 body { overflow-x: clip; }
 
+/* Faint background motifs (public/bg-motifs.svg): hearts, Lumi's bow, plus
+   signs and circuit traces, tiled behind everything so open space doesn't
+   feel empty. Cards stay white and cover it. It drifts very slowly on a
+   composited layer (transform only), and stands still for reduced motion. */
+body { position: relative; isolation: isolate; }
+body::before {
+  content: "";
+  position: fixed;
+  inset: -560px 0 0 -560px;
+  z-index: -1;
+  pointer-events: none;
+  background: url("/bg-motifs.svg") repeat;
+  background-size: 560px 560px;
+  animation: motif-drift 240s linear infinite;
+  will-change: transform;
+}
+@keyframes motif-drift {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(560px, 560px, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  body::before { animation: none; }
+}
+@media print {
+  body::before { display: none; }
+}
+
 ::selection {
   background: #F4D7DA;
   color: var(--ink);

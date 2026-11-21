@@ -16,7 +16,7 @@ export default function SupportersPage() {
       <PageHeader
         eyebrow="Community · first boards in fabrication"
         title={<>The people building <em>Falera with us.</em></>}
-        lede="Falera has no company or investor behind it. The first five boards were paid for out of pocket, and the community is funding the rest. Everyone who chips in is thanked here, by name."
+        lede="Falera has no investor behind it. The first five boards were paid for out of pocket, and the community is funding the rest. Everyone who chips in is thanked here, by name."
       />
 
       <Section id="fundraiser">

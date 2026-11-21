@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="560" height="560" viewBox="0 0 560 560">
+  <!-- Faint background motifs for falera.elixpo.com: hearts, Lumi's bow,
+       plus signs, dots and a little circuit trace, tiled behind the page.
+       Kept very light so text and cards stay the focus. -->
+  <defs>
+    <path id="heart" d="M0 3.2C-1.6-.8-7-.4-7 3.6c0 3.2 3.4 5.6 7 8.4 3.6-2.8 7-5.2 7-8.4 0-4-5.4-4.4-7-.4z"/>
+    <g id="bow">
+      <path d="M0 0L-9-5.5v11z"/><path d="M0 0L9-5.5v11z"/><circle r="2.4"/>
+    </g>
+    <path id="plus" d="M-5 0h10M0-5v10"/>
+  </defs>
+
+  <g fill="#C93A45" fill-opacity="0.09">
+    <use href="#heart" x="70" y="58"/>
+    <use href="#heart" x="402" y="132" transform="rotate(-14 402 132)"/>
+    <use href="#heart" x="236" y="318" transform="rotate(10 236 318)"/>
+    <use href="#heart" x="500" y="452"/>
+    <use href="#heart" x="112" y="482" transform="rotate(-8 112 482)"/>
+  </g>
+
+  <g fill="#C93A45" fill-opacity="0.08">
+    <use href="#bow" x="300" y="64" transform="rotate(-10 300 64)"/>
+    <use href="#bow" x="64" y="256" transform="rotate(8 64 256)"/>
+    <use href="#bow" x="472" y="292"/>
+    <use href="#bow" x="330" y="500" transform="rotate(-6 330 500)"/>
+  </g>
+
+  <g stroke="#1D2420" stroke-opacity="0.08" stroke-width="1.6" stroke-linecap="round" fill="none">
+    <use href="#plus" x="196" y="140"/>
+    <use href="#plus" x="520" y="40"/>
+    <use href="#plus" x="380" y="392"/>
+    <use href="#plus" x="30" y="380"/>
+    <!-- A small circuit trace with a pad at each end. -->
+    <path d="M140 190h40l14 14h46"/>
+    <path d="M420 230v34l-12 12v30"/>
+  </g>
+  <g fill="#1D2420" fill-opacity="0.08">
+    <circle cx="140" cy="190" r="3"/><circle cx="240" cy="204" r="3"/>
+    <circle cx="420" cy="230" r="3"/><circle cx="408" cy="306" r="3"/>
+    <circle cx="160" cy="400" r="2"/><circle cx="460" cy="180" r="2"/>
+    <circle cx="270" cy="440" r="2"/><circle cx="40" cy="140" r="2"/>
+  </g>
+</svg>

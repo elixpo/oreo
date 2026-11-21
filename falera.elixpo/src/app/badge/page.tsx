@@ -56,7 +56,7 @@ export default function BadgePage() {
 
       {/* The board, with the specs around it. */}
       <Section label="The board in 3D">
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-center">
           <figure className="card-fill overflow-hidden">
             {/* Fixed height, so the page does not shift while the model loads. */}
             <div className="h-[400px] sm:h-[560px] lg:h-[620px]">
@@ -75,7 +75,7 @@ export default function BadgePage() {
               </span>
             </figcaption>
           </figure>
-          <div className="grid content-start gap-4 sm:grid-cols-2 lg:grid-cols-1">
+          <div className="grid content-start gap-4 sm:grid-cols-2 lg:grid-cols-1 lg:content-center">
             {SPECS_SIDE.map(([k, v]) => <Fact key={k} k={k}>{v}</Fact>)}
           </div>
         </div>
