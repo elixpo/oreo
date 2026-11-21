@@ -111,7 +111,7 @@ export function PageHeader({
   return (
     <div className={cx("border-b border-border", className)}>
       <div className="container-page page-top pb-12 sm:pb-16">
-        <div className={aside ? "grid items-start gap-10 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-16" : undefined}>
+        <div className={aside ? "grid items-start gap-10 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-center lg:gap-16" : undefined}>
           <SectionHeader as="h1" eyebrow={eyebrow} title={title} lede={lede}>
             {children && <div className="mt-8 flex flex-wrap items-center gap-3">{children}</div>}
           </SectionHeader>
