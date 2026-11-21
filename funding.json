@@ -77,7 +77,7 @@
         "guid": "four-month-plan",
         "status": "active",
         "name": "Four months: 25 badges in developers' hands",
-        "description": "The next four months, ₹3,00,000 in all. Milestones: month 1, the first PCB badges running FaleraOS and a public build guide; month 2, touch, audio and an app tutorial, and 25 badges built and tested for contributors and testers; month 3, board revision 2 with fixes from the first batch; month 4, two workshops where every attendee builds a badge and publishes an app. Each milestone is reported publicly in the repository. Lines: maintainer stipends ₹1,20,000; 25 badges ₹1,00,000; board revision 2 ₹30,000; test equipment ₹25,000; two workshops ₹25,000. Full terms: pitch-deck/SPONSORSHIP.md.",
+        "description": "Four months, ₹3,00,000. Month 1: the first PCB badges running FaleraOS and a public build guide. Month 2: touch, audio, an app tutorial, and 25 badges built and tested. Month 3: board revision 2 with fixes from the first batch. Month 4: two workshops where everyone builds a badge and publishes an app. Each milestone is reported in the repository. The budget lines are the plans below; full terms in pitch-deck/SPONSORSHIP.md.",
         "amount": 300000,
         "currency": "INR",
         "frequency": "one-time",
