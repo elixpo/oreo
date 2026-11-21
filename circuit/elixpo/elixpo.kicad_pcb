@@ -8,12 +8,12 @@
 	)
 	(paper "A4")
 	(title_block
-		(title "Oreo Badge")
+		(title "Falera Badge")
 		(date "2026-11-15")
 		(rev "1.0")
 		(company "Elixpo")
 		(comment 1 "Hardware: CERN-OHL-P-2.0, OSHWA IN000107")
-		(comment 2 "4 layers, 1.6 mm, ENIG, black mask")
+		(comment 2 "4 layers, 1.6 mm, HASL, black mask")
 	)
 	(layers
 		(0 "F.Cu" signal)
@@ -54,7 +54,7 @@
 			)
 			(layer "F.Mask"
 				(type "Top Solder Mask")
-				(color "Black")
+				(color "#0A0A0AF0")
 				(thickness 0.01)
 			)
 			(layer "F.Cu"
@@ -96,7 +96,7 @@
 			)
 			(layer "B.Mask"
 				(type "Bottom Solder Mask")
-				(color "Black")
+				(color "#0A0A0AF0")
 				(thickness 0.01)
 			)
 			(layer "B.Paste"
@@ -106,7 +106,7 @@
 				(type "Bottom Silk Screen")
 				(color "White")
 			)
-			(copper_finish "ENIG")
+			(copper_finish "HAL lead-free")
 			(dielectric_constraints no)
 		)
 		(pad_to_mask_clearance 0)
@@ -35480,7 +35480,7 @@
 			(justify mirror)
 		)
 	)
-	(gr_text "oreo.elixpo.com"
+	(gr_text "falera.elixpo.com"
 		(at 55 56.8 0)
 		(layer "B.SilkS")
 		(uuid "a3d37893-7f4f-4300-8e46-af92842bb239")
@@ -35492,7 +35492,7 @@
 			(justify mirror)
 		)
 	)
-	(gr_text "github.com/elixpo/oreo"
+	(gr_text "github.com/elixpo/falera"
 		(at 84 82.1 0)
 		(layer "B.SilkS")
 		(uuid "b5d93650-dac6-4514-bfdf-7e22642b8251")
@@ -35540,7 +35540,7 @@
 			(justify mirror)
 		)
 	)
-	(gr_text "OREO BADGE"
+	(gr_text "FALERA BADGE"
 		(at 55 54 0)
 		(layer "B.SilkS")
 		(uuid "dce680f2-6a5e-4c3d-82e7-11bce646d865")
