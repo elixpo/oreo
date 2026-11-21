@@ -5,7 +5,7 @@
     "role": "owner",
     "name": "Elixpo",
     "email": "hello@elixpo.com",
-    "description": "Elixpo is an open-source project foundry in India, a Udyam-registered MSME (UDYAM-WB-07-0152337). It builds FaleraOS and the Elixpo Falera Badge: open hardware, open software and the research behind them, all released under open licences. Three maintainers: Ayushman Bhattacharya (lead), Anwesha Chakraborty and Vivek Yadav.",
+    "description": "Elixpo is an open-source project foundry in India, a Udyam-registered MSME (UDYAM-WB-07-0152337). It builds FaleraOS and the Elixpo Falera Badge: open hardware, open software and the research behind them, all released under open licences. Team: Ayushman Bhattacharya (founder), Anwesha Chakraborty and Vivek Yadav (co-founders), and Nihal Gazi (maintainer).",
     "webpageUrl": {
       "url": "https://falera.elixpo.com",
       "wellKnown": "https://falera.elixpo.com/.well-known/funding-manifest-urls"
@@ -89,7 +89,7 @@
         "guid": "maintainer-stipends",
         "status": "active",
         "name": "Maintainer stipends",
-        "description": "Three maintainers × ₹10,000 a month for four months (₹1,20,000), paid by milestone.",
+        "description": "Four maintainers × ₹7,500 a month for four months (₹1,20,000), paid by milestone.",
         "amount": 30000,
         "currency": "INR",
         "frequency": "monthly",

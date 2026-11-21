@@ -13,7 +13,7 @@ proven on 10 badges, so every board built after it works first time.
 
 | Line | Amount | Share |
 | --- | ---: | ---: |
-| Maintainer stipends: 3 maintainers × ₹10,000 × 4 months, paid by milestone | ₹1,20,000 ($1,277) | 48% |
+| Maintainer stipends: 4 maintainers × ₹7,500 × 4 months, paid by milestone | ₹1,20,000 ($1,277) | 48% |
 | Final version 2 board: the fixes, fabrication and assembly, then 10 badges built and tested on it | ₹75,000 ($798) | 30% |
 | Two workshops: kits, travel and documentation | ₹30,000 ($319) | 12% |
 | Test equipment: hot-air station, bench supply, logic analyser | ₹25,000 ($266) | 10% |
