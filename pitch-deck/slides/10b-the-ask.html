@@ -8,18 +8,18 @@
     /* Left: the budget as a ring, one segment per line. Right: what each line
        buys. Bottom: why it is a safe place to put money. Dollars at ₹93.96 (17 Nov 2026). Budget:
        EMAILS_BATCH2.md, FOSS United table (adds up to ₹3,00,000). */
-    .wrap { margin-top: 20px; display: grid; grid-template-columns: 400px 1fr; column-gap: 60px; width: 1648px; align-items: center; }
-    .ring { position: relative; width: 360px; height: 360px; margin: 0 auto; }
-    .ring svg { width: 360px; height: 360px; transform: rotate(-90deg); }
+    .wrap { margin-top: 14px; display: grid; grid-template-columns: 400px 1fr; column-gap: 60px; width: 1648px; align-items: center; }
+    .ring { position: relative; width: 320px; height: 320px; margin: 0 auto; }
+    .ring svg { width: 320px; height: 320px; transform: rotate(-90deg); }
     .ring .mid { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
-    .ring .mid b { font-family: var(--mono); font-size: 30px; color: var(--ink); }
+    .ring .mid b { font-family: var(--mono); font-size: 26px; color: var(--ink); }
     .ring .mid i { font-style: normal; font-family: var(--mono); font-size: 24px; font-weight: 700; color: var(--red); margin-top: 2px; }
     .ring .mid span { font-size: 21px; color: var(--muted); margin-top: 4px; }
     .monthly { margin-top: 12px; text-align: center; width: 400px; font-size: 22px; color: var(--dim); }
     .monthly b { color: var(--red); font-family: var(--mono); }
 
     .row { display: grid; grid-template-columns: 26px 1fr 200px; column-gap: 20px; align-items: center;
-           padding: 9px 0; border-bottom: 1px solid var(--border); }
+           padding: 6px 0; border-bottom: 1px solid var(--border); }
     .row:first-child { border-top: 1px solid var(--border); }
     .sw { width: 22px; height: 22px; border-radius: 6px; }
     .nm b { display: block; font-size: 24px; color: var(--ink); }
@@ -29,13 +29,15 @@
     .amt em { display: block; font-style: normal; font-size: 20px; font-weight: 700; color: var(--red); margin-top: 2px; }
     .amt span { display: inline; font-size: 17px; font-weight: 400; color: var(--muted); }
 
-    .safe { margin-top: 18px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; width: 1648px; }
+    .safe { margin-top: 14px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; width: 1648px; }
     .safe div { padding: 14px 20px; border-radius: 18px; background: var(--card); font-size: 20px; line-height: 1.35; color: var(--dim); }
     .safe b { display: block; font-size: 24px; color: var(--ink); margin-bottom: 4px; }
     /* The third card leads to the next slide: same card, red outline. */
     .safe div.hl { background: #fff; border: 2px solid var(--red); padding: 12px 18px; }
     .safe div.hl b { color: var(--red); }
     .title .fm { font-weight: 700; }
+    .phase { margin-top: 14px; font-size: 26px; line-height: 1.35; color: var(--dim); }
+    .phase b { color: var(--ink); }
   </style>
 </head>
 <body>
@@ -50,6 +52,7 @@
     <h2 class="title" style="max-width: 1560px">
       To put badges in people’s hands, we need <em>₹3,00,000 ($3,193) for <b class="fm">four months</b>.</em>
     </h2>
+    <p class="phase">This is the <b>development phase</b>: three people, a better board and the first 25 badges. Production follows at about <b>₹4,000 ($43) a badge</b>.</p>
 
     <div class="wrap">
       <div>
@@ -60,7 +63,7 @@
           </svg>
           <div class="mid"><b>₹3,00,000</b><i>$3,193</i><span>four months</span></div>
         </div>
-        <div class="monthly">That’s <b>₹75,000 ($798)</b> a month:<br>three people working on it, and 25 badges.</div>
+        <div class="monthly">That’s <b>₹75,000 ($798)</b> a month.</div>
       </div>
 
       <div class="rows">
