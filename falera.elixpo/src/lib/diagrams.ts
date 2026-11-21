@@ -65,7 +65,7 @@ function markers(id: string): string {
 }
 
 function figure(label: string, viewBox: string, maxWidth: number, body: string): string {
-  return `<figure class="my-8 overflow-x-auto rounded-lg border border-border bg-bg-raised/70 p-4 sm:p-6">` +
+  return `<figure class="my-8 overflow-x-auto rounded-inner border border-border bg-card-sub p-4 sm:p-6">` +
     `<svg viewBox="${viewBox}" role="img" aria-label="${label}" class="mx-auto block h-auto w-full font-sans" style="max-width:${maxWidth}px;min-width:520px">` +
     `<title>${label}</title>${body}</svg>` +
     `<figcaption class="mt-4 text-center text-xs text-muted">${label}</figcaption></figure>`;

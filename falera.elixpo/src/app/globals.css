@@ -4,115 +4,165 @@
 
 /* ── Design tokens ───────────────────────────────────────────────────
  *
- * The site follows the Elixpo Research visual language: ink on a warm
- * paper page, white cards, pill controls, and tight sans-serif display
- * type with Georgia italics for emphasis.
+ * The site follows the Elixpo Research look (ink on a warm paper page,
+ * generous margins, a clear reading width) with the sponsor deck's card
+ * language (pitch-deck/style.css): white cards with a 1px grey-green
+ * border, no shadows anywhere, Falera red for numbers, labels and one
+ * emphasis per block, small uppercase monospace labels, and headlines in
+ * a strong sans with an italic Georgia second half.
  *
- * Two parallel naming schemes coexist on the site:
- *
- *   • Brand tokens (`bg`, `card`, `primary` …) — declared in
- *     theme.js, re-exported via tailwind.config.ts, used by everything
- *     we wrote by hand.
- *
- *   • shadcn-style semantic tokens (`--background`, `--foreground`,
- *     `--primary`, `--border` …) — read by the canvas-wave hero and any
- *     drop-in component. They mirror the same palette.
- *
- * Adding a new colour: update theme.js first, then mirror it here if a
- * third-party component needs it.
+ * Colours live in theme.js and reach Tailwind through tailwind.config.ts;
+ * the variables below mirror them for plain CSS and the converter. The
+ * rules every page follows are written down in README.md ("Design rules").
  */
 :root {
   color-scheme: light;
-  --font-display: Arial, Helvetica, ui-sans-serif, system-ui, sans-serif;
 
-  --background:           #FBFBF8;
-  --foreground:           #142018;
-  --card:                 #EFF1ED;
-  --card-foreground:      #142018;
-  --popover:              #FFFFFF;
-  --popover-foreground:   #142018;
-  --primary:              #C93A45;
-  --primary-foreground:   #FFFFFF;
-  --secondary:            #3A65C7;
-  --secondary-foreground: #FFFFFF;
-  --muted:                #EFF1ED;
-  --muted-foreground:     #5F6962;
-  --accent:               #0B623C;
-  --accent-foreground:    #FFFFFF;
-  --destructive:          #C93A45;
-  --destructive-foreground:#FFFFFF;
-  --border:               #D7DBD6;
-  --input:                #D7DBD6;
-  --ring:                 #3A65C7;
-  --radius:               1.4rem;
+  /* The deck's tokens (pitch-deck/style.css), on the research paper page. */
+  --ink:    #142018;
+  --dim:    #555C58;
+  --muted:  #5F6962;
+  --text:   #2A352E;
+  --red:    #C93A45;
+  --red-dim:#A92F39;
+  --border: #D7DBD6;
+  --card:   #F6F7F4;
+  --paper:  #FBFBF8;
+  --mono:   ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --serif:  Georgia, serif;
+
+  --background: var(--paper);
+  --foreground: var(--ink);
+
+  /* Header height, for sticky offsets and anchor scrolling. */
+  --header-h: 4rem;
 }
 
 html, body {
   background: var(--background);
   color:      var(--foreground);
-  font-family: Arial, Helvetica, theme("fontFamily.sans");
+  font-family: Arial, Helvetica, ui-sans-serif, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
-html { scroll-behavior: smooth; overscroll-behavior: none; }
-
-::selection {
-  background: #DCE7FF;
-  color: theme("colors.text");
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: calc(var(--header-h) + 1rem);
 }
 
-/* Display type: tight tracking like the research headlines; italic
-   emphasis switches to Georgia. */
-.font-display { letter-spacing: -0.045em; font-weight: 600; }
-.font-display em, h1 em, h2 em { font-family: Georgia, serif; font-weight: 400; }
+/* No horizontal scroll on phones: nothing may be wider than the page. */
+body { overflow-x: clip; }
 
-/* ── Reusable components ─────────────────────────────────────────── */
+::selection {
+  background: #F4D7DA;
+  color: var(--ink);
+}
+
+/* Visible focus for keyboard users, everywhere. */
+:focus-visible {
+  outline: 2px solid var(--red);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* Headline italics switch to Georgia (the deck's `.title em`). */
+h1 em, h2 em, h3 em, .font-display em {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-style: italic;
+  letter-spacing: -0.02em;
+}
+.font-display { letter-spacing: -0.035em; font-weight: 600; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── Components ──────────────────────────────────────────────────────
+ * Pages compose these (and the React components in src/components/ui.tsx)
+ * instead of hand-rolling widths, spacing or colours. */
 @layer components {
+  /* The one container: max 1200px, 16px gutters on phones, 24px from
+     640px, 32px from 1024px. */
   .container-page {
-    @apply mx-auto w-full max-w-7xl px-5 sm:px-8;
+    @apply mx-auto w-full max-w-page px-4 sm:px-6 lg:px-8;
   }
+
+  /* Vertical rhythm between sections. A section after another one gets
+     a hairline on top (research style). */
+  .section {
+    @apply py-16 sm:py-20 lg:py-24;
+  }
+  .section + .section { @apply border-t border-border; }
+  .section-tight { @apply py-10 sm:py-12 lg:py-14; }
+  .section-fill { @apply bg-card-sub; }
+
+  /* Page top: the space between the header and a page's h1. */
+  .page-top { @apply pt-12 sm:pt-16 lg:pt-20; }
+
+  /* Small uppercase monospace label in red, with letter-spacing. */
   .eyebrow {
-    @apply font-mono text-[0.68rem] font-bold uppercase tracking-[0.19em] text-lilac;
+    @apply font-mono text-[0.7rem] font-bold uppercase leading-snug tracking-[0.19em] text-primary;
   }
-  .btn-primary {
-    @apply inline-flex min-h-[44px] items-center justify-center gap-2 rounded-pill
-           border border-text bg-text px-5 py-2.5 text-sm font-bold text-bg
-           transition-opacity hover:opacity-85;
+  /* The same label in grey, for card keys and table heads. */
+  .label {
+    @apply font-mono text-[0.7rem] font-semibold uppercase leading-snug tracking-[0.14em] text-muted;
   }
-  .btn-ghost {
-    @apply inline-flex min-h-[44px] items-center justify-center gap-2 rounded-pill
-           border border-text px-5 py-2.5 text-sm font-bold text-text
-           transition-colors hover:bg-bg-raised;
+
+  .h-display { @apply font-display text-display text-text; }
+  .h-title   { @apply font-display text-title text-text; }
+  .h-card    { @apply text-lg font-bold leading-snug tracking-[-0.01em] text-text; }
+  .lede      { @apply text-lede text-text-dim; }
+
+  /* Cards: white, 1px border, rounded, no shadow. Links darken the
+     border on hover; nothing moves. */
+  .card {
+    @apply rounded-card border border-border bg-card;
   }
+  .card-fill {
+    @apply rounded-card border border-border bg-card-sub;
+  }
+  .card-link {
+    @apply rounded-card border border-border bg-card transition-colors hover:border-text/50;
+  }
+
+  /* Buttons. Primary is ink, accent is red (one per page area: "Fund the
+     badge"), ghost is an outline. */
+  .btn {
+    @apply inline-flex min-h-[44px] items-center justify-center gap-2 rounded-pill border px-5 py-2.5
+           text-sm font-bold transition-colors;
+  }
+  .btn-primary { @apply btn border-text bg-text text-bg hover:bg-text/85; }
+  .btn-accent  { @apply btn border-primary bg-primary text-white hover:border-primary-dim hover:bg-primary-dim; }
+  .btn-ghost   { @apply btn border-text/70 bg-transparent text-text hover:border-text hover:bg-bg-raised; }
+
+  /* The onward link at the end of a section: one per section. */
+  .link-onward {
+    @apply inline-flex items-center gap-2 text-sm font-bold text-primary underline-offset-4 hover:underline;
+  }
+  /* Inline text links. */
+  .link {
+    @apply text-text underline decoration-border decoration-1 underline-offset-4 transition-colors hover:decoration-primary;
+  }
+
+  /* Chips: small mono labels in a pill. */
   .chip {
-    @apply inline-flex items-center gap-1.5 rounded-pill border border-border bg-card
-           px-3 py-1 font-mono text-[0.68rem] font-semibold uppercase
-           tracking-[0.14em] text-muted;
+    @apply inline-flex items-center gap-1.5 rounded-pill border border-border bg-card px-3 py-1
+           font-mono text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-muted;
   }
-  .card-surface {
-    @apply rounded-[1.4rem] border border-border bg-card transition-all duration-200
-           hover:shadow-[0_20px_50px_rgba(24,38,28,0.09)];
+
+  /* Inline code in hand-written pages. */
+  .code {
+    @apply rounded bg-card-sub px-1.5 py-0.5 font-mono text-[0.9em] text-text;
   }
-  /* Thin accent edge used on hero CTAs and featured cards. */
-  .ring-glow {
-    position: relative;
-    isolation: isolate;
-  }
-  .ring-glow::before {
-    content: "";
-    position: absolute;
-    inset: -1px;
-    border-radius: inherit;
-    padding: 1px;
-    background: linear-gradient(120deg,
-      theme("colors.primary"), theme("colors.lilac"), theme("colors.teal"));
-    -webkit-mask:
-      linear-gradient(#000 0 0) content-box,
-      linear-gradient(#000 0 0);
-    -webkit-mask-composite: xor;
-            mask-composite: exclude;
-    pointer-events: none;
-    opacity: 0.6;
+  /* Code blocks. */
+  .pre {
+    @apply overflow-x-auto rounded-inner border border-border bg-card-sub p-4 font-mono text-xs leading-relaxed text-text;
   }
 }

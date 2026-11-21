@@ -60,7 +60,7 @@ export default function MermaidDiagram({ chart, label }: MermaidDiagramProps) {
   return (
     <figure
       aria-label={label}
-      className="my-8 overflow-x-auto rounded-lg border border-border bg-bg-raised/70 p-4 sm:p-6"
+      className="my-8 overflow-x-auto rounded-inner border border-border bg-card-sub p-4 sm:p-6"
     >
       {error ? (
         <div className="rounded-md border border-primary/30 bg-primary/5 p-4 text-sm text-text-dim">

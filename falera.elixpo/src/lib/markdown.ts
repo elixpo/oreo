@@ -90,9 +90,9 @@ function plainText(md: string): string {
 }
 
 const CODE_CLASS =
-  "rounded bg-bg-raised px-1.5 py-0.5 font-mono text-[0.9em] text-text";
+  "rounded bg-card-sub px-1.5 py-0.5 font-mono text-[0.9em] text-text";
 const LINK_CLASS =
-  "text-primary underline decoration-primary/40 underline-offset-2 hover:decoration-primary";
+  "text-text underline decoration-primary/50 underline-offset-4 hover:decoration-primary";
 
 function renderInline(src: string, resolve: LinkResolver): string {
   // Code spans and backslash escapes are set aside first so nothing
@@ -169,7 +169,7 @@ function renderBlocks(lines: string[], ctx: Ctx, tight = false): string {
         }
       }
       out.push(
-        `<pre class="my-5 overflow-x-auto rounded-md border border-border bg-bg p-4 text-xs leading-relaxed text-text"><code>${escapeHtml(body.join("\n"))}</code></pre>`,
+        `<pre class="my-5 overflow-x-auto rounded-inner border border-border bg-card-sub p-4 font-mono text-xs leading-relaxed text-text"><code>${escapeHtml(body.join("\n"))}</code></pre>`,
       );
       continue;
     }
@@ -184,10 +184,10 @@ function renderBlocks(lines: string[], ctx: Ctx, tight = false): string {
       const id = seen ? `${base}-${seen}` : base;
       ctx.headings.push({ level: h[1].length, id, text: plainText(h[2]) });
       const klass = {
-        1: "mt-12 mb-4 font-display text-4xl tracking-tight text-text",
-        2: "mt-14 mb-4 border-t border-border/60 pt-10 font-display text-3xl tracking-tight text-text",
-        3: "mt-10 mb-3 font-display text-xl tracking-tight text-text",
-        4: "mt-6 mb-2 font-display text-lg tracking-tight text-text",
+        1: "mt-12 mb-4 font-display text-title text-text",
+        2: "mt-14 mb-4 border-t border-border pt-10 font-display text-[1.625rem] leading-tight text-text",
+        3: "mt-10 mb-3 text-lg font-bold leading-snug text-text",
+        4: "mt-6 mb-2 text-base font-bold text-text",
       }[level as 1 | 2 | 3 | 4];
       out.push(
         `<h${level} id="${id}" class="group scroll-mt-24 ${klass}">${renderInline(h[2], ctx.resolve)}` +
@@ -199,7 +199,7 @@ function renderBlocks(lines: string[], ctx: Ctx, tight = false): string {
 
     // Horizontal rule
     if (/^-{3,} *$/.test(line)) {
-      out.push('<hr class="my-10 border-border/60" />');
+      out.push('<hr class="my-10 border-border" />');
       i++;
       continue;
     }
@@ -223,7 +223,7 @@ function renderBlocks(lines: string[], ctx: Ctx, tight = false): string {
             .join("")}</tr>`)
         .join("");
       out.push(
-        `<div class="my-6 overflow-x-auto rounded-md border border-border"><table class="w-full text-sm text-text-dim"><thead class="bg-bg-raised/60"><tr>${th}</tr></thead><tbody>${tb}</tbody></table></div>`,
+        `<div class="my-6 overflow-x-auto rounded-inner border border-border bg-card"><table class="w-full text-sm text-text-dim"><thead class="bg-card-sub"><tr>${th}</tr></thead><tbody>${tb}</tbody></table></div>`,
       );
       continue;
     }
@@ -236,7 +236,7 @@ function renderBlocks(lines: string[], ctx: Ctx, tight = false): string {
         i++;
       }
       out.push(
-        `<blockquote class="my-6 rounded-r-md border-l-2 border-primary/60 bg-bg-raised/50 px-5 py-1">${renderBlocks(body, ctx)}</blockquote>`,
+        `<blockquote class="my-6 rounded-r-inner border-l-2 border-primary bg-card-sub px-5 py-1">${renderBlocks(body, ctx)}</blockquote>`,
       );
       continue;
     }
