@@ -1,11 +1,23 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
 import { Reveal, fadeUp, staggerContainer } from "@/components/MotionWrap";
 import {
   Cpu, MemoryStick, Battery, Radio, Usb, Layers,
   Layout, Ruler, Github, Heart,
 } from "lucide-react";
+
+// <model-viewer> touches window and WebGL, so it only ever loads in the
+// browser; the static export ships the loading state in its place.
+const BoardViewer = dynamic(() => import("@/components/BoardViewer"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-full items-center justify-center text-xs uppercase tracking-widest text-muted">
+      Loading the 3D board…
+    </div>
+  ),
+});
 
 const SPECS = [
   { Icon: Cpu,          k: "MCU",      v: "ESP32-S3-WROOM-1 · dual core @ 240 MHz" },
@@ -124,30 +136,28 @@ export default function BadgePage() {
 
         {/* ── THE BOARD ───────────────────────────────────────────────── */}
         <Reveal>
-          <div className="mt-16 grid gap-4 sm:grid-cols-2">
-            {[
-              { src: "/pcb_front.jpg", alt: "Front of the Falera badge PCB", label: "Front" },
-              { src: "/pcb_back.jpg",  alt: "Back of the Falera badge PCB",  label: "Back" },
-            ].map((img) => (
-              <figure
-                key={img.src}
-                className="overflow-hidden rounded-lg border border-border bg-bg-raised/40"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={img.src}
-                  alt={img.alt}
-                  className="h-auto w-full object-contain"
-                  width={700} height={1064}
-                  loading="lazy"
-                  decoding="async"
-                />
-                <figcaption className="px-4 py-3 text-xs uppercase tracking-widest text-muted">
-                  {img.label}
-                </figcaption>
-              </figure>
-            ))}
-          </div>
+          <figure className="mt-16 overflow-hidden rounded-lg border border-border
+                             bg-[radial-gradient(ellipse_at_center,#FFFFFF_0%,#EFF1ED_70%)]">
+            {/* Fixed height, so the page does not shift while the model loads. */}
+            <div className="h-[400px] sm:h-[560px] lg:h-[620px]">
+              <BoardViewer />
+            </div>
+            <figcaption className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1
+                                   border-t border-border px-4 py-3 text-xs text-muted">
+              <span className="uppercase tracking-widest">
+                PCB v1 · black mask, white silkscreen, HASL
+              </span>
+              <span>
+                Flat renders:{" "}
+                <a href="/pcb_front.jpg" className="text-text underline-offset-4 hover:underline">front</a>
+                {" · "}
+                <a href="/pcb_back.jpg" className="text-text underline-offset-4 hover:underline">back</a>
+                {" · "}
+                <a href="/models/falera-badge.glb" download
+                   className="text-text underline-offset-4 hover:underline">GLB model</a>
+              </span>
+            </figcaption>
+          </figure>
         </Reveal>
 
         {/* ── SPEC GRID ────────────────────────────────────────────── */}
