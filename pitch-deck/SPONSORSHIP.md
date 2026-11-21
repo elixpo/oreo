@@ -28,19 +28,19 @@ which is where the ₹4,000 a badge comes from.
 
 ## Levels
 
-Each level pays for one named part of the plan, and includes every return
+Each level pays for a named part of the plan, and includes every return
 of the level below it.
 
-| | Bamboo | Bow | Lumi |
-| --- | --- | --- | --- |
-| **Contribution** | ₹25,000 ($266) | ₹1,00,000 ($1,064) | ₹3,00,000 ($3,193) |
-| **Pays for** | the test bench every badge is checked on | the 25 badges for contributors and workshops | the whole four-month plan |
-| Logo and link on falera.elixpo.com (supporters page) and in the repository README | yes | larger | largest, listed first |
-| Credit in the About screen of every badge | name | name and logo | name and logo, top of the list |
-| Monthly progress report | yes | yes, with your name in it | yes, with your name in it |
-| Logo printed on board revision 2 | | | yes |
-| Posts from Elixpo | thank-you post | thank-you post | dedicated launch post, tags in every build log |
-| Falera Badges for your team | 2 | 5 | 10 |
+| | Sprout | Bamboo | Bow | Lumi |
+| --- | --- | --- | --- | --- |
+| **Contribution** | ₹10,000 ($106) | ₹25,000 ($266) | ₹1,00,000 ($1,064) | ₹3,00,000 ($3,193) |
+| **Pays for** | parts for two more badges | the test bench every badge is checked on | the 25 badges for contributors and workshops | the whole four-month plan |
+| Logo and link on falera.elixpo.com (supporters page) and in the repository README | name only | yes | larger | largest, listed first |
+| Credit in the About screen of every badge | name | name | name and logo | name and logo, top of the list |
+| Monthly progress report | yes | yes | yes, with your name in it | yes, with your name in it |
+| Logo printed on board revision 2 | | | | yes |
+| Posts from Elixpo | thank-you post | thank-you post | thank-you post | dedicated launch post, tags in every build log |
+| Falera Badges for your team | | 2 | 5 | 10 |
 
 **Founding sponsors.** Every sponsor who signs before the first 25 badges
 ship is listed as a founding sponsor in FaleraOS's About screen, for as long
@@ -111,6 +111,6 @@ Elixpo is a Udyam-registered MSME in India, registration number
 UDYAM-WB-07-0152337 (verify at https://udyamregistration.gov.in). Invoices and
 receipts for sponsorships are issued by Elixpo.
 
-Ayushman Bhattacharya (ayushman@elixpo.com), Anwesha Chakraborty
-(anwesha@elixpo.com) and Vivek Yadav, finance and tax (vivek@elixpo.com),
-Elixpo.
+Ayushman Bhattacharya, founder (ayushman@elixpo.com); Anwesha Chakraborty,
+co-founder and maintainer (anwesha@elixpo.com); and Vivek Yadav, co-founder,
+finance and tax (vivek@elixpo.com). Elixpo.
