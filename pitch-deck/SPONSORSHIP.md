@@ -102,6 +102,10 @@ the About screen credit stays on every badge already made.
 
 hello@elixpo.com · https://falera.elixpo.com
 
+Elixpo is a Udyam-registered MSME in India, registration number
+UDYAM-WB-07-0152337 (verify at https://udyamregistration.gov.in). Invoices and
+receipts for sponsorships are issued by Elixpo.
+
 Ayushman Bhattacharya (ayushman@elixpo.com), Anwesha Chakraborty
 (anwesha@elixpo.com) and Vivek Yadav, finance and tax (vivek@elixpo.com),
 Elixpo.
