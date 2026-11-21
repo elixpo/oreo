@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Bow } from "@/components/ui";
+import { LumiWave } from "@/components/Lumi";
 
 type FooterLink = { label: string; href: string; external?: boolean };
 type FooterColumn = { title: string; links: FooterLink[] };
@@ -68,6 +69,7 @@ export default function Footer() {
             An open-source operating system for a pocket-sized badge.
             Open hardware, open firmware, open research.
           </p>
+          <div className="mt-6"><LumiWave /></div>
           <p className="mt-5">
             <a href="https://certification.oshwa.org/in000107.html" target="_blank" rel="noreferrer"
                className="inline-flex items-center gap-2 text-sm font-semibold text-text hover:text-primary">

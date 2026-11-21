@@ -1,3 +1,4 @@
+import { LumiTip } from "@/components/Lumi";
 import { ListRow, NextStep, PageHeader, Section, SectionHeader } from "@/components/ui";
 import { pageMetadata } from "@/lib/seo";
 
@@ -60,6 +61,7 @@ export default function DocsPage() {
             <ListRow key={doc.href} n={String(i + 1).padStart(2, "0")} href={doc.href} title={doc.title} body={doc.description} />
           ))}
         </ul>
+        <LumiTip pose="read">Most of these pages are built from Markdown files in the repo. Spotted a mistake? Fix it there.</LumiTip>
       </Section>
 
       <Section id="deep-dives" fill>

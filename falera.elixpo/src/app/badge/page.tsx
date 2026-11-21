@@ -1,5 +1,6 @@
 import BoardViewerLazy from "@/components/BoardViewerLazy";
 import PressStrip from "@/components/PressStrip";
+import { LumiTip } from "@/components/Lumi";
 import { Card, Fact, NextStep, PageHeader, Section, SectionHeader } from "@/components/ui";
 import { FUND_URL, GITHUB } from "@/lib/links";
 
@@ -131,6 +132,7 @@ export default function BadgePage() {
 
       <Section id="press">
         <PressStrip />
+        <LumiTip pose="badge">This board is certified open hardware (OSHWA IN000107). Fork the KiCad files and make your own!</LumiTip>
       </Section>
 
       <NextStep

@@ -2,6 +2,7 @@ import Link from "next/link";
 import AppCard from "@/components/AppCard";
 import { FUND_URL } from "@/lib/links";
 import { AppIcon } from "@/components/AppCard";
+import { LumiTip } from "@/components/Lumi";
 import { Card, Eyebrow, NumberBand, Onward, Screen, Section, SectionHeader, Split, Stat, Steps } from "@/components/ui";
 import { PRELOADED, STORE } from "@/data/apps";
 
@@ -181,6 +182,7 @@ export default function Home() {
           }))}
         />
         <Onward href="/docs/">Read the docs</Onward>
+        <LumiTip align="right">The whole OS is MicroPython. Every line of it is on GitHub, so you can read how I work.</LumiTip>
       </Section>
 
       {/* 6 · RV565: the red area, with a video frame */}

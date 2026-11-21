@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LumiTip } from "@/components/Lumi";
 import { Card, ListRow, NextStep, NumberBand, PageHeader, Screen, Section, SectionHeader, Steps } from "@/components/ui";
 import { pageMetadata } from "@/lib/seo";
 
@@ -112,6 +113,7 @@ export default function Rv565Page() {
             <ListRow key={href} n={String(i + 1).padStart(2, "0")} href={href} title={<>{who} <span aria-hidden="true" className="text-muted">↗</span></>} body={what} />
           ))}
         </ul>
+        <LumiTip pose="badge">RV565 frames decode straight to the screen&apos;s own pixels, so the board does no colour conversion at all.</LumiTip>
       </Section>
 
       <NextStep

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LumiTip } from "@/components/Lumi";
 import { Card, NextStep, NumberBand, PageHeader, Section, SectionHeader } from "@/components/ui";
 import { pageMetadata } from "@/lib/seo";
 
@@ -203,6 +204,7 @@ export default function PaperPage() {
       <Section id="cite">
         <SectionHeader eyebrow="Cite" title={<>BibTeX.</>} />
         <pre className="pre mt-8 p-6">{bibtex()}</pre>
+        <LumiTip pose="read">The measurement artifact is on Zenodo, so you can check every number on this page yourself.</LumiTip>
       </Section>
 
       <NextStep

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { NextStep, PageHeader, Section, SectionHeader, Steps } from "@/components/ui";
 import JsonLd from "@/components/JsonLd";
+import { LumiTip } from "@/components/Lumi";
 import Rv565Converter from "@/components/Rv565Converter";
 import { SITE_URL, pageMetadata } from "@/lib/seo";
 
@@ -105,6 +106,7 @@ export default function ConvertPage() {
 
       <Section id="converter" label="Converter">
         <Rv565Converter />
+        <LumiTip align="right">Your video never leaves your computer: the whole conversion runs in this browser tab.</LumiTip>
       </Section>
 
       <Section id="steps" tone="red">

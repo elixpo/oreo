@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ExternalLink, Github } from "lucide-react";
+import { LumiTip } from "@/components/Lumi";
 import { NextStep, PageHeader, Section } from "@/components/ui";
 import { HACKS, hackUrl } from "@/data/hacks";
 import { GITHUB as REPO } from "@/lib/links";
@@ -56,8 +57,7 @@ export default function HacksPage() {
             );
           })}
         </ul>
-
-
+        <LumiTip align="right">New here? Start with the five-minute hack: put your GitHub handle on the badge.</LumiTip>
       </Section>
 
       <Section id="your-hack" tone="green">

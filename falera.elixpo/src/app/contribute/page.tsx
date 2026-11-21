@@ -12,6 +12,7 @@ export default function ContributePage() {
     <RepoDoc
       file="CONTRIBUTING.md"
       childrenTone="green"
+      lumi="You don't need a badge to start: most of FaleraOS is tested on an ordinary computer."
       chip="made by humans, with humans"
       title={
         <>

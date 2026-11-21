@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { Github } from "lucide-react";
 import { PageHeader, Section, type Tone } from "@/components/ui";
+import { LumiTip } from "@/components/Lumi";
 import { HACK_GUIDES } from "@/data/hacks";
 import { mermaidDrawing } from "@/lib/diagrams";
 import { renderMarkdown, repoLinkResolver } from "@/lib/markdown";
@@ -85,8 +86,10 @@ function SourceCard({ file }: { file: string }) {
 
 export default function RepoDoc({
   file, chip, title, lead, quickLinks = [], related = [], children,
-  bodyTitle, aside, childrenTone = "plain",
+  bodyTitle, aside, childrenTone = "plain", lumi,
 }: {
+  /** Lumi's tip at the end of the page. */
+  lumi?: ReactNode;
   /** The tone of the section holding `children`. */
   childrenTone?: Tone;
   /** Path in the repository, e.g. "docs/CLI.md" or "CONTRIBUTING.md". */
@@ -171,6 +174,9 @@ export default function RepoDoc({
             )}
           </div>
         </div>
+        <LumiTip pose="read" align="right">
+          {lumi ?? <>This page is built from {file} in the repo. Spotted a mistake? Fix it there, and it shows up here.</>}
+        </LumiTip>
       </Section>
     </>
   );

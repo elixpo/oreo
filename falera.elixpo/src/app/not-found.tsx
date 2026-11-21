@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Eyebrow } from "@/components/ui";
+import { LumiNote } from "@/components/Lumi";
 
 /* 404: plain and cheap to render (some misrouted bots will hammer it). */
 
@@ -14,6 +15,10 @@ export default function NotFound() {
         or maybe a typo. Head back home and we&apos;ll forget this ever
         happened.
       </p>
+      <LumiNote pose="read" className="mt-10">
+        <p className="label text-accent">Lumi says</p>
+        <p className="mt-1 text-text">I looked everywhere, even under the battery holder. This page isn&apos;t here.</p>
+      </LumiNote>
       <div className="mt-10 flex flex-wrap gap-3">
         <Link href="/" className="btn-primary">Back home</Link>
         <Link href="/apps/" className="btn-ghost">Browse apps</Link>

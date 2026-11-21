@@ -1,5 +1,6 @@
 import Link from "next/link";
 import AppCard, { AppIcon } from "@/components/AppCard";
+import { LumiTip } from "@/components/Lumi";
 import { NextStep, PageHeader, Screen, Section, SectionHeader, Split } from "@/components/ui";
 import { PRELOADED, ALL_APPS, STORE } from "@/data/apps";
 import { GITHUB } from "@/lib/links";
@@ -85,6 +86,7 @@ export default function AppsPage() {
         <ul className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {STORE.map((a) => <li key={a.slug} className="reveal min-w-0"><AppCard app={a} /></li>)}
         </ul>
+        <LumiTip pose="pet">Psst, every app is one Python class: subclass oreoOS.App and the launcher finds it.</LumiTip>
       </Section>
 
       <NextStep

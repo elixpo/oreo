@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LumiTip } from "@/components/Lumi";
 import { Card, NextStep, PageHeader, Screen, Section, SectionHeader, Steps } from "@/components/ui";
 import { GITHUB } from "@/lib/links";
 
@@ -33,6 +34,7 @@ export default function GetStartedPage() {
 
       <Section id="steps">
         <Steps steps={STEPS.map((st) => ({ title: st.t, body: <p>{withCode(st.b)}</p> }))} />
+        <LumiTip pose="read" align="right">Stuck on a step? Run falera doctor first. It checks the cable, the port, the permissions and the firmware.</LumiTip>
       </Section>
 
       <Section id="first-boot" tone="green">

@@ -4,15 +4,15 @@ import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { FUND_URL, GITHUB } from "@/lib/links";
+import { formatStars, useGithubStars } from "@/lib/useGithubStats";
 
-const NAV = [
+const NAV: { href: string; label: string; love?: boolean }[] = [
   { href: "/badge/",       label: "Badge" },
   { href: "/apps/",        label: "Apps" },
   { href: "/get-started/", label: "Get started" },
-  { href: "/docs/",        label: "Docs" },
   { href: "/rv565/",       label: "RV565" },
   { href: "/contribute/",  label: "Contribute" },
-  { href: "/supporters/",  label: "Support" },
+  { href: "/supporters/",  label: "Supporters", love: true },
 ];
 
 // Everything else, in the "More" menu.
@@ -27,6 +27,16 @@ const MORE: { href: string; label: string; external?: boolean }[] = [
   { href: "/paper/",                    label: "Research paper" },
   { href: "https://research.elixpo.com", label: "Elixpo Research", external: true },
 ];
+
+// A small heart. In the header, the one on "Supporters" and the one on
+// "Fund the badge" beat together when either is hovered or focused.
+function Heart({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" className={`love-heart h-3 w-3 shrink-0 ${className}`} aria-hidden="true">
+      <path d="M8 14s-5.5-3.4-5.5-7.4A3 3 0 0 1 8 4.7a3 3 0 0 1 5.5 1.9C13.5 10.6 8 14 8 14z" fill="currentColor" />
+    </svg>
+  );
+}
 
 // Pages that live under another nav item.
 const SECTION_OF: [string, string][] = [
@@ -49,6 +59,7 @@ function GithubIcon({ className = "h-4 w-4" }: { className?: string }) {
  * closes the menu after a navigation. */
 export default function Header() {
   const pathname = usePathname() ?? "/";
+  const stars = useGithubStars();
   const menu = useRef<HTMLDetailsElement>(null);
   const more = useRef<HTMLDetailsElement>(null);
 
@@ -61,7 +72,7 @@ export default function Header() {
   const current = (href: string) => pathname.startsWith(href) || section === href;
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-bg/95 backdrop-blur supports-[backdrop-filter]:bg-bg/85">
+    <header className="site-header sticky top-0 z-40 border-b border-border bg-bg/95 backdrop-blur supports-[backdrop-filter]:bg-bg/85">
       <div className="container-page flex h-[var(--header-h)] items-center justify-between gap-4">
         <Link href="/" className="flex shrink-0 items-center gap-2.5" aria-label="Falera, home">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -72,17 +83,18 @@ export default function Header() {
           </span>
         </Link>
 
-        <nav aria-label="Main" className="hidden lg:block">
+        <nav aria-label="Main" className="hidden xl:block">
           <ul className="flex items-center gap-6 text-[0.8125rem] font-semibold">
             {NAV.map((n) => (
               <li key={n.href}>
                 <Link
                   href={n.href}
                   aria-current={current(n.href) ? "page" : undefined}
-                  className={`py-2 transition-colors hover:text-primary ${
+                  className={`inline-flex items-center gap-1.5 py-2 transition-colors hover:text-primary ${
                     current(n.href) ? "text-primary" : "text-text"
-                  }`}
+                  } ${n.love ? "love-link" : ""}`}
                 >
+                  {n.love && <Heart className="text-primary" />}
                   {n.label}
                 </Link>
               </li>
@@ -124,21 +136,40 @@ export default function Header() {
             href={GITHUB}
             target="_blank"
             rel="noreferrer"
-            aria-label="FaleraOS on GitHub"
-            className="hidden h-10 w-10 items-center justify-center rounded-pill text-text transition-colors hover:bg-bg-raised sm:inline-flex"
+            aria-label={stars !== null ? `FaleraOS on GitHub, ${stars} stars` : "FaleraOS on GitHub"}
+            className="hidden h-10 min-w-[6.75rem] items-center justify-center gap-2 rounded-pill bg-text px-4 text-[0.8125rem] font-bold text-bg transition-colors hover:bg-text/85 md:inline-flex"
           >
             <GithubIcon />
+            {stars !== null ? (
+              <span className="inline-flex items-center gap-1 tabular-nums">
+                <svg viewBox="0 0 16 16" className="h-3 w-3" aria-hidden="true"><path d="M8 1.5l1.9 4 4.4.5-3.3 3 .9 4.3L8 11.2 4.1 13.3 5 9 1.7 6l4.4-.5z" fill="currentColor" /></svg>
+                {formatStars(stars)}
+              </span>
+            ) : (
+              <span>GitHub</span>
+            )}
           </a>
+          <Link
+            href="/docs/"
+            aria-current={pathname.startsWith("/docs/") && !section ? "page" : undefined}
+            className={`hidden h-10 items-center rounded-pill border px-4 text-[0.8125rem] font-bold transition-colors hover:border-text sm:inline-flex ${
+              current("/docs/") ? "border-primary text-primary" : "border-text/60 text-text"
+            }`}
+          >
+            Docs
+          </Link>
           <a
             href={FUND_URL}
             target="_blank"
             rel="noreferrer"
-            className="btn-accent min-h-[40px] px-4 py-2 text-[0.8125rem]"
+            className="love-link btn-accent min-h-[44px] flex-col gap-0 px-4 py-1 leading-tight"
+            aria-label="Fund the badge, from $0.11"
           >
-            Fund the badge
+            <span className="inline-flex items-center gap-1.5 text-[0.8125rem]"><Heart /> Fund the badge</span>
+            <span className="text-[0.6875rem] font-semibold opacity-90">from $0.11 (₹10)</span>
           </a>
 
-          <details ref={menu} className="group relative lg:hidden">
+          <details ref={menu} className="group relative xl:hidden">
             <summary
               className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-pill border border-border
                          [&::-webkit-details-marker]:hidden"
@@ -163,13 +194,14 @@ export default function Header() {
                     Home
                   </Link>
                 </li>
-                {NAV.map((n) => (
+                {[...NAV.slice(0, 3), { href: "/docs/", label: "Docs" }, ...NAV.slice(3)].map((n) => (
                   <li key={n.href}>
                     <Link
                       href={n.href}
                       aria-current={current(n.href) ? "page" : undefined}
-                      className={`block rounded-inner px-3 py-3 hover:bg-bg-raised ${current(n.href) ? "text-primary" : ""}`}
+                      className={`flex items-center gap-2 rounded-inner px-3 py-3 hover:bg-bg-raised ${current(n.href) ? "text-primary" : ""}`}
                     >
+                      {"love" in n && n.love && <Heart className="text-primary" />}
                       {n.label}
                     </Link>
                   </li>

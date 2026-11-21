@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { FUND_URL } from "@/lib/links";
+import { LumiNote } from "@/components/Lumi";
 
 // Same-origin Pages Function first (functions/api/supporters.js); the
 // payouts API directly as a fallback, which works once it sends CORS.
@@ -97,11 +98,13 @@ export default function SupportersLive() {
             <p className="mt-2 text-sm text-text-dim">{pct}% of the goal</p>
           </>
         ) : (
-          <p className="mt-4 text-text-dim" aria-live="polite">
-            {failed
-              ? "The live total couldn't load. It's on the fundraiser page."
-              : "Loading the live total…"}
-          </p>
+          <LumiNote pose="pet" className="mt-4">
+            <p className="text-text-dim" aria-live="polite">
+              {failed
+                ? "The live total couldn't load. Lumi checked twice; it's on the fundraiser page."
+                : "Lumi is counting the live total…"}
+            </p>
+          </LumiNote>
         )}
         <a href={FUND_URL} target="_blank" rel="noreferrer" className="btn-accent mt-6">
           Fund the badge. Even ₹10 helps
