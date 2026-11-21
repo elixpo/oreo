@@ -21,6 +21,7 @@
 [![Wikidata](https://img.shields.io/badge/Wikidata-Q141968869-006699?style=flat-square&logo=wikidata&logoColor=white)](https://www.wikidata.org/wiki/Q141968869)
 [![arXiv](https://img.shields.io/badge/arXiv-2610.35935-b31b1b?style=flat-square)](https://arxiv.org/abs/2610.35935)
 [![OSHWA certified: IN000107](https://img.shields.io/badge/OSHWA-IN000107-333333?style=flat-square)](https://certification.oshwa.org/in000107.html)
+[![Udyam-registered MSME: UDYAM-WB-07-0152337](https://img.shields.io/badge/Udyam_MSME-UDYAM--WB--07--0152337-0B6E4F?style=flat-square)](https://udyamregistration.gov.in/Udyam_Verify.aspx)
 
 **Featured on** [Adafruit](https://blog.adafruit.com/2026/11/04/oreoos-a-micropython-based-operating-system/) · [MA-NO](https://www.ma-no.org/en/software/operating-systems/oreoos-turns-an-esp32-s3-board-into-a-badge-with-apps-and-video) · [HardLabs](https://www.hardlabs.io/boards/elixpo--oreo) · [USB ID from Espressif](https://github.com/espressif/usb-pids/pull/425) · [more](#-in-the-press)
 
