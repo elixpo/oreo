@@ -45,7 +45,7 @@ export function BoardFallback() {
             loading="lazy"
             decoding="async"
           />
-          <figcaption className="pt-2 text-xs uppercase tracking-widest text-muted">
+          <figcaption className="pt-2 font-mono text-xs uppercase tracking-[0.14em] text-muted">
             {img.label}
           </figcaption>
         </figure>
@@ -176,7 +176,7 @@ export default function BoardViewer() {
               style={{ width: `${Math.round(progress * 100)}%` }}
             />
           </div>
-          <span className="text-xs uppercase tracking-widest text-muted">
+          <span className="font-mono text-xs uppercase tracking-[0.14em] text-muted">
             Loading the 3D board…
           </span>
         </div>

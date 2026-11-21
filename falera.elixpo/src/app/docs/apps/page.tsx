@@ -1,11 +1,4 @@
-"use client";
-
-import { motion } from "framer-motion";
-import { Reveal, fadeUp, staggerContainer } from "@/components/MotionWrap";
-import {
-  FolderTree, Code2, Layers, Cog, Palette, Save,
-  ExternalLink, ArrowRight,
-} from "lucide-react";
+import { Card, NextStep, PageHeader, Section } from "@/components/ui";
 
 /* /docs/apps — the full "how to write a badge app" reference.
  *
@@ -19,53 +12,28 @@ import {
 
 export default function AppDocsPage() {
   return (
-    <div className="relative">
-      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[480px] overflow-hidden">
-        <div className="absolute left-1/4 top-0 h-[320px] w-[320px]
-                        rounded-full bg-primary/[0.08] blur-[120px]" />
-        <div className="absolute right-1/4 top-20 h-[260px] w-[260px]
-                        rounded-full bg-teal/[0.10] blur-[120px]" />
-      </div>
+    <>
+      <PageHeader
+        eyebrow="Docs · writing apps"
+        title={<>Write an app <em>for the badge.</em></>}
+        lede={<>Apps on FaleraOS are plain Python packages. One manifest, one shim, and a <code className="code">src/</code> tree that you organise however your app needs. The launcher discovers it automatically.</>}
+      />
 
-      <div className="container-page pt-16 pb-28">
-        <motion.div initial="hidden" animate="visible" variants={staggerContainer}>
-          <motion.span variants={fadeUp} className="chip mb-6">
-            <FolderTree className="h-3 w-3 text-primary" /> docs · writing apps
-          </motion.span>
-          <motion.h1
-            variants={fadeUp}
-            className="font-display text-4xl leading-[1.05] tracking-tight sm:text-5xl"
-          >
-            Write an app for the badge.
-          </motion.h1>
-          <motion.p variants={fadeUp} className="mt-5 max-w-2xl text-text-dim">
-            Apps on FaleraOS are plain Python packages. One manifest, one
-            shim, and a <code className="text-text">src/</code> tree that
-            you organise however your app needs. The launcher discovers
-            it automatically.
-          </motion.p>
-        </motion.div>
-
+      <Section>
+      <div className="max-w-3xl [&>section:first-child]:mt-0 [&>section:first-child]:border-0 [&>section:first-child]:pt-0">
         {/* ── Directory layout ───────────────────────────────────── */}
-        <Reveal>
-          <section className="mt-16">
-            <div className="mb-3 flex items-center gap-3">
-              <FolderTree className="h-5 w-5 text-primary" />
-              <h2 className="font-display text-2xl tracking-tight">
-                Directory layout
-              </h2>
-            </div>
-            <p className="mb-6 max-w-3xl text-sm text-text-dim">
-              Every app lives in <code className="text-text">apps/&lt;name&gt;/</code>.
+          <section className="mt-12 border-t border-border pt-12">
+            <h2 className="mb-4 font-display text-[1.625rem] leading-tight text-text">Directory layout</h2>
+            <p className="mb-6 max-w-3xl text-[0.975rem] leading-relaxed text-text-dim">
+              Every app lives in <code className="code">apps/&lt;name&gt;/</code>.
               The launcher imports{" "}
-              <code className="text-text">apps.&lt;name&gt;.main</code> and
-              reads <code className="text-text">App</code> off it — so{" "}
-              <code className="text-text">main.py</code> is required, but
+              <code className="code">apps.&lt;name&gt;.main</code> and
+              reads <code className="code">App</code> off it — so{" "}
+              <code className="code">main.py</code> is required, but
               it's a 2-line shim. Your actual code lives under{" "}
-              <code className="text-text">src/</code>.
+              <code className="code">src/</code>.
             </p>
-            <pre className="overflow-x-auto rounded-md border border-border
-                            bg-bg p-4 text-xs leading-relaxed text-text-dim">
+            <pre className="pre">
 {`apps/snake/
 ├── manifest.json     name, author, icon, version, category
 ├── main.py           thin shim — re-exports App from src/
@@ -81,65 +49,49 @@ export default function AppDocsPage() {
     ├── render.py     drawing
     └── highscore.py  file I/O`}
             </pre>
-            <p className="mt-4 max-w-3xl text-sm text-text-dim">
-              The split inside <code className="text-text">src/</code> is{" "}
+            <p className="mt-4 max-w-3xl text-[0.975rem] leading-relaxed text-text-dim">
+              The split inside <code className="code">src/</code> is{" "}
               <em>your call</em> — Snake uses logic / render / persistence,
               but a simpler app might be a single{" "}
-              <code className="text-text">src/app.py</code>, and a complex
+              <code className="code">src/app.py</code>, and a complex
               game can have a dozen modules. The deploy script pushes every
-              <code className="text-text"> .py</code> under{" "}
-              <code className="text-text">src/</code> recursively.
+              <code className="code"> .py</code> under{" "}
+              <code className="code">src/</code> recursively.
             </p>
           </section>
-        </Reveal>
 
         {/* ── main.py shim ──────────────────────────────────────── */}
-        <Reveal>
-          <section className="mt-14">
-            <div className="mb-3 flex items-center gap-3">
-              <Code2 className="h-5 w-5 text-teal" />
-              <h2 className="font-display text-2xl tracking-tight">
-                The main.py shim
-              </h2>
-            </div>
-            <p className="mb-4 max-w-3xl text-sm text-text-dim">
-              The launcher requires <code className="text-text">main.py</code> and
-              looks for a class named <code className="text-text">App</code>{" "}
-              on it. Re-export from your <code className="text-text">src/</code>{" "}
+          <section className="mt-12 border-t border-border pt-12">
+            <h2 className="mb-4 font-display text-[1.625rem] leading-tight text-text">The main.py shim</h2>
+            <p className="mb-4 max-w-3xl text-[0.975rem] leading-relaxed text-text-dim">
+              The launcher requires <code className="code">main.py</code> and
+              looks for a class named <code className="code">App</code>{" "}
+              on it. Re-export from your <code className="code">src/</code>{" "}
               package and you're done:
             </p>
-            <pre className="overflow-x-auto rounded-md border border-border
-                            bg-bg p-4 text-xs leading-relaxed text-text">
+            <pre className="pre">
 {`# apps/snake/main.py
 
 from .src.app import App
 
 __all__ = ["App"]`}
             </pre>
-            <p className="mt-4 max-w-3xl text-sm text-text-dim">
+            <p className="mt-4 max-w-3xl text-[0.975rem] leading-relaxed text-text-dim">
               That's the whole file. Real app code goes in{" "}
-              <code className="text-text">src/app.py</code>.
+              <code className="code">src/app.py</code>.
             </p>
           </section>
-        </Reveal>
 
         {/* ── manifest.json ──────────────────────────────────────── */}
-        <Reveal>
-          <section className="mt-14">
-            <div className="mb-3 flex items-center gap-3">
-              <Cog className="h-5 w-5 text-gold" />
-              <h2 className="font-display text-2xl tracking-tight">
-                manifest.json
-              </h2>
-            </div>
-            <p className="mb-4 max-w-3xl text-sm text-text-dim">
+          <section className="mt-12 border-t border-border pt-12">
+            <h2 className="mb-4 font-display text-[1.625rem] leading-tight text-text">manifest.json</h2>
+            <p className="mb-4 max-w-3xl text-[0.975rem] leading-relaxed text-text-dim">
               Metadata the launcher reads at boot to populate the app
               drawer. All fields are required except{" "}
-              <code className="text-text">icon</code> (defaults to a
+              <code className="code">icon</code> (defaults to a
               generic tile).
             </p>
-            <pre className="overflow-x-auto rounded-md border border-border
-                            bg-bg p-4 text-xs leading-relaxed text-text">
+            <pre className="pre">
 {`{
   "name":     "Snake",
   "author":   "Circuit-Overtime",
@@ -148,7 +100,7 @@ __all__ = ["App"]`}
   "icon":     "snake"
 }`}
             </pre>
-            <ul className="mt-4 max-w-3xl space-y-2 text-sm text-text-dim">
+            <ul className="mt-4 max-w-3xl space-y-2 text-[0.975rem] leading-relaxed text-text-dim">
               <li><b className="text-text">name</b> — display name in the drawer (under the tile).</li>
               <li><b className="text-text">author</b> — GitHub handle shown on the about screen.</li>
               <li><b className="text-text">version</b> — semver; bumped by your PR.</li>
@@ -156,19 +108,12 @@ __all__ = ["App"]`}
               <li><b className="text-text">icon</b> — stem of a sprite in <code>assets/icons/optimized/</code> (e.g. <code>"snake"</code> → <code>snake.py</code>).</li>
             </ul>
           </section>
-        </Reveal>
 
         {/* ── Lifecycle hooks ────────────────────────────────────── */}
-        <Reveal>
-          <section className="mt-14">
-            <div className="mb-3 flex items-center gap-3">
-              <Layers className="h-5 w-5 text-lilac" />
-              <h2 className="font-display text-2xl tracking-tight">
-                Lifecycle hooks
-              </h2>
-            </div>
-            <p className="mb-6 max-w-3xl text-sm text-text-dim">
-              The OS calls four methods on your <code className="text-text">App</code>{" "}
+          <section className="mt-12 border-t border-border pt-12">
+            <h2 className="mb-4 font-display text-[1.625rem] leading-tight text-text">Lifecycle hooks</h2>
+            <p className="mb-6 max-w-3xl text-[0.975rem] leading-relaxed text-text-dim">
+              The OS calls four methods on your <code className="code">App</code>{" "}
               instance — implement what you need, ignore what you don't.
             </p>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -189,8 +134,7 @@ __all__ = ["App"]`}
                 body="Called when a button goes down. btn is one of api.BTN_UP / DOWN / LEFT / RIGHT / A / B / HOME. HOME is reserved by the launcher — it pops back to the drawer."
               />
             </div>
-            <pre className="mt-6 overflow-x-auto rounded-md border border-border
-                            bg-bg p-4 text-xs leading-relaxed text-text-dim">
+            <pre className="pre mt-6">
 {`# apps/snake/src/app.py (excerpt)
 
 import oreoOS
@@ -224,159 +168,133 @@ class App(oreoOS.App):
             self._start()`}
             </pre>
           </section>
-        </Reveal>
 
         {/* ── Drawing API ───────────────────────────────────────── */}
-        <Reveal>
-          <section className="mt-14">
-            <div className="mb-3 flex items-center gap-3">
-              <Palette className="h-5 w-5 text-primary" />
-              <h2 className="font-display text-2xl tracking-tight">
-                Drawing API
-              </h2>
-            </div>
-            <p className="mb-4 max-w-3xl text-sm text-text-dim">
+          <section className="mt-12 border-t border-border pt-12">
+            <h2 className="mb-4 font-display text-[1.625rem] leading-tight text-text">Drawing API</h2>
+            <p className="mb-4 max-w-3xl text-[0.975rem] leading-relaxed text-text-dim">
               Screen is 320×240 landscape. The display object{" "}
-              <code className="text-text">d</code> passed to{" "}
-              <code className="text-text">draw()</code> exposes a small set
+              <code className="code">d</code> passed to{" "}
+              <code className="code">draw()</code> exposes a small set
               of primitives:
             </p>
-            <ul className="max-w-3xl space-y-2 text-sm text-text-dim">
+            <ul className="max-w-3xl space-y-2 text-[0.975rem] leading-relaxed text-text-dim">
               <li>
-                <code className="text-text">d.clear(color)</code> — fill the
+                <code className="code">d.clear(color)</code> — fill the
                 whole framebuffer.
               </li>
               <li>
-                <code className="text-text">d.rect(x, y, w, h, color, fill=True)</code>
+                <code className="code">d.rect(x, y, w, h, color, fill=True)</code>
                 {" "}— solid or outlined rectangle.
               </li>
               <li>
-                <code className="text-text">d.text(s, x, y, color, scale=1)</code>
+                <code className="code">d.text(s, x, y, color, scale=1)</code>
                 {" "}— bitmap text at the given scale (1, 2, or 3).
               </li>
               <li>
-                <code className="text-text">d.blit(data, x, y, w, h)</code>
+                <code className="code">d.blit(data, x, y, w, h)</code>
                 {" "}— stamp an RGB565 sprite. Magenta is the chroma key for
                 transparency.
               </li>
               <li>
-                <code className="text-text">d.blit_scale(data, x, y, w, h, scale)</code>
+                <code className="code">d.blit_scale(data, x, y, w, h, scale)</code>
                 {" "}— integer upscale of a sprite during stamping.
               </li>
             </ul>
-            <p className="mt-4 max-w-3xl text-sm text-text-dim">
-              Use <code className="text-text">widgets.draw_header(d, "TITLE")</code>{" "}
-              and <code className="text-text">widgets.draw_hint(d, "...")</code>{" "}
+            <p className="mt-4 max-w-3xl text-[0.975rem] leading-relaxed text-text-dim">
+              Use <code className="code">widgets.draw_header(d, "TITLE")</code>{" "}
+              and <code className="code">widgets.draw_hint(d, "...")</code>{" "}
               for the standard chrome — the badge looks more consistent if
               every app uses them.
             </p>
           </section>
-        </Reveal>
 
         {/* ── Persistence ───────────────────────────────────────── */}
-        <Reveal>
-          <section className="mt-14">
-            <div className="mb-3 flex items-center gap-3">
-              <Save className="h-5 w-5 text-teal" />
-              <h2 className="font-display text-2xl tracking-tight">
-                Persistence
-              </h2>
-            </div>
-            <p className="mb-4 max-w-3xl text-sm text-text-dim">
+          <section className="mt-12 border-t border-border pt-12">
+            <h2 className="mb-4 font-display text-[1.625rem] leading-tight text-text">Persistence</h2>
+            <p className="mb-4 max-w-3xl text-[0.975rem] leading-relaxed text-text-dim">
               Two options:
             </p>
-            <ul className="max-w-3xl space-y-3 text-sm text-text-dim">
+            <ul className="max-w-3xl space-y-3 text-[0.975rem] leading-relaxed text-text-dim">
               <li>
                 <b className="text-text">OS settings</b> — for small
                 key/value state shared across launches:{" "}
-                <code className="text-text">os.settings_get(key, default)</code>{" "}
+                <code className="code">os.settings_get(key, default)</code>{" "}
                 /{" "}
-                <code className="text-text">os.settings_set(key, value)</code>.
+                <code className="code">os.settings_set(key, value)</code>.
                 Backed by a single JSON file the OS manages for you.
               </li>
               <li>
                 <b className="text-text">Plain files</b> — for larger or
                 custom data, just{" "}
-                <code className="text-text">open()</code> a file under your
+                <code className="code">open()</code> a file under your
                 app dir. Snake's hi-score lives at{" "}
-                <code className="text-text">apps/snake/hiscore.txt</code>.
-                Wrap I/O in <code className="text-text">try</code> blocks
+                <code className="code">apps/snake/hiscore.txt</code>.
+                Wrap I/O in <code className="code">try</code> blocks
                 so a full or read-only flash doesn't crash the app.
               </li>
             </ul>
           </section>
-        </Reveal>
 
         {/* ── Deploying ─────────────────────────────────────────── */}
-        <Reveal>
-          <section className="mt-14">
-            <div className="mb-3 flex items-center gap-3">
-              <ArrowRight className="h-5 w-5 text-gold" />
-              <h2 className="font-display text-2xl tracking-tight">
-                Deploying to the badge
-              </h2>
-            </div>
-            <p className="mb-4 max-w-3xl text-sm text-text-dim">
+          <section className="mt-12 border-t border-border pt-12">
+            <h2 className="mb-4 font-display text-[1.625rem] leading-tight text-text">Deploying to the badge</h2>
+            <p className="mb-4 max-w-3xl text-[0.975rem] leading-relaxed text-text-dim">
               From the repo root, with the badge connected over USB:
             </p>
-            <pre className="overflow-x-auto rounded-md border border-border
-                            bg-bg p-4 text-xs leading-relaxed text-text">
+            <pre className="pre">
 {`python tools/deploy.py            # auto-detect port, push diffs
 python tools/deploy.py --force    # ignore hash cache, push everything
 python tools/deploy.py --clean    # wipe device first`}
             </pre>
-            <p className="mt-4 max-w-3xl text-sm text-text-dim">
+            <p className="mt-4 max-w-3xl text-[0.975rem] leading-relaxed text-text-dim">
               The script auto-discovers any directory under{" "}
-              <code className="text-text">apps/</code> that has both{" "}
-              <code className="text-text">main.py</code> and{" "}
-              <code className="text-text">manifest.json</code>, plus its
-              entire <code className="text-text">src/</code> subtree. No
-              entry in <code className="text-text">tools/deploy.py</code>{" "}
+              <code className="code">apps/</code> that has both{" "}
+              <code className="code">main.py</code> and{" "}
+              <code className="code">manifest.json</code>, plus its
+              entire <code className="code">src/</code> subtree. No
+              entry in <code className="code">tools/deploy.py</code>{" "}
               to edit.
             </p>
           </section>
-        </Reveal>
 
         {/* ── Snake reference ───────────────────────────────────── */}
-        <Reveal>
-          <section className="mt-14 rounded-lg border border-border bg-bg-raised/40 p-8 sm:p-10">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 className="font-display text-2xl tracking-tight">
-                  Read the reference: apps/snake/
-                </h2>
-                <p className="mt-3 max-w-2xl text-sm text-text-dim">
-                  Snake is the canonical example for this layout. About
-                  350 lines split across four modules, each under 150
-                  lines. If you're stuck, start by reading{" "}
-                  <code className="text-text">src/app.py</code> —
-                  it's the smallest and shows how the pieces wire together.
-                </p>
-              </div>
-              <a
-                href="https://github.com/elixpo/falera/tree/main/apps/snake"
-                target="_blank" rel="noreferrer"
-                className="inline-flex shrink-0 items-center gap-1.5
-                           rounded-md border border-border bg-bg px-3 py-2
-                           text-xs text-text hover:border-primary/50
-                           hover:text-primary"
-              >
-                View on GitHub <ExternalLink className="h-3 w-3" />
-              </a>
-            </div>
-          </section>
-        </Reveal>
-
+        <Card fill className="mt-12 p-6 sm:p-8">
+          <p className="eyebrow">Reference app</p>
+          <h2 className="h-card mt-3">Read the reference: apps/snake/</h2>
+          <p className="mt-2 max-w-2xl text-[0.975rem] leading-relaxed text-text-dim">
+            Snake is the canonical example for this layout. About
+            350 lines split across four modules, each under 150
+            lines. If you&apos;re stuck, start by reading{" "}
+            <code className="code">src/app.py</code> —
+            it&apos;s the smallest and shows how the pieces wire together.
+          </p>
+          <a
+            href="https://github.com/elixpo/falera/tree/main/apps/snake"
+            target="_blank" rel="noreferrer"
+            className="btn-ghost mt-6"
+          >
+            View on GitHub ↗
+          </a>
+        </Card>
       </div>
-    </div>
+      </Section>
+
+      <NextStep
+        title={<>Ship it to <em>the App Store.</em></>}
+        body="Propose your app, then open a pull request that adds it to apps_market/."
+        href="/contribute/"
+        cta="Contribute"
+      />
+    </>
   );
 }
 
 function Hook({ sig, body }: { sig: string; body: string }) {
   return (
-    <div className="rounded-md border border-border bg-bg-raised/50 p-4">
-      <code className="text-sm font-semibold text-primary">{sig}</code>
-      <p className="mt-2 text-xs leading-relaxed text-text-dim">{body}</p>
+    <div className="card p-5">
+      <code className="font-mono text-sm font-bold text-primary">{sig}</code>
+      <p className="mt-2 text-sm leading-relaxed text-text-dim">{body}</p>
     </div>
   );
 }

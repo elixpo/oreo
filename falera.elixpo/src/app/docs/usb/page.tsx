@@ -1,4 +1,3 @@
-import { Usb } from "lucide-react";
 import RepoDoc from "@/components/RepoDoc";
 import { pageMetadata } from "@/lib/seo";
 
@@ -17,7 +16,6 @@ export default function UsbDocsPage() {
     <RepoDoc
       file="docs/USB.md"
       chip="docs · USB"
-      icon={Usb}
       title="Using the badge from a computer."
       lead="Everything you do with the badge from a computer goes over its USB-C cable, with the falera CLI. Wi-Fi on the badge is for the internet only."
       quickLinks={[
