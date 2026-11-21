@@ -101,6 +101,35 @@ WAIT_FOR_ASSETS = """async () => {
 }"""
 
 
+# Wait for two animation frames so the page has painted before the capture.
+PAINTED = "() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))"
+
+
+def shoot(browser, page, f: Path, png: Path, scale: float, tries: int = 3):
+    """Screenshot the slide, retrying Chromium's intermittent "Unable to
+    capture screenshot" (no frame painted yet, often under memory pressure)
+    with a pause, then on a fresh page. Returns the page to keep using."""
+    for attempt in range(1, tries + 1):
+        try:
+            page.evaluate(PAINTED)
+            page.screenshot(path=str(png), clip={"x": 0, "y": 0, "width": W, "height": H},
+                            animations="disabled")
+            return page
+        except Exception as e:  # noqa: BLE001 - Playwright raises a generic Error
+            if attempt == tries:
+                sys.exit(f"{f.name}: screenshot failed after {tries} tries: {e}")
+            print(f"warning: {f.name}: screenshot failed ({e.__class__.__name__}), retrying",
+                  file=sys.stderr)
+            page.wait_for_timeout(500 * attempt)
+            if attempt == tries - 1:
+                page.close()
+                page = browser.new_page(viewport={"width": W, "height": H},
+                                        device_scale_factor=scale)
+                page.goto(f.as_uri(), wait_until="load")
+                page.evaluate(WAIT_FOR_ASSETS)
+    return page
+
+
 def render(files: list[tuple[int, Path]], out: Path, scale: float) -> list[Path]:
     try:
         from playwright.sync_api import sync_playwright
@@ -117,7 +146,7 @@ def render(files: list[tuple[int, Path]], out: Path, scale: float) -> list[Path]
             for src in broken:
                 print(f"warning: {f.name}: image did not load: {src}", file=sys.stderr)
             png = out / f"{n:02d}.png"
-            page.screenshot(path=str(png), clip={"x": 0, "y": 0, "width": W, "height": H})
+            page = shoot(browser, page, f, png, scale)
             print(png)
             written.append(png)
         browser.close()

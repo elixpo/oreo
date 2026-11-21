@@ -1,80 +1,107 @@
 # Sponsoring FaleraOS and the Falera Badge
 
-The terms behind slide 11 of the sponsor deck: what a sponsor gives, what
-they get back, and when. Send this with the deck PDF. Keep the slide and
-this file in step: amounts, badge counts and benefits are defined here.
+The terms behind the sponsorship slides of the deck (slides 13 to 15): what
+a sponsor gives, what they get back, and when. Send this with the deck PDF.
+The slides and this file must agree: amounts, badge counts, returns and
+dates are defined here first.
+
+## The plan a sponsor funds
+
+Four months, ₹3,00,000 ($3,193), ₹75,000 ($798) a month:
+
+| Line | Amount | Share |
+| --- | ---: | ---: |
+| Maintainer stipends: 2 maintainers × ₹15,000 × 4 months, paid by milestone | ₹1,20,000 ($1,277) | 40% |
+| 25 badges, built and tested: ₹4,000 each at 25-unit prices | ₹1,00,000 ($1,064) | 33% |
+| Board revision 2: fabrication and assembly of the next prototypes | ₹30,000 ($319) | 10% |
+| Test equipment: hot-air station, bench supply, logic analyser | ₹25,000 ($266) | 8% |
+| Two workshops: kits, travel and documentation | ₹25,000 ($266) | 8% |
+
+A badge costs ₹4,172 in parts at the prices paid for the first five boards
+(`circuit/elixpo/BOM_COST.md`). At 25 units the board and parts cost less,
+which is where the ₹4,000 a badge comes from.
 
 ## Levels
 
-Each level includes everything in the level below it.
+Each level pays for one named part of the plan, and includes every return
+of the level below it.
 
 | | Bamboo | Bow | Lumi |
 | --- | --- | --- | --- |
 | **Contribution** | ₹25,000 ($266) | ₹1,00,000 ($1,064) | ₹3,00,000 ($3,193) |
-| What the money pays for (slide 13) | the test equipment line | the 25 assembled badges | the whole four-month plan |
-| Logo and link on falera.elixpo.com (supporters page) and in the repository README | small | larger | largest, listed first |
-| Credit in FaleraOS's About screen, on every badge | name | name and logo | name and logo, top of the list |
-| Named in the four monthly progress reports | | yes | yes |
-| Logo printed on the silkscreen of board revision 2 | | | yes |
+| **Pays for** | the test bench every badge is checked on | the 25 badges for contributors and workshops | the whole four-month plan |
+| Logo and link on falera.elixpo.com (supporters page) and in the repository README | yes | larger | largest, listed first |
+| Credit in the About screen of every badge | name | name and logo | name and logo, top of the list |
+| Monthly progress report | yes | yes, with your name in it | yes, with your name in it |
+| Logo printed on board revision 2 | | | yes |
 | Posts from Elixpo | thank-you post | thank-you post | dedicated launch post, tags in every build log |
-| Falera Badges for the sponsor's team | 2 | 5 | 10 |
+| Falera Badges for your team | 2 | 5 | 10 |
+
+**Founding sponsors.** Every sponsor who signs before the first 25 badges
+ship is listed as a founding sponsor in FaleraOS's About screen, for as long
+as FaleraOS ships.
 
 Dollars are at ₹93.96, the rate charged on the 17 November 2026 orders.
 
-The Lumi level funds the whole four-month plan on slide 10:
+## What happens after you sign
 
-- maintainer stipends: ₹1,20,000;
-- 25 assembled badges: ₹90,000;
-- board revision 2: ₹30,000;
-- test equipment: ₹25,000;
-- two workshops: ₹35,000.
+Days and weeks count from Day 0, when the MoU is signed and the payment made.
 
-Smaller levels fund those lines in that order of priority.
+| When | What | Who |
+| --- | --- | --- |
+| Day 0 | MoU signed by both sides (the level, its returns and the payment terms), payment and receipt | every sponsor |
+| Day 7 | Logo and link live on falera.elixpo.com and the README | every sponsor |
+| Next FaleraOS update | Credit in the About screen, delivered over the air to every badge | every sponsor |
+| Weeks 4–6 | Your team's badges, assembled, tested and shipped | every sponsor (2, 5 or 10) |
+| Months 1–4 | Progress report: milestones and spending against the plan | every sponsor; named from Bow |
+| Month 3 | Logo printed on board revision 2 | Lumi |
 
-## In kind
-
-PCB fabrication or assembly for 10 to 25 badges, bare boards for revision 2,
-or ESP32-S3 modules for workshop badges. The sponsor is credited:
-
-- on the website;
-- in the About screen;
-- in the README;
-- in a build log or video showing their boards or parts.
-
-The open KiCad project and BOM link to the sponsor so others can order from
-them. The level of credit follows the value of what's sent, measured against
-the levels above.
-
-## Event badges
-
-For a conference or community event:
-
-- **Price:** badges at cost for the quantity ordered (₹4,172 in parts per badge at today's prototype prices, from `circuit/elixpo/BOM_COST.md`; less in volume, and quoted per order).
-- **Custom app:** the event's schedule, branding and a Lumi theme.
-- **Workshop:** an optional badge-hacking workshop on the day, with travel at cost.
-
-Sponsors at Bow level and above can be credited on an event's badges.
+After the four months, website and README credit stays for 12 months, and
+the About screen credit stays on every badge already made.
 
 ## How credit appears
 
-- **Website and README:** added within 7 days of the contribution, and kept for 12 months.
-- **About screen:** a "Supported by" list in FaleraOS's About app. It reaches badges in the next FaleraOS update after the contribution, delivered over the air to every badge. The list is a credit, not an advert: names and small logos, no links or offers.
-- **Logos:** the sponsor sends an SVG or a PNG of at least 512 px. The badge shows logos in its own colours, with the sponsor's approval of the result.
+- **Website and README:** a supporters section, ordered by level.
+- **About screen:** a "Supported by" list in FaleraOS's About app. It is a
+  credit, not an advert: names and small logos, no links or offers.
+- **Logos:** the sponsor sends an SVG or a PNG of at least 512 px. The badge
+  shows logos in its own colours, and the sponsor approves the result before
+  it ships.
 
 ## Badges
 
-- **What sponsors get:** assembled, tested Falera Badges with FaleraOS installed, shipped within India at our cost.
-- **When:** they ship from the next production batch after the contribution. Lead time is quoted at signing; first batches take about 4–6 weeks.
-- **Outside India:** shipping and import duties are paid by the sponsor.
+- **What you get:** assembled, tested Falera Badges with FaleraOS installed.
+- **Shipping:** free within India. Outside India, shipping and import duties
+  are paid by the sponsor.
+
+## Other ways to take part
+
+- **In kind:** PCB fabrication or assembly for 10 to 25 badges, bare boards
+  for revision 2, or ESP32-S3 modules for workshop badges. Credit follows the
+  value sent, measured against the levels above, and the open KiCad project
+  and BOM link to the sponsor.
+- **Event badges:** badges for a conference at cost for the quantity
+  ordered, with a custom app for the event (its schedule, branding and a
+  Lumi theme), quoted per order. A badge-hacking workshop on the day is
+  optional, with travel at cost. Bow and Lumi sponsors can be credited on an
+  event's badges.
 
 ## What we commit to
 
-- **Open:** everything funded stays open source: FaleraOS under its licence, the hardware under CERN-OHL-P.
-- **Reporting:** a monthly progress report to every sponsor, four in all, on the milestones and spending against the plan.
-- **No control:** sponsorship doesn't buy control of the project's roadmap, code or content, and FaleraOS doesn't carry ads.
-- **Process:** an introductory call, a follow-up meeting to agree the level, returns and timeline, then a memorandum of understanding (MoU) signed by both sides, setting out the level, its returns and the payment terms. Every payment gets a receipt, and credit goes live within 7 days of payment.
+- **Open:** everything funded stays open source: FaleraOS under MIT, the
+  hardware under CERN-OHL-P-2.0.
+- **Accountable:** stipends are paid by milestone, and every sponsor gets the
+  monthly report on progress and spending.
+- **Independent:** sponsorship doesn't buy control of the roadmap, code or
+  content, and FaleraOS carries no ads.
+- **In writing:** an introductory call, a follow-up meeting to agree the
+  level, returns and timeline, then an MoU signed by both sides. Every
+  payment gets a receipt.
 
 ## Contact
 
-hello@elixpo.com · https://falera.elixpo.com · Ayushman Bhattacharya and
-Anwesha Chakraborty, Elixpo
+hello@elixpo.com · https://falera.elixpo.com
+
+Ayushman Bhattacharya (ayushman@elixpo.com), Anwesha Chakraborty
+(anwesha@elixpo.com) and Vivek Yadav, finance and tax (vivek@elixpo.com),
+Elixpo.

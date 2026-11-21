@@ -6,9 +6,7 @@
   <link rel="stylesheet" href="../style.css">
   <style>
     /* Left: how an app gets from a laptop to every badge, a code sample and
-       the numbers. Right: three 16:9 images of FaleraOS, stacked. Drop the
-       images in assets/screens/ as 1.jpg, 2.jpg, 3.jpg; until then the frames
-       show dashed outlines. */
+       the numbers. Right: three screenshots from the badge, stacked. */
     .left { width: 1200px; }
 
     .flow { margin-top: 38px; display: flex; align-items: stretch; }
@@ -48,17 +46,16 @@
       background: var(--card); font-size: 19px; line-height: 1.35; color: var(--ink);
     }
 
-    /* Three 16:9 frames, stacked. */
-    .shots { position: absolute; right: 136px; top: 360px; display: grid; row-gap: 18px; }
-    .shot {
-      position: relative; width: 340px; height: 191px; border-radius: 16px;
-      border: 2px dashed var(--border);
-      background-size: cover; background-position: center;
-    }
+    /* Three real screenshots (320x240, taken with falera screenshot), stacked
+       at 4:3 so nothing is cropped, scaled without smoothing. */
+    .shots { position: absolute; right: 136px; top: 330px; display: grid; row-gap: 16px; }
+    .shot { position: relative; width: 268px; height: 201px; border-radius: 14px; overflow: hidden;
+            border: 4px solid var(--ink); background: var(--ink); }
+    .shot img { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
     .shot .cap {
-      position: absolute; left: 10px; bottom: 10px;
-      background: rgba(255, 255, 255, 0.92); border-radius: 10px;
-      padding: 4px 12px; font-size: 17px; font-weight: 700; color: var(--ink);
+      position: absolute; right: -4px; bottom: -4px;
+      background: var(--ink); color: #fff; border-radius: 10px 0 0 0;
+      padding: 4px 12px; font-family: var(--mono); font-size: 15px; letter-spacing: 0.04em;
     }
   </style>
 </head>
@@ -130,11 +127,11 @@
       </div>
     </div>
 
-    <!-- Three 16:9 images of FaleraOS: assets/screens/1.jpg, 2.jpg, 3.jpg. -->
+    <!-- Screenshots from the badge: assets/screens/1.png, 2.png, 3.png. -->
     <div class="shots">
-      <div class="shot" style="background-image: url('../assets/screens/1.jpg')"><span class="cap">Home screen</span></div>
-      <div class="shot" style="background-image: url('../assets/screens/2.jpg')"><span class="cap">App Store</span></div>
-      <div class="shot" style="background-image: url('../assets/screens/3.jpg')"><span class="cap">Lumi</span></div>
+      <div class="shot"><img src="../assets/screens/1.png" alt="FaleraOS home screen with the clock and date"><span class="cap">Home screen</span></div>
+      <div class="shot"><img src="../assets/screens/2.png" alt="The App Store on the badge, listing games to install"><span class="cap">App Store</span></div>
+      <div class="shot"><img src="../assets/screens/3.png" alt="The About app showing FaleraOS 2.0.1 and the system details"><span class="cap">About</span></div>
     </div>
   </div>
 
