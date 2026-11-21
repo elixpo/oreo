@@ -53,11 +53,25 @@ export function Eyebrow({ children, className }: { children: ReactNode; classNam
   );
 }
 
-/** One band of a page. `fill` gives it the light grey-green fill. */
+export type Tone = "plain" | "fill" | "red" | "green" | "ink";
+
+const TONE: Record<Tone, string> = {
+  plain: "",
+  fill: "section-fill",
+  red: "section-red",
+  green: "section-green",
+  ink: "section-ink",
+};
+
+/** One band of a page. `tone` picks its treatment: `fill` (light grey-green),
+ *  `red` (soft red tint, for callouts), `green` (soft green, Lumi and the
+ *  apps), `ink` (the dark panda band: one strong moment per page). */
 export function Section({
-  id, fill = false, tight = false, className, children, label,
+  id, tone = "plain", fill = false, tight = false, className, children, label,
 }: {
   id?: string;
+  tone?: Tone;
+  /** Shorthand for tone="fill". */
   fill?: boolean;
   /** Less vertical space, for a strip such as a stat row. */
   tight?: boolean;
@@ -67,7 +81,7 @@ export function Section({
   label?: string;
 }) {
   return (
-    <section id={id} aria-label={label} className={cx("section", tight && "section-tight", fill && "section-fill", className)}>
+    <section id={id} aria-label={label} className={cx("section", tight && "section-tight", TONE[fill ? "fill" : tone], className)}>
       <div className="container-page">{children}</div>
     </section>
   );
@@ -97,8 +111,10 @@ export function SectionHeader({
 
 /** The top of every page: a section holding the h1. */
 export function PageHeader({
-  eyebrow, title, lede, children, aside, className,
+  eyebrow, title, lede, children, aside, className, tone = "plain",
 }: {
+  /** A tinted header for the route's area (green for apps, red for RV565). */
+  tone?: Tone;
   eyebrow?: ReactNode;
   title: ReactNode;
   lede?: ReactNode;
@@ -109,7 +125,7 @@ export function PageHeader({
   className?: string;
 }) {
   return (
-    <div className={cx("border-b border-border", className)}>
+    <div className={cx("border-b border-border", TONE[tone], tone !== "plain" && "border-b-transparent", className)}>
       <div className="container-page page-top pb-12 sm:pb-16">
         <div className={aside ? "grid items-start gap-10 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-center lg:gap-16" : undefined}>
           <SectionHeader as="h1" eyebrow={eyebrow} title={title} lede={lede}>
@@ -148,7 +164,7 @@ export function Stat({
 }: { value: ReactNode; label: ReactNode; href?: string; className?: string }) {
   const body = (
     <>
-      <span className="block font-display text-[1.5rem] font-bold leading-none tracking-[-0.03em] text-primary tabular-nums sm:text-[2rem]">
+      <span className="block font-display text-[1.5rem] font-bold leading-none tracking-[-0.03em] text-accent tabular-nums sm:text-[2rem]">
         {value}
       </span>
       <span className="mt-3 block text-sm leading-snug text-text-dim">{label}</span>
@@ -156,7 +172,7 @@ export function Stat({
   );
   if (href) {
     return (
-      <SmartLink href={href} className={cx("card-link block p-5 sm:p-6", className)}>
+      <SmartLink href={href} className={cx("card-link block min-w-0 p-5 sm:p-6", className)}>
         {body}
       </SmartLink>
     );
@@ -219,6 +235,100 @@ export function NextStep({
         </span>
       </SmartLink>
     </Section>
+  );
+}
+
+/** Big numbers without cards, for a band (works on any tone). */
+export function NumberBand({ items, className }: { items: { value: ReactNode; label: ReactNode; href?: string }[]; className?: string }) {
+  return (
+    <ul className={cx("grid grid-cols-2 gap-x-6 gap-y-10 lg:grid-flow-col lg:auto-cols-fr lg:grid-cols-none", className)}>
+      {items.map((it, i) => {
+        const body = (
+          <>
+            <span className="block font-display text-[2.25rem] font-bold leading-none tracking-[-0.04em] text-accent tabular-nums sm:text-[2.75rem]">
+              {it.value}
+            </span>
+            <span className="mt-3 block max-w-[14rem] text-sm leading-snug text-text-dim">{it.label}</span>
+          </>
+        );
+        return (
+          <li key={i} className="reveal min-w-0 border-l border-border pl-5">
+            {it.href ? <SmartLink href={it.href} className="group block hover:[&>span:first-child]:underline">{body}</SmartLink> : body}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/** Text beside media; `flip` puts the media on the left from lg. */
+export function Split({
+  media, children, flip = false, className,
+}: { media: ReactNode; children: ReactNode; flip?: boolean; className?: string }) {
+  return (
+    <div className={cx("grid items-center gap-10 lg:grid-cols-2 lg:gap-16", className)}>
+      <div className={cx("min-w-0", flip && "lg:order-2")}>{children}</div>
+      <div className={cx("min-w-0", flip && "lg:order-1")}>{media}</div>
+    </div>
+  );
+}
+
+/** Numbered steps on a line: horizontal from md, vertical on phones. A
+ *  hairline joins each number to the next. */
+export function Steps({ steps, className }: { steps: { title: ReactNode; body: ReactNode }[]; className?: string }) {
+  return (
+    <ol className={cx("grid gap-10 md:grid-flow-col md:auto-cols-fr md:gap-6", className)}>
+      {steps.map((s, i) => (
+        <li
+          key={i}
+          className={cx(
+            "reveal relative flex gap-5 md:flex-col md:gap-0",
+            i < steps.length - 1 &&
+              "before:absolute before:left-5 before:top-12 before:-bottom-8 before:w-px before:bg-border md:before:bottom-auto md:before:left-14 md:before:right-2 md:before:top-5 md:before:h-px md:before:w-auto",
+          )}
+        >
+          <span className="relative grid h-10 w-10 shrink-0 place-items-center rounded-pill border border-accent font-mono text-sm font-bold text-accent">
+            {String(i + 1).padStart(2, "0")}
+          </span>
+          <div className="min-w-0 md:mt-6 md:pr-4">
+            <h3 className="h-card">{s.title}</h3>
+            <div className="mt-2 text-sm leading-relaxed text-text-dim">{s.body}</div>
+          </div>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/** A full-width row in a list (docs, guides): number, title, text, arrow. */
+export function ListRow({ n, href, title, body }: { n?: ReactNode; href: string; title: ReactNode; body: ReactNode }) {
+  return (
+    <li className="border-b border-border first:border-t">
+      <SmartLink href={href} className="group flex items-baseline gap-4 py-6 sm:gap-8">
+        <span className="w-8 shrink-0 font-mono text-sm font-bold text-accent">{n}</span>
+        <span className="grid min-w-0 flex-1 gap-1 md:grid-cols-[16rem_minmax(0,1fr)] md:gap-8">
+          <span className="h-card group-hover:text-primary">{title}</span>
+          <span className="text-sm leading-relaxed text-text-dim">{body}</span>
+        </span>
+        <span aria-hidden="true" className="shrink-0 text-accent transition-transform group-hover:translate-x-1">→</span>
+      </SmartLink>
+    </li>
+  );
+}
+
+/** A 320×240 badge screen (or a video frame) in a black PCB-coloured bezel. */
+export function Screen({
+  src, alt, caption, className,
+}: { src: string; alt: string; caption?: ReactNode; className?: string }) {
+  return (
+    <figure className={cx("min-w-0", className)}>
+      <div className="rounded-[1.25rem] bg-[#141414] p-3 sm:p-4">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={src} alt={alt} width={640} height={480} loading="lazy" decoding="async"
+             className="aspect-[4/3] h-auto w-full rounded-md [image-rendering:pixelated]" />
+      </div>
+      {caption && <figcaption className="mt-3 text-xs leading-relaxed text-muted">{caption}</figcaption>}
+    </figure>
   );
 }
 

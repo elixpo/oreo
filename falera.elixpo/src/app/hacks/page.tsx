@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ExternalLink, Github } from "lucide-react";
-import { Card, NextStep, PageHeader, Section } from "@/components/ui";
+import { NextStep, PageHeader, Section } from "@/components/ui";
 import { HACKS, hackUrl } from "@/data/hacks";
 import { GITHUB as REPO } from "@/lib/links";
 
@@ -15,16 +15,16 @@ export default function HacksPage() {
 
       <Section id="hacks">
         <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {HACKS.map((h) => {
+          {HACKS.map((h, i) => {
             const url = hackUrl(h);
             const external = /^https?:/.test(url);
             return (
-              <li key={h.slug} className="card-link group relative flex flex-col p-6">
+              <li key={h.slug} className={`card-link group relative flex flex-col p-6 ${i === 0 ? "sm:col-span-2 lg:row-span-2 lg:p-8" : ""}`}>
                 <p className="flex items-center gap-3">
                   <span className="label text-primary">{h.difficulty}</span>
                   <span className="label">{h.mins < 60 ? `${h.mins} min` : `${Math.round(h.mins / 60)} h`}</span>
                 </p>
-                <h2 className="h-card mt-3">
+                <h2 className={i === 0 ? "mt-4 font-display text-title text-text" : "h-card mt-3"}>
                   {/* The title link covers the whole card (after:inset-0). */}
                   <Link
                     href={url}
@@ -34,7 +34,8 @@ export default function HacksPage() {
                     {h.title}
                   </Link>
                 </h2>
-                <p className="mt-2 text-sm leading-relaxed text-text-dim">{h.body}</p>
+                <p className={i === 0 ? "mt-4 max-w-prose-site leading-relaxed text-text-dim" : "mt-2 text-sm leading-relaxed text-text-dim"}>{h.body}</p>
+                {i === 0 && h.lead && <p className="mt-3 max-w-prose-site text-sm leading-relaxed text-text-dim">{h.lead}</p>}
                 <div className="mt-auto flex items-center justify-between gap-3 pt-6 text-xs">
                   <span className="inline-flex items-center gap-1 font-bold text-primary">
                     {h.doc ? "Try this hack" : "Open"}
@@ -56,9 +57,13 @@ export default function HacksPage() {
           })}
         </ul>
 
-        <Card fill className="mt-10 p-6 sm:p-8">
+
+      </Section>
+
+      <Section id="your-hack" tone="green">
+        <div className="max-w-3xl">
           <p className="eyebrow">Your hack here</p>
-          <h2 className="h-card mt-3">Got an idea for a hack?</h2>
+          <h2 className="h-title mt-3">Got an idea <em>for a hack?</em></h2>
           <p className="mt-2 max-w-prose-site leading-relaxed text-text-dim">
             Propose it, then write it up as one Markdown file in <code className="code">docs/hacks/</code> and
             send a pull request. Once it is merged, it gets its own page here.
@@ -71,7 +76,7 @@ export default function HacksPage() {
               <Github className="h-4 w-4" aria-hidden="true" /> docs/hacks on GitHub
             </a>
           </div>
-        </Card>
+        </div>
       </Section>
 
       <NextStep

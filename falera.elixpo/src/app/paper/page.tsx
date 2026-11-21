@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Card, NextStep, PageHeader, Section, SectionHeader, Stat } from "@/components/ui";
+import { Card, NextStep, NumberBand, PageHeader, Section, SectionHeader } from "@/components/ui";
 import { pageMetadata } from "@/lib/seo";
 
 // Set to the arXiv identifier (e.g. "2610.01234") once the paper is announced;
@@ -101,10 +101,9 @@ export default function PaperPage() {
       </PageHeader>
 
       {/* Headline numbers */}
-      <Section label="Headline numbers" tight>
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-          {HEADLINES.map((h) => <Stat key={h.label} value={h.value} label={h.label} />)}
-        </div>
+      <Section label="Headline numbers" tone="ink">
+        <p className="eyebrow mb-10">Headline numbers</p>
+        <NumberBand items={HEADLINES} />
       </Section>
 
       {/* Abstract + status */}
@@ -167,7 +166,7 @@ export default function PaperPage() {
       </Section>
 
       {/* Results */}
-      <Section id="results">
+      <Section id="results" fill>
         <SectionHeader
           eyebrow="Measured results"
           title={<>Ten independently reset runs <em>per standalone configuration.</em></>}

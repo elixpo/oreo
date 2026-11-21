@@ -11,6 +11,7 @@ export default function ContributePage() {
     <>
     <RepoDoc
       file="CONTRIBUTING.md"
+      childrenTone="green"
       chip="made by humans, with humans"
       title={
         <>

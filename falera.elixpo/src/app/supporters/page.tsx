@@ -19,7 +19,7 @@ export default function SupportersPage() {
         lede="Falera has no investor behind it. The first five boards were paid for out of pocket, and the community is funding the rest. Everyone who chips in is thanked here, by name."
       />
 
-      <Section id="fundraiser">
+      <Section id="fundraiser" tone="ink">
         <SupportersLive />
       </Section>
 
@@ -43,7 +43,7 @@ export default function SupportersPage() {
         <PressStrip />
       </Section>
 
-      <Section id="sponsors" fill>
+      <Section id="sponsors" tone="red">
         <div className="grid items-end gap-8 lg:grid-cols-[minmax(0,1fr)_auto]">
           <SectionHeader
             eyebrow="Sponsors"

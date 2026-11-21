@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Card, NextStep, PageHeader, Section, SectionHeader } from "@/components/ui";
+import { Card, NextStep, PageHeader, Screen, Section, SectionHeader, Steps } from "@/components/ui";
 import { GITHUB } from "@/lib/links";
 
 const STEPS = [
@@ -32,39 +32,45 @@ export default function GetStartedPage() {
       />
 
       <Section id="steps">
-        <ol className="grid gap-4">
-          {STEPS.map((s) => (
-            <li key={s.n} className="card flex flex-col gap-3 p-6 sm:flex-row sm:gap-8 sm:p-8">
-              <span className="w-12 shrink-0 font-mono text-xl font-bold text-primary">{s.n}</span>
-              <div className="max-w-prose-site">
-                <h2 className="h-card">{s.t}</h2>
-                <p className="mt-2 leading-relaxed text-text-dim">{withCode(s.b)}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
+        <Steps steps={STEPS.map((st) => ({ title: st.t, body: <p>{withCode(st.b)}</p> }))} />
       </Section>
 
-      <Section id="next">
-        <SectionHeader eyebrow="Go further" title={<>Guides for <em>after the first boot.</em></>} />
-        <div className="mt-10 grid gap-4 sm:grid-cols-3">
-          {MORE.map((m) => (
-            <Card key={m.title} href={m.href} className="p-6">
-              <p className="h-card group-hover:text-primary">{m.title}</p>
-              <p className="mt-2 text-sm leading-relaxed text-text-dim">{m.body}</p>
-            </Card>
-          ))}
+      <Section id="first-boot" tone="green">
+        <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)] lg:gap-16">
+          <div>
+            <SectionHeader
+              eyebrow="Then"
+              title={<>Tap A, <em>and the home screen comes up.</em></>}
+              lede="From there the falera CLI does the rest over the same cable: Wi-Fi, your profile, apps and FaleraOS updates."
+            />
+            <div className="mt-10 grid gap-4 sm:grid-cols-3">
+              {MORE.map((m) => (
+                <Card key={m.title} href={m.href} className="p-5">
+                  <p className="h-card group-hover:text-primary">{m.title}</p>
+                  <p className="mt-2 text-sm leading-relaxed text-text-dim">{m.body}</p>
+                </Card>
+              ))}
+            </div>
+          </div>
+          <Screen
+            src="/screens/home.webp"
+            alt="The FaleraOS home screen on the badge: the time, 11:06, and the date, Sat 21 Nov 2026"
+            caption="The FaleraOS home screen."
+            className="mx-auto w-full max-w-md"
+          />
         </div>
+      </Section>
 
-        <Card fill className="mt-10 p-6 sm:p-8">
+      <Section id="help" tone="red" tight>
+        <div className="max-w-3xl">
           <p className="eyebrow">Need help?</p>
-          <p className="mt-3 max-w-3xl leading-relaxed text-text-dim">
-            Run <code className="code">falera doctor</code> first: it checks the cable, port, permissions and
+          <p className="mt-3 leading-relaxed text-text-body">
+            Run <code className="code bg-card">falera doctor</code> first: it checks the cable, port, permissions and
             firmware and ends with next steps (see{" "}
             <Link href="/docs/cli/#troubleshooting" className="link">troubleshooting</Link>). Still stuck? Open an
-            issue with its output and the console log from <code className="code">falera logs --restart</code>.
+            issue with its output and the console log from <code className="code bg-card">falera logs --restart</code>.
           </p>
-        </Card>
+        </div>
       </Section>
 
       <NextStep

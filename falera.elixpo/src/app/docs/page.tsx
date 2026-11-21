@@ -1,4 +1,4 @@
-import { Card, NextStep, PageHeader, Section, SectionHeader } from "@/components/ui";
+import { ListRow, NextStep, PageHeader, Section, SectionHeader } from "@/components/ui";
 import { pageMetadata } from "@/lib/seo";
 
 export const metadata = pageMetadata({
@@ -44,17 +44,6 @@ const docs = [
 const guides = docs.filter((d) => !d.href.includes("video") && d.href !== "/paper/");
 const deep = docs.filter((d) => d.href.includes("video") || d.href === "/paper/");
 
-function DocCard({ doc, n }: { doc: (typeof docs)[number]; n: number }) {
-  return (
-    <Card href={doc.href} className="flex h-full flex-col p-6 sm:p-7">
-      <span className="font-mono text-sm font-bold text-primary">{String(n).padStart(2, "0")}</span>
-      <h3 className="h-card mt-4 group-hover:text-primary">{doc.title}</h3>
-      <p className="mt-2 flex-1 text-sm leading-relaxed text-text-dim">{doc.description}</p>
-      <span className="link-onward mt-6">Read <span aria-hidden="true">→</span></span>
-    </Card>
-  );
-}
-
 export default function DocsPage() {
   return (
     <>
@@ -66,16 +55,20 @@ export default function DocsPage() {
 
       <Section id="guides">
         <SectionHeader eyebrow="Developer guides" title={<>Use the badge <em>from your computer.</em></>} />
-        <div className="mt-10 grid gap-4 md:grid-cols-2">
-          {guides.map((doc, i) => <DocCard key={doc.href} doc={doc} n={i + 1} />)}
-        </div>
+        <ul className="mt-10">
+          {guides.map((doc, i) => (
+            <ListRow key={doc.href} n={String(i + 1).padStart(2, "0")} href={doc.href} title={doc.title} body={doc.description} />
+          ))}
+        </ul>
       </Section>
 
-      <Section id="deep-dives">
+      <Section id="deep-dives" fill>
         <SectionHeader eyebrow="Engineering deep dives" title={<>How the video <em>path works.</em></>} />
-        <div className="mt-10 grid gap-4 md:grid-cols-2">
-          {deep.map((doc, i) => <DocCard key={doc.href} doc={doc} n={guides.length + i + 1} />)}
-        </div>
+        <ul className="mt-10">
+          {deep.map((doc, i) => (
+            <ListRow key={doc.href} n={String(guides.length + i + 1).padStart(2, "0")} href={doc.href} title={doc.title} body={doc.description} />
+          ))}
+        </ul>
       </Section>
 
       <NextStep

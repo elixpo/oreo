@@ -34,6 +34,9 @@
   --background: var(--paper);
   --foreground: var(--ink);
 
+  /* The accent of the current section tone; sections override it. */
+  --accent: var(--red);
+
   /* Header height, for sticky offsets and anchor scrolling. */
   --header-h: 4rem;
 }
@@ -128,14 +131,38 @@ h1 em, h2 em, h3 em, .font-display em {
   }
   .section + .section { @apply border-t border-border; }
   .section-tight { @apply py-10 sm:py-12 lg:py-14; }
-  .section-fill { @apply bg-card-sub; }
+
+  /* Section tones (Section's `tone` prop). One strong tone per page at
+     most: `ink` is the dark panda moment, `red` a callout, `green` Lumi
+     and bamboo. Each sets --accent so labels, numbers and links keep AA
+     contrast on it. A toned section has no hairline on top. */
+  .section-fill  { @apply bg-card-sub; }
+  .section-red   { @apply bg-red-tint; --accent: #A92F39; }
+  .section-green { @apply bg-green-tint; --accent: #0B623C; }
+  .section-ink   { @apply bg-ink text-white; --accent: #F4A0A6; color-scheme: dark; }
+  .section-fill, .section-red, .section-green, .section-ink { border-top-color: transparent !important; }
+  .section-red + .section, .section-green + .section, .section-ink + .section,
+  .section-fill + .section { border-top-color: transparent; }
+
+  /* On ink, the light-page utilities flip. */
+  .section-ink :is(.text-text, .h-title, .h-card, .h-display) { color: #FFFFFF; }
+  .section-ink :is(.text-text-dim, .lede, .text-text-body) { color: rgb(255 255 255 / 0.78); }
+  .section-ink :is(.text-muted, .label) { color: #AEB8B1; }
+  .section-ink :is(.card, .card-fill, .card-link) { background: #1C2B22; border-color: rgb(255 255 255 / 0.14); }
+  .section-ink .card-link:hover { border-color: rgb(255 255 255 / 0.5); }
+  .section-ink .border-border { border-color: rgb(255 255 255 / 0.14); }
+  .section-ink .btn-primary { @apply border-white bg-white text-ink hover:bg-white/85; }
+  .section-ink .btn-ghost { @apply border-white/60 text-white hover:border-white hover:bg-white/10; }
+  .section-ink .link { @apply text-white decoration-white/40 hover:decoration-[#F4A0A6]; }
+  .section-ink .code { background: rgb(255 255 255 / 0.1); color: #fff; }
+  .section-red .card-fill, .section-green .card-fill { @apply bg-card; }
 
   /* Page top: the space between the header and a page's h1. */
   .page-top { @apply pt-12 sm:pt-16 lg:pt-20; }
 
   /* Small uppercase monospace label in red, with letter-spacing. */
   .eyebrow {
-    @apply font-mono text-[0.7rem] font-bold uppercase leading-snug tracking-[0.19em] text-primary;
+    @apply font-mono text-[0.7rem] font-bold uppercase leading-snug tracking-[0.19em] text-accent;
   }
   /* The same label in grey, for card keys and table heads. */
   .label {
@@ -156,7 +183,7 @@ h1 em, h2 em, h3 em, .font-display em {
     @apply rounded-card border border-border bg-card-sub;
   }
   .card-link {
-    @apply rounded-card border border-border bg-card transition-colors hover:border-text/50;
+    @apply rounded-card border border-border bg-card transition-[border-color,transform] duration-200 hover:border-text/50;
   }
 
   /* Buttons. Primary is ink, accent is red (one per page area: "Fund the
@@ -171,7 +198,7 @@ h1 em, h2 em, h3 em, .font-display em {
 
   /* The onward link at the end of a section: one per section. */
   .link-onward {
-    @apply inline-flex items-center gap-2 text-sm font-bold text-primary underline-offset-4 hover:underline;
+    @apply inline-flex items-center gap-2 text-sm font-bold text-accent underline-offset-4 hover:underline;
   }
   /* Inline text links. */
   .link {
@@ -192,4 +219,25 @@ h1 em, h2 em, h3 em, .font-display em {
   .pre {
     @apply overflow-x-auto rounded-inner border border-border bg-card-sub p-4 font-mono text-xs leading-relaxed text-text;
   }
+}
+
+/* ── Small motion, only when the reader allows it ─────────────────────
+ * Linked cards lift 2px on hover (a transform; still no shadow). Elements
+ * with .reveal fade up as they scroll into view, in CSS alone
+ * (scroll-driven animations); browsers without them show the content
+ * as it is. */
+@media (prefers-reduced-motion: no-preference) {
+  .card-link:hover { transform: translateY(-2px); }
+
+  @supports (animation-timeline: view()) {
+    .reveal {
+      animation: reveal-up linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 35%;
+    }
+  }
+}
+@keyframes reveal-up {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: none; }
 }

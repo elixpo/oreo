@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { NextStep, PageHeader, Section, SectionHeader } from "@/components/ui";
+import { NextStep, PageHeader, Section, SectionHeader, Steps } from "@/components/ui";
 import JsonLd from "@/components/JsonLd";
 import Rv565Converter from "@/components/Rv565Converter";
 import { SITE_URL, pageMetadata } from "@/lib/seo";
@@ -85,6 +85,7 @@ export default function ConvertPage() {
       />
 
       <PageHeader
+        tone="red"
         eyebrow="RV565 · free tool · runs in your browser"
         title={<>Video in your display&apos;s <em>own pixels</em>, ready for your microcontroller.</>}
         lede={
@@ -106,20 +107,12 @@ export default function ConvertPage() {
         <Rv565Converter />
       </Section>
 
-      <Section id="steps">
+      <Section id="steps" tone="red">
         <SectionHeader
           eyebrow="From video to screen"
           title={<>Three steps to video <em>on a microcontroller.</em></>}
         />
-        <ol className="mt-10 grid gap-4 md:grid-cols-3">
-          {STEPS.map(([title, body], i) => (
-            <li key={title} className="card flex flex-col p-6">
-              <span className="font-mono text-sm font-bold text-primary">{String(i + 1).padStart(2, "0")}</span>
-              <h3 className="h-card mt-4">{title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-text-dim">{body}</p>
-            </li>
-          ))}
-        </ol>
+        <Steps className="mt-12" steps={STEPS.map(([title, body]) => ({ title, body }))} />
         <div className="mt-10 flex flex-wrap gap-3">
           <a href="https://github.com/elixpo/rv565" target="_blank" rel="noreferrer" className="btn-primary">
             RV565 library on GitHub ↗

@@ -38,6 +38,12 @@ const config: Config = {
         "muted-deep": theme.colors.mutedDeep,
 
         // CSS-variable aliases, kept for the converter and Markdown output.
+        // The accent of the current section tone (red on paper, a lighter
+        // red on ink, deep red on the red tint, green on the green tint).
+        accent:               "var(--accent)",
+        "red-tint":           "#FBE9EA",
+        "green-tint":         "#E5F0E8",
+        ink:                  theme.colors.text,
         background:           "var(--background)",
         foreground:           "var(--foreground)",
       },

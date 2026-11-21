@@ -78,7 +78,7 @@ export default function SupportersLive() {
         {fund ? (
           <>
             <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
-              <p className="font-display text-[2.5rem] font-bold leading-none tracking-[-0.03em] text-primary tabular-nums">
+              <p className="font-display text-[2.5rem] font-bold leading-none tracking-[-0.03em] text-accent tabular-nums">
                 {money(fund.raised, fund.goal.currency)}
                 <span className="ml-2 text-lg font-normal tracking-normal text-text-dim">
                   of {money(fund.goal.amount, fund.goal.currency)}
@@ -91,7 +91,7 @@ export default function SupportersLive() {
             <div className="mt-5 h-3 overflow-hidden rounded-pill border border-border bg-card-sub" role="progressbar"
                  aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}
                  aria-label="Fundraiser progress">
-              <div className="h-full rounded-pill bg-primary"
+              <div className="h-full rounded-pill bg-accent"
                    style={{ width: `${Math.max(pct, fund.raised > 0 ? 2 : 0)}%` }} />
             </div>
             <p className="mt-2 text-sm text-text-dim">{pct}% of the goal</p>
@@ -115,7 +115,7 @@ export default function SupportersLive() {
             <li key={`${s.paid_at}-${i}`} className="card flex flex-col gap-2 p-5">
               <div className="flex items-baseline justify-between gap-3">
                 <p className="font-bold text-text">{s.name || "Anonymous"}</p>
-                <p className="font-mono text-sm text-primary">{money(s.amount, s.currency)}</p>
+                <p className="font-mono text-sm text-accent">{money(s.amount, s.currency)}</p>
               </div>
               {s.message ? <p className="text-sm leading-relaxed text-text-dim">“{s.message}”</p> : null}
               <p className="mt-auto font-mono text-xs text-muted">{when(s.paid_at)}</p>

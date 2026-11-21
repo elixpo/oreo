@@ -3,7 +3,7 @@ import path from "node:path";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Github } from "lucide-react";
-import { PageHeader, Section } from "@/components/ui";
+import { PageHeader, Section, type Tone } from "@/components/ui";
 import { HACK_GUIDES } from "@/data/hacks";
 import { mermaidDrawing } from "@/lib/diagrams";
 import { renderMarkdown, repoLinkResolver } from "@/lib/markdown";
@@ -85,8 +85,10 @@ function SourceCard({ file }: { file: string }) {
 
 export default function RepoDoc({
   file, chip, title, lead, quickLinks = [], related = [], children,
-  bodyTitle, aside,
+  bodyTitle, aside, childrenTone = "plain",
 }: {
+  /** The tone of the section holding `children`. */
+  childrenTone?: Tone;
   /** Path in the repository, e.g. "docs/CLI.md" or "CONTRIBUTING.md". */
   file: string;
   /** The eyebrow above the title. */
@@ -124,7 +126,7 @@ export default function RepoDoc({
         </a>
       </PageHeader>
 
-      {children && <Section>{children}</Section>}
+      {children && <Section tone={childrenTone}>{children}</Section>}
 
       <Section>
         {bodyTitle && <h2 className="h-title mb-10">{bodyTitle}</h2>}

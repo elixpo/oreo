@@ -1,7 +1,8 @@
 import Link from "next/link";
 import AppCard from "@/components/AppCard";
 import { FUND_URL } from "@/lib/links";
-import { Card, Eyebrow, Fact, Onward, Section, SectionHeader, Stat } from "@/components/ui";
+import { AppIcon } from "@/components/AppCard";
+import { Card, Eyebrow, NumberBand, Onward, Screen, Section, SectionHeader, Split, Stat, Steps } from "@/components/ui";
 import { PRELOADED, STORE } from "@/data/apps";
 
 /* The home page tells one story, top to bottom: what Falera is, the proof,
@@ -11,8 +12,8 @@ import { PRELOADED, STORE } from "@/data/apps";
 const PROOF = [
   { value: "57", label: "FaleraOS releases since May 2026", href: "https://github.com/elixpo/falera/tags" },
   { value: "20", label: "apps: 10 built in, 10 in the App Store", href: "/apps/" },
-  { value: <span className="font-mono text-[0.85em]">IN000107</span>, label: "OSHWA-certified open source hardware", href: "https://certification.oshwa.org/in000107.html" },
-  { value: <span className="font-mono text-[0.85em]">303a:83ec</span>, label: "its own USB ID, assigned by Espressif", href: "https://github.com/espressif/usb-pids/pull/425" },
+  { value: <span className="font-mono text-[0.68em]">IN000107</span>, label: "OSHWA-certified open source hardware", href: "https://certification.oshwa.org/in000107.html" },
+  { value: <span className="font-mono text-[0.68em]">303a:83ec</span>, label: "its own USB ID, assigned by Espressif", href: "https://github.com/espressif/usb-pids/pull/425" },
   { value: "Adafruit", label: "covered FaleraOS and RV565 on its blog", href: "https://blog.adafruit.com/2026/11/04/oreoos-a-micropython-based-operating-system/" },
 ];
 
@@ -23,9 +24,11 @@ const SPECS: [string, string][] = [
   ["Power", "LiPo with USB-C charging"],
 ];
 
+const STORE_APP = PRELOADED.find((a) => a.slug === "store")!;
 const SHOWCASE = [
-  ...PRELOADED.filter((a) => ["store", "gallery", "reader"].includes(a.slug)),
-  ...STORE.filter((a) => ["Lumi", "snake", "quest"].includes(a.slug)),
+  ...PRELOADED.filter((a) => ["gallery"].includes(a.slug)),
+  ...STORE.filter((a) => ["quest"].includes(a.slug)),
+  ...STORE.filter((a) => ["Lumi", "snake"].includes(a.slug)),
 ];
 
 const BUILD = [
@@ -74,125 +77,174 @@ export default function Home() {
         </div>
       </div>
 
-      {/* 2 · Proof */}
-      <Section label="Proof" tight>
-        <ul className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-5 [&>li:first-child]:col-span-2 lg:[&>li:first-child]:col-span-1">
-          {PROOF.map((p) => (
-            <li key={p.label} className="min-w-0">
-              <Stat value={p.value} label={p.label} href={p.href} className="h-full" />
-            </li>
-          ))}
-        </ul>
+      {/* 2 · Proof: the one dark band on the page */}
+      <Section label="Proof" tone="ink">
+        <p className="eyebrow mb-10">The record so far</p>
+        <NumberBand items={PROOF} />
       </Section>
 
-      {/* 3 · The badge */}
+      {/* 3 · The badge: image left, text right */}
       <Section id="badge">
-        <div className="grid items-center gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)] lg:gap-16">
-          <div>
-            <SectionHeader
-              eyebrow="The badge"
-              title={<>The hardware, <em>all open.</em></>}
-              lede="A 2.8″ touch screen, eight buttons, IR for line-of-sight quests, a motion sensor for shake and tilt, and a speaker, on a 4-layer board. The KiCad design, the bill of materials and the build notes are in the repo, so you can fork them and make your own."
-            />
-            <div className="mt-10 grid gap-3 sm:grid-cols-2 sm:gap-4">
-              {SPECS.map(([k, v]) => <Fact key={k} k={k}>{v}</Fact>)}
-            </div>
-            <Onward href="/badge/">See the board in 3D</Onward>
-          </div>
-          <figure className="card-fill mx-auto w-full max-w-sm p-6 sm:p-8 lg:max-w-none">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/pcb_back_card.webp"
-              alt="Back of the Falera Badge PCB, a KiCad render: the ESP32-S3 module, the OSHW mark, the microSD slot and USB-C"
-              width={808}
-              height={1218}
-              loading="lazy"
-              decoding="async"
-              className="mx-auto h-auto max-h-[22rem] w-auto sm:max-h-[34rem]"
-            />
-          </figure>
-        </div>
+        <Split
+          flip
+          media={
+            <figure className="card-fill mx-auto w-full max-w-sm p-6 sm:p-8 lg:max-w-md">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/pcb_back_card.webp"
+                alt="Back of the Falera Badge PCB, a KiCad render: the ESP32-S3 module, the OSHW mark, the microSD slot and USB-C"
+                width={808}
+                height={1218}
+                loading="lazy"
+                decoding="async"
+                className="mx-auto h-auto max-h-[22rem] w-auto sm:max-h-[32rem]"
+              />
+            </figure>
+          }
+        >
+          <SectionHeader
+            eyebrow="The badge"
+            title={<>The hardware, <em>all open.</em></>}
+            lede="A 2.8″ touch screen, eight buttons, IR for line-of-sight quests, a motion sensor for shake and tilt, and a speaker, on a 4-layer board. The KiCad design, the bill of materials and the build notes are in the repo, so you can fork them and make your own."
+          />
+          <dl className="mt-10 border-t border-border">
+            {SPECS.map(([k, v]) => (
+              <div key={k} className="grid grid-cols-[6rem_minmax(0,1fr)] gap-4 border-b border-border py-3.5">
+                <dt className="label pt-0.5">{k}</dt>
+                <dd className="text-[0.95rem] text-text">{v}</dd>
+              </div>
+            ))}
+          </dl>
+          <Onward href="/badge/">See the board in 3D</Onward>
+        </Split>
       </Section>
 
-      {/* 4 · Apps and the App Store */}
-      <Section id="apps">
+      {/* 4 · Apps and the App Store: Lumi green, a bento of apps */}
+      <Section id="apps" tone="green">
         <SectionHeader
           eyebrow="Apps and the App Store"
           title={<>Everything that ships, <em>and everything that streams in.</em></>}
           lede="Ten apps come on every badge. The on-device App Store installs ten more from GitHub at runtime: no laptop, no recompile."
         />
-        <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {SHOWCASE.map((app) => <AppCard key={app.slug} app={app} />)}
+        <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Link
+            href={`/apps/${STORE_APP.urlSlug}/`}
+            className="card-link group flex flex-col gap-6 p-6 sm:col-span-2 lg:row-span-2"
+          >
+            <Screen src="/screens/store.webp" alt="The App Store on the badge's screen, listing Patakha, Racer, Flappy Lumi and Snake with Install buttons" />
+            <span>
+              <span className="label text-accent">Built in</span>
+              <span className="mt-2 block font-display text-2xl leading-tight text-text group-hover:text-primary">{STORE_APP.name}</span>
+              <span className="mt-2 block text-sm leading-relaxed text-text-dim">{STORE_APP.blurb}</span>
+            </span>
+          </Link>
+          {SHOWCASE.map((app) => (
+            <Link key={app.slug} href={`/apps/${app.urlSlug}/`} className="card-link group flex flex-col gap-4 p-5">
+              <AppIcon app={app} />
+              <span>
+                <span className="block font-bold text-text group-hover:text-primary">{app.name}</span>
+                <span className="mt-1 block text-sm leading-snug text-text-dim">{app.blurb}</span>
+              </span>
+            </Link>
+          ))}
         </div>
         <Onward href="/apps/">See all 20 apps</Onward>
       </Section>
 
-      {/* 5 · Build for it */}
-      <Section id="build" fill>
+      {/* A press line */}
+      <Section label="In the press" tight>
+        <figure className="mx-auto max-w-4xl text-center">
+          <blockquote className="font-serif text-[clamp(1.5rem,1.1rem+1.8vw,2.5rem)] italic leading-snug text-text">
+            “OreoOS, a MicroPython-based operating system”
+          </blockquote>
+          <figcaption className="label mt-5">
+            <a href="https://blog.adafruit.com/2026/11/04/oreoos-a-micropython-based-operating-system/" target="_blank" rel="noreferrer" className="hover:text-primary">
+              Adafruit blog, 4 Nov 2026 <span aria-hidden="true">↗</span>
+            </a>
+            <span className="mx-2" aria-hidden="true">·</span>FaleraOS was called OreoOS until November 2026
+          </figcaption>
+        </figure>
+      </Section>
+
+      {/* 5 · Build for it: steps on a line */}
+      <Section id="build">
         <SectionHeader
           eyebrow="Build for it"
           title={<>Build your own apps. <em>It&apos;s a manifest and a main.py.</em></>}
           lede={<>Apps are plain Python packages that FaleraOS loads at runtime. Fork the repo, drop your app in <code className="code">apps_market/</code> and open a pull request: the next person to refresh the store will see it.</>}
         />
-        <ol className="mt-10 grid gap-4 md:grid-cols-3">
-          {BUILD.map((b) => (
-            <li key={b.n}>
-              <Card href={b.href} className="flex h-full flex-col p-6">
-                <span className="font-mono text-sm font-bold text-primary">{b.n}</span>
-                <span className="h-card mt-4 block group-hover:text-primary">{b.title}</span>
-                <span className="mt-2 block text-sm leading-relaxed text-text-dim">{b.body}</span>
-              </Card>
-            </li>
-          ))}
-        </ol>
+        <Steps
+          className="mt-12"
+          steps={BUILD.map((b) => ({
+            title: <Link href={b.href} className="hover:text-primary">{b.title} <span aria-hidden="true" className="text-accent">→</span></Link>,
+            body: b.body,
+          }))}
+        />
         <Onward href="/docs/">Read the docs</Onward>
       </Section>
 
-      {/* 6 · RV565 */}
-      <Section id="rv565">
-        <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-16">
-          <div>
-            <SectionHeader
-              eyebrow="RV565 video"
-              title={<>Video, <em>built for the hardware.</em></>}
-              lede="RV565 is Elixpo's frame-independent video format for microcontroller displays: frames decode straight to the panel's own pixels. It plays the Gallery's videos on the badge, and ships for Arduino, ESP-IDF and Python."
+      {/* 6 · RV565: the red area, with a video frame */}
+      <Section id="rv565" tone="red">
+        <Split
+          media={
+            <Screen
+              src="/screens/bbb-frame.webp"
+              alt="A frame of Big Buck Bunny as RV565 plays it: the big white rabbit in a green meadow"
+              caption="Big Buck Bunny (CC BY 3.0, Blender Foundation), the paper's test film."
+              className="mx-auto w-full max-w-lg"
             />
-            <Onward href="/rv565/">Explore RV565</Onward>
-          </div>
-          <div className="grid grid-cols-2 content-start gap-3 sm:gap-4">
-            <Stat value="24 FPS" label="on ESP32-S3 with zero missed deadlines, dual-core" />
-            <Stat value="98.1%" label="of the 40 MHz SPI wire-time bound" />
+          }
+        >
+          <SectionHeader
+            eyebrow="RV565 video"
+            title={<>Video, <em>built for the hardware.</em></>}
+            lede="RV565 is Elixpo's frame-independent video format for microcontroller displays: frames decode straight to the panel's own pixels. It plays the Gallery's videos on the badge, and ships for Arduino, ESP-IDF and Python."
+          />
+          <div className="mt-10 grid grid-cols-2 gap-3 sm:gap-4">
+            <Stat value="24 FPS" label="on ESP32-S3, zero missed deadlines" />
             <Stat value="arXiv" label="the paper, 2610.35935 (cs.AR)" href="/paper/" />
-            <Stat value="In-browser" label="converter: MP4 to RV565 or clip.h, no upload" href="/rv565/convert/" />
           </div>
-        </div>
+          <Onward href="/rv565/">Explore RV565</Onward>
+        </Split>
       </Section>
 
       {/* 7 · Support */}
-      <Section id="support" fill>
-        <div className="grid items-start gap-12 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] lg:gap-16">
-          <div>
-            <SectionHeader
-              eyebrow="Support"
-              title={<>The first Falera PCBs <em>are being made now.</em></>}
-              lede="Falera has no investor behind it. The first five boards were paid for out of pocket, and the community is funding the rest. Even ₹10 helps build them, and everyone who chips in is thanked by name."
-            >
-              <div className="mt-8 flex flex-wrap gap-3">
-                <a href={FUND_URL} target="_blank" rel="noreferrer" className="btn-accent">Fund the badge</a>
+      <Section id="support">
+        <Split
+          flip
+          media={
+            <div className="grid gap-4">
+              <div className="card-fill flex items-center gap-6 p-6">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/lumi-badge.webp" alt="Lumi the panda holding a Falera Badge" width={374} height={384}
+                     loading="lazy" decoding="async" className="h-28 w-auto [image-rendering:pixelated]" />
+                <p className="text-sm leading-relaxed text-text-dim">
+                  Lumi, FaleraOS's panda, lives on the badge: feed her, play, put her to bed. The fundraiser builds the boards she runs on.
+                </p>
               </div>
-            </SectionHeader>
-            <Onward href="/supporters/">Meet our supporters</Onward>
-          </div>
-          <Card className="p-6 sm:p-8">
-            <p className="eyebrow">Sponsors</p>
-            <p className="h-card mt-3">Become a founding sponsor</p>
-            <p className="mt-2 text-sm leading-relaxed text-text-dim">
-              Hardware makers, chip companies and developer-tool teams: help take Falera from five
-              hand-built boards to a factory batch. Write to{" "}
-              <span className="select-all font-mono text-text">hello@elixpo.com</span>.
-            </p>
-          </Card>
-        </div>
+              <Card className="p-6 sm:p-8">
+                <p className="eyebrow">Sponsors</p>
+                <p className="h-card mt-3">Become a founding sponsor</p>
+                <p className="mt-2 text-sm leading-relaxed text-text-dim">
+                  Hardware makers, chip companies and developer-tool teams: help take Falera from five
+                  hand-built boards to a factory batch. Write to{" "}
+                  <span className="select-all font-mono text-text">hello@elixpo.com</span>.
+                </p>
+              </Card>
+            </div>
+          }
+        >
+          <SectionHeader
+            eyebrow="Support"
+            title={<>The first Falera PCBs <em>are being made now.</em></>}
+            lede="Falera has no investor behind it. The first five boards were paid for out of pocket, and the community is funding the rest. Even ₹10 helps build them, and everyone who chips in is thanked by name."
+          >
+            <div className="mt-8 flex flex-wrap gap-3">
+              <a href={FUND_URL} target="_blank" rel="noreferrer" className="btn-accent">Fund the badge</a>
+            </div>
+          </SectionHeader>
+          <Onward href="/supporters/">Meet our supporters</Onward>
+        </Split>
       </Section>
     </>
   );

@@ -26,6 +26,10 @@ const STACK = [
   { lvl: "MicroPython", body: "Runtime — we credit it loudly; we did not write it." },
 ];
 
+// Flat tints, top to bottom: the app layer in red, the OS white, the
+// drivers green, the runtime grey.
+const LAYER_TINT = ["bg-red-tint", "bg-card", "bg-green-tint", "bg-card-sub"];
+
 export default function BadgePage() {
   return (
     <>
@@ -56,7 +60,8 @@ export default function BadgePage() {
       </PageHeader>
 
       {/* The board, with the specs around it. */}
-      <Section label="The board in 3D">
+      <Section label="The board in 3D" tone="ink">
+        <p className="eyebrow mb-8">PCB v1 · drag to turn it</p>
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-center">
           <figure className="card-fill overflow-hidden">
             {/* Fixed height, so the page does not shift while the model loads. */}
@@ -64,7 +69,7 @@ export default function BadgePage() {
               <BoardViewerLazy />
             </div>
             <figcaption className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1
-                                   border-t border-border bg-card px-4 py-3 text-xs text-muted">
+                                   border-t border-border px-4 py-3 text-xs text-muted">
               <span className="font-mono uppercase tracking-[0.12em]">PCB v1 · black mask, white silkscreen, HASL</span>
               <span>
                 Flat renders:{" "}
@@ -86,20 +91,27 @@ export default function BadgePage() {
       </Section>
 
       <Section id="architecture">
-        <SectionHeader
-          eyebrow="Software stack"
-          title={<>Layered <em>architecture.</em></>}
-          lede="Four layers, each can be rewritten without the others noticing."
-        />
-        <ol className="mt-10 grid gap-3">
-          {STACK.map((row, i) => (
-            <li key={row.lvl} className="card flex flex-col gap-2 p-5 sm:flex-row sm:items-baseline sm:gap-6">
-              <span className="w-10 shrink-0 font-mono text-sm font-bold text-primary">L{STACK.length - i}</span>
-              <code className="w-36 shrink-0 font-mono text-base font-bold text-text">{row.lvl}</code>
-              <span className="text-sm leading-relaxed text-text-dim">{row.body}</span>
-            </li>
-          ))}
-        </ol>
+        <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-16">
+          <SectionHeader
+            eyebrow="Software stack"
+            title={<>Layered <em>architecture.</em></>}
+            lede="Four layers, each can be rewritten without the others noticing."
+          />
+          {/* Drawn as a stack: apps on top, MicroPython at the bottom. */}
+          <ol className="grid gap-2">
+            {STACK.map((row, i) => (
+              <li
+                key={row.lvl}
+                className={`reveal flex flex-col gap-1 rounded-card border border-border p-5 sm:flex-row sm:items-baseline sm:gap-6 ${LAYER_TINT[i]}`}
+                style={{ marginInline: `${i * 0.75}rem` }}
+              >
+                <span className="w-8 shrink-0 font-mono text-sm font-bold text-primary-dim">L{STACK.length - i}</span>
+                <code className="w-32 shrink-0 font-mono text-base font-bold text-text">{row.lvl}</code>
+                <span className="text-sm leading-relaxed text-text-dim">{row.body}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
 
         <Card fill className="mt-10 p-6 sm:p-8">
           <p className="eyebrow">Made by</p>
