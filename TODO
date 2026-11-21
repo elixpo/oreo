@@ -1,4 +1,4 @@
-RV565 / Oreo Badge: full tracker (updated 2026-11-11)
+RV565 / Oreo Badge: full tracker (updated 2026-11-18)
 Legend: [you] = Ayushman, [claude] = Claude, [wait] = waiting on someone else
 
 == GOAL NOW: CircuitPython + stable oreo-cli + release, so the badge is easy to use ==
@@ -36,6 +36,57 @@ Not done yet (from the agents' lists):
   - CLI side of the profile (oreo setup); app dev loop (oreo new / oreo app install); crash traceback in launcher; unloading app modules
   - Transfer entry in the interactive `oreo` menu; App Store icon downloads still block a frame; header Wi-Fi bars don't show "retrying"
   - CircuitPython: Community Bundle submission after hardware test; Sphinx build not verified
+
+== 0. SPONSORSHIP AND THE PCB BUILD (2026-11-18) ==
+Drafts: ~/Documents/oreo-launch/EMAILS_NOW.md (send now) and LAUNCH_KIT.md (later ones).
+Proof to cite: README "In the press" (github.com/elixpo/oreo#-in-the-press) and oreo.elixpo.com/supporters/.
+Attach to every email: circuit/elixpo/renders/top-angle.jpg + oreo.elixpo/public/photo_portrait.jpg.
+Always write "OreoOS by Elixpo" or "the Oreo Badge", never just "Oreo".
+
+Send now:
+[you] 1. PCBWay sponsorship, to sponsor@pcbway.com: ask them to fabricate and assemble the next 20 badges.
+         Only offer the silkscreen credit if PCBWay's logo goes on the next board revision.
+[you] 2. Seeed Co-Create, to fusion@seeed.io: does an ESP32-S3-WROOM badge qualify, or must it use a XIAO ESP32-S3?
+[you] 3. JLCPCB Brand Advocate: apply on JLCPCB's help page (text in EMAILS_NOW.md section 3).
+[you] 4. LinkedIn post, scheduled 2026-11-19 09:30 IST. Links in the first comment; tag the team;
+         ask the team to comment in the first 30 minutes; reply to every comment in the first hour.
+[you] 5. Send the team message with the fundraiser QR (payouts.elixpo.com/f/oreo-badge, goal Rs 8,000).
+[you] 6. Google Search Console + Bing Webmaster: verify oreo.elixpo.com, submit /sitemap.xml;
+         check the home page in Google's Rich Results Test.
+[you] 7. Wikidata Q141968869: add official website (oreo.elixpo.com), "different from" (P1889) Android 8.0 Oreo
+         and the Oreo cookie, and the Adafruit posts as "described by source".
+Send now, batch 2 (drafts: ~/Documents/oreo-launch/EMAILS_BATCH2.md; sources and eligibility: SPONSORS.md):
+[you] 8. NextPCB Accelerator: first ask support@nextpcb.com whether the current campaign covers ESP32-S3,
+         then fill the form (2 free assembled boards, up to $500, plus testing of 10 units).
+[you] 9. Elecrow Sponsorship: make an account, fill the questionnaire (PCBA for 10 badges; replies in ~48 h).
+[you] 10. AISLER: email developer-relations@aisler.net (bare boards for board revision 2).
+[you] 11. Espressif sponsorship form: modules for a PLANNED badge workshop; name a real event and date first.
+[you] 12. IIM Calcutta Innovation Park: email contact@iimcip.org (incubation; help with NIDHI-PRAYAS).
+Grant applications (send after deciding the rename; they keep the name you apply under):
+[you] 13. FOSS United project grant (fossunited.org/grants/apply/new): draft asks Rs 3,00,000 over 4 months
+          with 4 milestones; check the budget against real costs first.
+[you] 14. NIDHI-PRAYAS: find a PRAYAS Centre near West Bengal with an open call; adapt the concept note.
+Later: TI samples (needs a company-domain email, e.g. @elixpo.com), Tindie / Elecrow Partner Seller / Lectronz,
+       IndiaFOSS 2027 and FOSSASIA 2027 as the event badge. Skip: students-only programmes, SparkFun (paused),
+       Sovereign Tech Fund, Prototype Fund, OSHWA funding.
+[you] Decide on the rename (trademark risk with OREO, SEO); Claude checks shortlisted names' availability.
+[claude] When a sponsor replies, draft the answer.
+
+Send when a badge works on video (record 60 s: boot, apps, App Store, IR, video):
+[you] Hackaday: Hackaday.io project page + build logs now; tip to tips@hackaday.com with the video (LAUNCH_KIT.md section 3).
+[you] Note to GitHub about the Universe badge inspiration (LAUNCH_KIT.md section 5).
+[you] Reply on the PCBWay and Seeed threads with photos and the video.
+[later] Crowd Supply, after the founder badges sell (Rs 4,999 founder price, then Rs 5,999).
+
+PCB build:
+[wait] JLCPCB order Y3-14135204A: 5 boards, in production, estimated finish 2026-11-20; then about a week to ship.
+[wait] LCSC parts: $43.24, SingPost, 20-35 business days.
+[you]  Buy: 2.8" ILI9341 touch module (Rs 629), MPU-6050 (Rs 426), LiPo (Rs 300), M3 x 11 mm standoffs + M3 x 5 / M2 x 6 screws.
+[you]  Test PR #180 (OreoOS on the PCB, draft) on the BREADBOARD badge before merging: merging ships OTA to every badge.
+       Its checklist covers both boards.
+[claude] Next OS work: touch (XPT2046 on the display's SPI bus, chip select on the expander), then the build and
+         first power-on guide when the parts arrive.
+Cost of one badge: circuit/elixpo/BOM_COST.md (Rs 4,172 +/-2%); pricing kept privately in ~/Documents.
 
 == 1. YOU, NOW ==
 1. [done] FFmpeg: rebased onto newer master and pushed (9db3b9688f, includes the 3 fixes). Now STOP pushing; wait for a maintainer.
@@ -83,6 +134,11 @@ LVGL forum     feature request pending; write lv_rv565 only after they reply
 #116           docs/USB.md (ours): needs the CLI rework (section 2) before merging
 
 == 5. DONE ==
+2026-11-18  Website: More menu (#183), press section + SEO (#182), supporters page with live totals (#181), all deployed
+2026-11-18  README press: Adafruit x2, MA-NO, HardLabs; Espressif USB ID, file(1), CircuitPython bundle, Arduino_GFX, awesome lists
+2026-11-17  Fundraiser live at payouts.elixpo.com/f/oreo-badge (payouts.elixpo#60); linked from README, site, GitHub Sponsor button (#177, #179)
+2026-11-17  PCB ordered: JLCPCB 5 boards $43.87 (#174 removed the order-number mark), LCSC parts $43.24; BOM_ORDER matches (#175)
+2026-11-17  Credits for @anwe-ch on the badge, docs and site (#176); OreoOS PCB support opened as draft #180
 2026-11-11  Adafruit blogged RV565 (not in the newsletter: Python projects only)
 2026-11-10  #121 network/boot/Wi-Fi and #122 oreo CLI merged (main 07ff252, stable/v2.0.5 released)
 2026-11-10  micropython-media#132, Adafruit email, FFmpeg approval + fixes, RPi forum reply, file(1), Kaitai, Arduino_GFX, awesome lists, usb.ids email, LVGL post
@@ -90,5 +146,5 @@ LVGL forum     feature request pending; write lv_rv565 only after they reply
 
 == 6. LATER ==
 - OreoOS v2.1 issues #100-#105
-- PCB fabrication (circuit/elixpo/elixpo.kicad_pcb): unblocks battery features and a real board photo
+- [in progress] PCB fabrication: see section 0.
 - Posts from drafts.md 1-5: Hackaday.io, Arduino forum, Reddit, Espressif forum (cite the Adafruit blog)
